@@ -91,3 +91,8 @@ deploy/online/*.tar.gz
 .claude/
 issues/
 CLAUDE.md
+
+deploy/adobe-relay/data/
+deploy/adobe-relay/postgres_data/
+deploy/adobe-relay/redis_data/
+deploy/adobe-relay/*.tar.gz

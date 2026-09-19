@@ -1,0 +1,56 @@
+name: Deploy Adobe Relay
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: adobe-relay-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build amd64 image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: adobe-relay:${{ github.sha }}
+          build-args: |
+            COMMIT=${{ github.sha }}
+            GOPROXY=https://proxy.golang.org,direct
+            GOSUMDB=sum.golang.org
+            NPM_CONFIG_REGISTRY=https://registry.npmjs.org
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.ALIYUN_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+      - name: Upload and deploy
+        env:
+          DEPLOY_HOST: ${{ secrets.ALIYUN_HOST }}
+          DEPLOY_USER: ${{ secrets.ALIYUN_USER }}
+          IMAGE: adobe-relay:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          ssh -i ~/.ssh/deploy_key "$target" 'mkdir -p /home/admin/adobe-relay/deploy/adobe-relay'
+          scp -i ~/.ssh/deploy_key deploy/adobe-relay/{compose.yml,init_env.py,release.sh,README.md} "$target:/home/admin/adobe-relay/deploy/adobe-relay/"
+          docker save "$IMAGE" | gzip | ssh -i ~/.ssh/deploy_key "$target" 'gunzip | docker load'
+          ssh -i ~/.ssh/deploy_key "$target" "cd /home/admin/adobe-relay && bash deploy/adobe-relay/release.sh '$IMAGE'"
+      - name: Public health check
+        env:
+          DEPLOY_HOST: ${{ secrets.ALIYUN_HOST }}
+        run: curl --fail --retry 6 --retry-delay 5 "http://$DEPLOY_HOST:9500/health"
