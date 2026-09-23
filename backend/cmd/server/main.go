@@ -153,6 +153,11 @@ func runMainServer() {
 		log.Fatalf("Failed to initialize application: %v", err)
 	}
 	defer app.Cleanup()
+	clashCtx, stopClash := context.WithCancel(context.Background())
+	defer stopClash()
+	if app.Clash != nil {
+		go app.Clash.Run(clashCtx)
+	}
 	if app.PluginManager != nil {
 		if err := app.PluginManager.Start(context.Background()); err != nil {
 			log.Printf("Plugin manager started in degraded state: %v", err)

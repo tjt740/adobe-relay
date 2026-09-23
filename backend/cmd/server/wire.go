@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/internal/clash"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
@@ -25,6 +26,7 @@ import (
 )
 
 type Application struct {
+	Clash         *clash.Manager
 	Server        *http.Server
 	PromptAudit   *securityaudit.PromptService
 	PluginManager *service.PluginManager
@@ -33,6 +35,7 @@ type Application struct {
 
 func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	wire.Build(
+		clash.NewManager,
 		// Infrastructure layer ProviderSets
 		config.ProviderSet,
 
@@ -58,7 +61,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 		provideCleanup,
 
 		// Application struct
-		wire.Struct(new(Application), "Server", "PromptAudit", "PluginManager", "Cleanup"),
+		wire.Struct(new(Application), "Server", "PromptAudit", "PluginManager", "Clash", "Cleanup"),
 	)
 	return nil, nil
 }
