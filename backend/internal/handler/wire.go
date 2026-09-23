@@ -272,7 +272,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewKiroOAuthHandler,
 	admin.NewGrokOAuthHandler,
 	admin.NewCNProviderHandler,
-	admin.NewProxyHandler,
+	admin.NewProxyHandlerWithClash,
 	admin.NewRedeemHandler,
 	admin.NewPromoHandler,
 	ProvideAdminSettingHandler,

@@ -9,11 +9,30 @@ concurrency:
   group: adobe-relay-production
   cancel-in-progress: false
 jobs:
-  deploy:
+  build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Check deployment scripts and backend
+        run: |
+          bash -n deploy/clash/release-online.sh
+          python3 -m unittest discover -s deploy/clash -p 'test_*.py'
+          cd backend
+          go test ./internal/clash
+      - name: Check frontend workflows
+        run: |
+          npm install -g pnpm@9.15.9
+          pnpm --dir frontend install --frozen-lockfile --ignore-scripts
+          pnpm --dir frontend exec vitest run src/__tests__/integration/clash-subscription.spec.ts src/views/admin/__tests__/ProxiesView.filters.spec.ts
       - uses: docker/setup-buildx-action@v3
       - name: Build amd64 image
         uses: docker/build-push-action@v6
@@ -29,28 +48,74 @@ jobs:
             NPM_CONFIG_REGISTRY=https://registry.npmjs.org
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Configure SSH
+      - name: Bundle application and Clash runtime
         env:
-          SSH_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
-          KNOWN_HOSTS: ${{ secrets.ALIYUN_KNOWN_HOSTS }}
+          IMAGE: adobe-relay:${{ github.sha }}
         run: |
+          docker pull --platform linux/amd64 metacubex/mihomo:v1.19.31
+          docker save "$IMAGE" metacubex/mihomo:v1.19.31 | gzip > release-images.tar.gz
+          sha256sum release-images.tar.gz > release-images.tar.gz.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-images
+          path: |
+            release-images.tar.gz
+            release-images.tar.gz.sha256
+          retention-days: 1
+          compression-level: 0
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: domestic
+            host: 47.106.176.71
+            ssh_key: DOMESTIC_SSH_KEY
+            known_hosts: DOMESTIC_KNOWN_HOSTS
+            health_url: https://47.106.176.71:6660/health
+          - target: overseas
+            host: 8.212.129.43
+            ssh_key: OVERSEAS_SSH_KEY
+            known_hosts: OVERSEAS_KNOWN_HOSTS
+            health_url: https://8.212.129.43/health
+    name: Deploy ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-images
+      - name: Verify image archive and configure SSH
+        env:
+          SSH_KEY: ${{ secrets[matrix.ssh_key] }}
+          KNOWN_HOSTS: ${{ secrets[matrix.known_hosts] }}
+        run: |
+          set -euo pipefail
+          sha256sum -c release-images.tar.gz.sha256
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
-      - name: Upload and deploy
+      - name: Upload, back up and deploy
         env:
-          DEPLOY_HOST: ${{ secrets.ALIYUN_HOST }}
-          DEPLOY_USER: ${{ secrets.ALIYUN_USER }}
+          DEPLOY_HOST: ${{ matrix.host }}
           IMAGE: adobe-relay:${{ github.sha }}
         run: |
           set -euo pipefail
-          target="$DEPLOY_USER@$DEPLOY_HOST"
-          ssh -i ~/.ssh/deploy_key "$target" 'mkdir -p /home/admin/adobe-relay/deploy/adobe-relay'
-          scp -i ~/.ssh/deploy_key deploy/adobe-relay/{compose.yml,init_env.py,release.sh,README.md} "$target:/home/admin/adobe-relay/deploy/adobe-relay/"
-          docker save "$IMAGE" | gzip | ssh -i ~/.ssh/deploy_key "$target" 'gunzip | docker load'
-          ssh -i ~/.ssh/deploy_key "$target" "cd /home/admin/adobe-relay && bash deploy/adobe-relay/release.sh '$IMAGE'"
-      - name: Public health check
+          target="admin@$DEPLOY_HOST"
+          ssh_opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=20)
+          ssh "${ssh_opts[@]}" "$target" 'mkdir -p /home/admin/sub2api-online/deploy/clash'
+          scp "${ssh_opts[@]}" deploy/clash/{compose.yml,init_env.py,release-online.sh,README.md} "$target:/home/admin/sub2api-online/deploy/clash/"
+          gzip -dc release-images.tar.gz | ssh "${ssh_opts[@]}" "$target" 'sudo -n docker load'
+          ssh "${ssh_opts[@]}" "$target" "cd /home/admin/sub2api-online && sudo -n bash deploy/clash/release-online.sh '$IMAGE'"
+      - name: Verify public HTTPS endpoint
         env:
-          DEPLOY_HOST: ${{ secrets.ALIYUN_HOST }}
-        run: curl --fail --retry 6 --retry-delay 5 "http://$DEPLOY_HOST:9500/health"
+          HEALTH_URL: ${{ matrix.health_url }}
+        run: curl --fail --show-error --retry 6 --retry-delay 5 --max-time 30 "$HEALTH_URL"
+      - name: Remove runner SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

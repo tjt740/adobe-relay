@@ -96,3 +96,6 @@ deploy/adobe-relay/data/
 deploy/adobe-relay/postgres_data/
 deploy/adobe-relay/redis_data/
 deploy/adobe-relay/*.tar.gz
+
+# Private deployment state, backups and local build staging
+**/*.local

@@ -1,0 +1,37 @@
+# Overlay for deploy/online/compose.yml (service name: app).
+# Run from the repository root; see README.md for paths and secret generation.
+services:
+  app:
+    environment:
+      CLASH_CONTROLLER_URL: http://mihomo:9090
+      CLASH_CONTROLLER_SECRET: ${CLASH_CONTROLLER_SECRET:?Set CLASH_CONTROLLER_SECRET}
+      CLASH_PROXY_HOST: mihomo
+      CLASH_PORT_START: "20000"
+    depends_on:
+      mihomo:
+        condition: service_started
+  mihomo:
+    image: metacubex/mihomo:v1.19.31
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        umask 077
+        printf 'external-controller: 0.0.0.0:9090\nsecret: "%s"\nmode: rule\nlog-level: warning\nrules: ["MATCH,REJECT"]\n' "$$CLASH_CONTROLLER_SECRET" > /root/.config/mihomo/config.yaml
+        exec /mihomo -d /root/.config/mihomo
+    environment:
+      CLASH_CONTROLLER_SECRET: ${CLASH_CONTROLLER_SECRET:?Set CLASH_CONTROLLER_SECRET}
+    volumes:
+      - mihomo_data:/root/.config/mihomo
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    mem_limit: 256m
+    # No published ports. The controller and node listeners are only on the Compose network.
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+volumes:
+  mihomo_data:

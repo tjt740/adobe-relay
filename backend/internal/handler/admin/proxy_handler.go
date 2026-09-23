@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/clash"
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -16,6 +17,7 @@ import (
 // ProxyHandler handles admin proxy management
 type ProxyHandler struct {
 	adminService service.AdminService
+	clash        *clash.Manager
 }
 
 // NewProxyHandler creates a new admin proxy handler
@@ -176,6 +178,10 @@ func (h *ProxyHandler) Update(c *gin.Context) {
 		return
 	}
 
+	if h.rejectManagedClashProxy(c, proxyID) {
+		return
+	}
+
 	var req UpdateProxyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
@@ -225,6 +231,10 @@ func (h *ProxyHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	if h.rejectManagedClashProxy(c, proxyID) {
+		return
+	}
+
 	err = h.adminService.DeleteProxy(c.Request.Context(), proxyID)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -245,6 +255,12 @@ func (h *ProxyHandler) BatchDelete(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
+	}
+
+	for _, id := range req.IDs {
+		if h.rejectManagedClashProxy(c, id) {
+			return
+		}
 	}
 
 	result, err := h.adminService.BatchDeleteProxies(c.Request.Context(), req.IDs)

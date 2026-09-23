@@ -2,87 +2,100 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
-        <div class="flex flex-wrap items-center gap-3">
-          <!-- Left: Search + Filters -->
-          <div class="relative w-full sm:w-64">
-            <Icon
-              name="search"
-              size="md"
-              class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
-            />
-            <input
-              v-model="searchQuery"
-              type="text"
-              :placeholder="t('admin.proxies.searchProxies')"
-              class="input pl-10"
-              @input="handleSearch"
-            />
+        <div class="proxy-toolbar">
+          <div class="proxy-toolbar-main">
+            <div class="proxy-filters">
+              <div class="proxy-search relative min-w-0">
+                <Icon
+                  name="search"
+                  size="md"
+                  class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+                />
+                <input
+                  v-model="searchQuery"
+                  type="text"
+                  :aria-label="t('admin.proxies.searchProxies')"
+                  :placeholder="t('admin.proxies.searchProxies')"
+                  class="input h-10 py-2 pl-10"
+                  @input="handleSearch"
+                />
+              </div>
+              <Select
+                v-model="filters.protocol"
+                :options="protocolOptions"
+                :placeholder="t('admin.proxies.allProtocols')"
+                :aria-label="t('admin.proxies.filters.protocol')"
+                @change="handleFilterChange"
+              />
+              <Select
+                v-model="filters.status"
+                :options="statusOptions"
+                :placeholder="t('admin.proxies.allStatus')"
+                :aria-label="t('admin.proxies.filters.status')"
+                @change="handleFilterChange"
+              />
+              <button
+                @click="loadProxies"
+                :disabled="loading"
+                class="btn btn-secondary proxy-toolbar-button proxy-refresh"
+                :title="t('common.refresh')"
+                :aria-label="t('common.refresh')"
+              >
+                <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
+              </button>
+            </div>
+
+            <div class="proxy-primary-actions">
+              <button @click="showClashSubscription = true" class="btn btn-secondary proxy-toolbar-button">
+                {{ t('admin.proxies.clash.title') }}
+              </button>
+              <button @click="showCreateModal = true" class="btn btn-primary proxy-toolbar-button">
+                <Icon name="plus" size="md" />
+                {{ t('admin.proxies.createProxy') }}
+              </button>
+            </div>
           </div>
 
-          <div class="w-full sm:w-40">
-            <Select
-              v-model="filters.protocol"
-              :options="protocolOptions"
-              :placeholder="t('admin.proxies.allProtocols')"
-              @change="handleFilterChange"
-            />
-          </div>
-          <div class="w-full sm:w-36">
-            <Select
-              v-model="filters.status"
-              :options="statusOptions"
-              :placeholder="t('admin.proxies.allStatus')"
-              @change="handleFilterChange"
-            />
-          </div>
-
-          <!-- Right: All action buttons -->
-          <div class="flex flex-1 flex-wrap items-center justify-end gap-2">
-            <button
-              @click="loadProxies"
-              :disabled="loading"
-              class="btn btn-secondary"
-              :title="t('common.refresh')"
-            >
-              <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
-            </button>
-            <button
-              @click="handleBatchTest"
-              :disabled="batchTesting || loading"
-              class="btn btn-secondary"
-              :title="t('admin.proxies.testConnection')"
-            >
-              <Icon name="play" size="md" class="mr-2" />
-              {{ t('admin.proxies.testConnection') }}
-            </button>
-            <button
-              @click="handleBatchQualityCheck"
-              :disabled="batchQualityChecking || loading"
-              class="btn btn-secondary"
-              :title="t('admin.proxies.batchQualityCheck')"
-            >
-              <Icon name="shield" size="md" class="mr-2" :class="batchQualityChecking ? 'animate-pulse' : ''" />
-              {{ t('admin.proxies.batchQualityCheck') }}
-            </button>
-            <button
-              @click="openBatchDelete"
-              :disabled="selectedCount === 0"
-              class="btn btn-danger"
-              :title="t('admin.proxies.batchDeleteAction')"
-            >
-              <Icon name="trash" size="md" class="mr-2" />
-              {{ t('admin.proxies.batchDeleteAction') }}
-            </button>
-            <button @click="showImportData = true" class="btn btn-secondary">
-              {{ t('admin.proxies.dataImport') }}
-            </button>
-            <button @click="showExportDataDialog = true" class="btn btn-secondary">
-              {{ selectedCount > 0 ? t('admin.proxies.dataExportSelected') : t('admin.proxies.dataExport') }}
-            </button>
-            <button @click="showCreateModal = true" class="btn btn-primary">
-              <Icon name="plus" size="md" class="mr-2" />
-              {{ t('admin.proxies.createProxy') }}
-            </button>
+          <div class="proxy-toolbar-secondary">
+            <div class="proxy-batch-actions">
+              <button
+                @click="handleBatchTest"
+                :disabled="batchTesting || loading"
+                class="btn btn-secondary proxy-toolbar-button"
+                :title="t('admin.proxies.testConnection')"
+              >
+                <Icon name="play" size="sm" />
+                {{ t('admin.proxies.testConnection') }}
+              </button>
+              <button
+                @click="handleBatchQualityCheck"
+                :disabled="batchQualityChecking || loading"
+                class="btn btn-secondary proxy-toolbar-button"
+                :title="t('admin.proxies.batchQualityCheck')"
+              >
+                <Icon name="shield" size="sm" :class="batchQualityChecking ? 'animate-pulse' : ''" />
+                {{ t('admin.proxies.batchQualityCheck') }}
+              </button>
+              <button
+                @click="openBatchDelete"
+                :disabled="selectedCount === 0"
+                class="btn proxy-toolbar-button"
+                :class="selectedCount > 0 ? 'btn-danger' : 'btn-secondary'"
+                :title="t('admin.proxies.batchDeleteAction')"
+              >
+                <Icon name="trash" size="sm" />
+                {{ t('admin.proxies.batchDeleteAction') }}
+                <span v-if="selectedCount > 0" class="rounded-md bg-white/20 px-1.5 text-xs tabular-nums">{{ selectedCount }}</span>
+              </button>
+            </div>
+            <div class="proxy-transfer-actions">
+              <button @click="showImportData = true" class="btn btn-secondary proxy-toolbar-button">
+                {{ t('admin.proxies.dataImport') }}
+              </button>
+              <button @click="showExportDataDialog = true" class="btn btn-secondary proxy-toolbar-button">
+                {{ selectedCount > 0 ? t('admin.proxies.dataExportSelected') : t('admin.proxies.dataExport') }}
+              </button>
+            </div>
           </div>
         </div>
       </template>
@@ -959,6 +972,7 @@
         </div>
       </template>
     </BaseDialog>
+    <ClashSubscriptionModal v-if="showClashSubscription" @close="showClashSubscription = false" @changed="loadProxies" />
   </AppLayout>
 </template>
 
@@ -977,6 +991,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ImportDataModal from '@/components/admin/proxy/ImportDataModal.vue'
+import ClashSubscriptionModal from '@/components/admin/proxy/ClashSubscriptionModal.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
 import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
@@ -989,6 +1004,7 @@ import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const showClashSubscription = ref(false)
 const { copyToClipboard } = useClipboard()
 
 const columns = computed<Column[]>(() => [
@@ -2085,3 +2101,92 @@ onUnmounted(() => {
   document.removeEventListener('click', closeCopyMenu)
 })
 </script>
+
+<style scoped>
+.proxy-toolbar {
+  @apply rounded-2xl border border-gray-200/80 bg-white/75 p-4 dark:border-dark-700 dark:bg-dark-800/75;
+  container-type: inline-size;
+}
+
+.proxy-toolbar-main,
+.proxy-toolbar-secondary {
+  @apply flex flex-wrap items-center justify-between gap-3;
+}
+
+.proxy-filters {
+  display: grid;
+  flex: 1 1 32rem;
+  grid-template-columns: minmax(10rem, 1fr) 9rem 8rem 2.5rem;
+  gap: 0.5rem;
+  min-width: 0;
+  max-width: 46rem;
+}
+
+.proxy-filters :deep(.select-trigger) {
+  @apply h-10 py-2;
+}
+
+.proxy-primary-actions,
+.proxy-batch-actions,
+.proxy-transfer-actions {
+  @apply flex items-center gap-2;
+}
+
+.proxy-primary-actions {
+  @apply ml-auto shrink-0;
+}
+
+.proxy-toolbar-secondary {
+  @apply mt-3 border-t border-gray-100 pt-3 dark:border-dark-700;
+}
+
+.proxy-toolbar-button {
+  @apply h-10 shrink-0 whitespace-nowrap px-3 py-2;
+}
+
+.proxy-refresh {
+  @apply w-10 px-0;
+}
+
+@container (max-width: 48rem) {
+  .proxy-filters {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .proxy-primary-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+}
+
+@container (max-width: 36rem) {
+  .proxy-filters {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 2.5rem;
+  }
+
+  .proxy-search {
+    grid-column: 1 / -1;
+  }
+
+  .proxy-toolbar-secondary {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .proxy-batch-actions,
+  .proxy-transfer-actions {
+    display: contents;
+  }
+
+  .proxy-toolbar-secondary .proxy-toolbar-button {
+    grid-column: span 2;
+  }
+
+  .proxy-batch-actions .proxy-toolbar-button:not(:last-child) {
+    grid-column: span 3;
+  }
+}
+</style>
