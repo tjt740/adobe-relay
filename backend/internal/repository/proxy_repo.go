@@ -754,6 +754,7 @@ func (r *proxyRepository) sweepOneExpiredProxyOnExec(ctx context.Context, exec s
 				END,
 				updated_at=NOW()
 			WHERE proxy_id=$1 AND deleted_at IS NULL
+            AND NOT EXISTS (SELECT 1 FROM account_proxy_failover f WHERE f.account_id=accounts.id AND f.enabled)
 			RETURNING id`, proxyID)
 	} else {
 		rows, err = exec.QueryContext(ctx, `
@@ -765,6 +766,7 @@ func (r *proxyRepository) sweepOneExpiredProxyOnExec(ctx context.Context, exec s
 				END,
 				updated_at=NOW()
 			WHERE proxy_id=$1 AND deleted_at IS NULL
+            AND NOT EXISTS (SELECT 1 FROM account_proxy_failover f WHERE f.account_id=accounts.id AND f.enabled)
 			RETURNING id`, proxyID, *target)
 	}
 	if err != nil {

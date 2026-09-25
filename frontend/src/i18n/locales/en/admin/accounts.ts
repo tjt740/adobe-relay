@@ -1,5 +1,36 @@
 export default {
     accounts: {
+      proxyFailover: {
+  "title": "Automatic proxy failover",
+  "hint": "Check Adobe every 30 seconds. After 2 consecutive failures, switch to a healthy backup in order. No automatic failback, generation replay, or direct fallback.",
+  "current": "Current route",
+  "primary": "Primary proxy",
+  "resetPrimary": "Use current route as primary",
+  "backups": "Backups in priority order (up to 8)",
+  "moveUp": "Move up",
+  "add": "Add backup",
+  "failures": "{count} consecutive failures",
+  "pendingProxy": "Update the account to save the selected proxy before configuring failover.",
+  "lastSwitch": "Last switch",
+  "save": "Save failover policy",
+  "saved": "Active now",
+  "saveHint": "This policy is saved separately and takes effect immediately. Checks verify the connection to Adobe, not account credits or authentication.",
+  "noProxy": "No proxy",
+  "loadFailed": "Unable to load policy. Refresh to retry.",
+  "saveFailed": "Save failed. The proxy or policy may have changed; refresh and retry.",
+  "states": {
+    "disabled": "Disabled",
+    "checking": "Checking",
+    "paused": "Paused: account unavailable or route outside policy",
+    "healthy": "Adobe reachable",
+    "no_backup": "Current route failed; waiting for a healthy backup"
+  },
+  "health": {
+    "healthy": "Adobe reachable",
+    "unhealthy": "Connection failed",
+    "unknown": "Pending / inconclusive"
+  }
+},
       title: 'Account Management',
       description: 'Manage AI platform accounts and credentials',
       createAccount: 'Create Account',
@@ -1709,6 +1740,8 @@ export default {
         kiroReset: 'Reset',
         adobeCredits: 'Credits',
         adobeReset: 'Reset',
+        adobeRevalidate: 'Revalidate',
+        adobeUsageFailed: 'Could not load credits. Click Revalidate to retry.',
         adobePlanCap: 'Plan',
         estimatedTotalCost: 'Est. total ${cost}',
         estimatedTotalCostTooltip: 'Estimated total cost at 100% utilization, based on current window cost and utilization'

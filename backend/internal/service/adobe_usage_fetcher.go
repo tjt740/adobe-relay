@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
+	"net"
 	"strings"
 	"time"
 
@@ -113,6 +115,18 @@ func (s *AccountUsageService) fetchAndCacheAdobeUsage(ctx context.Context, accou
 	}
 
 	bal, err := client.FetchCreditsBalance(ctx, token)
+	// A balance GET is safe to retry once after a transient transport failure.
+	// Never retry authentication/entitlement failures or a cancelled request.
+	if ctx.Err() == nil && isAdobeUsageRetryable(err) {
+		timer := time.NewTimer(250 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+		bal, err = client.FetchCreditsBalance(ctx, token)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -144,6 +158,18 @@ func (s *AccountUsageService) fetchAndCacheAdobeUsage(ctx context.Context, accou
 	s.applyAdobeCreditsCooldown(ctx, account, bal, info.AdobeCreditResetAt)
 	s.storeAdobeUsageSnapshot(account.ID, info)
 	return info, nil
+}
+
+func isAdobeUsageRetryable(err error) bool {
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var temporary *adobe.UpstreamTemporaryError
+	if errors.As(err, &temporary) {
+		return temporary.StatusCode == 0 || temporary.StatusCode >= 500
+	}
+	var network net.Error
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.As(err, &network)
 }
 
 // applyAdobeCreditsCooldown 在 credits 耗尽时把账号临时摆出调度，直到 availableUntil。

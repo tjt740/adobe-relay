@@ -13,6 +13,15 @@
       <span class="select-value">
         {{ selectedLabel }}
       </span>
+      <span
+        v-if="selectedProxy"
+        class="latency-badge"
+        :class="proxyHealth[selectedProxy.id].className"
+        :title="proxyHealth[selectedProxy.id].message"
+        aria-live="polite"
+      >
+        {{ proxyHealth[selectedProxy.id].label }}
+      </span>
       <span class="select-icon">
         <Icon
           name="chevronDown"
@@ -44,6 +53,7 @@
             :disabled="batchTesting"
             class="batch-test-btn"
             :title="t('admin.proxies.batchTest')"
+            :aria-label="t('admin.proxies.batchTest')"
           >
             <svg v-if="batchTesting" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle
@@ -92,31 +102,20 @@
                 >
                   {{ proxy.account_count }}
                 </span>
-                <!-- Test result badges -->
-                <template v-if="testResults[proxy.id]">
-                  <span
-                    v-if="testResults[proxy.id].success"
-                    class="inline-flex flex-shrink-0 items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                  >
-                    <span v-if="testResults[proxy.id].country">{{
-                      testResults[proxy.id].country
-                    }}</span>
-                    <span v-if="testResults[proxy.id].latency_ms"
-                      >{{ testResults[proxy.id].latency_ms }}ms</span
-                    >
-                  </span>
-                  <span
-                    v-else
-                    class="inline-flex flex-shrink-0 items-center rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                  >
-                    {{ t('admin.proxies.testFailed') }}
-                  </span>
-                </template>
               </div>
               <div class="truncate text-xs text-gray-500 dark:text-gray-400">
                 {{ proxy.protocol }}://{{ proxy.host }}:{{ proxy.port }}
               </div>
             </div>
+
+            <span
+              class="latency-badge"
+              :class="proxyHealth[proxy.id].className"
+              :title="proxyHealth[proxy.id].message"
+              aria-live="polite"
+            >
+              {{ proxyHealth[proxy.id].label }}
+            </span>
 
             <!-- Individual test button -->
             <button
@@ -125,6 +124,7 @@
               :disabled="testingProxyIds.has(proxy.id)"
               class="test-btn"
               :title="t('admin.proxies.testConnection')"
+              :aria-label="`${t('admin.proxies.testConnection')} ${proxy.name}`"
             >
               <svg
                 v-if="testingProxyIds.has(proxy.id)"
@@ -209,6 +209,32 @@ const searchInputRef = ref<HTMLInputElement | null>(null)
 const testResults = reactive<Record<number, ProxyTestResult>>({})
 const testingProxyIds = reactive(new Set<number>())
 const batchTesting = ref(false)
+
+// The server returns the same cached measurements used by IP management.
+// A fresh test in this selector takes precedence over that snapshot.
+const proxyHealth = computed(() => Object.fromEntries(props.proxies.map(proxy => {
+  const result = testResults[proxy.id]
+  const success = result ? result.success : proxy.latency_status === 'success'
+  const failed = result ? !result.success : proxy.latency_status === 'failed'
+  const latency = result ? result.latency_ms : proxy.latency_ms
+  const country = result ? result.country : proxy.country
+  const message = result ? result.message : proxy.latency_message
+  const measured = typeof latency === 'number' && Number.isFinite(latency) && latency >= 0
+  if (testingProxyIds.has(proxy.id)) {
+    return [proxy.id, { label: t('admin.proxies.testing'), message: '', className: 'latency-pending' }]
+  }
+  if (failed) {
+    return [proxy.id, { label: t('admin.proxies.testFailed'), message, className: 'latency-failed' }]
+  }
+  if (success || measured) {
+    return [proxy.id, {
+      label: [country, measured ? `${latency} ms` : t('admin.proxies.testSuccess')].filter(Boolean).join(' · '),
+      message,
+      className: measured && latency >= 200 ? 'latency-slow' : 'latency-success'
+    }]
+  }
+  return [proxy.id, { label: t('admin.proxies.clash.notTested'), message: '', className: 'latency-unknown' }]
+})))
 
 const selectedProxy = computed(() => {
   if (props.modelValue === null) return null
@@ -306,6 +332,30 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.latency-badge {
+  @apply inline-flex flex-shrink-0 items-center rounded px-1.5 py-0.5 text-xs;
+}
+
+.latency-success {
+  @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400;
+}
+
+.latency-slow {
+  @apply bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400;
+}
+
+.latency-failed {
+  @apply bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400;
+}
+
+.latency-unknown {
+  @apply bg-gray-100 text-gray-500 dark:bg-dark-600 dark:text-gray-400;
+}
+
+.latency-pending {
+  @apply bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400;
+}
+
 .select-trigger {
   @apply flex w-full items-center justify-between gap-2;
   @apply rounded-xl px-4 py-2.5 text-sm;

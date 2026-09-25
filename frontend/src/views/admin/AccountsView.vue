@@ -846,7 +846,7 @@ const flushQueuedUsageBatch = async () => {
       nextUsage[key] = usage
       nextErrors[key] = errorMap[key] ?? null
       nextLoading[key] = false
-      if (usage) {
+      if (usage && !usage.error && !usage.error_code && !errorMap[key]) {
         usageBatchCache.set(accountID, { data: usage, ts: now })
       } else {
         usageBatchCache.delete(accountID)
@@ -1905,6 +1905,8 @@ const loadAccountDetails = async (account: Pick<AccountListItem, 'id'>): Promise
 }
 
 const handleEdit = async (a: AccountListItem) => {
+  // Reload cached latency so tests run in IP management appear on reopening.
+  void loadProxies()
   const account = await loadAccountDetails(a)
   if (!account) return
   edAcc.value = account
@@ -2604,6 +2606,14 @@ const handleClickOutside = (event: MouseEvent) => {
   }
 }
 
+const loadProxies = async () => {
+  try {
+    proxies.value = await adminAPI.proxies.getAllWithCount()
+  } catch (error) {
+    console.error('Failed to load proxies:', error)
+  }
+}
+
 onMounted(async () => {
   if (typeof window !== 'undefined') {
     desktopViewportMediaQuery = window.matchMedia(desktopViewportQuery)
@@ -2620,15 +2630,10 @@ onMounted(async () => {
 
   load()
   loadUpstreamBillingProbeGlobalState()
-  const [proxiesResult, groupsResult] = await Promise.allSettled([
-    adminAPI.proxies.getAll(),
+  const [, groupsResult] = await Promise.allSettled([
+    loadProxies(),
     adminAPI.groups.getAll()
   ])
-  if (proxiesResult.status === 'fulfilled') {
-    proxies.value = proxiesResult.value
-  } else {
-    console.error('Failed to load proxies:', proxiesResult.reason)
-  }
   if (groupsResult.status === 'fulfilled') {
     groups.value = groupsResult.value
   } else {

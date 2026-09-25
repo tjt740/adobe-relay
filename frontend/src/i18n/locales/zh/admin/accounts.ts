@@ -1,5 +1,36 @@
 export default {
     accounts: {
+      proxyFailover: {
+  "title": "自动故障切换",
+  "hint": "每 30 秒检查 Adobe 连通性；连续 2 次失败后按备用顺序切换。恢复后不自动切回，不重放生图请求，也不会改走直连。",
+  "current": "当前出口",
+  "primary": "主代理",
+  "resetPrimary": "以当前出口重新设置主代理",
+  "backups": "备用代理（按顺序，最多 8 个）",
+  "moveUp": "提高优先级",
+  "add": "添加备用代理",
+  "failures": "连续失败 {count} 次",
+  "pendingProxy": "请先更新账号以保存上方选择的代理，再配置故障切换。",
+  "lastSwitch": "最近切换",
+  "save": "保存切换策略",
+  "saved": "已生效",
+  "saveHint": "此策略单独保存，立即生效。检查验证代理到 Adobe 的连接，不验证账号额度或登录状态。",
+  "noProxy": "未设置代理",
+  "loadFailed": "无法加载策略，请刷新重试。",
+  "saveFailed": "保存失败，代理或策略可能已变化，请刷新后重试。",
+  "states": {
+    "disabled": "未启用",
+    "checking": "检查中",
+    "paused": "已暂停：账号不可调度或出口不在策略内",
+    "healthy": "Adobe 连接正常",
+    "no_backup": "当前出口故障，等待可用备用"
+  },
+  "health": {
+    "healthy": "Adobe 可达",
+    "unhealthy": "连接失败",
+    "unknown": "待检查 / 暂无法确认"
+  }
+},
       title: '账号管理',
       description: '管理 AI 平台账号和 Cookie',
       createAccount: '添加账号',
@@ -529,6 +560,8 @@ export default {
         kiroReset: '重置',
         adobeCredits: 'Credits',
         adobeReset: '重置',
+        adobeRevalidate: '重新校验',
+        adobeUsageFailed: '额度查询失败，请点击重新校验',
         adobePlanCap: '套餐',
         estimatedTotalCost: '预计总费用 ${cost}',
         estimatedTotalCostTooltip: '根据当前窗口费用和使用率估算达到 100% 使用率时的总费用'

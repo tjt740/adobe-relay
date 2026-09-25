@@ -6,7 +6,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"net/url"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -434,7 +436,7 @@ func TestGetAdobeUsageForceBypassesErrorSnapshot(t *testing.T) {
 	client.balance = &adobe.CreditsBalance{Total: int64Ptr(10), Used: int64Ptr(2), Available: int64Ptr(8)}
 	forced, err := svc.getAdobeUsage(context.Background(), account, "active", true)
 	require.NoError(t, err)
-	require.Equal(t, int32(2), client.calls.Load(), "force=true must not be short-circuited by the error snapshot")
+	require.Equal(t, int32(3), client.calls.Load(), "initial failure retries once; force=true must still query again")
 	require.Empty(t, forced.Error)
 }
 
@@ -494,4 +496,39 @@ func TestGetAdobeUsageLeaderCancelDoesNotPoisonFollowers(t *testing.T) {
 	cached, ok := svc.getCachedAdobeUsage(account.ID)
 	require.True(t, ok)
 	require.Empty(t, cached.Error)
+}
+
+// Reproduce the credits endpoint closing the connection before any response.
+type flakyAdobeCreditsClient struct{ calls int }
+
+func (c *flakyAdobeCreditsClient) FetchCreditsBalance(context.Context, string) (*adobe.CreditsBalance, error) {
+	c.calls++
+	if c.calls == 1 {
+		return nil, &url.Error{Op: "Get", URL: "https://firefly.adobe.io/v1/credits/balance", Err: io.EOF}
+	}
+	return &adobe.CreditsBalance{Total: int64Ptr(8000), Used: int64Ptr(4000), Available: int64Ptr(4000)}, nil
+}
+func TestAdobeUsageRecoversFromEOF(t *testing.T) {
+	client := &flakyAdobeCreditsClient{}
+	svc := newAdobeUsageTestService(t, &adobeUsageTestRepo{}, client)
+	info, err := svc.getAdobeUsage(context.Background(), adobeAccountWithToken(), "active", true)
+	require.NoError(t, err)
+	require.Empty(t, info.Error)
+	require.NotNil(t, info.AdobeCredit)
+	require.Equal(t, 2, client.calls)
+}
+func TestAdobeUsageRetryClassification(t *testing.T) {
+	for _, err := range []error{nil, context.Canceled, context.DeadlineExceeded, adobe.NewAuthError("expired", 401), adobe.NewQuotaExhaustedError("quota", 403), adobe.NewUpstreamTemporaryError("rate limited", 429, adobe.ErrorTypeStatus)} {
+		require.False(t, isAdobeUsageRetryable(err))
+	}
+	require.True(t, isAdobeUsageRetryable(io.ErrUnexpectedEOF))
+	require.True(t, isAdobeUsageRetryable(adobe.NewUpstreamTemporaryError("unavailable", 503, adobe.ErrorTypeStatus)))
+}
+func TestAdobeUsageRetriesAtMostOnce(t *testing.T) {
+	client := &stubAdobeCreditsClient{err: io.EOF}
+	svc := newAdobeUsageTestService(t, &adobeUsageTestRepo{}, client)
+	info, err := svc.getAdobeUsage(context.Background(), adobeAccountWithToken(), "active", true)
+	require.NoError(t, err)
+	require.Equal(t, errorCodeNetworkError, info.ErrorCode)
+	require.Equal(t, int32(2), client.calls.Load())
 }

@@ -1,0 +1,9 @@
+[Unit]
+Description=Renew Sub2API IP TLS certificate and reload nginx
+Wants=network-online.target
+After=network-online.target nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sub2api-cert-renew
+TimeoutStartSec=900

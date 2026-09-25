@@ -13,6 +13,20 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: failover-test
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,16 +37,21 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
       - name: Check deployment scripts and backend
+        env:
+          PROXY_FAILOVER_TEST_DATABASE_URL: postgres://postgres:failover-test@localhost:5432/postgres?sslmode=disable
         run: |
           bash -n deploy/clash/release-online.sh
+          bash -n deploy/online/renew-ip-certificate.sh
           python3 -m unittest discover -s deploy/clash -p 'test_*.py'
           cd backend
-          go test ./internal/clash
+          go test -race ./internal/clash ./internal/proxyfailover
+          go test ./internal/repository -run 'TestExpiryRespectsLiveFailoverPolicy|TestProxyUpdate'
+          go test -tags unit ./internal/service -run 'Test(GetAdobeUsage|AdobeUsage|BuildAdobeDegradedUsage)'
       - name: Check frontend workflows
         run: |
           npm install -g pnpm@9.15.9
           pnpm --dir frontend install --frozen-lockfile --ignore-scripts
-          pnpm --dir frontend exec vitest run src/__tests__/integration/clash-subscription.spec.ts src/views/admin/__tests__/ProxiesView.filters.spec.ts
+          pnpm --dir frontend exec vitest run src/__tests__/integration/clash-subscription.spec.ts src/views/admin/__tests__/ProxiesView.filters.spec.ts src/components/account/__tests__/ProxyFailoverPanel.spec.ts src/components/account/__tests__/EditAccountModal.spec.ts src/components/account/__tests__/AccountUsageCell.spec.ts src/components/common/__tests__/ProxySelector.testing.spec.ts src/views/admin/__tests__/AccountsView
       - uses: docker/setup-buildx-action@v3
       - name: Build amd64 image
         uses: docker/build-push-action@v6

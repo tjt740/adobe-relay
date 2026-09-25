@@ -15,6 +15,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
+	"github.com/Wei-Shaw/sub2api/internal/proxyfailover"
 	"github.com/Wei-Shaw/sub2api/internal/repository"
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
 	"github.com/Wei-Shaw/sub2api/internal/server"
@@ -26,6 +27,7 @@ import (
 )
 
 type Application struct {
+	ProxyFailover *proxyfailover.Manager
 	Clash         *clash.Manager
 	Server        *http.Server
 	PromptAudit   *securityaudit.PromptService
@@ -36,6 +38,7 @@ type Application struct {
 func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	wire.Build(
 		clash.NewManager,
+		proxyfailover.NewManager,
 		// Infrastructure layer ProviderSets
 		config.ProviderSet,
 
@@ -61,7 +64,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 		provideCleanup,
 
 		// Application struct
-		wire.Struct(new(Application), "Server", "PromptAudit", "PluginManager", "Clash", "Cleanup"),
+		wire.Struct(new(Application), "Server", "PromptAudit", "PluginManager", "Clash", "ProxyFailover", "Cleanup"),
 	)
 	return nil, nil
 }
