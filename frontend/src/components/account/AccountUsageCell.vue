@@ -670,8 +670,8 @@
         <div class="h-4 w-24 animate-pulse rounded bg-gray-200 dark:bg-gray-700"></div>
         <div class="h-1.5 w-32 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700"></div>
       </div>
-      <div v-else-if="error" class="text-xs text-red-500">
-        {{ error }}
+      <div v-else-if="error || usageInfo?.error || usageInfo?.error_code" class="text-xs text-red-500">
+        {{ t('admin.accounts.usageWindow.adobeUsageFailed') }}
       </div>
       <div v-else-if="adobeUsageAvailable" class="space-y-2">
         <div v-if="usageInfo?.adobe_plan_cap" class="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -699,6 +699,13 @@
         </div>
       </div>
       <div v-else class="text-xs text-gray-400">-</div>
+      <button
+        type="button"
+        data-test="adobe-usage-refresh"
+        class="mt-1 text-xs text-blue-600 disabled:opacity-50"
+        :disabled="loading || activeQueryLoading"
+        @click="refreshAdobeUsage"
+      >{{ t('admin.accounts.usageWindow.adobeRevalidate') }}</button>
     </template>
 
     <!-- Other accounts: no usage window -->
@@ -1745,7 +1752,11 @@ const loadUsage = async (options?: { source?: 'passive' | 'active'; bypassCache?
     if (!unmounted.value) {
       usageInfo.value = result
       syncKiroUsageMeta(result)
-      _usageCache.set(props.account.id, { data: result, ts: Date.now() })
+      if (result?.error || result?.error_code) {
+        _usageCache.delete(props.account.id)
+      } else {
+        _usageCache.set(props.account.id, { data: result, ts: Date.now() })
+      }
     }
   } catch (e: any) {
     if (!unmounted.value) {
@@ -1807,13 +1818,26 @@ const attachVisibilityObserver = () => {
   visibilityObserver.observe(rootRef.value)
 }
 
+const refreshAdobeUsage = async () => {
+  activeQueryLoading.value = true
+  try {
+    await loadUsage({ source: 'active', bypassCache: true })
+  } finally {
+    activeQueryLoading.value = false
+  }
+}
+
 const loadActiveUsage = async () => {
   activeQueryLoading.value = true
   try {
     const result = await adminAPI.accounts.getUsage(props.account.id, 'active', true)
     usageInfo.value = result
     syncKiroUsageMeta(result)
-    _usageCache.set(props.account.id, { data: result, ts: Date.now() })
+    if (result?.error || result?.error_code) {
+      _usageCache.delete(props.account.id)
+    } else {
+      _usageCache.set(props.account.id, { data: result, ts: Date.now() })
+    }
   } catch (e: any) {
     console.error('Failed to load active usage:', e)
   } finally {

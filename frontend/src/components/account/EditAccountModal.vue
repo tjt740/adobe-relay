@@ -1841,7 +1841,12 @@
           <label class="input-label mb-0">{{ t('admin.accounts.proxy') }}</label>
           <ProxyAdBanner />
         </div>
-        <ProxySelector v-model="form.proxy_id" :proxies="proxies" />
+        <ProxySelector v-model="form.proxy_id" :proxies="proxies" @update:model-value="proxyManuallyChanged = true" />
+        <ProxyFailoverPanel
+          v-if="show && account.platform === 'adobe' && account.type === 'oauth'"
+          :key="account.id" :account-id="account.id" :selected-proxy-id="form.proxy_id" :proxies="proxies"
+          @current="id => { if (!proxyManuallyChanged) form.proxy_id = id }"
+        />
       </div>
 
       <UpstreamRequestIdHeaderField
@@ -3289,6 +3294,7 @@ import UpstreamRequestIdHeaderField from '@/components/account/UpstreamRequestId
 import Toggle from '@/components/common/Toggle.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
+import ProxyFailoverPanel from './ProxyFailoverPanel.vue'
 import GroupSelector from '@/components/common/GroupSelector.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import QuotaLimitCard from '@/components/account/QuotaLimitCard.vue'
@@ -4166,6 +4172,8 @@ const mixedChannelWarningMessageText = computed(() => {
   return mixedChannelWarningRawMessage.value
 })
 
+const proxyManuallyChanged = ref(false)
+
 const form = reactive({
   name: '',
   notes: '',
@@ -4277,6 +4285,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   mixedChannelWarningAction.value = null
   form.name = newAccount.name
   form.notes = newAccount.notes || ''
+  proxyManuallyChanged.value = false
   form.proxy_id = newAccount.proxy_id
   form.concurrency = newAccount.concurrency
   form.load_factor = newAccount.load_factor ?? null
@@ -5360,6 +5369,10 @@ const handleSubmit = async () => {
 
   const updatePayload: Record<string, unknown> = { ...form }
   try {
+    // Do not overwrite a background failover while saving unrelated account fields.
+    if (props.account.platform === 'adobe' && props.account.type === 'oauth' && !proxyManuallyChanged.value) {
+      delete updatePayload.proxy_id
+    }
     // 后端期望 proxy_id: 0 表示清除代理，而不是 null
     if (updatePayload.proxy_id === null) {
       updatePayload.proxy_id = 0

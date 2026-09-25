@@ -153,6 +153,12 @@ func runMainServer() {
 		log.Fatalf("Failed to initialize application: %v", err)
 	}
 	defer app.Cleanup()
+	if app.ProxyFailover != nil {
+		failoverCtx, stopFailover := context.WithCancel(context.Background())
+		failoverDone := make(chan struct{})
+		go func() { defer close(failoverDone); app.ProxyFailover.Run(failoverCtx) }()
+		defer func() { stopFailover(); <-failoverDone }()
+	}
 	clashCtx, stopClash := context.WithCancel(context.Background())
 	defer stopClash()
 	if app.Clash != nil {

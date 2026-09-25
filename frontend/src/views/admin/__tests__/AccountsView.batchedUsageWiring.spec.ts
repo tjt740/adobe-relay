@@ -11,12 +11,14 @@ const {
   listAccounts,
   listWithEtag,
   getBatchTodayStats,
+  getBatchUsage,
   getAllProxies,
   getAllGroups
 } = vi.hoisted(() => ({
   listAccounts: vi.fn(),
   listWithEtag: vi.fn(),
   getBatchTodayStats: vi.fn(),
+  getBatchUsage: vi.fn(),
   getAllProxies: vi.fn(),
   getAllGroups: vi.fn()
 }))
@@ -27,6 +29,7 @@ vi.mock('@/api/admin', () => ({
       list: listAccounts,
       listWithEtag,
       getBatchTodayStats,
+  getBatchUsage,
       getUpstreamBillingProbeSettings: vi
         .fn()
         .mockResolvedValue({ enabled: true, interval_minutes: 30 }),
@@ -35,7 +38,7 @@ vi.mock('@/api/admin', () => ({
       batchRefresh: vi.fn(),
       toggleSchedulable: vi.fn()
     },
-    proxies: { getAll: getAllProxies },
+    proxies: { getAllWithCount: getAllProxies },
     groups: { getAll: getAllGroups }
   }
 }))
@@ -154,7 +157,7 @@ describe('admin AccountsView batched usage wiring', () => {
       dispatchEvent: vi.fn()
     }))
 
-    for (const fn of [listAccounts, listWithEtag, getBatchTodayStats, getAllProxies, getAllGroups]) {
+    for (const fn of [listAccounts, listWithEtag, getBatchTodayStats, getBatchUsage, getAllProxies, getAllGroups]) {
       fn.mockReset()
     }
     listAccounts.mockResolvedValue({
@@ -196,4 +199,25 @@ describe('admin AccountsView batched usage wiring', () => {
 
     wrapper.unmount()
   })
+  it('re-queries degraded Adobe results instead of caching them for five minutes', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    getBatchUsage.mockResolvedValueOnce({ usage: { '104': { error_code: 'network_error', error: 'EOF' } }, errors: {} })
+      .mockResolvedValueOnce({ usage: { '104': { adobe_plan_cap: 'HARD' } }, errors: {} })
+    const query = capturedProps['104'].requestBatchedUsage as (account: ReturnType<typeof accountFixture>) => void
+    const account = accountFixture({ id: 104, platform: 'adobe', type: 'oauth' })
+    query(account)
+    await new Promise(resolve => setTimeout(resolve, 5))
+    await flushPromises()
+    query(account)
+    await new Promise(resolve => setTimeout(resolve, 5))
+    await flushPromises()
+    expect(getBatchUsage).toHaveBeenCalledTimes(2)
+    query(account)
+    await new Promise(resolve => setTimeout(resolve, 5))
+    await flushPromises()
+    expect(getBatchUsage).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
+
 })

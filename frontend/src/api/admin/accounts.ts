@@ -377,7 +377,9 @@ export async function getUsage(id: number, source?: 'passive' | 'active', force?
   if (source) params.source = source
   if (force) params.force = 'true'
   const { data } = await apiClient.get<AccountUsageInfo>(`/admin/accounts/${id}/usage`, {
-    params: Object.keys(params).length > 0 ? params : undefined
+    params: Object.keys(params).length > 0 ? params : undefined,
+    // Adobe token exchange + balance fetch has a 90s server-side deadline.
+    timeout: 120000
   })
   return data
 }
@@ -391,7 +393,7 @@ export async function getBatchUsage(accountIds: number[], force?: boolean): Prom
   const { data } = await apiClient.post<BatchAccountUsageResponse>('/admin/accounts/usage/batch', {
     account_ids: accountIds,
     force: force === true
-  })
+  }, { timeout: 120000 })
   return data
 }
 

@@ -1,6 +1,6 @@
 # 阿里云独立部署
 
-应用发布端口为 **6666**，容器内监听 8080。PostgreSQL 和 Redis 仅在独立 Compose 网络内访问，不发布数据库端口。
+公网入口为 **https://47.106.176.71**（443），也支持 **https://47.106.176.71:6660**。应用后端绑定 **127.0.0.1:6666**，容器内监听 8080。PostgreSQL 和 Redis 仅在独立 Compose 网络内访问，不发布数据库端口。
 
 这套配置用于全新安装，不复制本地数据库、Adobe Cookie 或 API 密钥。线上账号和密钥需重新创建。保留上游源码、许可证及提交历史。
 
@@ -19,16 +19,41 @@ curl --fail http://127.0.0.1:6666/health
 
 初始化脚本只在 `.env` 不存在时生成独立随机密码和固定加密密钥；文件权限为 0600，重复运行不会重置凭据。管理员邮箱默认为 `admin@sub2api.local`，初始密码见服务器的 `deploy/online/.env` 中 `ADMIN_PASSWORD`。
 
-`.env`、运行数据、日志和镜像归档均不应提交到 GitHub。新仓库保留了上游工作流文件，但默认关闭 GitHub Actions；本次部署通过 SSH 完成，不配置 GitHub 持有服务器私钥的自动部署。
+`.env`、运行数据、日志和镜像归档均不应提交到 GitHub。正式发布通过 GitHub Actions 在推送 `main` 时自动更新国内、国外两台服务器，参见 [Clash 与双机发布说明](../clash/README.md)。本文的 IP 与 Nginx 模板对应国内服务器；已有站点发布时保留各服务器现有的 `.env`、Nginx 和证书续期配置。
 
-## 浏览器访问
+## HTTPS / IP 访问
 
-Chromium 将 6666 列为受限端口，直接访问可能出现 `ERR_UNSAFE_PORT`，这并不代表服务器未运行。参见 [Chromium 端口列表](https://github.com/chromium/chromium/blob/main/net/base/port_util.cc)。
+- 网页：`https://47.106.176.71`
+- API Base URL：`https://47.106.176.71/v1`
+- 兼容原网页端口：`https://47.106.176.71:6660`；HTTP 6660 自动以 308 跳转到 HTTPS 443。
+- `6666` 仅监听本机，外部客户端应更新 Base URL。其他项目的端口不变。
+- Nginx 使用 `nginx.conf`，保留流式响应及 WebSocket 转发。
 
-- 命令行 / 原生 API 客户端可使用 `http://服务器IP:6666/v1`。
-- `nginx.conf` 提供独立的 **6660** 网页入口，代理同一个服务，可使用 `http://服务器IP:6660`。
-- 如有域名和证书，配置 HTTPS 443 反向代理到 `127.0.0.1:6666`，统一通过 HTTPS 使用网页和 API。
-- 阿里云安全组与主机防火墙须允许实际对外使用的端口。安装额外 Nginx 配置前先确认 6660 未被其他服务使用；执行 `nginx -t` 成功后再 reload。
+使用 Let's Encrypt IP 证书，证书名为 `sub2api-ip`，位于 `/etc/letsencrypt/live/sub2api-ip/`。IP 证书有效期约六天，`sub2api-cert-renew.timer` 每六小时检查续期，续期命令成功后校验并重新加载 Nginx。
+
+首次安装（服务器需 Python 3.11）：
+
+```sh
+sudo python3.11 -m venv /opt/sub2api-certbot
+sudo /opt/sub2api-certbot/bin/pip install --index-url https://pypi.org/simple certbot==5.4.0
+sudo /opt/sub2api-certbot/bin/certbot certonly --non-interactive --agree-tos \
+  --register-unsafely-without-email --preferred-profile shortlived \
+  --webroot -w /var/www/letsencrypt --ip-address 47.106.176.71 --cert-name sub2api-ip
+```
+
+签发前必须让该 IP 的 80 端口默认虚拟主机提供 `/.well-known/acme-challenge/`，静态目录为 `/var/www/letsencrypt`。当前入口在 `/etc/nginx/conf.d/card-recharge.conf` 中，仅新增验证路径，原项目路由保持不变。80 端口需要保持公网可达，以便自动续期。443、6660 也需要允许公网访问。
+
+将 `renew-ip-certificate.sh` 安装为 `/usr/local/sbin/sub2api-cert-renew`（0755），将同目录的 service/timer 安装到 `/etc/systemd/system/`：
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now sub2api-cert-renew.timer
+sudo /usr/local/sbin/sub2api-cert-renew --dry-run
+sudo systemctl list-timers sub2api-cert-renew.timer
+sudo journalctl -u sub2api-cert-renew.service --no-pager -n 30
+```
+
+切换前 Nginx 配置备份位于服务器 `/home/admin/sub2api-https-backup/`。应用 `.env` 中的 `BIND_HOST` 应设为 `127.0.0.1`，并通过 Compose 重新创建 app 容器生效。
 
 ## 维护
 

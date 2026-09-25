@@ -9,7 +9,7 @@ def main():
     destination = Path(__file__).resolve().parent / ".env"
     values = {
         "APP_PORT": "6666",
-        "BIND_HOST": "0.0.0.0",
+        "BIND_HOST": "127.0.0.1",
         "SUB2API_IMAGE": "sub2api-online:local",
         "ADMIN_EMAIL": "admin@sub2api.local",
         "ADMIN_PASSWORD": secrets.token_urlsafe(24),

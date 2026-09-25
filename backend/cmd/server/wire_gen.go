@@ -14,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	"github.com/Wei-Shaw/sub2api/internal/handler/admin"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
+	"github.com/Wei-Shaw/sub2api/internal/proxyfailover"
 	"github.com/Wei-Shaw/sub2api/internal/repository"
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
 	"github.com/Wei-Shaw/sub2api/internal/server"
@@ -213,7 +214,8 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	pluginManager := service.NewPluginManager(pluginRepository, secretEncryptor, configConfig, pluginHostInfo, pluginKVStore)
 	accountTestService := service.ProvideAccountTestService(accountRepository, geminiTokenProvider, claudeTokenProvider, kiroTokenProvider, grokTokenProvider, antigravityGatewayService, httpUpstream, configConfig, tlsFingerprintProfileService, openAIGatewayService, settingService, pluginManager, adobeTokenProvider)
 	crsSyncService := service.NewCRSSyncService(accountRepository, proxyRepository, oAuthService, openAIOAuthService, geminiOAuthService, configConfig)
-	accountHandler := admin.ProvideAccountHandler(configConfig, adminService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, kiroOAuthService, grokOAuthService, rateLimitService, accountUsageService, accountTestService, concurrencyService, crsSyncService, sessionLimitCache, rpmCache, compositeTokenCacheInvalidator, grokQuotaService)
+	manager := proxyfailover.NewManager(db)
+	accountHandler := admin.ProvideAccountHandler(configConfig, adminService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, kiroOAuthService, grokOAuthService, rateLimitService, accountUsageService, accountTestService, concurrencyService, crsSyncService, sessionLimitCache, rpmCache, compositeTokenCacheInvalidator, grokQuotaService, manager)
 	adminAnnouncementHandler := admin.NewAnnouncementHandler(announcementService)
 	dataManagementService := service.NewDataManagementService()
 	dataManagementHandler := admin.NewDataManagementHandler(dataManagementService)
@@ -233,8 +235,8 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	cnProviderQuotaService := service.ProvideCNProviderQuotaService(accountRepository, proxyRepository, httpUpstream, configConfig)
 	cnProviderBalanceService := service.ProvideCNProviderBalanceService(accountRepository, proxyRepository, httpUpstream, configConfig)
 	cnProviderHandler := admin.NewCNProviderHandler(cnProviderQuotaService, cnProviderBalanceService)
-	manager := clash.NewManager(db)
-	proxyHandler := admin.NewProxyHandlerWithClash(adminService, manager)
+	clashManager := clash.NewManager(db)
+	proxyHandler := admin.NewProxyHandlerWithClash(adminService, clashManager)
 	adminRedeemHandler := admin.NewRedeemHandler(adminService, redeemService)
 	promoHandler := admin.NewPromoHandler(promoService)
 	encryptionKey, err := payment.ProvideEncryptionKey(configConfig)
@@ -366,7 +368,8 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 		Server:        httpServer,
 		PromptAudit:   promptService,
 		PluginManager: pluginManager,
-		Clash:         manager,
+		Clash:         clashManager,
+		ProxyFailover: manager,
 		Cleanup:       v,
 	}
 	return application, nil
@@ -375,6 +378,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 // wire.go:
 
 type Application struct {
+	ProxyFailover *proxyfailover.Manager
 	Clash         *clash.Manager
 	Server        *http.Server
 	PromptAudit   *securityaudit.PromptService

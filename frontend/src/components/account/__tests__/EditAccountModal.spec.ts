@@ -371,6 +371,8 @@ function mountModal(account = buildAccount(), renderGroupSelector = false) {
         Select: SelectStub,
         Icon: true,
         ProxySelector: true,
+        ProxyFailoverPanel: true,
+        ProxyAdBanner: true,
         GroupSelector: renderGroupSelector ? false : GroupSelectorStub,
         ModelWhitelistSelector: ModelWhitelistSelectorStub
       }
@@ -1857,6 +1859,25 @@ describe('EditAccountModal OpenAI 自动使用重置卡', () => {
 
 
 describe('EditAccountModal Adobe model mapping', () => {
+  it('preserves background failover when saving unrelated fields', async () => {
+    const account = buildAdobeAccount()
+    account.proxy_id = 1
+    const wrapper = mountModal(account)
+    wrapper.findComponent({ name: 'ProxyFailoverPanel' }).vm.$emit('current', 2)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]).not.toHaveProperty('proxy_id')
+    wrapper.unmount()
+  })
+  it('persists an explicit manual proxy change', async () => {
+    const account = buildAdobeAccount()
+    account.proxy_id = 1
+    const wrapper = mountModal(account)
+    wrapper.findComponent({ name: 'ProxySelector' }).vm.$emit('update:modelValue', 3)
+    wrapper.findComponent({ name: 'ProxyFailoverPanel' }).vm.$emit('current', 2)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.proxy_id).toBe(3)
+    wrapper.unmount()
+  })
   beforeEach(() => {
     authIsSimpleMode.value = true
     updateAccountMock.mockReset()

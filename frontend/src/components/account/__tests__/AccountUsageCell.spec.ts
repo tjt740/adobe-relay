@@ -121,6 +121,41 @@ describe('AccountUsageCell', () => {
     })
   })
 
+  it('shows Adobe degraded errors and forces a fresh batched query', async () => {
+    const requestBatchedUsage = vi.fn()
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({ id: 9981, platform: 'adobe', type: 'oauth' }),
+        requestBatchedUsage,
+        batchedUsage: { error_code: 'network_error', error: 'Get credits: EOF' }
+      }
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('admin.accounts.usageWindow.adobeUsageFailed')
+    requestBatchedUsage.mockClear()
+    await wrapper.get('[data-test="adobe-usage-refresh"]').trigger('click')
+    expect(requestBatchedUsage).toHaveBeenCalledWith(expect.objectContaining({ id: 9981 }), { force: true })
+    await wrapper.setProps({ batchedUsage: { adobe_plan_cap: 'HARD', adobe_credit: { current_usage: 4000, usage_limit: 8000, percentage_used: 50 } } })
+    expect(wrapper.text()).not.toContain('admin.accounts.usageWindow.adobeUsageFailed')
+    expect(wrapper.text()).toContain('HARD')
+    wrapper.unmount()
+  })
+
+  it('does not cache an Adobe error as successful usage across mounts', async () => {
+    getUsage.mockResolvedValueOnce({ error_code: 'network_error', error: 'EOF' })
+      .mockResolvedValueOnce({ adobe_plan_cap: 'HARD' })
+    const props = { account: makeAccount({ id: 9982, platform: 'adobe', type: 'oauth' }) }
+    const first = mount(AccountUsageCell, { props })
+    await flushPromises()
+    expect(first.text()).toContain('admin.accounts.usageWindow.adobeUsageFailed')
+    first.unmount()
+    const second = mount(AccountUsageCell, { props })
+    await flushPromises()
+    expect(getUsage).toHaveBeenCalledTimes(2)
+    expect(second.text()).toContain('HARD')
+    second.unmount()
+  })
+
   it.each(['oauth', 'setup-token'] as const)('renders Codex ticket status for OpenAI %s accounts', async (type) => {
     getUsage.mockResolvedValue({})
     const wrapper = mount(AccountUsageCell, {
