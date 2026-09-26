@@ -47,12 +47,12 @@ vi.mock('vue-i18n', async (importOriginal) => {
         if (key === 'profile.avatar.title') return 'Profile avatar'
         if (key === 'profile.avatar.description') return 'Upload and manage your avatar'
         if (key === 'profile.avatar.uploadAction') return 'Upload image'
-        if (key === 'profile.avatar.uploadHint') return 'Uploaded images are compressed to 20KB when possible'
+        if (key === 'profile.avatar.uploadHint') return 'Uploaded images are compressed to 2MB when possible'
         if (key === 'profile.avatar.saveSuccess') return 'Avatar updated'
         if (key === 'profile.avatar.deleteSuccess') return 'Avatar removed'
         if (key === 'profile.avatar.invalidType') return 'Please choose an image file'
-        if (key === 'profile.avatar.gifTooLarge') return 'GIF avatars must already be 20KB or smaller'
-        if (key === 'profile.avatar.compressTooLarge') return 'Unable to compress this image below 20KB'
+        if (key === 'profile.avatar.gifTooLarge') return 'GIF avatars must already be 2.5MB or smaller'
+        if (key === 'profile.avatar.compressTooLarge') return 'Unable to compress this image below 2MB'
         if (key === 'profile.avatar.compressFailed') return 'Failed to compress the selected image'
         if (key === 'profile.avatar.readFailed') return 'Failed to read the selected image'
         if (key === 'common.save') return 'Save'
@@ -107,7 +107,7 @@ function installAvatarCompressionMocks(blobSize = 8 * 1024) {
       if (blob.type === 'image/webp') {
         this.result = 'data:image/webp;base64,' + Buffer.from('compressed-avatar').toString('base64')
       } else {
-        this.result = 'data:image/png;base64,' + Buffer.from('original-avatar').toString('base64')
+        this.result = `data:${blob.type};base64,` + Buffer.from('original-avatar').toString('base64')
       }
       this.onload?.call(this as unknown as FileReader, new ProgressEvent('load'))
     }
@@ -175,8 +175,8 @@ describe('ProfileAvatarCard', () => {
     expect(wrapper.find('[data-testid="profile-avatar-input"]').exists()).toBe(false)
   })
 
-  it('compresses an uploaded image that exceeds the 20KB target before saving', async () => {
-    installAvatarCompressionMocks()
+  it('compresses an uploaded image that exceeds the 2MB target before saving', async () => {
+    installAvatarCompressionMocks(2 * 1024 * 1024)
     const updatedUser = createUser({ avatar_url: 'data:image/webp;base64,Y29tcHJlc3NlZC1hdmF0YXI=' })
     updateProfileMock.mockResolvedValue(updatedUser)
     authStoreState.user = createUser()
@@ -194,7 +194,7 @@ describe('ProfileAvatarCard', () => {
 
     const fileInput = wrapper.get('[data-testid="profile-avatar-file-input"]')
     Object.defineProperty(fileInput.element, 'files', {
-      value: [new File([new Uint8Array(220 * 1024)], 'avatar.png', { type: 'image/png' })],
+      value: [new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'avatar.png', { type: 'image/png' })],
       configurable: true
     })
 
@@ -226,7 +226,7 @@ describe('ProfileAvatarCard', () => {
 
     const fileInput = wrapper.get('[data-testid="profile-avatar-file-input"]')
     Object.defineProperty(fileInput.element, 'files', {
-      value: [new File([new Uint8Array(220 * 1024)], 'avatar.png', { type: 'image/png' })],
+      value: [new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'avatar.png', { type: 'image/png' })],
       configurable: true
     })
 
@@ -235,6 +235,45 @@ describe('ProfileAvatarCard', () => {
 
     const preview = wrapper.get('[data-testid="profile-avatar-preview"]')
     expect(preview.attributes('src')).toBe('data:image/webp;base64,Y29tcHJlc3NlZC1hdmF0YXI=')
+  })
+
+  it.each([
+    ['image/png', 2 * 1024 * 1024],
+    ['image/gif', 2.5 * 1024 * 1024]
+  ])('preserves a %s avatar at its size limit', async (type, size) => {
+    installAvatarCompressionMocks()
+    const avatarURL = `data:${type};base64,` + Buffer.from('original-avatar').toString('base64')
+    updateProfileMock.mockResolvedValue(createUser({ avatar_url: avatarURL }))
+    const wrapper = mount(ProfileAvatarCard, { props: { user: createUser() } })
+    const fileInput = wrapper.get('[data-testid="profile-avatar-file-input"]')
+    Object.defineProperty(fileInput.element, 'files', {
+      value: [new File([new Uint8Array(size)], 'avatar', { type })]
+    })
+
+    await fileInput.trigger('change')
+    await flushAsyncWork()
+    await wrapper.get('[data-testid="profile-avatar-save"]').trigger('click')
+
+    expect(updateProfileMock).toHaveBeenCalledWith({ avatar_url: avatarURL })
+    expect(showErrorMock).not.toHaveBeenCalled()
+    expect(document.createElement).not.toHaveBeenCalledWith('canvas')
+  })
+
+  it('rejects a GIF one byte over 2.5MB', async () => {
+    installAvatarCompressionMocks()
+    const wrapper = mount(ProfileAvatarCard, { props: { user: createUser() } })
+    const fileInput = wrapper.get('[data-testid="profile-avatar-file-input"]')
+    Object.defineProperty(fileInput.element, 'files', {
+      value: [new File([new Uint8Array(2.5 * 1024 * 1024 + 1)], 'avatar.gif', { type: 'image/gif' })]
+    })
+
+    await fileInput.trigger('change')
+    await flushAsyncWork()
+
+    expect(showErrorMock).toHaveBeenCalledWith('GIF avatars must already be 2.5MB or smaller')
+    expect(wrapper.find('[data-testid="profile-avatar-preview"]').exists()).toBe(false)
+    expect(updateProfileMock).not.toHaveBeenCalled()
+    expect(document.createElement).not.toHaveBeenCalledWith('canvas')
   })
 
   it('deletes the current avatar', async () => {
