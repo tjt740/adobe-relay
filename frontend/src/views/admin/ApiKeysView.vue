@@ -10,13 +10,7 @@
           </div>
           <div>
             <label for="key-status" class="input-label">{{ t('common.status') }}</label>
-            <select id="key-status" v-model="status" class="input">
-              <option value="">{{ t('common.all') }}</option>
-              <option value="active">{{ t('common.active') }}</option>
-              <option value="inactive">{{ t('common.inactive') }}</option>
-              <option value="quota_exhausted">{{ t('adminKeys.quotaExhausted') }}</option>
-              <option value="expired">{{ t('adminKeys.expired') }}</option>
-            </select>
+            <Select id="key-status" v-model="status" :options="statusOptions" class="min-w-40" />
           </div>
           <button class="btn btn-primary" :disabled="loading">{{ t('common.search') }}</button>
           <button type="button" class="btn btn-secondary" :disabled="loading" @click="load">{{ t('common.refresh') }}</button>
@@ -51,14 +45,22 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AppLayout } from '@/components/layout'
 import Pagination from '@/components/common/Pagination.vue'
+import Select from '@/components/common/Select.vue'
 import AdminKeySecret from '@/components/admin/AdminKeySecret.vue'
 import { listApiKeys, type AdminApiKey } from '@/api/admin/apiKeys'
 const { t } = useI18n()
 const query = ref(''), status = ref('')
+const statusOptions = computed(() => [
+  { value: '', label: t('common.all') },
+  { value: 'active', label: t('common.active') },
+  { value: 'inactive', label: t('common.inactive') },
+  { value: 'quota_exhausted', label: t('adminKeys.quotaExhausted') },
+  { value: 'expired', label: t('adminKeys.expired') }
+])
 const page = ref(1), pageSize = ref(20), total = ref(0)
 const items = ref<AdminApiKey[]>([])
 const loading = ref(false), loadError = ref(false)

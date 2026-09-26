@@ -60,6 +60,15 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		return filtered
 	}
 
+	if isAdobeGeminiV1Beta(c, apiKey) {
+		models := service.AdobeGeminiModels()
+		for _, alias := range h.adobeGeminiAccountAliases(c.Request.Context(), apiKey.GroupID) {
+			models = append(models, service.AdobeGeminiModel(alias))
+		}
+		c.JSON(http.StatusOK, gemini.ModelsListResponse{Models: filterGeminiModels(models)})
+		return
+	}
+
 	agModelIDs, err := h.geminiCompatService.AntigravityGeminiModelIDs(c.Request.Context(), apiKey.GroupID, forcePlatform != service.PlatformAntigravity)
 	if err != nil {
 		googleError(c, http.StatusServiceUnavailable, "Unable to list Antigravity models")
@@ -71,15 +80,6 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 	}
 	if forcePlatform == service.PlatformAntigravity {
 		c.JSON(http.StatusOK, gemini.ModelsListResponse{Models: filterGeminiModels(agModels)})
-		return
-	}
-
-	if isAdobeGeminiV1Beta(c, apiKey) {
-		models := service.AdobeGeminiModels()
-		for _, alias := range h.adobeGeminiAccountAliases(c.Request.Context(), apiKey.GroupID) {
-			models = append(models, service.AdobeGeminiModel(alias))
-		}
-		c.JSON(http.StatusOK, gemini.ModelsListResponse{Models: filterGeminiModels(models)})
 		return
 	}
 

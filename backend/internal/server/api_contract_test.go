@@ -962,10 +962,14 @@ func TestAPIContracts(t *testing.T) {
 					"openai_codex_client_version_synced": "",
 					"openai_codex_version_auto_sync_enabled": true,
 					"openai_codex_ticket_enabled": false,
+                    "openai_codex_ticket_fail_closed": false,
 					"openai_codex_ticket_harvest_proxy_url": "",
 					"openai_codex_ticket_harvest_proxy_configured": false,
 					"openai_codex_ticket_default_length": 292,
 					"openai_codex_ticket_plan_lengths": [],
+					"claude_code_client_version": "",
+					"claude_code_client_version_synced": "",
+					"claude_code_version_auto_sync_enabled": true,
 					"openai_fast_policy_settings": {
 						"rules": []
 					},
@@ -1284,10 +1288,14 @@ func TestAPIContracts(t *testing.T) {
 					"openai_codex_client_version_synced": "",
 					"openai_codex_version_auto_sync_enabled": true,
 					"openai_codex_ticket_enabled": false,
+                    "openai_codex_ticket_fail_closed": false,
 					"openai_codex_ticket_harvest_proxy_url": "",
 					"openai_codex_ticket_harvest_proxy_configured": false,
 					"openai_codex_ticket_default_length": 292,
 					"openai_codex_ticket_plan_lengths": [],
+					"claude_code_client_version": "",
+					"claude_code_client_version_synced": "",
+					"claude_code_version_auto_sync_enabled": true,
 					"openai_fast_policy_settings": {
 						"rules": []
 					},

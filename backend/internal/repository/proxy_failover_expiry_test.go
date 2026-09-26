@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 )
@@ -33,7 +34,7 @@ func TestExpiryRespectsLiveFailoverPolicy(t *testing.T) {
 	db, err := sql.Open("postgres", u.String())
 	require.NoError(t, err)
 	defer db.Close()
-	_, err = db.Exec(`CREATE TABLE proxies(id bigint PRIMARY KEY,status text,updated_at timestamptz,deleted_at timestamptz);
+	_, err = db.Exec(`CREATE TABLE proxies(id bigint PRIMARY KEY,status text,updated_at timestamptz,deleted_at timestamptz,expires_at timestamptz,fallback_mode text,backup_proxy_id bigint);
  CREATE TABLE accounts(id bigint PRIMARY KEY,proxy_id bigint,proxy_fallback_origin_id bigint,type text,extra jsonb,updated_at timestamptz,deleted_at timestamptz);
  CREATE TABLE account_proxy_failover(account_id bigint PRIMARY KEY,enabled bool);
  INSERT INTO proxies(id,status) VALUES(1,'active'),(2,'active');
@@ -41,10 +42,14 @@ func TestExpiryRespectsLiveFailoverPolicy(t *testing.T) {
  INSERT INTO account_proxy_failover(account_id,enabled) VALUES(1,true),(2,false);`)
 	require.NoError(t, err)
 	repo := &proxyRepository{}
+	now := time.Now().UTC().Truncate(time.Second)
+	expiredAt := now.Add(-time.Hour)
 	for _, target := range []*int64{nil, new(int64(2))} {
 		_, err = db.Exec("UPDATE accounts SET proxy_id=1")
 		require.NoError(t, err)
-		changed, err := repo.sweepOneExpiredProxyOnExec(context.Background(), db, 1, target, true)
+		_, err = db.Exec("UPDATE proxies SET status='active', expires_at=$1, fallback_mode='direct' WHERE id=1", expiredAt)
+		require.NoError(t, err)
+		changed, err := repo.sweepOneExpiredProxyOnExec(context.Background(), db, service.Proxy{ID: 1, ExpiresAt: &expiredAt, FallbackMode: "direct"}, now, target, true)
 		require.NoError(t, err)
 		require.ElementsMatch(t, []int64{2, 3}, changed)
 		var current int64
