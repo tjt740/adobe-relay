@@ -241,6 +241,7 @@ type Account struct {
 	AutoPauseOnExpired      bool                              `json:"auto_pause_on_expired"`
 	CreatedAt               time.Time                         `json:"created_at"`
 	UpdatedAt               time.Time                         `json:"updated_at"`
+	OpenCodeGoUsage         *service.OpenCodeGoUsageState     `json:"opencode_go_usage,omitempty"`
 
 	Schedulable bool `json:"schedulable"`
 
@@ -358,6 +359,7 @@ type AccountListItem struct {
 	Extra             map[string]any                    `json:"extra,omitempty"`
 	OllamaCloudUsage  *service.OllamaCloudUsageState    `json:"ollama_cloud_usage,omitempty"`
 	CodexTurnTickets  []service.OpenAICodexTicketStatus `json:"codex_turn_tickets,omitempty"`
+	OpenCodeGoUsage   *service.OpenCodeGoUsageState     `json:"opencode_go_usage,omitempty"`
 
 	ProxyID                 *int64     `json:"proxy_id"`
 	ProxyFallbackOriginID   *int64     `json:"proxy_fallback_origin_id"`
@@ -722,16 +724,19 @@ type AdminUsageLog struct {
 }
 
 type UsageCleanupFilters struct {
-	StartTime   time.Time `json:"start_time"`
-	EndTime     time.Time `json:"end_time"`
-	UserID      *int64    `json:"user_id,omitempty"`
-	APIKeyID    *int64    `json:"api_key_id,omitempty"`
-	AccountID   *int64    `json:"account_id,omitempty"`
-	GroupID     *int64    `json:"group_id,omitempty"`
-	Model       *string   `json:"model,omitempty"`
-	RequestType *string   `json:"request_type,omitempty"`
-	Stream      *bool     `json:"stream,omitempty"`
-	BillingType *int8     `json:"billing_type,omitempty"`
+	StartTime             time.Time `json:"start_time"`
+	EndTime               time.Time `json:"end_time"`
+	UserID                *int64    `json:"user_id,omitempty"`
+	APIKeyID              *int64    `json:"api_key_id,omitempty"`
+	AccountID             *int64    `json:"account_id,omitempty"`
+	GroupID               *int64    `json:"group_id,omitempty"`
+	Model                 *string   `json:"model,omitempty"`
+	RequestType           *string   `json:"request_type,omitempty"`
+	Stream                *bool     `json:"stream,omitempty"`
+	BillingType           *int8     `json:"billing_type,omitempty"`
+	NativeCompactionV2    *bool     `json:"native_compaction_v2,omitempty"`
+	BillingMode           string    `json:"billing_mode,omitempty"`
+	UpstreamModelMismatch *bool     `json:"upstream_model_mismatch,omitempty"`
 }
 
 type UsageCleanupTask struct {
