@@ -98,7 +98,8 @@ const { t } = useI18n()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 
-const targetAvatarUploadBytes = 20 * 1024
+const targetAvatarUploadBytes = 2 * 1024 * 1024
+const maxGifAvatarUploadBytes = 2.5 * 1024 * 1024
 const avatarScaleSteps = [1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.52, 0.44, 0.36]
 const avatarQualitySteps = [0.92, 0.84, 0.76, 0.68, 0.6, 0.52, 0.44, 0.36]
 const avatarDraft = ref('')
@@ -193,7 +194,7 @@ async function prepareAvatarUpload(file: File): Promise<File> {
     throw new Error(t('profile.avatar.invalidType'))
   }
   if (file.type === 'image/gif') {
-    if (file.size > targetAvatarUploadBytes) {
+    if (file.size > maxGifAvatarUploadBytes) {
       throw new Error(t('profile.avatar.gifTooLarge'))
     }
     return file

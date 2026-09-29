@@ -748,9 +748,9 @@ func TestUpdateProfile_StoresInlineAvatarWithinLimit(t *testing.T) {
 	require.Equal(t, hex.EncodeToString(expectedSum[:]), updated.AvatarSHA256)
 }
 
-func TestUpdateProfile_CompressesInlineAvatarToTwentyKilobytes(t *testing.T) {
+func TestUpdateProfile_CompressesInlineAvatarToTwoMegabytes(t *testing.T) {
 	var encoded bytes.Buffer
-	for _, size := range []int{192, 224, 256, 288} {
+	for _, size := range []int{896, 928, 960, 992} {
 		encoded.Reset()
 		var img image.RGBA
 		img.Rect = image.Rect(0, 0, size, size)
@@ -765,12 +765,13 @@ func TestUpdateProfile_CompressesInlineAvatarToTwentyKilobytes(t *testing.T) {
 				img.Pix[offset+3] = 0xff
 			}
 		}
-		require.NoError(t, png.Encode(&encoded, &img))
-		if encoded.Len() > 20*1024 && encoded.Len() <= maxInlineAvatarBytes {
+		encoder := png.Encoder{CompressionLevel: png.NoCompression}
+		require.NoError(t, encoder.Encode(&encoded, &img))
+		if encoded.Len() > 2*1024*1024 && encoded.Len() <= maxInlineAvatarBytes {
 			break
 		}
 	}
-	require.Greater(t, encoded.Len(), 20*1024)
+	require.Greater(t, encoded.Len(), 2*1024*1024)
 	require.LessOrEqual(t, encoded.Len(), maxInlineAvatarBytes)
 
 	dataURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString(encoded.Bytes())
@@ -789,12 +790,12 @@ func TestUpdateProfile_CompressesInlineAvatarToTwentyKilobytes(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, repo.upsertAvatarArgs, 1)
 	require.Equal(t, "inline", repo.upsertAvatarArgs[0].StorageProvider)
-	require.LessOrEqual(t, repo.upsertAvatarArgs[0].ByteSize, 20*1024)
+	require.LessOrEqual(t, repo.upsertAvatarArgs[0].ByteSize, 2*1024*1024)
 	require.Equal(t, "image/jpeg", repo.upsertAvatarArgs[0].ContentType)
 	require.Contains(t, repo.upsertAvatarArgs[0].URL, "data:image/jpeg;base64,")
 	require.Equal(t, "inline", updated.AvatarSource)
 	require.Equal(t, "image/jpeg", updated.AvatarMIME)
-	require.LessOrEqual(t, updated.AvatarByteSize, 20*1024)
+	require.LessOrEqual(t, updated.AvatarByteSize, 2*1024*1024)
 	require.Contains(t, updated.AvatarURL, "data:image/jpeg;base64,")
 	require.NotEmpty(t, updated.AvatarSHA256)
 }
@@ -817,6 +818,40 @@ func TestUpdateProfile_RejectsInlineAvatarOverLimit(t *testing.T) {
 	require.ErrorIs(t, err, ErrAvatarTooLarge)
 	require.Empty(t, repo.upsertAvatarArgs)
 	require.Empty(t, repo.deleteAvatarIDs)
+	require.Zero(t, repo.updateCalls)
+}
+
+func TestUpdateProfile_PreservesAvatarAtSizeLimit(t *testing.T) {
+	for _, tc := range []struct {
+		contentType string
+		size        int
+	}{
+		{"image/png", 2 * 1024 * 1024},
+		{"image/gif", 5 * 1024 * 1024 / 2},
+	} {
+		t.Run(tc.contentType, func(t *testing.T) {
+			raw := make([]byte, tc.size)
+			dataURL := "data:" + tc.contentType + ";base64," + base64.StdEncoding.EncodeToString(raw)
+			repo := &mockUserRepo{getByIDUser: &User{ID: 18, Email: "avatar@example.com"}}
+			svc := NewUserService(repo, nil, nil, nil)
+			updated, err := svc.UpdateProfile(context.Background(), 18, UpdateProfileRequest{AvatarURL: &dataURL})
+			require.NoError(t, err)
+			require.Len(t, repo.upsertAvatarArgs, 1)
+			require.Equal(t, dataURL, updated.AvatarURL)
+			require.Equal(t, tc.contentType, updated.AvatarMIME)
+			require.Equal(t, tc.size, updated.AvatarByteSize)
+		})
+	}
+}
+
+func TestUpdateProfile_RejectsGIFOverSizeLimit(t *testing.T) {
+	raw := make([]byte, 5*1024*1024/2+1)
+	dataURL := "data:image/gif;base64," + base64.StdEncoding.EncodeToString(raw)
+	repo := &mockUserRepo{getByIDUser: &User{ID: 19, Email: "avatar@example.com"}}
+	svc := NewUserService(repo, nil, nil, nil)
+	_, err := svc.UpdateProfile(context.Background(), 19, UpdateProfileRequest{AvatarURL: &dataURL})
+	require.ErrorIs(t, err, ErrAvatarTooLarge)
+	require.Empty(t, repo.upsertAvatarArgs)
 	require.Zero(t, repo.updateCalls)
 }
 
