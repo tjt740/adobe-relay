@@ -599,6 +599,24 @@ func TestAdobeImageServiceFansOutNSharesUploadedSource(t *testing.T) {
 	}
 }
 
+func TestAdobeImageServiceRejectsUnsupportedFlareSizeBeforeSubmit(t *testing.T) {
+	api := &adobeFakeTransport{handler: func(*adobe.Request, int) (*adobe.Response, error) {
+		t.Fatal("invalid dimensions must not submit an upstream job")
+		return nil, nil
+	}}
+	svc := newAdobeTestService(t, adobe.NewClient(adobe.ClientConfig{Transport: api, DownloadTransport: api}), nil)
+	result, err := svc.Generate(context.Background(), adobeTestAccount(), "tok", &OpenAIImagesRequest{
+		Model: "gpt-image-2.5-flare", Prompt: "x", N: 1, Size: "4096x4096",
+	})
+	require.Nil(t, result)
+	require.ErrorContains(t, err, "longest edge must not exceed 3840")
+	var op *adobe.OperationError
+	require.ErrorAs(t, err, &op)
+	require.Equal(t, "prepare", op.Stage)
+	require.Equal(t, NextAccountStop, classifyAdobeError(err).Failover.NextAccountAction)
+	require.Empty(t, api.calls)
+}
+
 func TestAdobeImageServiceRejectsNAboveMax(t *testing.T) {
 	api := &adobeFakeTransport{handler: func(*adobe.Request, int) (*adobe.Response, error) {
 		t.Fatal("不应发起上游请求")

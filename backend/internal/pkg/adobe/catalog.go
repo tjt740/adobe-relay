@@ -576,6 +576,14 @@ func resolveNonRatioFamily(spec imageFamilySpec, req ImageRequest) (ImageModelCo
 			pixels = Size{Width: width, Height: height}
 		}
 	}
+	// Confirmed by Firefly's flare validation response (2026-09-29). These
+	// limits describe this model only; do not apply them to Gemini/other families
+	// or silently resize the image the caller requested.
+	if spec.upstreamModelVersion == "gpt-image-2.5-flare" &&
+		(pixels.Width > 3840 || pixels.Height > 3840 || pixels.Width*pixels.Height > 8294400) {
+		return ImageModelConf{}, NewRequestError(fmt.Sprintf(
+			"Invalid size %s for gpt-image-2.5-flare: longest edge must not exceed 3840 pixels and total pixels must not exceed 8294400. Use 3840x2160 for landscape 4K or 2048x2048 for a square image.", pixels.String()))
+	}
 
 	// 计费档位必须跟实际发给上游的像素走，而不是客户端写的 size：enum 家族会被 NearestSize
 	// 换成另一个尺寸（232x100 → 2112x912），按请求 size 计费会让用户挑低档或被多收。

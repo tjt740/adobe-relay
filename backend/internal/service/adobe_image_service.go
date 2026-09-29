@@ -150,7 +150,7 @@ func (s *AdobeImageService) GenerateCall(
 	upstreamModelID := account.GetMappedModel(requestedModel)
 	conf, err := adobe.ResolveImage(call.imageRequest(upstreamModelID))
 	if err != nil {
-		return nil, err
+		return nil, &adobe.OperationError{Stage: "prepare", Err: err}
 	}
 
 	client := s.clients.clientForAccount(account)
