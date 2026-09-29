@@ -58,6 +58,8 @@ type Request struct {
 // 或单个媒体文件，不需要流式处理。
 type Response struct {
 	StatusCode int
+	// Attempts is populated by the submission retry loop for diagnostics.
+	Attempts int
 	// Headers 的键统一小写，多值只保留第一个。
 	Headers map[string]string
 	Body    []byte

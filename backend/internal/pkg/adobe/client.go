@@ -24,6 +24,8 @@ const (
 	// maxConsecutivePollFailures 是轮询连续遇到临时故障（网络错误、408/429/5xx）的容忍次数。
 	// 任务已提交、credits 已在消耗，一次抖动就放弃会让 handler 换号重新生成；成功一次即清零。
 	maxConsecutivePollFailures = 3
+	// A media GET is safe to retry: it retrieves the same already-generated asset.
+	mediaDownloadAttempts = 3
 	// videoDownloadTimeout 是视频产物下载的单次超时；图片沿用 defaultSubmitTimeout。
 	videoDownloadTimeout = 5 * time.Minute
 )
@@ -31,6 +33,8 @@ const (
 // submitRetryWait 是两次提交之间的基础等待；按次翻倍（1.5s / 3s）。
 // 单测把它置 0，避免给套件加秒级延迟。
 var submitRetryWait = 1500 * time.Millisecond
+
+var downloadRetryWait = time.Second
 
 // ClientConfig 是构造 Client 的参数。
 type ClientConfig struct {
@@ -231,14 +235,24 @@ type GenerateResult struct {
 // 提交阶段依次尝试 BuildImagePayloadCandidates 返回的候选，命中 200 即停；
 // 遇到 401/403 立即中断——那是凭据问题，换 payload 形状无用。
 // 408/429/451/5xx 是上游过载或故障，不是 schema 问题：不再换候选（重试策略见 postSubmit）。
-func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) (*GenerateResult, error) {
+func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) (result *GenerateResult, retErr error) {
+	started := time.Now()
+	stage := "prepare"
+	var submitResp *Response
+	defer func() {
+		attempts := 0
+		if submitResp != nil {
+			attempts = submitResp.Attempts
+		}
+		retErr = operationError(retErr, stage, started, attempts, submitResp, "")
+	}()
 	candidates, err := BuildImagePayloadCandidates(input.Options)
 	if err != nil {
 		return nil, err
 	}
 
 	headers, order := c.submitHeaders(input.Token, input.Options.Prompt, input.ARPSessionID)
-	var submitResp *Response
+	stage = "submit"
 	for _, payload := range candidates {
 		body, err := marshalPayloadJSON(payload)
 		if err != nil {
@@ -281,8 +295,8 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) (*
 
 // GenerateVideoInput 是一次视频生成请求。
 type GenerateVideoInput struct {
-	Token        string
-	Options      VideoPayloadOptions
+	Token   string
+	Options VideoPayloadOptions
 	// ARPSessionID 是账号里保存的 Sherlock x-arp-session-id；空则回落到 BuildARPSessionID stub。
 	ARPSessionID string
 	Timeout      time.Duration
@@ -337,7 +351,13 @@ type pollParams struct {
 	downloadWait time.Duration
 }
 
-func (c *Client) poll(ctx context.Context, params pollParams) (*GenerateResult, error) {
+func (c *Client) poll(ctx context.Context, params pollParams) (result *GenerateResult, retErr error) {
+	started := time.Now()
+	var lastResponse *Response
+	attempts := 0
+	defer func() {
+		retErr = operationError(retErr, "poll", started, attempts, lastResponse, params.pollURL)
+	}()
 	// 轮询链接来自上游响应，且请求会带账号 token：只允许发往 adobe.io。
 	if err := validateAPIURL(params.pollURL); err != nil {
 		return nil, err
@@ -347,6 +367,7 @@ func (c *Client) poll(ctx context.Context, params pollParams) (*GenerateResult, 
 	consecutiveFailures := 0
 
 	for {
+		attempts++
 		resp, err := c.transport.Do(ctx, &Request{
 			Method:      http.MethodGet,
 			URL:         params.pollURL,
@@ -354,6 +375,7 @@ func (c *Client) poll(ctx context.Context, params pollParams) (*GenerateResult, 
 			HeaderOrder: order,
 			Timeout:     defaultSubmitTimeout,
 		})
+		lastResponse = resp
 		if err != nil {
 			if !isTransientPollError(ctx, err) {
 				return nil, err
@@ -435,7 +457,7 @@ func isTransientPollError(ctx context.Context, err error) bool {
 // waitNextPoll 在两次轮询之间检查截止时间并等待 pollInterval；ctx 取消立即返回。
 func waitNextPoll(ctx context.Context, deadline time.Time, params pollParams) error {
 	if timeNow().After(deadline) {
-		return NewRequestError(fmt.Sprintf("%s generation timed out", params.label))
+		return NewUpstreamTemporaryError(fmt.Sprintf("%s generation timed out", params.label), 0, ErrorTypeTimeout)
 	}
 	select {
 	case <-ctx.Done():
@@ -445,28 +467,50 @@ func waitNextPoll(ctx context.Context, deadline time.Time, params pollParams) er
 	}
 }
 
-func (c *Client) download(ctx context.Context, mediaURL string, maxBytes int64, timeout time.Duration) ([]byte, error) {
+func (c *Client) download(ctx context.Context, mediaURL string, maxBytes int64, timeout time.Duration) (data []byte, retErr error) {
+	started := time.Now()
+	var resp *Response
+	attempts := 0
+	defer func() {
+		retErr = operationError(retErr, "download", started, attempts, resp, "")
+	}()
 	if err := validateDownloadURL(mediaURL); err != nil {
 		return nil, err
 	}
-	resp, err := c.downloadTransport.Do(ctx, &Request{
-		Method:       http.MethodGet,
-		URL:          mediaURL,
-		Headers:      map[string]string{"accept": "*/*"},
-		Timeout:      orDuration(timeout, defaultSubmitTimeout),
-		MaxBodyBytes: maxBytes,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, &RequestError{
-			Message:    fmt.Sprintf("media download failed: HTTP %d", resp.StatusCode),
-			StatusCode: resp.StatusCode,
-			ErrorType:  ErrorTypeStatus,
+	for attempts = 1; attempts <= mediaDownloadAttempts; attempts++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		var err error
+		resp, err = c.downloadTransport.Do(ctx, &Request{
+			Method: http.MethodGet, URL: mediaURL,
+			Headers: map[string]string{"accept": "*/*"},
+			Timeout: orDuration(timeout, defaultSubmitTimeout), MaxBodyBytes: maxBytes,
+		})
+		if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
+			return resp.Body, nil
+		}
+		if err == nil {
+			if resp == nil {
+				err = NewUpstreamTemporaryError("media download returned no response", 0, ErrorTypeNetwork)
+			} else if resp.StatusCode == 408 || resp.StatusCode == 429 || resp.StatusCode >= 500 {
+				err = NewUpstreamTemporaryError(fmt.Sprintf("media download failed: HTTP %d", resp.StatusCode), resp.StatusCode, ErrorTypeStatus)
+			} else {
+				err = &RequestError{Message: fmt.Sprintf("media download failed: HTTP %d", resp.StatusCode), StatusCode: resp.StatusCode, ErrorType: ErrorTypeStatus}
+			}
+		}
+		var temporary *UpstreamTemporaryError
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if attempts == mediaDownloadAttempts || !errors.As(err, &temporary) {
+			return nil, err
+		}
+		if err := waitRetry(ctx, downloadRetryWait, attempts); err != nil {
+			return nil, err
 		}
 	}
-	return resp.Body, nil
+	return nil, NewUpstreamTemporaryError("media download retries exhausted", 0, ErrorTypeNetwork)
 }
 
 // postSubmit 发送 generate-async 提交，只对 Adobe 降载状态码（408/429）在同一账号上退避重试。
@@ -475,9 +519,12 @@ func (c *Client) download(ctx context.Context, mediaURL string, maxBytes int64, 
 // 重复的付费任务；这类错误交给 handler 换号，最坏提交次数从 3×换号数降到换号数。
 func (c *Client) postSubmit(
 	ctx context.Context, rawURL string, headers map[string]string, order []string, body []byte,
-) (*Response, error) {
+) (result *Response, retErr error) {
+	started := time.Now()
+	attempt := 0
+	defer func() { retErr = operationError(retErr, "submit", started, attempt, result, "") }()
 	var last *Response
-	for attempt := 1; attempt <= submitAttempts; attempt++ {
+	for attempt = 1; attempt <= submitAttempts; attempt++ {
 		resp, err := c.transport.Do(ctx, &Request{
 			Method:      http.MethodPost,
 			URL:         rawURL,
@@ -489,6 +536,10 @@ func (c *Client) postSubmit(
 		if err != nil {
 			return nil, err
 		}
+		if resp == nil {
+			return nil, NewUpstreamTemporaryError("submit returned no response", 0, ErrorTypeNetwork)
+		}
+		resp.Attempts = attempt
 		last = resp
 		if !isSubmitLoadSheddingStatus(resp.StatusCode) || IsContentRejectedBody(string(resp.Body)) {
 			return resp, nil
@@ -509,10 +560,13 @@ func isSubmitLoadSheddingStatus(status int) bool {
 }
 
 func waitSubmitRetry(ctx context.Context, attempt int) error {
+	return waitRetry(ctx, submitRetryWait, attempt)
+}
+
+func waitRetry(ctx context.Context, wait time.Duration, attempt int) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	wait := submitRetryWait
 	if wait <= 0 {
 		return nil
 	}
@@ -564,6 +618,8 @@ func classifyAdobeHTTPError(status int, body, message string) error {
 	}
 	// 上游 4xx 体可能含内部字段：原文只留在 Message（日志），对外给固定文案。
 	requestErr := NewRequestError(message)
+	requestErr.StatusCode = status
+	requestErr.ErrorType = ErrorTypeStatus
 	requestErr.UserMessage = fmt.Sprintf("Adobe rejected the request (HTTP %d)", status)
 	return requestErr
 }

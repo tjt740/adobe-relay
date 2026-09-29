@@ -18,6 +18,7 @@ import (
 
 func TestMain(m *testing.M) {
 	submitRetryWait = 0
+	downloadRetryWait = 0
 	os.Exit(m.Run())
 }
 
