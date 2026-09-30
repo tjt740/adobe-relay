@@ -116,6 +116,8 @@ An Adobe API-key account without `base_url` is not a relay account.
 
 `quality` maps to Firefly `detailLevel`: `low` (default) → 1, `medium` → 3, `high` → 5, `xhigh`/`max` → 5 on v2/1.5 or 7 on 2.5.
 
+Direct Adobe Cookie GPT Image generation and edit responses include a top-level `quality` describing the normalized level submitted to Firefly: 1 → `low`, 3 → `medium`, 5 → `high`, 7 → `max`. Requests for `max` or `xhigh` return `max` on 2.5 and `high` on v2/1.5. Omitted, `auto`, or unrecognized values retain the existing default and return `low`. The field is preserved for URL responses, Base64 responses, and storage failure fallback; other Adobe models without this quality control omit it. This reports the submitted setting, not an upstream assessment of the resulting image.
+
 The gpt-image family accepts OpenAI `background` values: `transparent`, `opaque`, and `auto`.
 
 `n` defaults to 1 (max 10). Cookie accounts split it into n Firefly jobs and bill per image. `output_format` of `png` or `jpeg` is applied locally after download; `webp` is rejected; omitting it keeps whatever Firefly returned. `background=transparent` cannot be combined with `output_format=jpeg`.

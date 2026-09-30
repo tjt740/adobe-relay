@@ -115,6 +115,8 @@ Cookie が無効になったらブラウザから再エクスポートしてく�
 
 `quality` は Firefly の `detailLevel` に対応します: `low`（デフォルト）→ 1、`medium` → 3、`high` → 5、`xhigh`/`max` は v2/1.5 で 5、2.5 で 7。
 
+Adobe Cookie 直結の GPT Image 生成・編集レスポンスは、Firefly に送信した設定を正規化した `quality` をトップレベルに返します。1 → `low`、3 → `medium`、5 → `high`、7 → `max` です。`max` / `xhigh` は 2.5 では `max`、v2/1.5 では `high` を返します。省略、`auto`、未認識の値は従来のデフォルトを維持し `low` を返します。URL・Base64・ストレージ失敗時のフォールバックでもこのフィールドを保持します。品質設定のない他の Adobe モデルでは省略します。これは送信した設定であり、上流による生成画像の品質評価ではありません。
+
 gpt-image ファミリーは OpenAI の `background`（`transparent` / `opaque` / `auto`）を受け付けます。
 
 `n` の省略時は 1（最大 10）です。Cookie アカウントは n 回の Firefly ジョブに分割し、枚数課金します。`output_format` が `png` または `jpeg` の場合はダウンロード後にローカル変換します。`webp` は拒否し、未指定なら Firefly の形式を維持します。`background=transparent` と `output_format=jpeg` は同時に使えません。

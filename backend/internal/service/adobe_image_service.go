@@ -186,7 +186,7 @@ func (s *AdobeImageService) GenerateCall(
 	}
 
 	requestID := uuid.NewString()
-	body, err := s.buildResponseBody(upstreamCtx, requestID, images)
+	body, err := s.buildResponseBody(upstreamCtx, requestID, images, adobeImageResponseQuality(conf, req.Quality))
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +294,7 @@ func (s *AdobeImageService) uploadSourceImages(
 //
 // 先按 b64_json 组装，再在对象存储可用时整体过一遍 ImageResultUploader.Rewrite——
 // 它会把每项的 b64_json 上传后替换成 url。这样两条分支共用同一段组装逻辑。
-func (s *AdobeImageService) buildResponseBody(ctx context.Context, requestID string, images [][]byte) ([]byte, error) {
+func (s *AdobeImageService) buildResponseBody(ctx context.Context, requestID string, images [][]byte, quality string) ([]byte, error) {
 	if len(images) == 0 {
 		return nil, adobe.NewRequestError("adobe returned an empty image")
 	}
@@ -308,6 +308,9 @@ func (s *AdobeImageService) buildResponseBody(ctx context.Context, requestID str
 	payload := map[string]any{
 		"created": time.Now().Unix(),
 		"data":    data,
+	}
+	if quality != "" {
+		payload["quality"] = quality
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
