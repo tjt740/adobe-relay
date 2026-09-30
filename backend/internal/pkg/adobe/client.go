@@ -245,6 +245,14 @@ type GenerationTimings struct {
 	SubmitAttempts   int   `json:"submit_attempts"`
 	PollCount        int   `json:"poll_count"`
 	DownloadAttempts int   `json:"download_attempts"`
+	// HTTP time includes both network transit and Adobe's handling/long polling.
+	// It is not a measurement of network latency alone.
+	PollHTTPMS         int64             `json:"poll_http_ms"`
+	PollWaitMS         int64             `json:"poll_wait_ms"`
+	PollHTTPMaxMS      int64             `json:"poll_http_max_ms"`
+	PollHost           string            `json:"poll_host,omitempty"`
+	Polls              []PollObservation `json:"polls,omitempty"`
+	PollSamplesDropped int               `json:"poll_samples_dropped,omitempty"`
 }
 
 // GenerateImage 走「提交 → 轮询 → 下载」完成一次出图。
@@ -393,9 +401,21 @@ func (c *Client) poll(ctx context.Context, params pollParams) (result *GenerateR
 	headers, order := c.pollHeaders(params.token)
 	deadline := timeNow().Add(params.timeout)
 	consecutiveFailures := 0
+	var timings GenerationTimings
+	if u, err := url.Parse(params.pollURL); err == nil {
+		timings.PollHost = u.Hostname()
+	}
+	var httpTime, waitTime time.Duration
+	wait := func(next pollParams) error {
+		waitStarted := time.Now()
+		err := waitNextPoll(ctx, deadline, next)
+		waitTime += time.Since(waitStarted)
+		return err
+	}
 
 	for {
 		attempts++
+		requestStarted := time.Now()
 		resp, err := c.transport.Do(ctx, &Request{
 			Method:      http.MethodGet,
 			URL:         params.pollURL,
@@ -403,6 +423,13 @@ func (c *Client) poll(ctx context.Context, params pollParams) (result *GenerateR
 			HeaderOrder: order,
 			Timeout:     defaultSubmitTimeout,
 		})
+		elapsed := time.Since(requestStarted)
+		httpTime += elapsed
+		var latest map[string]any
+		if resp != nil && err == nil {
+			_ = json.Unmarshal(resp.Body, &latest)
+		}
+		timings.recordPoll(newPollObservation(attempts, requestStarted.Sub(started), elapsed, resp, latest, params.outputKey, err))
 		lastResponse = resp
 		if err != nil {
 			if !isTransientPollError(ctx, err) {
@@ -412,7 +439,7 @@ func (c *Client) poll(ctx context.Context, params pollParams) (result *GenerateR
 			if consecutiveFailures > maxConsecutivePollFailures {
 				return nil, err
 			}
-			if waitErr := waitNextPoll(ctx, deadline, pollRetryParams(params, consecutiveFailures, resp)); waitErr != nil {
+			if waitErr := wait(pollRetryParams(params, consecutiveFailures, resp)); waitErr != nil {
 				return nil, waitErr
 			}
 			continue
@@ -422,7 +449,7 @@ func (c *Client) poll(ctx context.Context, params pollParams) (result *GenerateR
 		case resp.StatusCode == http.StatusAccepted:
 			// 202：任务仍在排队/运行，没有可解析的结果。
 			consecutiveFailures = 0
-			if err := waitNextPoll(ctx, deadline, pollRetryAfter(params, resp)); err != nil {
+			if err := wait(pollRetryAfter(params, resp)); err != nil {
 				return nil, err
 			}
 			continue
@@ -431,7 +458,7 @@ func (c *Client) poll(ctx context.Context, params pollParams) (result *GenerateR
 			if consecutiveFailures > maxConsecutivePollFailures {
 				return nil, c.errorForStatus(resp, params.label+" poll")
 			}
-			if err := waitNextPoll(ctx, deadline, pollRetryParams(params, consecutiveFailures, resp)); err != nil {
+			if err := wait(pollRetryParams(params, consecutiveFailures, resp)); err != nil {
 				return nil, err
 			}
 			continue
@@ -440,15 +467,13 @@ func (c *Client) poll(ctx context.Context, params pollParams) (result *GenerateR
 		}
 		consecutiveFailures = 0
 
-		var latest map[string]any
-		if err := json.Unmarshal(resp.Body, &latest); err != nil {
-			latest = map[string]any{}
-		}
-
 		if mediaURL, found, err := presignedURL(latest, params.outputKey); err != nil {
 			return nil, err
 		} else if found {
-			timings := GenerationTimings{PollMS: time.Since(started).Milliseconds(), PollCount: attempts}
+			timings.PollMS = time.Since(started).Milliseconds()
+			timings.PollCount = attempts
+			timings.PollHTTPMS = httpTime.Milliseconds()
+			timings.PollWaitMS = waitTime.Milliseconds()
 			bytes, err := c.downloadMeasured(ctx, mediaURL, params.maxDownload, params.downloadWait, &timings)
 			if err != nil {
 				return nil, err
@@ -468,7 +493,7 @@ func (c *Client) poll(ctx context.Context, params pollParams) (result *GenerateR
 			return nil, jobErr
 		}
 
-		if err := waitNextPoll(ctx, deadline, pollRetryAfter(params, resp)); err != nil {
+		if err := wait(pollRetryAfter(params, resp)); err != nil {
 			return nil, err
 		}
 	}

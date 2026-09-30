@@ -128,6 +128,8 @@ Adobe Cookie 直连显式指定 `response_format=b64_json` 时直接返回 Base6
 
 图片正常轮询间隔为 1 秒；临时故障退避为 3/6/12 秒，并遵守上游 `Retry-After`。视频正常轮询仍为 3 秒。`adobe_images.pipeline_completed` 日志包含提交、等待上游、下载、转码、转存、响应编码及写出耗时，以及请求质量和每张图的请求次数；多张图片并行阶段的耗时不能直接相加。此日志表示生成和处理已完成，交付失败另见 `adobe_images.delivery_failed` / `adobe_images.client_disconnected_after_generation`。
 
+轮询诊断中的 `poll_http_ms` 是查询 HTTP 请求的累计耗时（包含线路和 Adobe 接口处理），`poll_wait_ms` 是本地轮询间隔的累计等待；两者不能直接解释为“网络耗时”和“纯生成耗时”。`polls` 记录每次查询的起始偏移、耗时、HTTP 状态码、白名单任务状态和结果是否可用，最多保留 256 条并标注丢弃数量。没有提示词、签名链接或上游任意状态文本。
+
 ### 计费、额度与故障转移
 
 - 按张计费，档位为 `1K` / `2K` / `4K`（由输出长边推导）。优先使用分组配置的图片单价；未配置时使用 Adobe 渠道兜底价。
