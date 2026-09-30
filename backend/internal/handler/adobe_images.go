@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
@@ -699,6 +700,7 @@ func (h *GatewayHandler) finishAdobeImagesSuccess(
 	}
 	errorCount := len(c.Errors)
 	responseBytes := len(result.Body)
+	var responseWriteMS int64
 	if req.writesGemini() {
 		// 先拼好信封再记账：一张图都交付不了时返回 502 且不计费。
 		body, err := service.BuildGeminiGenerateContentResponse(req.parsed.Model, service.AdobeGeminiImagesFromBytes(result.Images))
@@ -712,14 +714,32 @@ func (h *GatewayHandler) finishAdobeImagesSuccess(
 		if adobeImagesWriteModeFromContext(c) == adobeImagesWriteGeminiSSE {
 			responseBytes = len(service.EncodeGeminiGenerateContentSSE(body))
 		}
+		writeStarted := time.Now()
 		writeAdobeGeminiImagesBody(c, body)
+		responseWriteMS = time.Since(writeStarted).Milliseconds()
 	} else {
+		writeStarted := time.Now()
 		c.Data(http.StatusOK, "application/json", result.Body)
+		responseWriteMS = time.Since(writeStarted).Milliseconds()
 		h.recordAdobeImagesUsage(c, apiKey, subject, subscription, account, result.Forward, req)
 	}
 	upstreamModel := ""
 	if result.Forward != nil {
 		upstreamModel = result.Forward.UpstreamModel
+		reqLog.Info("adobe_images.pipeline_completed",
+			zap.Int64("account_id", account.ID),
+			zap.String("generation_request_id", result.Forward.RequestID),
+			zap.String("upstream_model", upstreamModel),
+			zap.String("requested_quality", req.parsed.Quality),
+			zap.String("size", req.parsed.Size),
+			zap.Int("image_count", result.Forward.ImageCount),
+			zap.String("output_format", req.parsed.OutputFormat),
+			zap.String("response_format", req.parsed.ResponseFormat),
+			zap.Int64("processing_ms", result.Forward.Duration.Milliseconds()),
+			zap.Int64("response_write_ms", responseWriteMS),
+			zap.Int("response_bytes", responseBytes),
+			zap.Any("timings", result.Timings),
+		)
 	}
 	if !logAdobeImageDelivery(c, reqLog, account.ID, responseBytes, errorCount, result.Forward) {
 		return

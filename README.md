@@ -122,6 +122,12 @@ The gpt-image family accepts OpenAI `background` values: `transparent`, `opaque`
 
 `n` defaults to 1 (max 10). Cookie accounts split it into n Firefly jobs and bill per image. `output_format` of `png` or `jpeg` is applied locally after download; `webp` is rejected; omitting it keeps whatever Firefly returned. `background=transparent` cannot be combined with `output_format=jpeg`.
 
+### Response Format And Latency Diagnostics
+
+Adobe Cookie requests explicitly specifying `response_format=b64_json` bypass object storage. `url` or an omitted format uses configured storage URLs, with Base64 fallback when storage is disabled or an upload fails; Adobe signed URLs are not exposed. Existing image bytes are uploaded directly, with at most two concurrent uploads per request and stable result ordering.
+
+Healthy image jobs are polled every second; transient failures back off for 3/6/12 seconds and honor `Retry-After`. Healthy video polling remains at three seconds. The `adobe_images.pipeline_completed` log records submission, upstream waiting, download, conversion, storage, response encoding/write durations, requested quality and per-image request counts. Parallel image timings are not additive. Delivery failures remain separate log events.
+
 ### Billing, Quota, And Failover
 
 - Billing is per image on `1K` / `2K` / `4K` tiers derived from the output long edge. Group image prices win when set; otherwise Adobe channel fallback prices are used.

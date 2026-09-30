@@ -448,10 +448,13 @@ func TestAdobeImageServiceReturnsB64WithoutStorage(t *testing.T) {
 
 // 假的对象存储，只记录被存了什么。
 type adobeFakeStorage struct {
+	mu    sync.Mutex
 	saved map[string][]byte
 }
 
 func (s *adobeFakeStorage) Save(_ context.Context, key, _ string, data []byte) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.saved == nil {
 		s.saved = map[string][]byte{}
 	}
