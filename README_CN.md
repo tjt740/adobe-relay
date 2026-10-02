@@ -116,9 +116,19 @@ Cookie 失效后需要重新从浏览器导出。刷新器会把账号标为错�
 
 `quality` 会映射为 Firefly `detailLevel`：`low`（默认）→ 1，`medium` → 3，`high` → 5，`xhigh`/`max` 在 2 / 1.5 上为 5，在 2.5 上为 7。
 
+Adobe Cookie 直连的 GPT Image 生图和编辑响应会在顶层返回 `quality`，表示网关实际提交的归一化生成档位：1 → `low`，3 → `medium`，5 → `high`，7 → `max`。例如 2.5 请求 `max` 或 `xhigh` 都返回 `"quality":"max"`；2 / 1.5 请求这两档返回 `"quality":"high"`。省略、`auto` 或未识别值保持现有默认行为，返回 `low`。该字段在图片 URL、Base64 及转存失败回退时都保留；没有质量控制的其他 Adobe 模型不返回此字段。它反映提交参数，不是上游返回的图片质量评估。
+
 gpt-image 家族支持 OpenAI 的 `background`：`transparent` / `opaque` / `auto`。
 
 `n` 缺省 1，最大 10。Cookie 账号会拆成 n 次 Firefly 任务并按张计费。`output_format` 为 `png`/`jpeg` 时在下载后本机转码；`webp` 不支持；未传则保持上游格式。`background=transparent` 不能与 `output_format=jpeg` 同时使用。
+
+### 返回格式与耗时诊断
+
+Adobe Cookie 直连显式指定 `response_format=b64_json` 时直接返回 Base64，跳过对象存储。指定 `url` 或省略时，启用对象存储则返回本站存储 URL；未启用或转存失败则保留 Base64 回退。不会直接暴露 Adobe 临时链接。转存直接使用图片字节，每个请求最多并行上传两张，返回顺序保持不变。
+
+图片正常轮询间隔为 1 秒；临时故障退避为 3/6/12 秒，并遵守上游 `Retry-After`。视频正常轮询仍为 3 秒。`adobe_images.pipeline_completed` 日志包含提交、等待上游、下载、转码、转存、响应编码及写出耗时，以及请求质量和每张图的请求次数；多张图片并行阶段的耗时不能直接相加。此日志表示生成和处理已完成，交付失败另见 `adobe_images.delivery_failed` / `adobe_images.client_disconnected_after_generation`。
+
+轮询诊断中的 `poll_http_ms` 是查询 HTTP 请求的累计耗时（包含线路和 Adobe 接口处理），`poll_wait_ms` 是本地轮询间隔的累计等待；两者不能直接解释为“网络耗时”和“纯生成耗时”。`polls` 记录每次查询的起始偏移、耗时、HTTP 状态码、白名单任务状态和结果是否可用，最多保留 256 条并标注丢弃数量。没有提示词、签名链接或上游任意状态文本。
 
 ### 计费、额度与故障转移
 

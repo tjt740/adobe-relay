@@ -45,6 +45,20 @@ type AdobeImageResult struct {
 	Images [][]byte
 	// Forward 交给 RecordUsage 记账；计费只认 ImageCount 与 ImageSize 两个字段。
 	Forward *OpenAIForwardResult
+	Timings AdobeImageTimings
+}
+
+// Wall-clock stage durations. Per-image timings overlap when n > 1 and must not
+// be added together to estimate request latency.
+type AdobeImageTimings struct {
+	SourceUploadMS  int64                     `json:"source_upload_ms"`
+	GenerationMS    int64                     `json:"generation_ms"`
+	TranscodeMS     int64                     `json:"transcode_ms"`
+	StorageMS       int64                     `json:"storage_ms"`
+	EncodeMS        int64                     `json:"encode_ms"`
+	Delivery        string                    `json:"delivery"`
+	StorageFallback bool                      `json:"storage_fallback"`
+	Images          []adobe.GenerationTimings `json:"images"`
 }
 
 // adobeImageDetachedTimeout 是提交之后（提交重试、轮询、下载、转存）脱离客户端连接的总时限。
@@ -150,11 +164,14 @@ func (s *AdobeImageService) GenerateCall(
 	upstreamModelID := account.GetMappedModel(requestedModel)
 	conf, err := adobe.ResolveImage(call.imageRequest(upstreamModelID))
 	if err != nil {
-		return nil, err
+		return nil, &adobe.OperationError{Stage: "prepare", Err: err}
 	}
 
 	client := s.clients.clientForAccount(account)
+	var timings AdobeImageTimings
+	stageStarted := time.Now()
 	sourceImageIDs, err := s.uploadSourceImages(ctx, client, token, call)
+	timings.SourceUploadMS = time.Since(stageStarted).Milliseconds()
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +182,8 @@ func (s *AdobeImageService) GenerateCall(
 
 	upstreamCtx, cancelUpstream := context.WithTimeout(context.WithoutCancel(ctx), adobeImageDetachedTimeout)
 	defer cancelUpstream()
-	images, err := generateAdobeImages(upstreamCtx, client, token, account.GetCredential("arp_session_id"), adobe.ImagePayloadOptions{
+	stageStarted = time.Now()
+	images, imageTimings, err := generateAdobeImages(upstreamCtx, client, token, account.GetCredential("arp_session_id"), adobe.ImagePayloadOptions{
 		Prompt:               req.Prompt,
 		AspectRatio:          conf.AspectRatio,
 		OutputResolution:     conf.OutputResolution,
@@ -178,22 +196,33 @@ func (s *AdobeImageService) GenerateCall(
 		Edit:                 req.IsEdits(),
 		Background:           req.Background,
 	}, n)
+	timings.GenerationMS = time.Since(stageStarted).Milliseconds()
+	timings.Images = imageTimings
 	if err != nil {
 		return nil, err
 	}
+	stageStarted = time.Now()
+	var conversions errgroup.Group
+	conversions.SetLimit(adobeFanOutConcurrency)
 	for i := range images {
-		images[i] = applyAdobeOutputFormat(images[i], outputFormat, req.OutputCompression)
+		conversions.Go(func() error {
+			images[i] = applyAdobeOutputFormat(images[i], outputFormat, req.OutputCompression)
+			return nil
+		})
 	}
+	_ = conversions.Wait() // Conversion failures already fall back to original bytes.
+	timings.TranscodeMS = time.Since(stageStarted).Milliseconds()
 
 	requestID := uuid.NewString()
-	body, err := s.buildResponseBody(upstreamCtx, requestID, images)
+	body, err := s.buildResponseBody(upstreamCtx, requestID, images, adobeImageResponseQuality(conf, req.Quality), req.ResponseFormat, &timings)
 	if err != nil {
 		return nil, err
 	}
 
 	return &AdobeImageResult{
-		Body:   body,
-		Images: images,
+		Body:    body,
+		Images:  images,
+		Timings: timings,
 		Forward: &OpenAIForwardResult{
 			RequestID:  requestID,
 			Model:      requestedModel,
@@ -217,8 +246,9 @@ func generateAdobeImages(
 	arpSessionID string,
 	opts adobe.ImagePayloadOptions,
 	n int,
-) ([][]byte, error) {
+) ([][]byte, []adobe.GenerationTimings, error) {
 	images := make([][]byte, n)
+	timings := make([]adobe.GenerationTimings, n)
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(adobeFanOutConcurrency)
 	baseSeed := adobe.SeedNow()
@@ -240,13 +270,14 @@ func generateAdobeImages(
 				return adobe.NewUpstreamTemporaryError("adobe returned an empty image", 0, adobe.ErrorTypeStatus)
 			}
 			images[i] = generated.Bytes
+			timings[i] = generated.Timings
 			return nil
 		})
 	}
 	if err := group.Wait(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return images, nil
+	return images, timings, nil
 }
 
 // uploadSourceImages 把图生图的源图上传到 Adobe，返回可放进 payload 的 image id。
@@ -292,39 +323,56 @@ func (s *AdobeImageService) uploadSourceImages(
 
 // buildResponseBody 构造 OpenAI 形状的响应。
 //
-// 先按 b64_json 组装，再在对象存储可用时整体过一遍 ImageResultUploader.Rewrite——
-// 它会把每项的 b64_json 上传后替换成 url。这样两条分支共用同一段组装逻辑。
-func (s *AdobeImageService) buildResponseBody(ctx context.Context, requestID string, images [][]byte) ([]byte, error) {
+// URL delivery uploads existing bytes directly. Base64 is encoded only if needed
+// by the client or as a fallback when storage is disabled/unavailable.
+func (s *AdobeImageService) buildResponseBody(ctx context.Context, requestID string, images [][]byte, quality, responseFormat string, timings *AdobeImageTimings) ([]byte, error) {
 	if len(images) == 0 {
 		return nil, adobe.NewRequestError("adobe returned an empty image")
 	}
-	data := make([]any, 0, len(images))
 	for _, image := range images {
 		if len(image) == 0 {
 			return nil, adobe.NewRequestError("adobe returned an empty image")
 		}
-		data = append(data, map[string]any{"b64_json": base64.StdEncoding.EncodeToString(image)})
+	}
+	var urls []string
+	if !strings.EqualFold(strings.TrimSpace(responseFormat), "b64_json") && s.resolveStorage != nil {
+		started := time.Now()
+		if uploader, enabled := s.resolveStorage(); enabled && uploader != nil {
+			var err error
+			urls, err = uploader.UploadImages(ctx, requestID, images)
+			if err != nil {
+				// Already generated/charged: retain every image on storage failure.
+				timings.StorageFallback = true
+				urls = nil
+			}
+		}
+		timings.StorageMS = time.Since(started).Milliseconds()
+	}
+	started := time.Now()
+	defer func() { timings.EncodeMS = time.Since(started).Milliseconds() }()
+	data := make([]any, len(images))
+	timings.Delivery = "b64_json"
+	if len(urls) == len(images) {
+		timings.Delivery = "storage_url"
+		for i, url := range urls {
+			data[i] = map[string]any{"url": url}
+		}
+	} else {
+		for i, image := range images {
+			data[i] = map[string]any{"b64_json": base64.StdEncoding.EncodeToString(image)}
+		}
 	}
 	payload := map[string]any{
 		"created": time.Now().Unix(),
 		"data":    data,
+	}
+	if quality != "" {
+		payload["quality"] = quality
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, adobe.NewRequestError(fmt.Sprintf("encode images response: %v", err))
 	}
 
-	if s.resolveStorage == nil {
-		return body, nil
-	}
-	uploader, enabled := s.resolveStorage()
-	if !enabled || uploader == nil {
-		return body, nil
-	}
-	rewritten, err := uploader.Rewrite(ctx, requestID, body)
-	if err != nil {
-		// 转存失败不该让已经生成好（且已扣上游额度）的图丢掉，回落 b64_json。
-		return body, nil //nolint:nilerr // 有意吞掉：产物已生成，降级返回优于整体失败
-	}
-	return rewritten, nil
+	return body, nil
 }

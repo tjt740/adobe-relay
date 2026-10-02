@@ -58,6 +58,24 @@ func normalizeAdobeOutputFormat(raw string) (string, error) {
 	}
 }
 
+// adobeImageResponseQuality 返回实际提交的生成档位，复用 payload 的 detailLevel 映射。
+// 非 GPT Image 模型没有这个生成控制，不回显请求值，以免声称未生效的参数已生效。
+func adobeImageResponseQuality(conf adobe.ImageModelConf, requested string) string {
+	if !conf.IsGPTImage() {
+		return ""
+	}
+	switch adobe.GPTImageDetailLevelFromQualityForVersion(requested, conf.UpstreamModelVersion) {
+	case 7:
+		return "max"
+	case 5:
+		return "high"
+	case 3:
+		return "medium"
+	default:
+		return "low"
+	}
+}
+
 func applyAdobeOutputFormat(data []byte, format string, compression *int) []byte {
 	converted, err := transcodeAdobeImage(data, format, compression)
 	if err != nil {

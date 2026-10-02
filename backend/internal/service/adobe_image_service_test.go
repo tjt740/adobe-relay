@@ -429,7 +429,8 @@ func TestAdobeImageServiceReturnsB64WithoutStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	var payload struct {
-		Created int64 `json:"created"`
+		Created int64  `json:"created"`
+		Quality string `json:"quality"`
 		Data    []struct {
 			B64JSON string `json:"b64_json"`
 			URL     string `json:"url"`
@@ -437,6 +438,7 @@ func TestAdobeImageServiceReturnsB64WithoutStorage(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(result.Body, &payload))
 	require.Positive(t, payload.Created)
+	require.Equal(t, "low", payload.Quality)
 	require.Len(t, payload.Data, 1)
 	require.Empty(t, payload.Data[0].URL)
 	decoded, err := base64.StdEncoding.DecodeString(payload.Data[0].B64JSON)
@@ -446,10 +448,13 @@ func TestAdobeImageServiceReturnsB64WithoutStorage(t *testing.T) {
 
 // 假的对象存储，只记录被存了什么。
 type adobeFakeStorage struct {
+	mu    sync.Mutex
 	saved map[string][]byte
 }
 
 func (s *adobeFakeStorage) Save(_ context.Context, key, _ string, data []byte) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.saved == nil {
 		s.saved = map[string][]byte{}
 	}
@@ -465,12 +470,13 @@ func TestAdobeImageServiceReturnsURLWithStorage(t *testing.T) {
 	svc := newAdobeTestService(t, client, func() (*ImageResultUploader, bool) { return uploader, true })
 
 	result, err := svc.Generate(context.Background(), adobeTestAccount(), "tok", &OpenAIImagesRequest{
-		Model: "gpt-image-2", Prompt: "x", Size: "1024x1024", N: 1,
+		Model: "gpt-image-2.5-flare", Prompt: "x", Size: "1024x1024", Quality: "max", N: 1,
 	})
 	require.NoError(t, err)
 
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(result.Body, &payload))
+	require.Equal(t, "max", payload["quality"])
 	items := payload["data"].([]any)
 	first := items[0].(map[string]any)
 	require.Contains(t, first["url"], "https://cdn.example/adobe/")
@@ -487,10 +493,13 @@ func TestAdobeImageServiceFallsBackToB64WhenStorageFails(t *testing.T) {
 	svc := newAdobeTestService(t, client, func() (*ImageResultUploader, bool) { return uploader, true })
 
 	result, err := svc.Generate(context.Background(), adobeTestAccount(), "tok", &OpenAIImagesRequest{
-		Model: "gpt-image-2", Prompt: "x", Size: "1024x1024", N: 1,
+		Model: "gpt-image-2.5-flare", Prompt: "x", Size: "1024x1024", Quality: "max", N: 1,
 	})
 	require.NoError(t, err)
 	require.Contains(t, string(result.Body), "b64_json")
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(result.Body, &payload))
+	require.Equal(t, "max", payload["quality"])
 }
 
 type adobeFailingStorage struct{}
@@ -585,18 +594,41 @@ func TestAdobeImageServiceFansOutNSharesUploadedSource(t *testing.T) {
 		Prompt:   "edit",
 		Size:     "1024x1024",
 		N:        2,
+		Quality:  "medium",
 		Endpoint: openAIImagesEditsEndpoint,
 		Uploads:  []OpenAIImagesUpload{{Data: []byte("SRC"), ContentType: "image/png"}},
 	})
 	require.NoError(t, err)
 	require.Equal(t, 2, result.Forward.ImageCount)
 	require.Equal(t, 1, uploads)
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(result.Body, &payload))
+	require.Equal(t, "medium", payload["quality"])
 
 	submitted := adobeSubmitBodies(t, api)
 	require.Len(t, submitted, 2)
 	for _, body := range submitted {
 		require.Equal(t, []any{map[string]any{"id": "img-1", "usage": "subject"}}, body["referenceBlobs"])
+		require.Equal(t, float64(3), body["generationSettings"].(map[string]any)["detailLevel"])
 	}
+}
+
+func TestAdobeImageServiceRejectsUnsupportedFlareSizeBeforeSubmit(t *testing.T) {
+	api := &adobeFakeTransport{handler: func(*adobe.Request, int) (*adobe.Response, error) {
+		t.Fatal("invalid dimensions must not submit an upstream job")
+		return nil, nil
+	}}
+	svc := newAdobeTestService(t, adobe.NewClient(adobe.ClientConfig{Transport: api, DownloadTransport: api}), nil)
+	result, err := svc.Generate(context.Background(), adobeTestAccount(), "tok", &OpenAIImagesRequest{
+		Model: "gpt-image-2.5-flare", Prompt: "x", N: 1, Size: "4096x4096",
+	})
+	require.Nil(t, result)
+	require.ErrorContains(t, err, "longest edge must not exceed 3840")
+	var op *adobe.OperationError
+	require.ErrorAs(t, err, &op)
+	require.Equal(t, "prepare", op.Stage)
+	require.Equal(t, NextAccountStop, classifyAdobeError(err).Failover.NextAccountAction)
+	require.Empty(t, api.calls)
 }
 
 func TestAdobeImageServiceRejectsNAboveMax(t *testing.T) {
