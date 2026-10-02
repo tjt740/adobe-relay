@@ -972,7 +972,7 @@
         </div>
       </template>
     </BaseDialog>
-    <ClashSubscriptionModal v-if="showClashSubscription" @close="showClashSubscription = false" @changed="loadProxies" />
+    <ClashSubscriptionModal v-if="showClashSubscription" @close="showClashSubscription = false" @changed="handleClashChanged" />
   </AppLayout>
 </template>
 
@@ -1237,6 +1237,14 @@ const loadProxies = async () => {
 
 const handleFilterChange = () => {
   pagination.page = 1
+  loadProxies()
+}
+
+const handleClashChanged = (resetPage = false) => {
+  if (resetPage) {
+    clearSelectedProxies()
+    pagination.page = 1
+  }
   loadProxies()
 }
 

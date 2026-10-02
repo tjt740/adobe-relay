@@ -24,7 +24,6 @@ type State struct {
 	URL       string    `json:"url"`
 	Revision  int64     `json:"revision"`
 	UpdatedAt time.Time `json:"updated_at"`
-	NextPort  int       `json:"next_port"`
 	Nodes     []Node    `json:"nodes"`
 }
 
@@ -99,7 +98,9 @@ func (m *Manager) view(s State) View {
 	}
 	v := View{Configured: m.configured(), URL: s.URL, URLHint: hint, Revision: s.Revision, UpdatedAt: s.UpdatedAt, Nodes: make([]NodeView, 0, len(s.Nodes))}
 	for _, n := range s.Nodes {
-		v.Nodes = append(v.Nodes, m.nodeView(n))
+		if n.Enabled {
+			v.Nodes = append(v.Nodes, m.nodeView(n))
+		}
 	}
 	return v
 }
@@ -145,7 +146,9 @@ func (m *Manager) Preview(ctx context.Context, raw string) (View, error) {
 	}
 	existing := map[string]Node{}
 	for _, n := range s.Nodes {
-		existing[n.Name] = n
+		if n.Enabled {
+			existing[n.Name] = n
+		}
 	}
 	v := m.view(s)
 	v.Nodes = make([]NodeView, 0, len(nodes))
@@ -216,14 +219,26 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 	if previous.Revision != req.Revision {
 		return View{}, errors.New("订阅已被其他操作更新，请重新预览")
 	}
-	next := State{URL: raw, Revision: previous.Revision + 1, UpdatedAt: time.Now().UTC(), NextPort: previous.NextPort, Nodes: make([]Node, 0)}
-	if next.NextPort == 0 {
-		next.NextPort = m.portStart
-	}
+	next := State{URL: raw, Revision: previous.Revision + 1, UpdatedAt: time.Now().UTC(), Nodes: make([]Node, 0)}
 	oldByName := map[string]Node{}
+	usedPorts := map[int]bool{}
+	retiredIDs := []int64{}
 	for _, n := range previous.Nodes {
-		oldByName[n.Name] = n
+		// Mihomo creates new listeners before closing removed ones. Reserve all
+		// previous ports for this reload; retired ports become free next import.
+		usedPorts[n.Port] = true
+		if n.Enabled && selected[n.Name] {
+			oldByName[n.Name] = n
+		} else {
+			retiredIDs = append(retiredIDs, n.ProxyID)
+		}
 	}
+	// Lock and detach affected accounts before changing proxies, matching the
+	// account -> failover policy -> proxy lock order used by automatic failover.
+	if err = retireProxies(ctx, tx, retiredIDs); err != nil {
+		return View{}, err
+	}
+	nextPort := m.portStart
 	for _, n := range fetched {
 		if !selected[n.Name] {
 			continue
@@ -231,11 +246,14 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 		if old, ok := oldByName[n.Name]; ok {
 			n.ProxyID, n.Port, n.Password = old.ProxyID, old.Port, old.Password
 		} else {
-			if next.NextPort > min(m.portStart+4095, 65535) {
+			for usedPorts[nextPort] {
+				nextPort++
+			}
+			if nextPort > min(m.portStart+4095, 65535) {
 				return View{}, errors.New("Clash 节点端口已分配完毕")
 			}
-			n.Port = next.NextPort
-			next.NextPort++
+			n.Port = nextPort
+			usedPorts[n.Port] = true
 			secret := make([]byte, 24)
 			if _, err = rand.Read(secret); err != nil {
 				return View{}, err
@@ -248,23 +266,9 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 		}
 		n.Enabled = true
 		next.Nodes = append(next.Nodes, n)
-		delete(oldByName, n.Name)
-	}
-	// Keep retired assignments as rejecting listeners. A stale account snapshot can never
-	// accidentally use a newly allocated node or fall through to a direct connection.
-	for _, old := range previous.Nodes {
-		if _, ok := oldByName[old.Name]; ok {
-			old.Enabled = false
-			old.Config = nil
-			next.Nodes = append(next.Nodes, old)
-		}
 	}
 	for _, n := range next.Nodes {
-		status := "inactive"
-		if n.Enabled {
-			status = "active"
-		}
-		result, e := tx.ExecContext(ctx, `UPDATE proxies SET status=$1,updated_at=NOW() WHERE id=$2 AND deleted_at IS NULL`, status, n.ProxyID)
+		result, e := tx.ExecContext(ctx, `UPDATE proxies SET status='active',updated_at=NOW() WHERE id=$1 AND deleted_at IS NULL`, n.ProxyID)
 		if e != nil {
 			return View{}, e
 		}
@@ -298,33 +302,37 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 		if e != nil {
 			return View{}, e
 		}
-		for start := 0; start < len(accountIDs); start += 500 {
-			payload, _ := json.Marshal(map[string]any{"account_ids": accountIDs[start:min(start+500, len(accountIDs))]})
-			if _, e = tx.ExecContext(ctx, `INSERT INTO scheduler_outbox(event_type,payload) VALUES('account_bulk_changed',$1)`, string(payload)); e != nil {
-				return View{}, e
-			}
+		if e = notifyAccounts(ctx, tx, accountIDs); e != nil {
+			return View{}, e
 		}
 	}
-	payload, err := json.Marshal(next)
-	if err != nil {
+	if err = m.commitState(ctx, tx, next); err != nil {
 		return View{}, err
 	}
+	v := m.view(next)
+	v.Ready = true
+	return v, nil
+}
+
+func (m *Manager) commitState(ctx context.Context, tx *sql.Tx, next State) error {
+	payload, err := json.Marshal(next)
+	if err != nil {
+		return err
+	}
 	if _, err = tx.ExecContext(ctx, `UPDATE clash_subscription SET document=$1,updated_at=NOW() WHERE id=1`, string(payload)); err != nil {
-		return View{}, err
+		return err
 	}
 	// Save in the transaction first; the externally visible change is committed only after apply.
 	if err = m.apply(ctx, next); err != nil {
 		_ = tx.Rollback()
 		m.restorePersisted()
-		return View{}, err
+		return err
 	}
 	if err = tx.Commit(); err != nil {
 		m.restorePersisted()
-		return View{}, errors.New("保存订阅失败，已尝试恢复原节点")
+		return errors.New("保存订阅失败，已尝试恢复原节点")
 	}
-	v := m.view(next)
-	v.Ready = true
-	return v, nil
+	return nil
 }
 
 // After a failed apply/commit, read the authoritative document under a fresh
@@ -445,18 +453,7 @@ func (m *Manager) Run(ctx context.Context) {
 	reconcile := func() {
 		attempt, cancel := context.WithTimeout(ctx, 25*time.Second)
 		defer cancel()
-		tx, err := m.db.BeginTx(attempt, nil)
-		if err != nil {
-			return
-		}
-		defer tx.Rollback()
-		s, err := loadState(attempt, tx, true)
-		if err != nil || s.Revision == 0 {
-			return
-		}
-		if !m.matches(attempt, s) {
-			_ = m.apply(attempt, s)
-		}
+		_ = m.reconcile(attempt)
 	}
 	reconcile()
 	ticker := time.NewTicker(15 * time.Second)
@@ -469,4 +466,40 @@ func (m *Manager) Run(ctx context.Context) {
 			reconcile()
 		}
 	}
+}
+
+func (m *Manager) reconcile(ctx context.Context) error {
+	tx, err := m.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	s, err := loadState(ctx, tx, true)
+	if err != nil || s.Revision == 0 {
+		return err
+	}
+	// Upgrade old documents once, using the same transactional cleanup and
+	// runtime rollback as imports. Never infer ownership from proxy names/hosts.
+	current := make([]Node, 0, len(s.Nodes))
+	retiredIDs := []int64{}
+	for _, n := range s.Nodes {
+		if n.Enabled {
+			current = append(current, n)
+		} else {
+			retiredIDs = append(retiredIDs, n.ProxyID)
+		}
+	}
+	if len(retiredIDs) > 0 {
+		if err = retireProxies(ctx, tx, retiredIDs); err != nil {
+			return err
+		}
+		s.Nodes = current
+		s.Revision++
+		s.UpdatedAt = time.Now().UTC()
+		return m.commitState(ctx, tx, s)
+	}
+	if !m.matches(ctx, s) {
+		return m.apply(ctx, s)
+	}
+	return nil
 }

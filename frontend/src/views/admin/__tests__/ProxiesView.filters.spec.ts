@@ -101,4 +101,21 @@ describe('proxy list filter pagination', () => {
     expect(listProxies.mock.lastCall?.[0]).toBe(2)
     expect(wrapper.get('[data-test="page"]').text()).toBe('2')
   })
+
+  it('returns to page one after a subscription change removes old proxies', async () => {
+    wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-test="page"]').trigger('click')
+    await flushPromises()
+    const subscriptionButton = wrapper.findAll('button').find(button => button.text().includes('admin.proxies.clash.title'))!
+    await subscriptionButton.trigger('click')
+    listProxies.mockResolvedValue({ items: [{ id: 1, name: 'current-node' }], total: 1, pages: 1 })
+
+    wrapper.getComponent({ name: 'ClashSubscriptionModal' }).vm.$emit('changed', true)
+    await flushPromises()
+
+    expect(listProxies.mock.lastCall?.[0]).toBe(1)
+    expect(wrapper.get('[data-test="page"]').text()).toBe('1')
+    expect(wrapper.get('[data-test="rows"]').text()).toBe('current-node')
+  })
 })

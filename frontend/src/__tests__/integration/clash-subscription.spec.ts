@@ -52,12 +52,16 @@ describe('Clash subscription workflow', () => {
     expect(w.emitted('changed')).toBeUndefined()
     expect(w.findAll('input[type="checkbox"]')).toHaveLength(2)
   })
-  it('allows an empty selection to disable all imported nodes', async () => {
+  it('allows an empty selection to delete all imported nodes and refresh the pool', async () => {
+    vi.mocked(importClashSubscription).mockResolvedValue({ ...saved, revision: 3, nodes: [] })
     const w = await setup()
     await w.get('form').trigger('submit'); await flushPromises()
     for (const checkbox of w.findAll('input[type="checkbox"]')) await checkbox.setValue(false)
     await w.get('footer .btn-primary').trigger('click'); await flushPromises()
     expect(importClashSubscription).toHaveBeenCalledWith('', [], 2)
+    expect(w.emitted('changed')).toHaveLength(1)
+    expect(w.text()).not.toContain('jp.example.com:443')
+    expect(w.text()).toContain('admin.proxies.clash.emptyTitle')
   })
   it('tests only enabled imported nodes and renders latency', async () => {
     const w = await setup()

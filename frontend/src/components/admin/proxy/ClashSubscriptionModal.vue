@@ -165,7 +165,7 @@ import { getClashSubscription, previewClashSubscription, importClashSubscription
 import { testProxy } from '@/api/admin/proxies'
 import { formatDateTime } from '@/utils/format'
 
-const emit = defineEmits<{ close: []; changed: [] }>()
+const emit = defineEmits<{ close: []; changed: [resetPage?: boolean] }>()
 const { t } = useI18n()
 const state = ref<ClashSubscription | null>(null)
 const nodes = ref<ClashNode[]>([])
@@ -253,7 +253,7 @@ async function save() {
     state.value = await importClashSubscription(requestURL(), [...selected.value], previewRevision.value)
     nodes.value = state.value.nodes; hasPreview.value = false; url.value = state.value.url ?? url.value; results.value = {}; search.value = ''
     successMessage.value = t('admin.proxies.clash.imported', { count: state.value.nodes.filter(n => n.enabled).length })
-    emit('changed')
+    emit('changed', true)
   } catch (e) { errorMessage.value = errorText(e) }
   finally { saving.value = false }
 }

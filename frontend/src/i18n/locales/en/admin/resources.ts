@@ -92,7 +92,7 @@ export default {
         "pending": "Not imported",
         "disabled": "Disabled",
         "empty": "Paste a subscription URL and preview the nodes to import.",
-        "importHint": "Nodes with the same name retain proxy IDs and account bindings. Deselected or missing nodes are disabled. Deselecting all disables every subscription node.",
+        "importHint": "The pool keeps only selected nodes from the current subscription and manually added proxies. Current nodes with the same name retain account bindings. Deselected or missing nodes are deleted; their accounts are paused until a new proxy is selected and scheduling is restored. Deselecting all deletes every subscription node.",
         "useHint": "After importing, search for “Clash · node name” in the account proxy selector. Connection and exit IP checks are also available in IP management. Tests use the currently imported configuration.",
         "import": "Import selection / save replacement",
         "importing": "Importing…",
