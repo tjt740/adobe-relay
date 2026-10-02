@@ -18,6 +18,8 @@ import (
 
 func TestMain(m *testing.M) {
 	submitRetryWait = 0
+	downloadRetryWait = 0
+	pollRetryWait = time.Millisecond
 	os.Exit(m.Run())
 }
 

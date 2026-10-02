@@ -585,6 +585,24 @@ func TestResolveImageUnknownNameStillErrors(t *testing.T) {
 	require.Contains(t, err.Error(), "not-a-model")
 }
 
+func TestFlareRejectsConfirmedUpstreamSizeLimitsWithoutResizing(t *testing.T) {
+	for _, size := range []string{"4096x4096", "3856x1024", "1024x3856", "3000x3000"} {
+		_, err := ResolveImage(ImageRequest{ModelID: "gpt-image-2.5-flare", Size: size})
+		require.ErrorContains(t, err, "3840", size)
+		require.ErrorContains(t, err, "8294400", size)
+		require.False(t, IsRotatable(err))
+	}
+	for _, size := range []string{"1024x1024", "2048x2048", "3840x2160", "2160x3840", "2880x2880"} {
+		conf, err := ResolveImage(ImageRequest{ModelID: "gpt-image-2.5-flare", Size: size})
+		require.NoError(t, err, size)
+		require.Equal(t, size, conf.SizePixels.String())
+	}
+	_, err := ResolveImage(ImageRequest{ModelID: "gpt-image-2.5-flare", Size: "auto"})
+	require.NoError(t, err)
+	_, err = ResolveImage(ImageRequest{ModelID: "gemini-3-pro-image", Size: "4096x4096"})
+	require.NoError(t, err, "do not impose flare's limits on another model")
+}
+
 // 别名解析只到族级：对外名不带尺寸后缀，比例/分辨率一律从 size 推导。
 // 放行 "imagen-4-2k-16x9" 会让用户以为可以在模型名里编码尺寸，而那条路不存在。
 func TestResolveImageExternalNamesAreFamilyLevelOnly(t *testing.T) {

@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const defaultImageMaxDownloadBytes int64 = 32 << 20 // 32 MiB
@@ -55,6 +57,44 @@ func NewImageResultUploader(storage ImageStorage, prefix string, maxDownloadByte
 
 func defaultImageDownloadHTTPClient() *http.Client {
 	return &http.Client{Timeout: 60 * time.Second}
+}
+
+// UploadImages stores existing image bytes without a Base64/JSON round trip.
+// Uploads are bounded to two per request and results retain their input order.
+// Any failure returns no URLs, so the caller can fall back to the complete batch.
+func (u *ImageResultUploader) UploadImages(ctx context.Context, taskID string, images [][]byte) ([]string, error) {
+	if u == nil || u.storage == nil {
+		return nil, errors.New("image storage is unavailable")
+	}
+	for i, data := range images {
+		if len(data) == 0 {
+			return nil, fmt.Errorf("image %d is empty", i)
+		}
+	}
+	urls := make([]string, len(images))
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(2)
+	for i, data := range images {
+		group.Go(func() error {
+			if err := groupCtx.Err(); err != nil {
+				return err
+			}
+			contentType := detectImageContentType(data)
+			url, err := u.storage.Save(groupCtx, u.buildKey(taskID, i, contentType), contentType, data)
+			if err != nil {
+				return fmt.Errorf("image %d: upload to object storage: %w", i, err)
+			}
+			if strings.TrimSpace(url) == "" {
+				return fmt.Errorf("image %d: object storage returned an empty URL", i)
+			}
+			urls[i] = url
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+	return urls, nil
 }
 
 // Rewrite 将 result（上游生图响应 JSON）里的每张图片转存到对象存储，

@@ -115,13 +115,20 @@ func classifyAdobeError(err error) adobeFailure {
 
 	var temporaryErr *adobe.UpstreamTemporaryError
 	if errors.As(err, &temporaryErr) {
+		action := NextAccountRetry
+		var op *adobe.OperationError
+		if errors.As(err, &op) && (op.Stage == "poll" || op.Stage == "download") {
+			// The job was already accepted. Its local GET retries are exhausted;
+			// switching accounts would create and charge for a different image.
+			action = NextAccountStop
+		}
 		return adobeFailure{
 			Failover: &UpstreamFailoverError{
 				StatusCode:        statusOrDefault(temporaryErr.StatusCode, http.StatusBadGateway),
 				Stage:             GatewayFailureStageInference,
 				Scope:             GatewayFailureScopeProvider,
 				Reason:            adobeFailureUpstream,
-				NextAccountAction: NextAccountRetry,
+				NextAccountAction: action,
 			},
 		}
 	}

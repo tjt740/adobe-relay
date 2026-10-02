@@ -7,7 +7,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -501,6 +503,8 @@ func (h *GatewayHandler) runAdobeImagesFailover(
 			h.finishAdobeImagesSuccess(c, reqLog, apiKey, subject, subscription, account, result, req)
 			return
 		}
+		failureLog := reqLog.With(service.RecordAdobeImageFailure(c, account, parsed.Model, err)...)
+		failureLog.Warn("adobe_images.upstream_failed", zap.Int64("account_id", account.ID))
 
 		if errors.Is(err, context.Canceled) || failoverClientGone(c) {
 			reqLog.Info("adobe_images.aborted_client_disconnected", zap.Int64("account_id", account.ID))
@@ -510,8 +514,7 @@ func (h *GatewayHandler) runAdobeImagesFailover(
 		failover := h.gatewayService.AdobeFailover(requestCtx, account.ID, token, err)
 		if failover == nil {
 			// 不属于 Adobe 上游语义（编解码错误等）：没有换号的依据，直接上抛。
-			reqLog.Error("adobe_images.generate_failed",
-				zap.Int64("account_id", account.ID), zap.Error(err))
+			failureLog.Error("adobe_images.generate_failed", zap.Int64("account_id", account.ID))
 			adobeImagesError(c, http.StatusBadGateway, "api_error", "Upstream request failed")
 			return
 		}
@@ -531,7 +534,7 @@ func (h *GatewayHandler) runAdobeImagesFailover(
 			return
 		}
 
-		reqLog.Warn("adobe_images.account_failover",
+		failureLog.Warn("adobe_images.account_failover",
 			zap.Int64("account_id", account.ID),
 			zap.String("reason", string(failover.Reason)),
 			zap.Int("upstream_status", failover.StatusCode),
@@ -695,6 +698,9 @@ func (h *GatewayHandler) finishAdobeImagesSuccess(
 		adobeImagesError(c, http.StatusBadGateway, "api_error", "Upstream request failed")
 		return
 	}
+	errorCount := len(c.Errors)
+	responseBytes := len(result.Body)
+	var responseWriteMS int64
 	if req.writesGemini() {
 		// 先拼好信封再记账：一张图都交付不了时返回 502 且不计费。
 		body, err := service.BuildGeminiGenerateContentResponse(req.parsed.Model, service.AdobeGeminiImagesFromBytes(result.Images))
@@ -704,19 +710,67 @@ func (h *GatewayHandler) finishAdobeImagesSuccess(
 			return
 		}
 		h.recordAdobeImagesUsage(c, apiKey, subject, subscription, account, result.Forward, req)
+		responseBytes = len(body)
+		if adobeImagesWriteModeFromContext(c) == adobeImagesWriteGeminiSSE {
+			responseBytes = len(service.EncodeGeminiGenerateContentSSE(body))
+		}
+		writeStarted := time.Now()
 		writeAdobeGeminiImagesBody(c, body)
+		responseWriteMS = time.Since(writeStarted).Milliseconds()
 	} else {
+		writeStarted := time.Now()
 		c.Data(http.StatusOK, "application/json", result.Body)
+		responseWriteMS = time.Since(writeStarted).Milliseconds()
 		h.recordAdobeImagesUsage(c, apiKey, subject, subscription, account, result.Forward, req)
 	}
 	upstreamModel := ""
 	if result.Forward != nil {
 		upstreamModel = result.Forward.UpstreamModel
+		reqLog.Info("adobe_images.pipeline_completed",
+			zap.Int64("account_id", account.ID),
+			zap.String("generation_request_id", result.Forward.RequestID),
+			zap.String("upstream_model", upstreamModel),
+			zap.String("requested_quality", req.parsed.Quality),
+			zap.String("size", req.parsed.Size),
+			zap.Int("image_count", result.Forward.ImageCount),
+			zap.String("output_format", req.parsed.OutputFormat),
+			zap.String("response_format", req.parsed.ResponseFormat),
+			zap.Int64("processing_ms", result.Forward.Duration.Milliseconds()),
+			zap.Int64("response_write_ms", responseWriteMS),
+			zap.Int("response_bytes", responseBytes),
+			zap.Any("timings", result.Timings),
+		)
+	}
+	if !logAdobeImageDelivery(c, reqLog, account.ID, responseBytes, errorCount, result.Forward) {
+		return
 	}
 	reqLog.Debug("adobe_images.request_completed",
 		zap.Int64("account_id", account.ID),
 		zap.String("upstream_model", upstreamModel),
 	)
+}
+
+// A successful generation and a successful response write are separate outcomes.
+// Retain usage accounting while making failed delivery visible in the logs.
+func logAdobeImageDelivery(c *gin.Context, log *zap.Logger, accountID int64, responseBytes, previousErrors int, result *service.OpenAIForwardResult) bool {
+	fields := []zap.Field{
+		zap.Int64("account_id", accountID), zap.Bool("image_generated", true),
+		zap.Int("response_bytes", responseBytes), zap.Int("written_bytes", c.Writer.Size()),
+		zap.Bool("client_disconnected", c.Request.Context().Err() != nil),
+	}
+	if result != nil {
+		fields = append(fields, zap.Int64("generation_elapsed_ms", result.Duration.Milliseconds()))
+	}
+	if len(c.Errors) > previousErrors {
+		fields = append(fields, zap.String("error", adobe.SafeDiagnosticMessage(c.Errors[previousErrors:].String())))
+		log.Warn("adobe_images.delivery_failed", fields...)
+		return false
+	}
+	if c.Request.Context().Err() != nil {
+		log.Warn("adobe_images.client_disconnected_after_generation", fields...)
+		return false
+	}
+	return true
 }
 
 // finishAdobeImagesRelaySuccess 记账。响应体已由 ForwardImages 写入 gin，不能再 c.Data。
