@@ -282,3 +282,32 @@ func TestExistingAccountsBindWithoutChangingSchedulingState(t *testing.T) {
 	require.NoError(t, db.QueryRow(`SELECT count(*) FROM proxy_failover_events`).Scan(&eventsAfter))
 	require.Equal(t, eventsBefore, eventsAfter)
 }
+
+func TestAllocationRespectsActualExpirySchedulingPolicy(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	m := NewManager(db)
+	_, err := db.Exec(`INSERT INTO accounts(id,expires_at,auto_pause_on_expired) VALUES
+ (3,NOW()-INTERVAL '1 day',false),(4,NOW()-INTERVAL '1 day',true)`)
+	require.NoError(t, err)
+	v, err := m.SaveAllocation(ctx, AllocationPolicy{Enabled: true})
+	require.NoError(t, err)
+	require.Equal(t, 1, v.BindingOnlyAccounts, "an expired account allowed by the scheduler still needs routing protection")
+	m.probe = func(context.Context, proxy) health { return health{Status: "unhealthy"} }
+	require.NoError(t, m.check(ctx))
+	var paused bool
+	require.NoError(t, db.QueryRow(`SELECT status='error' AND NOT schedulable AND proxy_auto_paused AND proxy_id IS NULL FROM accounts WHERE id=3`).Scan(&paused))
+	require.True(t, paused, "a still-schedulable expired account must not become DIRECT while waiting")
+	require.NoError(t, db.QueryRow(`SELECT status='active' AND schedulable AND NOT proxy_auto_paused AND auto_pause_on_expired FROM accounts WHERE id=4`).Scan(&paused))
+	require.True(t, paused, "an account already excluded by the expiry policy retains its original state")
+	_, err = db.Exec(`UPDATE proxy_failover_health SET checked_at=NOW()-INTERVAL '31 seconds'`)
+	require.NoError(t, err)
+	m.probe = func(context.Context, proxy) health { return health{Status: "healthy"} }
+	require.NoError(t, m.check(ctx))
+	v, err = m.GetAllocation(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 4, v.Assigned)
+	require.Equal(t, 1, v.BindingOnlyAccounts)
+	require.NoError(t, db.QueryRow(`SELECT status='active' AND schedulable AND proxy_id IS NOT NULL AND NOT auto_pause_on_expired AND expires_at<NOW() FROM accounts WHERE id=3`).Scan(&paused))
+	require.True(t, paused, "restore only the allocator's pause; preserve the explicit expiry policy")
+}
