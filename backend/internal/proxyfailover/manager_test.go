@@ -104,13 +104,17 @@ func testDB(t *testing.T) *sql.DB {
 	db, err := sql.Open("postgres", u.String())
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
-	_, err = db.Exec(`CREATE TABLE proxies(id BIGINT PRIMARY KEY,protocol text DEFAULT 'http',host text DEFAULT 'localhost',port int DEFAULT 8080,username text,password text,status text DEFAULT 'active',expires_at timestamptz,updated_at timestamptz DEFAULT NOW(),deleted_at timestamptz);
- CREATE TABLE accounts(id BIGINT PRIMARY KEY,proxy_id bigint,platform text DEFAULT 'adobe',type text DEFAULT 'oauth',status text DEFAULT 'active',schedulable bool DEFAULT true,expires_at timestamptz,deleted_at timestamptz,updated_at timestamptz DEFAULT NOW(),proxy_fallback_origin_id bigint);
+	_, err = db.Exec(`CREATE TABLE proxies(id BIGINT PRIMARY KEY,name text DEFAULT 'test node',protocol text DEFAULT 'http',host text DEFAULT 'localhost',port int DEFAULT 8080,username text,password text,status text DEFAULT 'active',expires_at timestamptz,updated_at timestamptz DEFAULT NOW(),deleted_at timestamptz);
+ CREATE TABLE accounts(id BIGINT PRIMARY KEY,proxy_id bigint,platform text DEFAULT 'adobe',type text DEFAULT 'oauth',status text DEFAULT 'active',schedulable bool DEFAULT true,expires_at timestamptz,deleted_at timestamptz,updated_at timestamptz DEFAULT NOW(),proxy_fallback_origin_id bigint,error_message text);
  CREATE TABLE scheduler_outbox(id BIGSERIAL PRIMARY KEY,event_type text,payload jsonb);
  INSERT INTO proxies(id) VALUES(1),(2),(3),(4);
  INSERT INTO accounts(id,proxy_id) VALUES(1,1),(2,1);`)
 	require.NoError(t, err)
 	migration, err := os.ReadFile("../../migrations/241_account_proxy_failover.sql")
+	require.NoError(t, err)
+	_, err = db.Exec(string(migration))
+	require.NoError(t, err)
+	migration, err = os.ReadFile("../../migrations/242_proxy_auto_allocation.sql")
 	require.NoError(t, err)
 	_, err = db.Exec(string(migration))
 	require.NoError(t, err)

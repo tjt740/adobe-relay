@@ -2,14 +2,14 @@
   <section class="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-dark-600 dark:bg-dark-800">
     <div class="flex items-center justify-between gap-3">
       <label class="flex items-center gap-2 font-medium">
-        <input v-model="enabled" type="checkbox" :disabled="!view || saving" @change="dirty = true" />
+        <input v-model="enabled" type="checkbox" :disabled="!view || saving || view.auto_managed" @change="dirty = true" />
         {{ t('admin.accounts.proxyFailover.title') }}
       </label>
       <span v-if="view" class="text-sm" :class="view.state === 'healthy' ? 'text-teal-600' : 'text-gray-500'" aria-live="polite">
         {{ t(`admin.accounts.proxyFailover.states.${view.state}`) }}
       </span>
     </div>
-    <p class="mt-2 text-xs text-gray-500">{{ t('admin.accounts.proxyFailover.hint') }}</p>
+    <p class="mt-2 text-xs text-gray-500">{{ t(view?.auto_managed ? 'admin.accounts.proxyFailover.autoManaged' : 'admin.accounts.proxyFailover.hint') }}</p>
     <p v-if="error" role="alert" class="mt-2 text-sm text-red-600">{{ error }}</p>
     <template v-if="view && (enabled || view.enabled || view.events.length)">
       <div class="mt-3 space-y-1 text-sm">
@@ -76,7 +76,7 @@ const error = ref('')
 let alive = true
 let timer: ReturnType<typeof setInterval> | undefined
 const pendingProxyChange = computed(() => (props.selectedProxyId || 0) !== view.value?.current_proxy_id)
-const canSave = computed(() => view.value && dirty.value && !saving.value && !pendingProxyChange.value &&
+const canSave = computed(() => view.value && !view.value.auto_managed && dirty.value && !saving.value && !pendingProxyChange.value &&
   (!enabled.value || (primary.value > 0 && backups.value.length > 0 && backups.value.every(id => id && id !== primary.value) && new Set(backups.value).size === backups.value.length)))
 const name = (id: number) => props.proxies.find(p => p.id === id)?.name || (id ? `#${id}` : t('admin.accounts.proxyFailover.noProxy'))
 const formatTime = (value: string) => new Date(value).toLocaleString()

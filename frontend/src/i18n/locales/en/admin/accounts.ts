@@ -1,6 +1,7 @@
 export default {
     accounts: {
       proxyFailover: {
+  "autoManaged": "Routing is managed by automatic allocation in IP management, with at most 3 accounts per node.",
   "title": "Automatic proxy failover",
   "hint": "Check Adobe every 30 seconds. After 2 consecutive failures, switch to a healthy backup in order. No automatic failback, generation replay, or direct fallback.",
   "current": "Current route",
@@ -19,6 +20,7 @@ export default {
   "loadFailed": "Unable to load policy. Refresh to retry.",
   "saveFailed": "Save failed. The proxy or policy may have changed; refresh and retry.",
   "states": {
+    "auto_managed": "Automatically managed",
     "disabled": "Disabled",
     "checking": "Checking",
     "paused": "Paused: account unavailable or route outside policy",

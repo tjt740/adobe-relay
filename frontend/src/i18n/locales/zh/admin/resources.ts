@@ -42,6 +42,33 @@ export default {
 
     // Proxies Management
     proxies: {
+      allocation: {
+        "title": "自动分配节点",
+        "description": "持续为 Adobe OAuth 账号分配节点，每个节点最多 3 个账号。节点来自当前 Clash 订阅及手动录入的代理。",
+        "enable": "持续自动维护（3 个账号 / 节点）",
+        "behavior": "约每 30 秒检查 Adobe 连通性，大量节点会分批检测。优先保留可用绑定，连续 2 次失败后换到有空位的可用节点。新增或修改代理的账号通过检测后才恢复调度；手动停用、过期或凭据异常的账号不会自动恢复。其他账号已有的绑定也占用节点名额。",
+        "disableHint": "开启后统一接管代理分配，并关闭原有单账号故障切换。关闭后保留当前绑定，等待中的账号保持暂停，可手动配置后恢复。",
+        "saved": "设置已保存，后台将自动检测并分配。",
+        "waitingHint": "有 {count} 个账号正在等待检测或可用节点空位，期间暂停调度，不走直连。",
+        "assigned": "已分配账号",
+        "waiting": "等待分配",
+        "healthyNodes": "当前可用节点",
+        "availableSlots": "可用空位",
+        "checkedAt": "最近完成检查",
+        "pending": "等待首次检查",
+        "bindings": "绑定账号",
+        "health": "Adobe 连通性",
+        "noNodes": "请先导入 Clash 节点或手动添加代理。",
+        "loadFailed": "读取自动分配状态失败，请刷新重试。",
+        "saveFailed": "保存失败，请重试。",
+        "conflict": "设置已被其他操作修改，请刷新后重试。",
+        "states": {
+                "healthy": "可用",
+                "unhealthy": "不可用",
+                "unknown": "待检测 / 暂未确认",
+                "unavailable": "停用 / 已过期"
+        }
+},
       clash: {
         "hideURL": "隐藏链接",
         "showURL": "显示链接",
