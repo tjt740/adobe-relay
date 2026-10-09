@@ -227,7 +227,7 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 		keep := exists && freshHealthy(p, h, now)
 		// One failed probe, a stale measurement or an upstream outage does not
 		// move an established route. Edited/disabled/expired proxies do.
-		if !a.Waiting && exists && p.available(now) && h.fingerprint == p.fingerprint() && !(h.Status == "unhealthy" && h.Failures >= 2) {
+		if (!a.Waiting || a.BindingOnly) && exists && p.available(now) && h.fingerprint == p.fingerprint() && !(h.Status == "unhealthy" && h.Failures >= 2) {
 			keep = true
 		}
 		if keep && used[a.Current] < accountsPerProxy {

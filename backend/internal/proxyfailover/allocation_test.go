@@ -257,7 +257,11 @@ func TestExistingAccountsBindWithoutChangingSchedulingState(t *testing.T) {
 	}
 	failed = true
 	age()
-	check() // first failure keeps existing routes
+	check() // first failure keeps existing routes, including an expired auto-paused account
+	v, err = m.GetAllocation(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 8, v.Assigned)
+	require.Zero(t, v.Waiting)
 	age()
 	check() // second failure detaches unavailable routes, preserving stopped account states
 	v, err = m.GetAllocation(ctx)
