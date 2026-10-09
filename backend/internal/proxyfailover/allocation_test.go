@@ -196,3 +196,85 @@ func TestAllocationConcurrentEditsAndAtomicity(t *testing.T) {
 	require.NoError(t, db.QueryRow(`SELECT count(*) FROM accounts WHERE id=11 AND proxy_auto_paused AND proxy_id IS NULL`).Scan(&count))
 	require.Equal(t, 1, count)
 }
+
+func TestExistingAccountsBindWithoutChangingSchedulingState(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	m := NewManager(db)
+	_, err := db.Exec(`INSERT INTO accounts(id,proxy_id,status,schedulable,error_message,expires_at) VALUES
+ (3,1,'error',false,'cookie expired',NULL),
+ (4,1,'disabled',false,'manually disabled',NULL),
+ (5,1,'active',false,NULL,NULL),
+ (6,1,'active',true,NULL,NOW()-INTERVAL '1 day'),
+ (7,NULL,'error',true,'invalid credentials',NULL),
+ (8,NULL,'error',false,$1,NOW()-INTERVAL '1 day')`, allocationWaitingMessage)
+	require.NoError(t, err)
+	_, err = db.Exec(`UPDATE accounts SET proxy_auto_paused=true WHERE id=8;
+ INSERT INTO accounts(id,proxy_id,platform) VALUES(10,4,'openai');
+ INSERT INTO accounts(id,proxy_id,deleted_at) VALUES(11,1,NOW());`)
+	require.NoError(t, err)
+	snapshot := func() string {
+		t.Helper()
+		var raw string
+		require.NoError(t, db.QueryRow(`SELECT json_agg(s ORDER BY id)::text FROM
+ (SELECT id,status,schedulable,error_message,expires_at,proxy_auto_paused FROM accounts WHERE id BETWEEN 3 AND 8) s`).Scan(&raw))
+		return raw
+	}
+	before := snapshot()
+	policy, err := m.SaveAllocation(ctx, AllocationPolicy{Enabled: true})
+	require.NoError(t, err)
+	require.Equal(t, 8, policy.Accounts, "existing disabled, expired and error accounts are included")
+	require.Equal(t, 6, policy.BindingOnlyAccounts)
+	var failed bool
+	m.probe = func(_ context.Context, p proxy) health {
+		if failed {
+			return health{Status: "unhealthy"}
+		}
+		return health{Status: "healthy", LatencyMS: p.ID * 10}
+	}
+	check := func() {
+		t.Helper()
+		require.NoError(t, m.check(ctx))
+		require.Equal(t, before, snapshot(), "proxy changes must preserve every original scheduling/error/expiry field")
+		var other int64
+		require.NoError(t, db.QueryRow(`SELECT proxy_id FROM accounts WHERE id=10`).Scan(&other))
+		require.EqualValues(t, 4, other, "other platforms are never reallocated")
+		require.NoError(t, db.QueryRow(`SELECT proxy_id FROM accounts WHERE id=11`).Scan(&other))
+		require.EqualValues(t, 1, other, "deleted accounts are never changed")
+	}
+	check()
+	v, err := m.GetAllocation(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 8, v.Assigned)
+	require.Zero(t, v.Waiting)
+	require.Equal(t, 6, v.BindingOnlyAccounts, "an expired allocator-paused account can have an IP without being resumed")
+	for _, node := range v.Nodes {
+		require.LessOrEqual(t, node.Accounts, 3)
+	}
+	age := func() {
+		_, e := db.Exec(`UPDATE proxy_failover_health SET checked_at=NOW()-INTERVAL '31 seconds'`)
+		require.NoError(t, e)
+	}
+	failed = true
+	age()
+	check() // first failure keeps existing routes
+	age()
+	check() // second failure detaches unavailable routes, preserving stopped account states
+	v, err = m.GetAllocation(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 8, v.Waiting)
+	require.Zero(t, v.Assigned)
+	failed = false
+	age()
+	check() // capacity recovery binds existing inactive accounts too
+	v, err = m.GetAllocation(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 8, v.Assigned)
+	require.Zero(t, v.Waiting)
+	// Background rounds are idempotent once all existing accounts have routes.
+	var eventsBefore, eventsAfter int
+	require.NoError(t, db.QueryRow(`SELECT count(*) FROM proxy_failover_events`).Scan(&eventsBefore))
+	check()
+	require.NoError(t, db.QueryRow(`SELECT count(*) FROM proxy_failover_events`).Scan(&eventsAfter))
+	require.Equal(t, eventsBefore, eventsAfter)
+}

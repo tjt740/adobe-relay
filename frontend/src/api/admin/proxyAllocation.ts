@@ -7,6 +7,7 @@ export interface ProxyAllocationView {
   accounts: number
   assigned: number
   waiting: number
+  binding_only_accounts: number
   healthy_nodes: number
   available_slots: number
   checked_at: string | null
