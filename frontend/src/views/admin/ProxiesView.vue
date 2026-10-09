@@ -46,6 +46,9 @@
             </div>
 
             <div class="proxy-primary-actions">
+              <button @click="showProxyAllocation = true" class="btn btn-secondary proxy-toolbar-button">
+                {{ t('admin.proxies.allocation.title') }}
+              </button>
               <button @click="showClashSubscription = true" class="btn btn-secondary proxy-toolbar-button">
                 {{ t('admin.proxies.clash.title') }}
               </button>
@@ -972,6 +975,7 @@
         </div>
       </template>
     </BaseDialog>
+    <ProxyAllocationModal v-if="showProxyAllocation" @close="showProxyAllocation = false" @changed="loadProxies" />
     <ClashSubscriptionModal v-if="showClashSubscription" @close="showClashSubscription = false" @changed="handleClashChanged" />
   </AppLayout>
 </template>
@@ -991,6 +995,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ImportDataModal from '@/components/admin/proxy/ImportDataModal.vue'
+import ProxyAllocationModal from '@/components/admin/proxy/ProxyAllocationModal.vue'
 import ClashSubscriptionModal from '@/components/admin/proxy/ClashSubscriptionModal.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -1005,6 +1010,7 @@ import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
 const { t } = useI18n()
 const appStore = useAppStore()
 const showClashSubscription = ref(false)
+const showProxyAllocation = ref(false)
 const { copyToClipboard } = useClipboard()
 
 const columns = computed<Column[]>(() => [

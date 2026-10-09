@@ -42,6 +42,33 @@ export default {
 
     // Proxies
     proxies: {
+      allocation: {
+        "title": "Auto-assign proxies",
+        "description": "Continuously assign proxies to Adobe OAuth accounts, with at most 3 accounts per node. Uses the current Clash subscription and manually added proxies.",
+        "enable": "Maintain automatically (3 accounts / node)",
+        "behavior": "Checks Adobe connectivity about every 30 seconds; larger pools are checked in batches. Keeps working bindings and switches after 2 consecutive failures to a healthy node with capacity. New or edited routes wait for verification. Manually disabled, expired, or credential-error accounts are not resumed. Existing bindings for other accounts also consume capacity.",
+        "disableHint": "Enabling takes over routing and disables existing per-account failover policies. Disabling keeps current bindings; waiting accounts remain paused until manually configured and resumed.",
+        "saved": "Settings saved. Background checks and allocation will follow.",
+        "waitingHint": "{count} accounts are waiting for checks or capacity on a healthy node. Scheduling is paused; they do not use a direct connection.",
+        "assigned": "Assigned accounts",
+        "waiting": "Waiting accounts",
+        "healthyNodes": "Healthy nodes",
+        "availableSlots": "Available slots",
+        "checkedAt": "Last completed check",
+        "pending": "Waiting for first check",
+        "bindings": "Bound accounts",
+        "health": "Adobe connectivity",
+        "noNodes": "Import Clash nodes or manually add a proxy first.",
+        "loadFailed": "Unable to load automatic allocation. Please refresh.",
+        "saveFailed": "Unable to save. Please retry.",
+        "conflict": "Settings changed elsewhere. Refresh before trying again.",
+        "states": {
+                "healthy": "Healthy",
+                "unhealthy": "Unhealthy",
+                "unknown": "Pending / unconfirmed",
+                "unavailable": "Disabled / expired"
+        }
+},
       clash: {
         "hideURL": "Hide URL",
         "showURL": "Show URL",

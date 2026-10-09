@@ -1,6 +1,7 @@
 export default {
     accounts: {
       proxyFailover: {
+  "autoManaged": "代理由 IP 管理中的自动分配统一维护，每个节点最多 3 个账号。",
   "title": "自动故障切换",
   "hint": "每 30 秒检查 Adobe 连通性；连续 2 次失败后按备用顺序切换。恢复后不自动切回，不重放生图请求，也不会改走直连。",
   "current": "当前出口",
@@ -19,6 +20,7 @@ export default {
   "loadFailed": "无法加载策略，请刷新重试。",
   "saveFailed": "保存失败，代理或策略可能已变化，请刷新后重试。",
   "states": {
+    "auto_managed": "自动分配中",
     "disabled": "未启用",
     "checking": "检查中",
     "paused": "已暂停：账号不可调度或出口不在策略内",

@@ -34,7 +34,7 @@ func (h *AccountHandler) proxyFailoverRequest(c *gin.Context, save bool) {
 		view, err = h.proxyFailover.Get(c.Request.Context(), id)
 	}
 	switch {
-	case errors.Is(err, proxyfailover.ErrConflict):
+	case errors.Is(err, proxyfailover.ErrConflict), errors.Is(err, proxyfailover.ErrAutoManaged):
 		response.Error(c, 409, err.Error())
 	case errors.Is(err, proxyfailover.ErrInvalid):
 		response.Error(c, 400, err.Error())
@@ -42,6 +42,35 @@ func (h *AccountHandler) proxyFailoverRequest(c *gin.Context, save bool) {
 		response.Error(c, 404, "Adobe OAuth account not found")
 	case err != nil:
 		response.Error(c, 500, "Unable to load or save proxy failover")
+	default:
+		response.Success(c, view)
+	}
+}
+
+func (h *AccountHandler) GetProxyAllocation(c *gin.Context)  { h.proxyAllocationRequest(c, false) }
+func (h *AccountHandler) SaveProxyAllocation(c *gin.Context) { h.proxyAllocationRequest(c, true) }
+func (h *AccountHandler) proxyAllocationRequest(c *gin.Context, save bool) {
+	if h.proxyFailover == nil {
+		response.Error(c, 503, "Proxy allocation unavailable")
+		return
+	}
+	var view proxyfailover.AllocationView
+	var err error
+	if save {
+		var policy proxyfailover.AllocationPolicy
+		if c.ShouldBindJSON(&policy) != nil || policy.Revision < 0 {
+			response.Error(c, 400, "Invalid policy")
+			return
+		}
+		view, err = h.proxyFailover.SaveAllocation(c.Request.Context(), policy)
+	} else {
+		view, err = h.proxyFailover.GetAllocation(c.Request.Context())
+	}
+	switch {
+	case errors.Is(err, proxyfailover.ErrConflict):
+		response.Error(c, 409, err.Error())
+	case err != nil:
+		response.Error(c, 500, "Unable to load or save proxy allocation")
 	default:
 		response.Success(c, view)
 	}

@@ -15,6 +15,13 @@ async function panel(selectedProxyId = 1) {
   return wrapper
 }
 describe('Proxy failover policy', () => {
+  it('prevents individual policies from bypassing global allocation', async () => {
+    vi.mocked(getProxyFailover).mockResolvedValue({ ...initial(), auto_managed: true, state: 'auto_managed' })
+    const wrapper = await panel()
+    expect(wrapper.get('input[type="checkbox"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('.btn-primary').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('admin.accounts.proxyFailover.autoManaged')
+  })
   it('saves backup priority with the loaded revision and current proxy', async () => {
     const wrapper = await panel()
     await wrapper.findAll('[aria-label="admin.accounts.proxyFailover.moveUp"]')[1].trigger('click')

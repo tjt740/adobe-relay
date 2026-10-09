@@ -417,6 +417,8 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 		accounts.GET("/:id/stats", h.Admin.Account.GetStats)
 		accounts.POST("/:id/clear-error", h.Admin.Account.ClearError)
 		accounts.POST("/:id/revert-proxy-fallback", h.Admin.Account.RevertProxyFallback)
+		accounts.GET("/proxy-allocation", h.Admin.Account.GetProxyAllocation)
+		accounts.PUT("/proxy-allocation", h.Admin.Account.SaveProxyAllocation)
 		accounts.GET("/:id/proxy-failover", h.Admin.Account.GetProxyFailover)
 		accounts.PUT("/:id/proxy-failover", h.Admin.Account.SaveProxyFailover)
 		accounts.GET("/:id/usage", h.Admin.Account.GetUsage)

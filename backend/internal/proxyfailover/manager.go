@@ -43,9 +43,10 @@ type Event struct {
 }
 type View struct {
 	Policy
-	State  string   `json:"state"`
-	Health []health `json:"health"`
-	Events []Event  `json:"events"`
+	AutoManaged bool     `json:"auto_managed"`
+	State       string   `json:"state"`
+	Health      []health `json:"health"`
+	Events      []Event  `json:"events"`
 }
 type proxy struct {
 	ID                                         int64
@@ -67,18 +68,20 @@ func (p proxy) fingerprint() string {
 
 type Manager struct {
 	db    *sql.DB
+	wake  chan struct{}
 	probe func(context.Context, proxy) health
 }
 
-func NewManager(db *sql.DB) *Manager { return &Manager{db: db, probe: probeAdobe} }
+func NewManager(db *sql.DB) *Manager {
+	return &Manager{db: db, probe: probeAdobe, wake: make(chan struct{}, 1)}
+}
 
 type queryer interface {
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 }
 
 func loadProxies(ctx context.Context, q queryer) (map[int64]proxy, error) {
-	rows, err := q.QueryContext(ctx, `SELECT id, protocol, host, port, COALESCE(username,''), COALESCE(password,''), status, expires_at, updated_at, deleted_at IS NOT NULL FROM proxies
- WHERE id IN (SELECT primary_proxy_id FROM account_proxy_failover UNION SELECT jsonb_array_elements_text(backup_proxy_ids)::bigint FROM account_proxy_failover)`)
+	rows, err := q.QueryContext(ctx, `SELECT id, protocol, host, port, COALESCE(username,''), COALESCE(password,''), status, expires_at, updated_at, deleted_at IS NOT NULL FROM proxies`)
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +159,12 @@ func (m *Manager) Get(ctx context.Context, id int64) (View, error) {
 			}
 		}
 	}
+	if err = m.db.QueryRowContext(ctx, `SELECT enabled FROM proxy_auto_allocation WHERE id=1`).Scan(&v.AutoManaged); err != nil {
+		return v, err
+	}
+	if v.AutoManaged {
+		v.State = "auto_managed"
+	}
 	rows, err := m.db.QueryContext(ctx, `SELECT from_proxy_id,to_proxy_id,created_at FROM proxy_failover_events WHERE account_id=$1 ORDER BY id DESC LIMIT 10`, id)
 	if err != nil {
 		return v, err
@@ -181,6 +190,13 @@ func (m *Manager) Save(ctx context.Context, id int64, p Policy) (View, error) {
 	err = tx.QueryRowContext(ctx, `SELECT COALESCE(proxy_id,0) FROM accounts WHERE id=$1 AND deleted_at IS NULL AND platform='adobe' AND type='oauth' FOR UPDATE`, id).Scan(&current)
 	if err != nil {
 		return View{}, err
+	}
+	var autoEnabled bool
+	if err = tx.QueryRowContext(ctx, `SELECT enabled FROM proxy_auto_allocation WHERE id=1`).Scan(&autoEnabled); err != nil {
+		return View{}, err
+	}
+	if autoEnabled {
+		return View{}, ErrAutoManaged
 	}
 	if current != p.CurrentProxyID {
 		return View{}, ErrConflict
@@ -243,6 +259,7 @@ func (m *Manager) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+		case <-m.wake:
 		}
 	}
 }
@@ -265,6 +282,16 @@ func (m *Manager) check(ctx context.Context) error {
 	}
 	if !locked {
 		return nil
+	}
+	var automatic AllocationPolicy
+	if err = tx.QueryRowContext(ctx, `SELECT enabled,revision FROM proxy_auto_allocation WHERE id=1`).Scan(&automatic.Enabled, &automatic.Revision); err != nil {
+		return err
+	}
+	if automatic.Enabled {
+		if err = m.checkAllocation(ctx, tx, automatic); err != nil {
+			return err
+		}
+		return tx.Commit()
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT f.account_id,f.primary_proxy_id,f.backup_proxy_ids,f.revision,COALESCE(a.proxy_id,0) FROM account_proxy_failover f JOIN accounts a ON a.id=f.account_id
  WHERE f.enabled AND a.deleted_at IS NULL AND a.platform='adobe' AND a.type='oauth' AND a.status='active' AND a.schedulable AND (a.expires_at IS NULL OR a.expires_at>NOW()) ORDER BY f.account_id`)
@@ -310,69 +337,8 @@ func (m *Manager) check(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	pending := []proxy{}
-	for id := range needed {
-		p, exists := ps[id]
-		if !exists {
-			continue
-		}
-		h := hs[id]
-		if h.fingerprint != p.fingerprint() || time.Since(h.CheckedAt) >= 20*time.Second {
-			pending = append(pending, p)
-		}
-	}
-	sort.Slice(pending, func(i, j int) bool { return hs[pending[i].ID].CheckedAt.Before(hs[pending[j].ID].CheckedAt) })
-	// Bound load and leave time for the final transaction even with many slow proxies.
-	probeCtx, cancel := context.WithTimeout(ctx, 19*time.Second)
-	defer cancel()
-	results := make(chan health, len(pending))
-	jobs := make(chan proxy)
-	var wg sync.WaitGroup
-	for i := 0; i < 8; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for p := range jobs {
-				if probeCtx.Err() != nil {
-					return
-				}
-				h := m.probe(probeCtx, p)
-				if probeCtx.Err() != nil {
-					return
-				}
-				h.ProxyID = p.ID
-				h.fingerprint = p.fingerprint()
-				h.CheckedAt = time.Now()
-				results <- h
-			}
-		}()
-	}
-	go func() {
-		defer close(jobs)
-		for _, p := range pending {
-			select {
-			case jobs <- p:
-			case <-probeCtx.Done():
-				return
-			}
-		}
-	}()
-	wg.Wait()
-	close(results)
-	for h := range results {
-		old := hs[h.ProxyID]
-		if h.Status == "unhealthy" {
-			h.Failures = 1
-			if old.Status == "unhealthy" && old.fingerprint == h.fingerprint && h.CheckedAt.Sub(old.CheckedAt) < 3*time.Minute {
-				h.Failures = min(old.Failures+1, 100)
-			}
-		}
-		hs[h.ProxyID] = h
-		_, err = tx.ExecContext(ctx, `INSERT INTO proxy_failover_health(proxy_id,fingerprint,status,failures,latency_ms,checked_at,message) VALUES($1,$2,$3,$4,$5,$6,$7)
-  ON CONFLICT(proxy_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,status=EXCLUDED.status,failures=EXCLUDED.failures,latency_ms=EXCLUDED.latency_ms,checked_at=EXCLUDED.checked_at,message=EXCLUDED.message`, h.ProxyID, h.fingerprint, h.Status, h.Failures, h.LatencyMS, h.CheckedAt, h.Message)
-		if err != nil {
-			return err
-		}
+	if err = m.refreshHealth(ctx, tx, ps, hs, needed, true); err != nil {
+		return err
 	}
 	for _, a := range policies {
 		next := choose(a.Policy, ps, hs, time.Now())
@@ -456,4 +422,85 @@ func (m *Manager) switchProxy(ctx context.Context, tx *sql.Tx, a accountPolicy, 
 	payload, _ := json.Marshal(map[string]any{"account_ids": []int64{a.ID}})
 	_, err = tx.ExecContext(ctx, `INSERT INTO scheduler_outbox(event_type,payload) VALUES('account_bulk_changed',$1)`, string(payload))
 	return err
+}
+
+func (m *Manager) refreshHealth(ctx context.Context, tx *sql.Tx, ps map[int64]proxy, hs map[int64]health, needed map[int64]bool, persist bool) error {
+	pending := []proxy{}
+	for id := range needed {
+		p, exists := ps[id]
+		if !exists {
+			continue
+		}
+		h := hs[id]
+		if h.fingerprint != p.fingerprint() || time.Since(h.CheckedAt) >= 20*time.Second {
+			pending = append(pending, p)
+		}
+	}
+	sort.Slice(pending, func(i, j int) bool { return hs[pending[i].ID].CheckedAt.Before(hs[pending[j].ID].CheckedAt) })
+	// Bound load and leave time for the final transaction even with many slow proxies.
+	probeCtx, cancel := context.WithTimeout(ctx, 19*time.Second)
+	defer cancel()
+	results := make(chan health, len(pending))
+	jobs := make(chan proxy)
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for p := range jobs {
+				if probeCtx.Err() != nil {
+					return
+				}
+				h := m.probe(probeCtx, p)
+				if probeCtx.Err() != nil {
+					return
+				}
+				h.ProxyID = p.ID
+				h.fingerprint = p.fingerprint()
+				h.CheckedAt = time.Now()
+				results <- h
+			}
+		}()
+	}
+	go func() {
+		defer close(jobs)
+		for _, p := range pending {
+			select {
+			case jobs <- p:
+			case <-probeCtx.Done():
+				return
+			}
+		}
+	}()
+	wg.Wait()
+	close(results)
+	for h := range results {
+		old := hs[h.ProxyID]
+		if h.Status == "unhealthy" {
+			h.Failures = 1
+			if old.Status == "unhealthy" && old.fingerprint == h.fingerprint && h.CheckedAt.Sub(old.CheckedAt) < 3*time.Minute {
+				h.Failures = min(old.Failures+1, 100)
+			}
+		}
+		hs[h.ProxyID] = h
+	}
+	if persist {
+		return persistHealth(ctx, tx, ps, hs)
+	}
+	return nil
+}
+
+func persistHealth(ctx context.Context, tx *sql.Tx, ps map[int64]proxy, hs map[int64]health) error {
+	for id, h := range hs {
+		p, exists := ps[id]
+		if !exists || h.fingerprint != p.fingerprint() {
+			continue
+		}
+		_, err := tx.ExecContext(ctx, `INSERT INTO proxy_failover_health(proxy_id,fingerprint,status,failures,latency_ms,checked_at,message) VALUES($1,$2,$3,$4,$5,$6,$7)
+  ON CONFLICT(proxy_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,status=EXCLUDED.status,failures=EXCLUDED.failures,latency_ms=EXCLUDED.latency_ms,checked_at=EXCLUDED.checked_at,message=EXCLUDED.message`, h.ProxyID, h.fingerprint, h.Status, h.Failures, h.LatencyMS, h.CheckedAt, h.Message)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
