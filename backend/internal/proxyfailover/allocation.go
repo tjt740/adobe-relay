@@ -129,7 +129,7 @@ func (m *Manager) SaveAllocation(ctx context.Context, policy AllocationPolicy) (
 			return AllocationView{}, err
 		}
 		rows, e := tx.QueryContext(ctx, `UPDATE accounts SET proxy_auto_paused=true,status='error',schedulable=false,error_message=$1,updated_at=NOW()
- WHERE deleted_at IS NULL AND platform='adobe' AND type='oauth' AND status='active' AND schedulable AND (expires_at IS NULL OR expires_at>NOW()) RETURNING id`, allocationWaitingMessage)
+ WHERE deleted_at IS NULL AND platform='adobe' AND type='oauth' AND status='active' AND schedulable AND (auto_pause_on_expired IS NOT TRUE OR expires_at IS NULL OR expires_at>NOW()) RETURNING id`, allocationWaitingMessage)
 		if e != nil {
 			return AllocationView{}, e
 		}
@@ -175,7 +175,7 @@ func loadAllocationAccounts(ctx context.Context, q queryer) ([]allocationAccount
 	rows, err := q.QueryContext(ctx, `SELECT id,COALESCE(proxy_id,0),
  platform='adobe' AND type='oauth',
  COALESCE(proxy_auto_paused AND status='error' AND NOT schedulable AND error_message=$1,false),
- NOT ((expires_at IS NULL OR expires_at>NOW()) AND
+ NOT ((auto_pause_on_expired IS NOT TRUE OR expires_at IS NULL OR expires_at>NOW()) AND
  ((status='active' AND schedulable) OR COALESCE(proxy_auto_paused AND status='error' AND NOT schedulable AND error_message=$1,false)))
  FROM accounts WHERE deleted_at IS NULL ORDER BY id`, allocationWaitingMessage)
 	if err != nil {
@@ -227,7 +227,7 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 		keep := exists && freshHealthy(p, h, now)
 		// One failed probe, a stale measurement or an upstream outage does not
 		// move an established route. Edited/disabled/expired proxies do.
-		if !a.Waiting && exists && p.available(now) && h.fingerprint == p.fingerprint() && !(h.Status == "unhealthy" && h.Failures >= 2) {
+		if (!a.Waiting || a.BindingOnly) && exists && p.available(now) && h.fingerprint == p.fingerprint() && !(h.Status == "unhealthy" && h.Failures >= 2) {
 			keep = true
 		}
 		if keep && used[a.Current] < accountsPerProxy {
