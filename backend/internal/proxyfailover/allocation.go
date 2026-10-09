@@ -29,14 +29,15 @@ type AllocationNode struct {
 
 type AllocationView struct {
 	AllocationPolicy
-	AccountsPerProxy int              `json:"accounts_per_proxy"`
-	Accounts         int              `json:"accounts"`
-	Assigned         int              `json:"assigned"`
-	Waiting          int              `json:"waiting"`
-	HealthyNodes     int              `json:"healthy_nodes"`
-	AvailableSlots   int              `json:"available_slots"`
-	CheckedAt        *time.Time       `json:"checked_at"`
-	Nodes            []AllocationNode `json:"nodes"`
+	AccountsPerProxy    int              `json:"accounts_per_proxy"`
+	Accounts            int              `json:"accounts"`
+	Assigned            int              `json:"assigned"`
+	Waiting             int              `json:"waiting"`
+	BindingOnlyAccounts int              `json:"binding_only_accounts"`
+	HealthyNodes        int              `json:"healthy_nodes"`
+	AvailableSlots      int              `json:"available_slots"`
+	CheckedAt           *time.Time       `json:"checked_at"`
+	Nodes               []AllocationNode `json:"nodes"`
 }
 
 func (m *Manager) GetAllocation(ctx context.Context) (AllocationView, error) {
@@ -55,9 +56,12 @@ func (m *Manager) GetAllocation(ctx context.Context) (AllocationView, error) {
 			continue
 		}
 		v.Accounts++
-		if a.Waiting {
+		if a.BindingOnly {
+			v.BindingOnlyAccounts++
+		}
+		if a.Current == 0 || (a.Waiting && !a.BindingOnly) {
 			v.Waiting++
-		} else if a.Current != 0 {
+		} else {
 			v.Assigned++
 		}
 	}
@@ -164,13 +168,15 @@ func (m *Manager) SaveAllocation(ctx context.Context, policy AllocationPolicy) (
 type allocationAccount struct {
 	ID, Current       int64
 	Eligible, Waiting bool
+	BindingOnly       bool
 }
 
 func loadAllocationAccounts(ctx context.Context, q queryer) ([]allocationAccount, error) {
 	rows, err := q.QueryContext(ctx, `SELECT id,COALESCE(proxy_id,0),
- platform='adobe' AND type='oauth' AND (expires_at IS NULL OR expires_at>NOW())
- AND ((status='active' AND schedulable) OR (proxy_auto_paused AND status='error' AND NOT schedulable AND error_message=$1)),
- proxy_auto_paused AND status='error' AND NOT schedulable AND error_message=$1
+ platform='adobe' AND type='oauth',
+ COALESCE(proxy_auto_paused AND status='error' AND NOT schedulable AND error_message=$1,false),
+ NOT ((expires_at IS NULL OR expires_at>NOW()) AND
+ ((status='active' AND schedulable) OR COALESCE(proxy_auto_paused AND status='error' AND NOT schedulable AND error_message=$1,false)))
  FROM accounts WHERE deleted_at IS NULL ORDER BY id`, allocationWaitingMessage)
 	if err != nil {
 		return nil, err
@@ -179,7 +185,7 @@ func loadAllocationAccounts(ctx context.Context, q queryer) ([]allocationAccount
 	result := []allocationAccount{}
 	for rows.Next() {
 		var a allocationAccount
-		if err = rows.Scan(&a.ID, &a.Current, &a.Eligible, &a.Waiting); err != nil {
+		if err = rows.Scan(&a.ID, &a.Current, &a.Eligible, &a.Waiting, &a.BindingOnly); err != nil {
 			return nil, err
 		}
 		result = append(result, a)
@@ -192,7 +198,8 @@ func freshHealthy(p proxy, h health, now time.Time) bool {
 }
 
 // Preserve working bindings first, then fill a node to three before using the
-// next. Inactive and other-platform accounts still consume their reserved slot.
+// next. Existing inactive Adobe accounts get bindings too, without being resumed.
+// Other-platform accounts keep their reserved slots and are never modified.
 func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int64]health, now time.Time) map[int64]int64 {
 	used := map[int64]int{}
 	next := map[int64]int64{}
@@ -203,6 +210,9 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 	}
 	ordered := append([]allocationAccount(nil), accounts...)
 	sort.SliceStable(ordered, func(i, j int) bool {
+		if ordered[i].BindingOnly != ordered[j].BindingOnly {
+			return !ordered[i].BindingOnly
+		}
 		if ordered[i].Waiting != ordered[j].Waiting {
 			return !ordered[i].Waiting
 		}
@@ -310,10 +320,14 @@ func (m *Manager) checkAllocation(ctx context.Context, tx *sql.Tx, policy Alloca
 	changed := []int64{}
 	for _, a := range accounts {
 		pid, managed := next[a.ID]
-		if !managed || (pid == a.Current && a.Waiting == (pid == 0)) {
+		if !managed || (pid == a.Current && (a.BindingOnly || a.Waiting == (pid == 0))) {
 			continue
 		}
-		if pid == 0 {
+		if a.BindingOnly {
+			// Binding a stopped, expired or credential-error account must not
+			// change its scheduling state, error, expiry or ownership of a pause.
+			_, err = tx.ExecContext(ctx, `UPDATE accounts SET proxy_id=NULLIF($2,0),proxy_fallback_origin_id=NULL,updated_at=NOW() WHERE id=$1`, a.ID, pid)
+		} else if pid == 0 {
 			_, err = tx.ExecContext(ctx, `UPDATE accounts SET proxy_id=NULL,proxy_fallback_origin_id=NULL,proxy_auto_paused=true,status='error',schedulable=false,error_message=$2,updated_at=NOW() WHERE id=$1`, a.ID, allocationWaitingMessage)
 		} else {
 			_, err = tx.ExecContext(ctx, `UPDATE accounts SET proxy_id=$2,proxy_fallback_origin_id=NULL,proxy_auto_paused=false,status='active',schedulable=true,error_message=NULL,updated_at=NOW() WHERE id=$1`, a.ID, pid)

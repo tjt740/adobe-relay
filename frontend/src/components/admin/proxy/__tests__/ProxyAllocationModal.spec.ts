@@ -6,7 +6,7 @@ import { getProxyAllocation, saveProxyAllocation, type ProxyAllocationView } fro
 vi.mock('@/api/admin/proxyAllocation', () => ({ getProxyAllocation: vi.fn(), saveProxyAllocation: vi.fn() }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 enableAutoUnmount(afterEach)
-const initial = (): ProxyAllocationView => ({ enabled: false, revision: 4, accounts_per_proxy: 3, accounts: 7, assigned: 6, waiting: 1, healthy_nodes: 2, available_slots: 0, checked_at: null, nodes: [{ id: 1, name: 'Tokyo', accounts: 3, status: 'healthy', latency_ms: 200 }] })
+const initial = (): ProxyAllocationView => ({ enabled: false, revision: 4, accounts_per_proxy: 3, accounts: 7, assigned: 6, waiting: 1, binding_only_accounts: 0, healthy_nodes: 2, available_slots: 0, checked_at: null, nodes: [{ id: 1, name: 'Tokyo', accounts: 3, status: 'healthy', latency_ms: 200 }] })
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(getProxyAllocation).mockResolvedValue(initial()) })
 async function panel() {
   const w = mount(ProxyAllocationModal, { global: { stubs: { BaseDialog: { template: '<div><slot /></div>' } } } })
@@ -37,6 +37,13 @@ describe('Continuous proxy allocation', () => {
     expect(w.get('.btn-primary').attributes('disabled')).toBeDefined()
     await w.get('.btn-secondary').trigger('click'); await flushPromises()
     expect((w.get('input').element as HTMLInputElement).checked).toBe(false)
+  })
+  it('distinguishes IP bindings from resuming existing stopped accounts', async () => {
+    vi.mocked(getProxyAllocation).mockResolvedValue({ ...initial(), enabled: true, binding_only_accounts: 3 })
+    const w = await panel()
+    expect(w.get('[data-testid="binding-only-hint"]').text()).toContain('admin.proxies.allocation.bindingOnlyHint')
+    expect(w.text()).toContain('admin.proxies.allocation.assigned')
+    expect(w.text()).toContain('admin.proxies.allocation.waitingHint')
   })
   it('does not allow changing settings before a successful load', async () => {
     vi.mocked(getProxyAllocation).mockRejectedValue(new Error('offline'))

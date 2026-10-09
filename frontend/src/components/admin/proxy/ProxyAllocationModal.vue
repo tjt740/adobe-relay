@@ -19,6 +19,9 @@
             <p class="mt-1 text-2xl font-semibold tabular-nums">{{ stat.value }}</p>
           </div>
         </div>
+        <p v-if="view.binding_only_accounts" class="text-sm text-gray-500" data-testid="binding-only-hint">
+          {{ t('admin.proxies.allocation.bindingOnlyHint', { count: view.binding_only_accounts }) }}
+        </p>
         <p v-if="view.enabled && view.waiting" role="status" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
           {{ t('admin.proxies.allocation.waitingHint', { count: view.waiting }) }}
         </p>

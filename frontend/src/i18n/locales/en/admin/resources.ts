@@ -43,15 +43,16 @@ export default {
     // Proxies
     proxies: {
       allocation: {
+        "bindingOnlyHint": "{count} disabled, expired or error accounts receive proxy bindings only; they will not be automatically enabled.",
         "title": "Auto-assign proxies",
-        "description": "Continuously assign proxies to Adobe OAuth accounts, with at most 3 accounts per node. Uses the current Clash subscription and manually added proxies.",
+        "description": "Continuously bind proxies to existing and new Adobe OAuth accounts, with at most 3 accounts per healthy node. No account re-import is needed. Uses the current Clash subscription and manually added proxies.",
         "enable": "Maintain automatically (3 accounts / node)",
-        "behavior": "Checks Adobe connectivity about every 30 seconds; larger pools are checked in batches. Keeps working bindings and switches after 2 consecutive failures to a healthy node with capacity. New or edited routes wait for verification. Manually disabled, expired, or credential-error accounts are not resumed. Existing bindings for other accounts also consume capacity.",
+        "behavior": "Checks Adobe connectivity about every 30 seconds; larger pools are checked in batches. Keeps working bindings and switches after 2 consecutive failures to a healthy node with capacity. Existing disabled, expired and credential-error accounts also receive bindings while keeping their scheduling and error states. Only otherwise eligible accounts paused by the allocator itself are resumed after binding. Existing bindings for other platforms also consume capacity.",
         "disableHint": "Enabling takes over routing and disables existing per-account failover policies. Disabling keeps current bindings; waiting accounts remain paused until manually configured and resumed.",
         "saved": "Settings saved. Background checks and allocation will follow.",
-        "waitingHint": "{count} accounts are waiting for checks or capacity on a healthy node. Scheduling is paused; they do not use a direct connection.",
-        "assigned": "Assigned accounts",
-        "waiting": "Waiting accounts",
+        "waitingHint": "{count} accounts are waiting for checks or capacity on a healthy node. Otherwise eligible accounts are paused and never use a direct connection; disabled, expired and error accounts retain their states.",
+        "assigned": "Accounts with a proxy",
+        "waiting": "Waiting for a proxy",
         "healthyNodes": "Healthy nodes",
         "availableSlots": "Available slots",
         "checkedAt": "Last completed check",
