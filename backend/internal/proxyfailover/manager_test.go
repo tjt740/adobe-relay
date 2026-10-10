@@ -118,6 +118,10 @@ func testDB(t *testing.T) *sql.DB {
 	require.NoError(t, err)
 	_, err = db.Exec(string(migration))
 	require.NoError(t, err)
+	migration, err = os.ReadFile("../../migrations/243_proxy_auto_allocation_all_accounts.sql")
+	require.NoError(t, err)
+	_, err = db.Exec(string(migration))
+	require.NoError(t, err)
 	return db
 }
 
