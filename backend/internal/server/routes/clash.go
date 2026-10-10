@@ -7,5 +7,5 @@ import (
 
 // RegisterClashRoutes registers the token-protected read-only Clash export.
 func RegisterClashRoutes(r *gin.Engine, h *handler.Handlers) {
-	r.GET("/clash/subscribe/:token", h.Admin.Proxy.ClashSubscription)
+	r.GET("/api/v1/clash/subscribe/:token", h.Admin.Proxy.ClashSubscription)
 }
