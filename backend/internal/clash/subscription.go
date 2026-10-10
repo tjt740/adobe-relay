@@ -3,6 +3,7 @@ package clash
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -48,19 +49,169 @@ func parseSubscription(body []byte) ([]Node, error) {
 		Proxies []map[string]any `yaml:"proxies"`
 	}
 	// Decode only outbound nodes. Never execute subscription rules, providers, listeners or scripts.
-	if err := yaml.Unmarshal(body, &doc); err != nil {
-		return nil, errors.New("订阅不是有效的 Clash YAML")
+	if err := yaml.Unmarshal(body, &doc); err == nil && len(doc.Proxies) > 0 {
+		return normalizeProxyConfigs(doc.Proxies)
 	}
-	if len(doc.Proxies) == 0 {
-		return nil, errors.New("订阅没有 proxies 节点，请使用 Clash YAML 订阅链接")
+	decoded, err := decodeBase64Subscription(body)
+	if err != nil {
+		return nil, errors.New("订阅没有 proxies 节点，请使用 Clash YAML 或 Base64 节点订阅链接")
 	}
-	if len(doc.Proxies) > maxNodes {
+	configs := make([]map[string]any, 0)
+	for _, line := range strings.Split(string(decoded), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		config, ok, err := parseProxyURI(line)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			configs = append(configs, config)
+		}
+	}
+	if len(configs) == 0 {
+		return nil, errors.New("订阅没有可识别的节点")
+	}
+	return normalizeProxyConfigs(configs)
+}
+
+func decodeBase64Subscription(body []byte) ([]byte, error) {
+	raw := strings.TrimSpace(string(body))
+	if raw == "" || strings.ContainsAny(raw, " \t\r\n") {
+		return nil, errors.New("不是 Base64 订阅")
+	}
+	for _, encoding := range []*base64.Encoding{base64.StdEncoding, base64.RawStdEncoding, base64.URLEncoding, base64.RawURLEncoding} {
+		decoded, err := encoding.DecodeString(raw)
+		if err == nil && strings.Contains(string(decoded), "://") {
+			return decoded, nil
+		}
+	}
+	return nil, errors.New("不是 Base64 节点订阅")
+}
+
+func parseProxyURI(raw string) (map[string]any, bool, error) {
+	u, err := url.Parse(raw)
+	if err != nil || u.Hostname() == "" {
+		return nil, false, errors.New("节点链接无效")
+	}
+	name := strings.TrimSpace(u.Fragment)
+	if name == "" {
+		name = u.Hostname()
+	}
+	if isSubscriptionMetadata(name) {
+		return nil, false, nil
+	}
+	port, err := strconv.Atoi(u.Port())
+	if err != nil || port < 1 || port > 65535 {
+		return nil, false, fmt.Errorf("节点 %s 的地址或端口无效", name)
+	}
+	query := u.Query()
+	config := map[string]any{"name": name, "server": u.Hostname(), "port": port}
+	switch strings.ToLower(u.Scheme) {
+	case "vless":
+		config["type"] = "vless"
+		if u.User == nil || u.User.Username() == "" {
+			return nil, false, fmt.Errorf("节点 %s 缺少 VLESS UUID", name)
+		}
+		config["uuid"] = u.User.Username()
+		if network := query.Get("type"); network != "" {
+			config["network"] = network
+		}
+		if security := query.Get("security"); security != "" {
+			config["tls"] = security == "tls"
+		}
+		if sni := query.Get("sni"); sni != "" {
+			config["servername"] = sni
+		}
+		if fp := query.Get("fp"); fp != "" {
+			config["client-fingerprint"] = fp
+		}
+		if flow := query.Get("flow"); flow != "" {
+			config["flow"] = flow
+		}
+		if query.Get("insecure") == "1" || strings.EqualFold(query.Get("allowInsecure"), "true") {
+			config["skip-cert-verify"] = true
+		}
+		if pbk := query.Get("pbk"); pbk != "" {
+			config["reality-opts"] = map[string]any{"public-key": pbk, "short-id": query.Get("sid")}
+		}
+		switch network := query.Get("type"); network {
+		case "ws":
+			opts := map[string]any{}
+			if path := query.Get("path"); path != "" {
+				opts["path"] = path
+			}
+			if host := query.Get("host"); host != "" {
+				opts["headers"] = map[string]any{"Host": host}
+			}
+			config["ws-opts"] = opts
+		case "grpc":
+			if serviceName := query.Get("serviceName"); serviceName != "" {
+				config["grpc-opts"] = map[string]any{"grpc-service-name": serviceName}
+			}
+		}
+	case "hysteria2", "hy2":
+		config["type"] = "hysteria2"
+		if u.User == nil || u.User.Username() == "" {
+			return nil, false, fmt.Errorf("节点 %s 缺少 Hysteria2 密码", name)
+		}
+		config["password"] = u.User.Username()
+		if password, ok := u.User.Password(); ok {
+			config["password"] = password
+		}
+		if sni := query.Get("sni"); sni != "" {
+			config["sni"] = sni
+		}
+		if query.Get("insecure") == "1" || strings.EqualFold(query.Get("insecure"), "true") {
+			config["skip-cert-verify"] = true
+		}
+		if fingerprint := query.Get("pinSHA256"); fingerprint != "" {
+			config["fingerprint"] = fingerprint
+		}
+		if ports := query.Get("mport"); ports != "" {
+			config["ports"] = ports
+		}
+	case "trojan":
+		config["type"] = "trojan"
+		if u.User == nil || u.User.Username() == "" {
+			return nil, false, fmt.Errorf("节点 %s 缺少 Trojan 密码", name)
+		}
+		config["password"] = u.User.Username()
+		if sni := query.Get("sni"); sni != "" {
+			config["sni"] = sni
+		} else if peer := query.Get("peer"); peer != "" {
+			config["sni"] = peer
+		}
+		if query.Get("allowInsecure") == "1" || strings.EqualFold(query.Get("allowInsecure"), "true") {
+			config["skip-cert-verify"] = true
+		}
+		if alpn := query.Get("alpn"); alpn != "" {
+			config["alpn"] = strings.Split(alpn, ",")
+		}
+	default:
+		return nil, false, fmt.Errorf("节点 %s 的协议不受支持：%s", name, u.Scheme)
+	}
+	return config, true, nil
+}
+
+func isSubscriptionMetadata(name string) bool {
+	for _, prefix := range []string{"剩余流量：", "距离下次重置剩余：", "套餐到期："} {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeProxyConfigs(configs []map[string]any) ([]Node, error) {
+	if len(configs) > maxNodes {
 		return nil, fmt.Errorf("订阅最多支持 %d 个节点", maxNodes)
 	}
 	supported := map[string]bool{"ss": true, "ssr": true, "vmess": true, "vless": true, "trojan": true, "hysteria": true, "hysteria2": true, "tuic": true, "http": true, "socks5": true, "anytls": true}
 	seen := make(map[string]bool)
-	nodes := make([]Node, 0, len(doc.Proxies))
-	for i, cfg := range doc.Proxies {
+	nodes := make([]Node, 0, len(configs))
+	for i, cfg := range configs {
 		name, _ := cfg["name"].(string)
 		typ, _ := cfg["type"].(string)
 		host, _ := cfg["server"].(string)
@@ -166,25 +317,54 @@ func subscriptionClient() *http.Client {
 }
 
 func fetchSubscription(ctx context.Context, client *http.Client, raw string) ([]Node, error) {
-	if err := validateURL(raw); err != nil {
-		return nil, err
+	urls := strings.Fields(raw)
+	if len(urls) == 0 {
+		return nil, errors.New("请输入至少一个订阅链接")
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil)
-	if err != nil {
-		return nil, errors.New("订阅链接无效")
+	if len(urls) > 8 {
+		return nil, errors.New("最多支持 8 个订阅链接")
 	}
-	req.Header.Set("User-Agent", "clash.meta/sub2api")
-	res, err := client.Do(req)
-	if err != nil {
-		return nil, errors.New("获取订阅失败，请检查链接、网络或稍后重试")
+	all := make([]Node, 0)
+	for index, subscriptionURL := range urls {
+		if err := validateURL(subscriptionURL); err != nil {
+			return nil, err
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, subscriptionURL, nil)
+		if err != nil {
+			return nil, errors.New("订阅链接无效")
+		}
+		req.Header.Set("User-Agent", "clash.meta/sub2api")
+		res, err := client.Do(req)
+		if err != nil {
+			return nil, errors.New("获取订阅失败，请检查链接、网络或稍后重试")
+		}
+		body, readErr := io.ReadAll(io.LimitReader(res.Body, maxBody+1))
+		res.Body.Close()
+		if readErr != nil {
+			return nil, errors.New("读取订阅失败")
+		}
+		if res.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("订阅服务器返回 HTTP %d", res.StatusCode)
+		}
+		nodes, err := parseSubscription(body)
+		if err != nil {
+			return nil, err
+		}
+		if len(urls) > 1 {
+			prefix := fmt.Sprintf("订阅%d · ", index+1)
+			for i := range nodes {
+				name := []rune(prefix + nodes[i].Name)
+				if len(name) > 90 {
+					name = name[:90]
+				}
+				nodes[i].Name = string(name)
+				nodes[i].Config["name"] = nodes[i].Name
+			}
+		}
+		all = append(all, nodes...)
+		if len(all) > maxNodes {
+			return nil, fmt.Errorf("合并后的订阅节点超过 %d 个", maxNodes)
+		}
 	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("订阅服务器返回 HTTP %d", res.StatusCode)
-	}
-	body, err := io.ReadAll(io.LimitReader(res.Body, maxBody+1))
-	if err != nil {
-		return nil, errors.New("读取订阅失败")
-	}
-	return parseSubscription(body)
+	return all, nil
 }

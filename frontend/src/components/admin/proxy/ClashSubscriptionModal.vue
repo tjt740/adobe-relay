@@ -20,8 +20,8 @@
         <div class="flex flex-col gap-2 sm:flex-row">
           <div class="relative min-w-0 flex-1">
             <Icon name="link" size="sm" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input id="clash-subscription-url" v-model="url" :type="showURL ? 'text' : 'password'" autocomplete="off" autocapitalize="off" spellcheck="false"
-              class="input h-11 pl-9 pr-11 font-mono text-sm" :disabled="busy"
+            <textarea id="clash-subscription-url" v-model="url" rows="2" autocomplete="off" autocapitalize="off" spellcheck="false"
+              class="input min-h-11 resize-y pl-9 pr-11 font-mono text-sm" :class="{ 'clash-subscription-hidden': !showURL }" :disabled="busy"
               :placeholder="t(state?.url_hint ? 'admin.proxies.clash.keepURL' : 'admin.proxies.clash.urlPlaceholder')" @input="invalidatePreview" />
             <button type="button" class="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-dark-600 dark:hover:text-gray-200"
               :aria-label="t(showURL ? 'admin.proxies.clash.hideURL' : 'admin.proxies.clash.showURL')" :title="t(showURL ? 'admin.proxies.clash.hideURL' : 'admin.proxies.clash.showURL')"
@@ -280,6 +280,10 @@ onMounted(load)
 </script>
 
 <style scoped>
+.clash-subscription-hidden {
+  -webkit-text-security: disc;
+}
+
 .clash-progress {
   appearance: none;
 }
