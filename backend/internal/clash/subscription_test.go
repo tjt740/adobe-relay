@@ -63,6 +63,16 @@ func TestParseBase64URISubscription(t *testing.T) {
 	require.Equal(t, "password", nodes[1].Config["password"])
 }
 
+func TestParseTrojanURI(t *testing.T) {
+	nodes, err := parseSubscription([]byte(base64.StdEncoding.EncodeToString([]byte("trojan://secret@example.com:443?allowInsecure=1&peer=cdn.example.com#Hong%20Kong\n"))))
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.Equal(t, "trojan", nodes[0].Type)
+	require.Equal(t, "secret", nodes[0].Config["password"])
+	require.Equal(t, "cdn.example.com", nodes[0].Config["sni"])
+	require.Equal(t, true, nodes[0].Config["skip-cert-verify"])
+}
+
 func TestFetchMultipleSubscriptions(t *testing.T) {
 	responses := []string{
 		base64.StdEncoding.EncodeToString([]byte("vless://one@example.com:443?type=ws#Japan\n")),

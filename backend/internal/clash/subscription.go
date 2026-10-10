@@ -172,6 +172,23 @@ func parseProxyURI(raw string) (map[string]any, bool, error) {
 		if ports := query.Get("mport"); ports != "" {
 			config["ports"] = ports
 		}
+	case "trojan":
+		config["type"] = "trojan"
+		if u.User == nil || u.User.Username() == "" {
+			return nil, false, fmt.Errorf("节点 %s 缺少 Trojan 密码", name)
+		}
+		config["password"] = u.User.Username()
+		if sni := query.Get("sni"); sni != "" {
+			config["sni"] = sni
+		} else if peer := query.Get("peer"); peer != "" {
+			config["sni"] = peer
+		}
+		if query.Get("allowInsecure") == "1" || strings.EqualFold(query.Get("allowInsecure"), "true") {
+			config["skip-cert-verify"] = true
+		}
+		if alpn := query.Get("alpn"); alpn != "" {
+			config["alpn"] = strings.Split(alpn, ",")
+		}
 	default:
 		return nil, false, fmt.Errorf("节点 %s 的协议不受支持：%s", name, u.Scheme)
 	}
