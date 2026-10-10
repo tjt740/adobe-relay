@@ -3659,6 +3659,7 @@
       <div>
         <label class="input-label">{{ t('admin.accounts.proxy') }}</label>
         <ProxySelector v-model="form.proxy_id" :proxies="proxies" />
+        <p class="input-hint">{{ t('admin.accounts.proxyAutoAssignHint') }}</p>
       </div>
 
       <UpstreamRequestIdHeaderField

@@ -129,7 +129,7 @@ func (m *Manager) SaveAllocation(ctx context.Context, policy AllocationPolicy) (
 			return AllocationView{}, err
 		}
 		rows, e := tx.QueryContext(ctx, `UPDATE accounts SET proxy_auto_paused=true,status='error',schedulable=false,error_message=$1,updated_at=NOW()
- WHERE deleted_at IS NULL AND platform='adobe' AND type='oauth' AND status='active' AND schedulable AND (auto_pause_on_expired IS NOT TRUE OR expires_at IS NULL OR expires_at>NOW()) RETURNING id`, allocationWaitingMessage)
+ WHERE deleted_at IS NULL AND status='active' AND schedulable AND (auto_pause_on_expired IS NOT TRUE OR expires_at IS NULL OR expires_at>NOW()) RETURNING id`, allocationWaitingMessage)
 		if e != nil {
 			return AllocationView{}, e
 		}
@@ -173,7 +173,7 @@ type allocationAccount struct {
 
 func loadAllocationAccounts(ctx context.Context, q queryer) ([]allocationAccount, error) {
 	rows, err := q.QueryContext(ctx, `SELECT id,COALESCE(proxy_id,0),
- platform='adobe' AND type='oauth',
+ true,
  COALESCE(proxy_auto_paused AND status='error' AND NOT schedulable AND error_message=$1,false),
  NOT ((auto_pause_on_expired IS NOT TRUE OR expires_at IS NULL OR expires_at>NOW()) AND
  ((status='active' AND schedulable) OR COALESCE(proxy_auto_paused AND status='error' AND NOT schedulable AND error_message=$1,false)))
@@ -198,8 +198,8 @@ func freshHealthy(p proxy, h health, now time.Time) bool {
 }
 
 // Preserve working bindings first, then fill a node to three before using the
-// next. Existing inactive Adobe accounts get bindings too, without being resumed.
-// Other-platform accounts keep their reserved slots and are never modified.
+// next. Existing inactive accounts get bindings too, without being resumed.
+// Every schedulable account type shares the same three-account node capacity.
 func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int64]health, now time.Time) map[int64]int64 {
 	used := map[int64]int{}
 	next := map[int64]int64{}

@@ -1210,6 +1210,7 @@ export default {
       affinityBufferInfinite: '不限制',
       expired: '已过期',
       proxy: '代理',
+      proxyAutoAssignHint: '留空时，若 IP 管理已开启自动分配，将自动绑定可用节点；未开启则直连。',
       noProxy: '无代理',
       concurrency: '并发数',
       loadFactor: '负载因子',

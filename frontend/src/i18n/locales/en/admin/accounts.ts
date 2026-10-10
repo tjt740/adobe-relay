@@ -1099,6 +1099,7 @@ export default {
       affinityBufferInfinite: 'Unlimited',
       expired: 'Expired',
       proxy: 'Proxy',
+      proxyAutoAssignHint: 'Leave blank to assign an available node automatically when IP Management auto-allocation is enabled; otherwise the account uses a direct connection.',
       noProxy: 'No Proxy',
       concurrency: 'Concurrency',
       loadFactor: 'Load Factor',
