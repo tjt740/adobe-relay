@@ -19,6 +19,10 @@ secret: attacker
 rules: [MATCH,DIRECT]
 listeners: [{name: evil, type: http, port: 1}]
 proxies:
+ - name: 剩余流量：997 GB
+   type: vmess
+   server: metadata.example.com
+   port: 443
  - name: 日本
    type: vmess
    server: example.com
@@ -35,6 +39,7 @@ proxies:
 	require.NotContains(t, nodes[0].Config, "external-controller")
 	for _, body := range []string{
 		`proxies: []`, `proxy-providers: {remote: {url: https://example.com}}`,
+		`proxies: [{name: "剩余流量：1 GB", type: ss, server: x, port: 443}]`,
 		`proxies: [{name: A, type: direct, server: x, port: 1}]`,
 		`proxies: [{name: A, type: ss, server: x, port: 0}]`,
 		`proxies: [{name: A, type: ss, server: x, port: 1, dialer-proxy: DIRECT}]`,

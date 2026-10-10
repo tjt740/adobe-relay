@@ -216,6 +216,12 @@ func normalizeProxyConfigs(configs []map[string]any) ([]Node, error) {
 		typ, _ := cfg["type"].(string)
 		host, _ := cfg["server"].(string)
 		name = strings.TrimSpace(name)
+		// Subscription providers often include traffic/quota text as pseudo-nodes.
+		// Filter it here as well as in URI parsing so Clash YAML imports cannot retain
+		// provider metadata rows.
+		if isSubscriptionMetadata(name) {
+			continue
+		}
 		if name == "" || len([]rune(name)) > 90 || seen[name] {
 			return nil, fmt.Errorf("第 %d 个节点名称为空、重复或超过 90 字符", i+1)
 		}
@@ -238,6 +244,9 @@ func normalizeProxyConfigs(configs []map[string]any) ([]Node, error) {
 		cfg["name"], cfg["port"] = name, port
 		seen[name] = true
 		nodes = append(nodes, Node{Name: name, Type: typ, Config: cfg})
+	}
+	if len(nodes) == 0 {
+		return nil, errors.New("订阅没有可识别的节点")
 	}
 	return nodes, nil
 }
