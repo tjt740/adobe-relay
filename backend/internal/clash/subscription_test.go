@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestParseSubscription(t *testing.T) {
@@ -96,6 +97,24 @@ func TestFetchMultipleSubscriptions(t *testing.T) {
 	require.Len(t, nodes, 2)
 	require.Equal(t, "订阅1 · Japan", nodes[0].Name)
 	require.Equal(t, "订阅2 · Japan", nodes[1].Name)
+}
+
+func TestPublicSubscriptionConfig(t *testing.T) {
+	s := State{Nodes: []Node{
+		{Name: "Japan", Enabled: true, Config: map[string]any{"name": "Japan", "type": "vless", "server": "jp.example.com", "port": 443}},
+		{Name: "Disabled", Enabled: false, Config: map[string]any{"name": "Disabled", "type": "vless", "server": "off.example.com", "port": 443}},
+	}}
+	body, err := yaml.Marshal(publicSubscriptionConfig(s))
+	require.NoError(t, err)
+	var doc struct {
+		Proxies []map[string]any `yaml:"proxies"`
+		Rules   []string         `yaml:"rules"`
+	}
+	require.NoError(t, yaml.Unmarshal(body, &doc))
+	require.Len(t, doc.Proxies, 1)
+	require.Equal(t, "Japan", doc.Proxies[0]["name"])
+	require.NotContains(t, string(body), "Disabled")
+	require.Equal(t, []string{"MATCH,全部节点"}, doc.Rules)
 }
 
 func TestSubscriptionURLSafety(t *testing.T) {

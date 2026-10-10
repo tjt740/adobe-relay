@@ -30,6 +30,26 @@ func (h *ProxyHandler) ClashStatus(c *gin.Context) {
 	response.Success(c, result)
 }
 
+// ClashSubscription serves the current enabled node pool for Clash clients.
+// The URL token is the only authentication mechanism for this read-only export.
+func (h *ProxyHandler) ClashSubscription(c *gin.Context) {
+	if h.clash == nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	body, authorized, err := h.clash.ExportSubscription(c.Request.Context(), c.Param("token"))
+	if !authorized {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		c.Status(http.StatusServiceUnavailable)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.Data(http.StatusOK, "text/yaml; charset=utf-8", body)
+}
+
 func (h *ProxyHandler) ClashPreview(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	var req struct {
