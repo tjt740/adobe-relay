@@ -210,8 +210,8 @@ func TestExistingAccountsBindWithoutChangingSchedulingState(t *testing.T) {
  (8,NULL,'error',false,$1,NOW()-INTERVAL '1 day')`, allocationWaitingMessage)
 	require.NoError(t, err)
 	_, err = db.Exec(`UPDATE accounts SET proxy_auto_paused=true WHERE id=8;
- INSERT INTO accounts(id,proxy_id,platform,type) VALUES(10,4,'openai','api_key');
- INSERT INTO accounts(id,proxy_id,deleted_at) VALUES(11,1,NOW());`)
+	 INSERT INTO accounts(id,proxy_id,platform,type,status,schedulable,error_message) VALUES(10,4,'openai','api_key','error',true,$1);
+	 INSERT INTO accounts(id,proxy_id,deleted_at) VALUES(11,1,NOW());`)
 	require.NoError(t, err)
 	snapshot := func() string {
 		t.Helper()
@@ -239,6 +239,11 @@ func TestExistingAccountsBindWithoutChangingSchedulingState(t *testing.T) {
 		var other int64
 		require.NoError(t, db.QueryRow(`SELECT proxy_id FROM accounts WHERE id=10`).Scan(&other))
 		require.EqualValues(t, 4, other, "an existing healthy binding is preserved across account types")
+		var status string
+		var message *string
+		require.NoError(t, db.QueryRow(`SELECT status,error_message FROM accounts WHERE id=10`).Scan(&status, &message))
+		require.Equal(t, "active", status, "a stale allocation wait state is cleared after binding")
+		require.Nil(t, message, "a stale allocation wait message is cleared after binding")
 		require.NoError(t, db.QueryRow(`SELECT proxy_id FROM accounts WHERE id=11`).Scan(&other))
 		require.EqualValues(t, 1, other, "deleted accounts are never changed")
 	}
