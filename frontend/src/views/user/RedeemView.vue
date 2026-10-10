@@ -378,6 +378,8 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import Select from '@/components/common/Select.vue'
 import { formatDateTime } from '@/utils/format'
+import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
+import { getConfiguredTablePageSizeOptions } from '@/utils/tablePreferences'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -403,11 +405,11 @@ const errorMessage = ref('')
 const history = ref<RedeemHistoryItem[]>([])
 const loadingHistory = ref(false)
 const historyPage = ref(1)
-const historyPageSize = ref(20)
-const historyPageSizeOptions = [20, 50, 100].map(size => ({ value: size, label: String(size) }))
+const historyPageSize = ref(getPersistedPageSize())
+const historyPageSizeOptions = getConfiguredTablePageSizeOptions().map(size => ({ value: size, label: String(size) }))
 const historyTotal = ref(0)
 let historyRequest = 0
-let loadedHistoryPageSize = 20
+let loadedHistoryPageSize = getPersistedPageSize()
 const contactInfo = ref('')
 
 // Helper functions for history display

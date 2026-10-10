@@ -65,7 +65,7 @@ export interface BatchUpdateUserLimitsResponse {
  */
 export async function list(
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   filters?: {
     status?: 'active' | 'disabled'
     role?: 'admin' | 'user'
@@ -285,7 +285,7 @@ export interface BalanceHistoryResponse extends PaginatedResponse<BalanceHistory
 export async function getUserBalanceHistory(
   id: number,
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   type?: string
 ): Promise<BalanceHistoryResponse> {
   const params: Record<string, any> = { page, page_size: pageSize }

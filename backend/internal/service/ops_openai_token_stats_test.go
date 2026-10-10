@@ -97,7 +97,7 @@ func TestOpsServiceGetOpenAITokenStats_Validation(t *testing.T) {
 				StartTime: now.Add(-time.Hour),
 				EndTime:   now,
 				Page:      1,
-				PageSize:  101,
+				PageSize:  501,
 			},
 			wantCode:   400,
 			wantReason: "OPS_PAGE_SIZE_INVALID",
@@ -140,7 +140,7 @@ func TestOpsServiceGetOpenAITokenStats_DefaultPagination(t *testing.T) {
 	require.NotNil(t, resp)
 	require.NotNil(t, repo.captured)
 	require.Equal(t, 1, repo.captured.Page)
-	require.Equal(t, 20, repo.captured.PageSize)
+	require.Equal(t, 200, repo.captured.PageSize)
 	require.Equal(t, 0, repo.captured.TopN)
 }
 

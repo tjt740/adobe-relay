@@ -52,11 +52,11 @@ func TestPaginationParamsLimit(t *testing.T) {
 		pageSize int
 		want     int
 	}{
-		{name: "non-positive falls back to default", pageSize: 0, want: 20},
-		{name: "negative falls back to default", pageSize: -1, want: 20},
-		{name: "normal value keeps", pageSize: 50, want: 50},
-		{name: "max value keeps", pageSize: 1000, want: 1000},
-		{name: "beyond max clamps to 1000", pageSize: 1500, want: 1000},
+		{name: "non-positive falls back to default", pageSize: 0, want: 200},
+		{name: "negative falls back to default", pageSize: -1, want: 200},
+		{name: "normal value keeps", pageSize: 300, want: 300},
+		{name: "max value keeps", pageSize: 500, want: 500},
+		{name: "beyond max clamps to 500", pageSize: 1500, want: 500},
 	}
 
 	for _, tt := range tests {
@@ -80,10 +80,10 @@ func TestPaginationParamsOffsetUsesNormalizedLimit(t *testing.T) {
 		want     int
 	}{
 		{name: "invalid page uses first page", page: 0, pageSize: 50, want: 0},
-		{name: "zero page size uses default", page: 2, pageSize: 0, want: 20},
-		{name: "negative page size uses default", page: 2, pageSize: -1, want: 20},
-		{name: "normal values", page: 3, pageSize: 50, want: 100},
-		{name: "page size beyond max is clamped", page: 2, pageSize: 1500, want: 1000},
+		{name: "zero page size uses default", page: 2, pageSize: 0, want: 200},
+		{name: "negative page size uses default", page: 2, pageSize: -1, want: 200},
+		{name: "normal values", page: 3, pageSize: 300, want: 600},
+		{name: "page size beyond max is clamped", page: 2, pageSize: 1500, want: 500},
 	}
 
 	for _, tt := range tests {

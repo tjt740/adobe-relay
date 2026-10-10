@@ -120,7 +120,7 @@ interface PaginatedResponse<T> {
  */
 export async function list(
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   filters?: {
     status?: string
     search?: string

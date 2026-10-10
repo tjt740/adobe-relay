@@ -662,8 +662,8 @@ func (h *OpsHandler) ListRequestDetails(c *gin.Context) {
 	}
 
 	page, pageSize := response.ParsePagination(c)
-	if pageSize > 100 {
-		pageSize = 100
+	if pageSize > 500 {
+		pageSize = 500
 	}
 
 	startTime, endTime, err := parseOpsTimeRange(c, "1h")

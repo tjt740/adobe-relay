@@ -157,6 +157,7 @@ import EventWorkspace from './components/EventWorkspace.vue'
 import EventDetailDialog from './components/EventDetailDialog.vue'
 import FilterDeleteDialog from './components/FilterDeleteDialog.vue'
 import promptAuditAPI from './api'
+import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import type {
   PromptAuditDraft,
   PromptAuditEndpointDraft,
@@ -183,7 +184,7 @@ const serverConfig = ref<PromptAuditDraft | null>(null)
 const draft = ref<PromptAuditDraft | null>(null)
 const runtime = ref<PromptAuditRuntime | null>(null)
 const groups = ref<PromptAuditGroup[]>([])
-const events = reactive<PromptEventPage>({ items: [], total: 0, page: 1, page_size: 20, pages: 0 })
+const events = reactive<PromptEventPage>({ items: [], total: 0, page: 1, page_size: getPersistedPageSize(), pages: 0 })
 const filters = ref<PromptEventFilters>(emptyEventFilters())
 const appliedFilters = ref<PromptEventFilters>(emptyEventFilters())
 const selectedEventIds = ref<number[]>([])

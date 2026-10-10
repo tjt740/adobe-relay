@@ -30,7 +30,7 @@ export interface LiveCapability {
  */
 export async function list(
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   filters?: {
     platform?: GroupPlatform
     status?: 'active' | 'inactive'
@@ -277,7 +277,7 @@ export async function getStats(id: number): Promise<{
 export async function getGroupApiKeys(
   id: number,
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 200
 ): Promise<PaginatedResponse<any>> {
   const { data } = await apiClient.get<PaginatedResponse<any>>(`/admin/groups/${id}/api-keys`, {
     params: { page, page_size: pageSize }

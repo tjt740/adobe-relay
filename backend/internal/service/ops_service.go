@@ -691,7 +691,7 @@ func (s *OpsService) GetErrorLogs(ctx context.Context, filter *OpsErrorLogFilter
 		return nil, err
 	}
 	if s.opsRepo == nil {
-		return &OpsErrorLogList{Errors: []*OpsErrorLog{}, Total: 0, Page: 1, PageSize: 20}, nil
+		return &OpsErrorLogList{Errors: []*OpsErrorLog{}, Total: 0, Page: 1, PageSize: 200}, nil
 	}
 	result, err := s.opsRepo.ListErrorLogs(ctx, filter)
 	if err != nil {

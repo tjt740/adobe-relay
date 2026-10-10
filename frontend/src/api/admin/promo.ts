@@ -13,7 +13,7 @@ import type {
 
 export async function list(
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   filters?: {
     status?: string
     search?: string
@@ -54,7 +54,7 @@ export async function deleteCode(id: number): Promise<{ message: string }> {
 export async function getUsages(
   id: number,
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 200
 ): Promise<BasePaginationResponse<PromoCodeUsage>> {
   const { data } = await apiClient.get<BasePaginationResponse<PromoCodeUsage>>(
     `/admin/promo-codes/${id}/usages`,

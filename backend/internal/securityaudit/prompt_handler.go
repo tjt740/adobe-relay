@@ -86,7 +86,7 @@ func (h *PromptAdminHandler) ListEvents(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	pageSize, err := positiveIntQuery(c, "page_size", 20, 100)
+	pageSize, err := positiveIntQuery(c, "page_size", 200, 500)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

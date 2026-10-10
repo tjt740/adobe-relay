@@ -6,6 +6,7 @@ import Select from '@/components/common/Select.vue'
 import OpsErrorLogTable from './OpsErrorLogTable.vue'
 import { opsAPI, type OpsErrorLog } from '@/api/admin/ops'
 import { buildOpsErrorTimeParams } from '../utils/opsErrorParams'
+import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 interface Props {
   show: boolean
@@ -31,7 +32,7 @@ const loading = ref(false)
 const rows = ref<OpsErrorLog[]>([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(getPersistedPageSize())
 
 const q = ref('')
 const statusCode = ref<number | 'other' | null>(null)
@@ -170,7 +171,7 @@ watch(
     if (!open) return
     if (props.resumeState) return
     page.value = 1
-    pageSize.value = 10
+    pageSize.value = getPersistedPageSize()
     resetFilters()
   }
 )

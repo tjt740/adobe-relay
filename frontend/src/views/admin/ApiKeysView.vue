@@ -49,6 +49,7 @@ import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AppLayout } from '@/components/layout'
 import Pagination from '@/components/common/Pagination.vue'
+import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import Select from '@/components/common/Select.vue'
 import AdminKeySecret from '@/components/admin/AdminKeySecret.vue'
 import { listApiKeys, type AdminApiKey } from '@/api/admin/apiKeys'
@@ -61,7 +62,7 @@ const statusOptions = computed(() => [
   { value: 'quota_exhausted', label: t('adminKeys.quotaExhausted') },
   { value: 'expired', label: t('adminKeys.expired') }
 ])
-const page = ref(1), pageSize = ref(20), total = ref(0)
+const page = ref(1), pageSize = ref(getPersistedPageSize()), total = ref(0)
 const items = ref<AdminApiKey[]>([])
 const loading = ref(false), loadError = ref(false)
 let requestID = 0

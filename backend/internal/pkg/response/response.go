@@ -151,7 +151,7 @@ func PaginatedWithResult(c *gin.Context, items any, pagination *PaginationResult
 			Items:    items,
 			Total:    0,
 			Page:     1,
-			PageSize: 20,
+			PageSize: 200,
 			Pages:    1,
 		})
 		return
@@ -169,7 +169,7 @@ func PaginatedWithResult(c *gin.Context, items any, pagination *PaginationResult
 // ParsePagination 解析分页参数
 func ParsePagination(c *gin.Context) (page, pageSize int) {
 	page = 1
-	pageSize = 20
+	pageSize = 200
 
 	if p := c.Query("page"); p != "" {
 		if val, err := parseInt(p); err == nil && val > 0 {
@@ -179,11 +179,11 @@ func ParsePagination(c *gin.Context) (page, pageSize int) {
 
 	// 支持 page_size 和 limit 两种参数名
 	if ps := c.Query("page_size"); ps != "" {
-		if val, err := parseInt(ps); err == nil && val > 0 && val <= 1000 {
+		if val, err := parseInt(ps); err == nil && val > 0 && val <= 500 {
 			pageSize = val
 		}
 	} else if l := c.Query("limit"); l != "" {
-		if val, err := parseInt(l); err == nil && val > 0 && val <= 1000 {
+		if val, err := parseInt(l); err == nil && val > 0 && val <= 500 {
 			pageSize = val
 		}
 	}

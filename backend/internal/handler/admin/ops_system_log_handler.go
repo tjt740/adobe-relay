@@ -42,8 +42,8 @@ func (h *OpsHandler) ListSystemLogs(c *gin.Context) {
 	}
 
 	page, pageSize := response.ParsePagination(c)
-	if pageSize > 200 {
-		pageSize = 200
+	if pageSize > 500 {
+		pageSize = 500
 	}
 
 	start, end, err := parseOpsTimeRange(c, "1h")

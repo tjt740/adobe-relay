@@ -121,8 +121,8 @@ func (s *ChannelMonitorService) List(ctx context.Context, params ChannelMonitorL
 	if params.Page < 1 {
 		params.Page = 1
 	}
-	if params.PageSize < 1 || params.PageSize > 200 {
-		params.PageSize = 20
+	if params.PageSize < 1 || params.PageSize > 500 {
+		params.PageSize = 200
 	}
 	items, total, err := s.repo.List(ctx, params)
 	if err != nil {

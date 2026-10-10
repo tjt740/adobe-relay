@@ -674,10 +674,10 @@ func normalizeAffiliateRecordFilter(filter AffiliateRecordFilter) AffiliateRecor
 		filter.Page = 1
 	}
 	if filter.PageSize <= 0 {
-		filter.PageSize = 20
+		filter.PageSize = 200
 	}
-	if filter.PageSize > 100 {
-		filter.PageSize = 100
+	if filter.PageSize > 500 {
+		filter.PageSize = 500
 	}
 	filter.Search = strings.TrimSpace(filter.Search)
 	filter.SortBy = strings.TrimSpace(filter.SortBy)

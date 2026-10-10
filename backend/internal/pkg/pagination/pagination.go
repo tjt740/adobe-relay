@@ -28,7 +28,7 @@ type PaginationResult struct {
 func DefaultPagination() PaginationParams {
 	return PaginationParams{
 		Page:      1,
-		PageSize:  20,
+		PageSize:  200,
 		SortOrder: SortOrderDesc,
 	}
 }
@@ -44,10 +44,10 @@ func (p PaginationParams) Offset() int {
 // Limit 获取限制数
 func (p PaginationParams) Limit() int {
 	if p.PageSize < 1 {
-		return 20
+		return 200
 	}
-	if p.PageSize > 1000 {
-		return 1000
+	if p.PageSize > 500 {
+		return 500
 	}
 	return p.PageSize
 }

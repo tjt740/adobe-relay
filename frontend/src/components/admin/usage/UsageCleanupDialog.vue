@@ -74,8 +74,7 @@
           :total="tasksTotal"
           :page="tasksPage"
           :page-size="tasksPageSize"
-          :page-size-options="[5]"
-          :show-page-size-selector="false"
+          :show-page-size-selector="true"
           :show-jump="true"
           @update:page="handleTaskPageChange"
           @update:pageSize="handleTaskPageSizeChange"
@@ -127,6 +126,7 @@ import UsageFilters from '@/components/admin/usage/UsageFilters.vue'
 import { adminUsageAPI } from '@/api/admin/usage'
 import type { AdminUsageQueryParams, UsageCleanupTask, CreateUsageCleanupTaskRequest } from '@/api/admin/usage'
 import { requestTypeToLegacyStream } from '@/utils/usageRequestType'
+import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 interface Props {
   show: boolean
@@ -151,7 +151,7 @@ const localEndDate = ref('')
 const tasks = ref<UsageCleanupTask[]>([])
 const tasksLoading = ref(false)
 const tasksPage = ref(1)
-const tasksPageSize = ref(5)
+const tasksPageSize = ref(getPersistedPageSize())
 const tasksTotal = ref(0)
 const submitting = ref(false)
 const confirmVisible = ref(false)

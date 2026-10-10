@@ -35,10 +35,10 @@ func TestRedeemHistory(t *testing.T) {
 		status, page, size int
 	}{
 		{"legacy", "", 7, 200, 0, 0},
-		{"default", "?page=1", 7, 200, 1, 20},
+		{"default", "?page=1", 7, 200, 1, 200},
 		{"size only", "?page_size=50", 7, 200, 1, 50},
 		{"second user", "?page=2&page_size=100&user_id=7", 8, 200, 2, 100},
-		{"cap", "?page_size=101", 7, 200, 1, 100},
+		{"cap", "?page_size=501", 7, 200, 1, 500},
 		{"beyond last", "?page=100&page_size=20", 7, 200, 100, 20},
 		{"zero", "?page=0", 7, 400, 0, 0},
 		{"negative", "?page_size=-1", 7, 400, 0, 0},

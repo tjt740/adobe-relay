@@ -1319,10 +1319,10 @@ func (s *ContentModerationService) ListLogs(ctx context.Context, filter ContentM
 		filter.Pagination.Page = 1
 	}
 	if filter.Pagination.PageSize <= 0 {
-		filter.Pagination.PageSize = 20
+		filter.Pagination.PageSize = 200
 	}
-	if filter.Pagination.PageSize > 100 {
-		filter.Pagination.PageSize = 100
+	if filter.Pagination.PageSize > 500 {
+		filter.Pagination.PageSize = 500
 	}
 	if filter.Pagination.SortOrder == "" {
 		filter.Pagination.SortOrder = pagination.SortOrderDesc

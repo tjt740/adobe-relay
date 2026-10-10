@@ -41,13 +41,13 @@ func (s *OpsService) GetOpenAITokenStats(ctx context.Context, filter *OpsOpenAIT
 			filter.Page = 1
 		}
 		if filter.PageSize <= 0 {
-			filter.PageSize = 20
+			filter.PageSize = 200
 		}
 		if filter.Page < 1 {
 			return nil, infraerrors.BadRequest("OPS_PAGE_INVALID", "page must be >= 1")
 		}
-		if filter.PageSize < 1 || filter.PageSize > 100 {
-			return nil, infraerrors.BadRequest("OPS_PAGE_SIZE_INVALID", "page_size must be between 1 and 100")
+		if filter.PageSize < 1 || filter.PageSize > 500 {
+			return nil, infraerrors.BadRequest("OPS_PAGE_SIZE_INVALID", "page_size must be between 1 and 500")
 		}
 	}
 

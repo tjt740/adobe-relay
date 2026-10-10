@@ -21,7 +21,7 @@ func (s *OpsService) ListSystemLogs(ctx context.Context, filter *OpsSystemLogFil
 			Logs:     []*OpsSystemLog{},
 			Total:    0,
 			Page:     1,
-			PageSize: 50,
+			PageSize: 200,
 		}, nil
 	}
 	if filter == nil {
@@ -31,10 +31,10 @@ func (s *OpsService) ListSystemLogs(ctx context.Context, filter *OpsSystemLogFil
 		filter.Page = 1
 	}
 	if filter.PageSize <= 0 {
-		filter.PageSize = 50
-	}
-	if filter.PageSize > 200 {
 		filter.PageSize = 200
+	}
+	if filter.PageSize > 500 {
+		filter.PageSize = 500
 	}
 
 	result, err := s.opsRepo.ListSystemLogs(ctx, filter)

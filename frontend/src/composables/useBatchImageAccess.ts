@@ -7,7 +7,7 @@ const loaded = ref(false)
 const loading = ref(false)
 const hasAllowedBatchImageKey = ref(false)
 let pendingLoad: Promise<boolean> | null = null
-const pageSize = 100
+const pageSize = 500
 
 function keyAllowsBatchImage(key: ApiKey): boolean {
   return (

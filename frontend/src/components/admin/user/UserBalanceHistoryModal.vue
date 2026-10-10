@@ -180,6 +180,7 @@ import type { AdminUser } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 const props = defineProps<{ show: boolean; user: AdminUser | null; hideActions?: boolean }>()
 const emit = defineEmits(['close', 'deposit', 'withdraw'])
@@ -190,7 +191,7 @@ const loading = ref(false)
 const currentPage = ref(1)
 const total = ref(0)
 const totalRecharged = ref(0)
-const pageSize = 15
+const pageSize = getPersistedPageSize()
 const typeFilter = ref('')
 let requestVersion = 0
 

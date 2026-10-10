@@ -189,7 +189,7 @@ func (r *channelMonitorRepository) List(ctx context.Context, params service.Chan
 
 	pageSize := params.PageSize
 	if pageSize <= 0 {
-		pageSize = 20
+		pageSize = 200
 	}
 	page := params.Page
 	if page <= 0 {

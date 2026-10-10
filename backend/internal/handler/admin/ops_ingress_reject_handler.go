@@ -35,8 +35,8 @@ func (h *OpsHandler) ListIngressRejects(c *gin.Context) {
 		return
 	}
 	page, pageSize := response.ParsePagination(c)
-	if pageSize > 200 {
-		pageSize = 200
+	if pageSize > 500 {
+		pageSize = 500
 	}
 	startTime, endTime, err := parseOpsTimeRange(c, "1h")
 	if err != nil {

@@ -294,7 +294,7 @@ func parseOpsOpenAITokenStatsFilter(c *gin.Context) (*service.OpsOpenAITokenStat
 	}
 
 	filter.Page = 1
-	filter.PageSize = 20
+	filter.PageSize = 200
 	if pageRaw != "" {
 		page, err := strconv.Atoi(pageRaw)
 		if err != nil || page < 1 {
@@ -304,7 +304,7 @@ func parseOpsOpenAITokenStatsFilter(c *gin.Context) (*service.OpsOpenAITokenStat
 	}
 	if pageSizeRaw != "" {
 		pageSize, err := strconv.Atoi(pageSizeRaw)
-		if err != nil || pageSize < 1 || pageSize > 100 {
+		if err != nil || pageSize < 1 || pageSize > 500 {
 			return nil, fmt.Errorf("invalid page_size")
 		}
 		filter.PageSize = pageSize

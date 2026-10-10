@@ -279,8 +279,8 @@ func (h *UsageHandler) ListErrors(c *gin.Context) {
 	}
 
 	page, pageSize := response.ParsePagination(c)
-	if pageSize > 100 {
-		pageSize = 100
+	if pageSize > 500 {
+		pageSize = 500
 	}
 
 	filter := &service.OpsErrorLogFilter{Page: page, PageSize: pageSize}

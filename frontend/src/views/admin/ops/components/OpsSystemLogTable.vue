@@ -9,6 +9,7 @@ import Select from '@/components/common/Select.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { useAppStore } from '@/stores'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 const appStore = useAppStore()
 const { t } = useI18n()
@@ -28,7 +29,7 @@ const loading = ref(false)
 const logs = ref<OpsSystemLog[]>([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(getPersistedPageSize())
 
 const health = ref<OpsSystemLogSinkHealth>({
   queue_depth: 0,

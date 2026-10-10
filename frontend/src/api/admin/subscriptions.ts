@@ -61,7 +61,7 @@ export async function bulkAction(
  */
 export async function list(
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   filters?: {
     status?: 'active' | 'expired' | 'revoked' | 'suspended'
     user_id?: number
@@ -197,7 +197,7 @@ export async function resetQuota(
 export async function listByGroup(
   groupId: number,
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 200
 ): Promise<PaginatedResponse<UserSubscription>> {
   const { data } = await apiClient.get<PaginatedResponse<UserSubscription>>(
     `/admin/groups/${groupId}/subscriptions`,
@@ -218,7 +218,7 @@ export async function listByGroup(
 export async function listByUser(
   userId: number,
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 200
 ): Promise<PaginatedResponse<UserSubscription>> {
   const { data } = await apiClient.get<PaginatedResponse<UserSubscription>>(
     `/admin/users/${userId}/subscriptions`,

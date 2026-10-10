@@ -30,7 +30,7 @@ function assertProxyArray(value: unknown): asserts value is Proxy[] {
  */
 export async function list(
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   filters?: {
     protocol?: string
     status?: 'active' | 'inactive' | 'expired'

@@ -207,7 +207,7 @@ func (r *channelRepository) List(ctx context.Context, params pagination.Paginati
 		return nil, nil, fmt.Errorf("count channels: %w", err)
 	}
 
-	pageSize := params.Limit() // 约束在 [1, 100]
+	pageSize := params.Limit() // 约束在 [1, 500]
 	page := params.Page
 	if page < 1 {
 		page = 1

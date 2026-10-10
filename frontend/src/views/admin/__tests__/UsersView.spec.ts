@@ -375,7 +375,7 @@ describe('admin UsersView', () => {
 
     expect(listUsers).toHaveBeenLastCalledWith(
       1,
-      20,
+      200,
       expect.objectContaining({
         sort_by: 'last_used_at',
         sort_order: 'desc'
@@ -456,7 +456,7 @@ describe('admin UsersView', () => {
     expect(wrapper.get('[data-test="row-order"]').text()).toBe('last-used-first@example.com,usage-first@example.com')
     expect(listUsers).toHaveBeenLastCalledWith(
       1,
-      20,
+      200,
       expect.objectContaining({
         sort_by: 'last_used_at',
         sort_order: 'desc'

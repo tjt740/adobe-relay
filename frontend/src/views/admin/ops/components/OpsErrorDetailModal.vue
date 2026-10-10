@@ -359,7 +359,7 @@ async function fetchCorrelatedUpstreamErrors(requestErrorId: number) {
   try {
     const res = await opsAPI.listRequestErrorUpstreamErrors(
       requestErrorId,
-      { page: 1, page_size: 100, view: 'all' },
+      { page: 1, page_size: 200, view: 'all' },
       { include_detail: true }
     )
     correlatedUpstream.value = res.items || []

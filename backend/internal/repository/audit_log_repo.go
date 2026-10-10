@@ -247,10 +247,10 @@ func (r *auditLogRepository) List(ctx context.Context, filter *service.AuditLogF
 	}
 	pageSize := filter.PageSize
 	if pageSize <= 0 {
-		pageSize = 50
-	}
-	if pageSize > 200 {
 		pageSize = 200
+	}
+	if pageSize > 500 {
+		pageSize = 500
 	}
 
 	where, args := buildAuditLogsWhere(filter)

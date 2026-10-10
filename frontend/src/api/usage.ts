@@ -121,13 +121,13 @@ export interface UsageDashboardSnapshotV2Response {
 /**
  * List usage logs with optional filters
  * @param page - Page number (default: 1)
- * @param pageSize - Items per page (default: 20)
+ * @param pageSize - Items per page (default: 200)
  * @param apiKeyId - Filter by API key ID
  * @returns Paginated list of usage logs
  */
 export async function list(
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   apiKeyId?: number
 ): Promise<PaginatedResponse<UsageLog>> {
   const params: UsageQueryParams = {
@@ -228,7 +228,7 @@ export async function getByDateRange(
     start_date: startDate,
     end_date: endDate,
     page: 1,
-    page_size: 100
+    page_size: 200
   }
 
   if (apiKeyId !== undefined) {

@@ -65,10 +65,10 @@ func (r *PostgreSQLRepository) ListEvents(ctx context.Context, filter EventFilte
 		page = 1
 	}
 	if pageSize < 1 {
-		pageSize = 20
+		pageSize = 200
 	}
-	if pageSize > 100 {
-		pageSize = 100
+	if pageSize > 500 {
+		pageSize = 500
 	}
 	where, args := buildEventWhere(filter, 1)
 	var total int64

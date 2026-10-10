@@ -286,8 +286,8 @@ func parseAffiliateRecordFilter(c *gin.Context, page, pageSize int) service.Affi
 		SortBy:   c.Query("sort_by"),
 		SortDesc: c.Query("sort_order") != "asc",
 	}
-	if filter.PageSize > 100 {
-		filter.PageSize = 100
+	if filter.PageSize > 500 {
+		filter.PageSize = 500
 	}
 	userTZ := c.Query("timezone")
 	if t := parseAffiliateRecordStartTime(c.Query("start_at"), userTZ); t != nil {

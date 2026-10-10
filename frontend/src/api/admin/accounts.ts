@@ -43,7 +43,7 @@ import type {
  */
 export async function list(
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   filters?: {
     platform?: string
     type?: string
@@ -85,7 +85,7 @@ export interface AccountUpstreamBillingRatesWithEtagResult {
 
 export async function getUpstreamBillingRatesWithEtag(
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   filters?: {
     platform?: string
     type?: string
@@ -118,7 +118,7 @@ export async function getUpstreamBillingRatesWithEtag(
 
 export async function listWithEtag(
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   filters?: {
     platform?: string
     type?: string

@@ -82,10 +82,10 @@ func (r *opsRepository) ListIngressRejects(ctx context.Context, filter *service.
 		page = 1
 	}
 	if pageSize <= 0 {
-		pageSize = 50
-	}
-	if pageSize > 200 {
 		pageSize = 200
+	}
+	if pageSize > 500 {
+		pageSize = 500
 	}
 
 	clauses := []string{"1=1"}

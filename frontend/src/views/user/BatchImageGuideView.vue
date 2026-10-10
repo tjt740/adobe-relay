@@ -772,6 +772,7 @@ import SearchInput from '@/components/common/SearchInput.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize, setPersistedPageSize } from '@/composables/usePersistedPageSize'
+import { getConfiguredTablePageSizeOptions } from '@/utils/tablePreferences'
 import { useAppStore } from '@/stores/app'
 import { keysAPI } from '@/api'
 import {
@@ -840,7 +841,7 @@ const PREVIEW_CACHE_MAX_ENTRIES = 120
 const PREVIEW_CACHE_MAX_BYTES = 48 * 1024 * 1024
 const BATCH_IMAGE_MAX_OUTPUTS_PER_ITEM = 4
 const BATCH_IMAGE_MAX_OUTPUTS_PER_JOB = 200
-const batchPageSizeOptions: SelectOption[] = [20, 50, 100].map(size => ({ value: size, label: String(size) }))
+const batchPageSizeOptions: SelectOption[] = getConfiguredTablePageSizeOptions().map(size => ({ value: size, label: String(size) }))
 
 const appStore = useAppStore()
 const { copyToClipboard } = useClipboard()
@@ -902,7 +903,7 @@ const filters = reactive({
 
 const pagination = reactive({
   page: 1,
-  page_size: Math.min(getPersistedPageSize(20), 100),
+  page_size: getPersistedPageSize(),
   has_more: false,
 })
 

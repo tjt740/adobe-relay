@@ -93,10 +93,10 @@ func (r *contentModerationRepository) ListLogs(ctx context.Context, filter servi
 		params.Page = 1
 	}
 	if params.PageSize <= 0 {
-		params.PageSize = 20
+		params.PageSize = 200
 	}
-	if params.PageSize > 100 {
-		params.PageSize = 100
+	if params.PageSize > 500 {
+		params.PageSize = 500
 	}
 	queryArgs := append([]any{}, args...)
 	queryArgs = append(queryArgs, params.Limit(), params.Offset())

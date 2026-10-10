@@ -8,6 +8,7 @@ import { useClipboard } from '@/composables/useClipboard'
 import { useAppStore } from '@/stores'
 import { opsAPI, type OpsRequestDetailsParams, type OpsRequestDetail } from '@/api/admin/ops'
 import { parseTimeRangeMinutes, formatDateTime } from '../utils/opsFormatters'
+import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 export interface OpsRequestDetailsPreset {
   title: string
@@ -43,7 +44,7 @@ const loading = ref(false)
 const items = ref<OpsRequestDetail[]>([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(getPersistedPageSize())
 
 const close = () => emit('update:modelValue', false)
 
@@ -109,7 +110,7 @@ watch(
     if (open) {
       if (props.resumeState) return
       page.value = 1
-      pageSize.value = 10
+      pageSize.value = getPersistedPageSize()
       fetchData()
     }
   }

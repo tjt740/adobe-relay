@@ -92,7 +92,7 @@ function normalizeListResponse(
 
 export async function list(
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   filters?: {
     search?: string;
     sort_by?: string;

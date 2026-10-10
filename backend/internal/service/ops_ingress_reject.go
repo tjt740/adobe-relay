@@ -445,7 +445,7 @@ func (s *OpsService) ListIngressRejects(ctx context.Context, filter *OpsIngressR
 	}
 	repo, ok := s.opsRepo.(OpsIngressRejectRepository)
 	if !ok {
-		return &OpsIngressRejectList{Items: []*OpsIngressRejectAggregate{}, Page: 1, PageSize: 50}, nil
+		return &OpsIngressRejectList{Items: []*OpsIngressRejectAggregate{}, Page: 1, PageSize: 200}, nil
 	}
 	return repo.ListIngressRejects(ctx, filter)
 }

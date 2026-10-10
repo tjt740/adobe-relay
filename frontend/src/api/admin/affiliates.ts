@@ -147,7 +147,7 @@ export async function listUsers(
     {
       params: {
         page: params.page ?? 1,
-        page_size: params.page_size ?? 20,
+        page_size: params.page_size ?? 200,
         search: params.search ?? '',
       },
     },
@@ -196,7 +196,7 @@ export async function batchSetRate(
 function recordParams(params: ListAffiliateRecordsParams = {}) {
   return {
     page: params.page ?? 1,
-    page_size: params.page_size ?? 20,
+    page_size: params.page_size ?? 200,
     search: params.search ?? '',
     start_at: params.start_at || undefined,
     end_at: params.end_at || undefined,

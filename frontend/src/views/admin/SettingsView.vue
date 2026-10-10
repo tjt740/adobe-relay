@@ -9167,6 +9167,14 @@ import {
   type FingerprintSignalRow,
 } from "./codexFingerprintSignals";
 import { openAIPlanTypeLabel } from "@/utils/planType";
+import { getPersistedPageSize } from "@/composables/usePersistedPageSize";
+import {
+  MAX_TABLE_PAGE_SIZE,
+  MIN_TABLE_PAGE_SIZE,
+  DEFAULT_TABLE_PAGE_SIZE,
+  DEFAULT_TABLE_PAGE_SIZE_OPTIONS,
+  normalizeTablePageSize,
+} from "@/utils/tablePreferences";
 
 const { t, locale } = useI18n();
 
@@ -9320,7 +9328,7 @@ const testEmailAddress = ref("");
 const registrationEmailSuffixWhitelistTags = ref<string[]>([]);
 const registrationEmailSuffixWhitelistDraft = ref("");
 const forwardedClientIpHeaderDraft = ref("");
-const tablePageSizeOptionsInput = ref("10, 20, 50, 100");
+const tablePageSizeOptionsInput = ref(DEFAULT_TABLE_PAGE_SIZE_OPTIONS.join(", "));
 
 // Admin API Key 状态
 const adminApiKeyLoading = ref(true);
@@ -9426,9 +9434,9 @@ const openaiFastPolicyForm = reactive({
 // 避免后端 GET 出错或字段缺失时，保存把默认规则覆盖成空数组。
 const openaiFastPolicyLoaded = ref(false);
 
-const tablePageSizeMin = 5;
-const tablePageSizeMax = 1000;
-const tablePageSizeDefault = 20;
+const tablePageSizeMin = MIN_TABLE_PAGE_SIZE;
+const tablePageSizeMax = MAX_TABLE_PAGE_SIZE;
+const tablePageSizeDefault = DEFAULT_TABLE_PAGE_SIZE;
 
 function defaultLoginAgreementDocuments(): LoginAgreementDocument[] {
   return [
@@ -9981,7 +9989,7 @@ const form = reactive<SettingsForm>({
   payment_alipay_force_qrcode: false,
   payment_alipay_mobile_precreate_deep_link: false,
   table_default_page_size: tablePageSizeDefault,
-  table_page_size_options: [10, 20, 50, 100],
+  table_page_size_options: [...DEFAULT_TABLE_PAGE_SIZE_OPTIONS],
   custom_menu_items: [] as Array<{
     id: string;
     label: string;
@@ -11098,6 +11106,27 @@ function parseTablePageSizeOptionsInput(raw: string): number[] | null {
   return deduped;
 }
 
+function normalizeTablePageSizeOptions(value: unknown): number[] {
+  if (!Array.isArray(value)) {
+    return [...DEFAULT_TABLE_PAGE_SIZE_OPTIONS];
+  }
+
+  const normalized = Array.from(
+    new Set(
+      value
+        .map((item) => Number(item))
+        .filter(
+          (item) =>
+            Number.isInteger(item) &&
+            item >= tablePageSizeMin &&
+            item <= tablePageSizeMax,
+        ),
+    ),
+  ).sort((a, b) => a - b);
+
+  return normalized.length > 0 ? normalized : [...DEFAULT_TABLE_PAGE_SIZE_OPTIONS];
+}
+
 // ── codex_cli_only 黑/白名单结构化编辑（行 ↔ JSON）──
 interface CodexClientRow {
   originator: string;
@@ -11203,6 +11232,10 @@ async function loadSettings() {
         (form as Record<string, unknown>)[key] = value;
       }
     }
+    // Migrate settings saved under the previous 5-1000 range so the form can
+    // still be saved after the global range changes to 200-500.
+    form.table_default_page_size = normalizeTablePageSize(settings.table_default_page_size);
+    form.table_page_size_options = normalizeTablePageSizeOptions(settings.table_page_size_options);
     // For this optional override, null explicitly selects per-account rates.
     if (settings.openai_oauth_scheduling_rate_multiplier === null) {
       form.openai_oauth_scheduling_rate_multiplier = null;
@@ -11268,9 +11301,7 @@ async function loadSettings() {
     );
     forwardedClientIpHeaderDraft.value = "";
     tablePageSizeOptionsInput.value = formatTablePageSizeOptions(
-      Array.isArray(settings.table_page_size_options)
-        ? settings.table_page_size_options
-        : [10, 20, 50, 100],
+      form.table_page_size_options,
     );
     registrationEmailSuffixWhitelistDraft.value = "";
     form.smtp_password = "";
@@ -12016,9 +12047,7 @@ async function saveSettings() {
     );
     forwardedClientIpHeaderDraft.value = "";
     tablePageSizeOptionsInput.value = formatTablePageSizeOptions(
-      Array.isArray(updated.table_page_size_options)
-        ? updated.table_page_size_options
-        : [10, 20, 50, 100],
+      normalizeTablePageSizeOptions(updated.table_page_size_options),
     );
     registrationEmailSuffixWhitelistDraft.value = "";
     form.smtp_password = "";
@@ -13107,7 +13136,7 @@ const affiliateState = reactive<AffiliateState>({
   entries: [],
   total: 0,
   page: 1,
-  pageSize: 20,
+  pageSize: getPersistedPageSize(),
   search: "",
   selected: [],
   searchTimer: null,

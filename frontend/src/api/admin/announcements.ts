@@ -13,7 +13,7 @@ import type {
 
 export async function list(
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   filters?: {
     status?: string
     search?: string
@@ -54,7 +54,7 @@ export async function deleteAnnouncement(id: number): Promise<{ message: string 
 export async function getReadStatus(
   id: number,
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   filters?: {
     search?: string
     sort_by?: string

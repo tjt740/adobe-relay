@@ -73,7 +73,7 @@ func (h *RedeemHandler) GetHistory(c *gin.Context) {
 
 	// Keep the legacy array response for clients that do not request pagination.
 	if c.Request.URL.Query().Has("page") || c.Request.URL.Query().Has("page_size") {
-		page, pageSize := 1, 20
+		page, pageSize := 1, 200
 		for name, target := range map[string]*int{"page": &page, "page_size": &pageSize} {
 			if raw, exists := c.GetQuery(name); exists {
 				value, err := strconv.Atoi(raw)
@@ -84,8 +84,8 @@ func (h *RedeemHandler) GetHistory(c *gin.Context) {
 				*target = value
 			}
 		}
-		if pageSize > 100 {
-			pageSize = 100
+		if pageSize > 500 {
+			pageSize = 500
 		}
 		if page-1 > int(^uint(0)>>1)/pageSize {
 			response.BadRequest(c, "Invalid page")

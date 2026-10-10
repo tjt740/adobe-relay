@@ -19,7 +19,7 @@ import (
 
 const (
 	// monitorMaxPageSize 列表分页上限。
-	monitorMaxPageSize = 100
+	monitorMaxPageSize = 500
 	// monitorAPIKeyMaskPrefix 脱敏时保留的明文前缀长度。
 	monitorAPIKeyMaskPrefix = 4
 	// monitorAPIKeyMaskSuffix 脱敏后追加的占位字符串。

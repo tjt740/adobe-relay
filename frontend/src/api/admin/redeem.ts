@@ -21,7 +21,7 @@ import type {
  */
 export async function list(
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 200,
   filters?: {
     type?: RedeemCodeType
     status?: 'active' | 'used' | 'expired' | 'unused' | 'disabled'

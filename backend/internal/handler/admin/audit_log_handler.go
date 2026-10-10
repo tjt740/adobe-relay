@@ -32,8 +32,8 @@ func NewAuditLogHandler(auditService *service.AuditLogService, totpService *serv
 // GET /api/v1/admin/audit-logs
 func (h *AuditLogHandler) List(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
-	if pageSize > 200 {
-		pageSize = 200
+	if pageSize > 500 {
+		pageSize = 500
 	}
 
 	filter := &service.AuditLogFilter{

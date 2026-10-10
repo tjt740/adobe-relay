@@ -663,10 +663,10 @@ export default {
         tablePreferencesTitle: '通用表格设置',
         tablePreferencesDescription: '设置后台与用户侧表格组件的默认分页行为',
         tableDefaultPageSize: '默认每页条数',
-        tableDefaultPageSizeHint: '必须为 5-1000 之间的整数',
+        tableDefaultPageSizeHint: '必须为 200-500 之间的整数',
         tablePageSizeOptions: '可选每页条数列表',
-        tablePageSizeOptionsPlaceholder: '10, 20, 50, 100',
-        tablePageSizeOptionsHint: '使用英文逗号分隔，取值范围 5-1000，保存时会自动去重并排序',
+        tablePageSizeOptionsPlaceholder: '200, 300, 400, 500',
+        tablePageSizeOptionsHint: '使用英文逗号分隔，取值范围 200-500，保存时会自动去重并排序',
         tableDefaultPageSizeRangeError: '默认每页条数必须在 {min}-{max} 之间',
         tablePageSizeOptionsFormatError: '可选每页条数格式无效，请输入 {min}-{max} 之间的整数并用英文逗号分隔',
         customEndpoints: {

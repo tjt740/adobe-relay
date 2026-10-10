@@ -215,7 +215,7 @@ func (r *opsRepository) ListErrorLogs(ctx context.Context, filter *service.OpsEr
 	}
 	pageSize := filter.PageSize
 	if pageSize <= 0 {
-		pageSize = 20
+		pageSize = 200
 	}
 	if pageSize > 500 {
 		pageSize = 500
@@ -760,10 +760,10 @@ func (r *opsRepository) ListSystemLogs(ctx context.Context, filter *service.OpsS
 	}
 	pageSize := filter.PageSize
 	if pageSize <= 0 {
-		pageSize = 50
-	}
-	if pageSize > 200 {
 		pageSize = 200
+	}
+	if pageSize > 500 {
+		pageSize = 500
 	}
 
 	where, args, _ := buildOpsSystemLogsWhere(filter)

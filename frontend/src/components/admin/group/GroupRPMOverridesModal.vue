@@ -216,6 +216,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import Icon from '@/components/icons/Icon.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
+import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 interface LocalEntry extends GroupRPMOverrideEntry {}
 
@@ -242,7 +243,7 @@ const showDropdown = ref(false)
 const selectedUser = ref<AdminUser | null>(null)
 const newRpm = ref<number | null>(null)
 const currentPage = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(getPersistedPageSize())
 
 let searchTimeout: ReturnType<typeof setTimeout>
 

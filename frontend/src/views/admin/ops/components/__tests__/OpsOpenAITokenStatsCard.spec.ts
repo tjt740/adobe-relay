@@ -64,9 +64,9 @@ const sampleResponse = {
       requests_with_first_token: 10,
     },
   ],
-  total: 40,
+  total: 401,
   page: 1,
-  page_size: 20,
+  page_size: 200,
   top_n: null,
 }
 
@@ -148,7 +148,7 @@ describe('OpsOpenAITokenStatsCard', () => {
       platform,
       group_id: 7,
       page: 1,
-      page_size: 20,
+      page_size: 200,
     })
     expect(wrapper.text()).toContain(model)
     expect(wrapper.text()).not.toContain('gpt-4o-mini')
@@ -199,9 +199,9 @@ describe('OpsOpenAITokenStatsCard', () => {
       ...sampleResponse,
       time_range: params.time_range ?? '30d',
       page: params.page ?? 1,
-      page_size: params.page_size ?? 20,
+      page_size: params.page_size ?? 200,
       top_n: params.top_n ?? null,
-      total: 40,
+      total: 401,
     }))
 
     const wrapper = mount(OpsOpenAITokenStatsCard, {
@@ -224,7 +224,7 @@ describe('OpsOpenAITokenStatsCard', () => {
     expect(mockGetOpenAITokenStats).toHaveBeenCalledWith(
       expect.objectContaining({
         page: 1,
-        page_size: 20,
+        page_size: 200,
       })
     )
 
@@ -236,7 +236,7 @@ describe('OpsOpenAITokenStatsCard', () => {
     expect(mockGetOpenAITokenStats).toHaveBeenCalledWith(
       expect.objectContaining({
         page: 2,
-        page_size: 20,
+        page_size: 200,
       })
     )
 

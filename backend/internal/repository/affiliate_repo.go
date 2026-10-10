@@ -1318,8 +1318,8 @@ func (r *affiliateRepository) ListUsersWithCustomSettings(ctx context.Context, f
 		page = 1
 	}
 	pageSize := filter.PageSize
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = 20
+	if pageSize <= 0 || pageSize > 500 {
+		pageSize = 200
 	}
 	offset := (page - 1) * pageSize
 	likePattern := "%" + strings.TrimSpace(filter.Search) + "%"

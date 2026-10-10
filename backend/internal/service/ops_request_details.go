@@ -71,7 +71,7 @@ type OpsRequestDetailFilter struct {
 
 func (f *OpsRequestDetailFilter) Normalize() (page, pageSize int, startTime, endTime time.Time) {
 	page = 1
-	pageSize = 50
+	pageSize = 200
 	endTime = time.Now()
 	startTime = endTime.Add(-1 * time.Hour)
 
@@ -85,8 +85,8 @@ func (f *OpsRequestDetailFilter) Normalize() (page, pageSize int, startTime, end
 	if f.PageSize > 0 {
 		pageSize = f.PageSize
 	}
-	if pageSize > 100 {
-		pageSize = 100
+	if pageSize > 500 {
+		pageSize = 500
 	}
 
 	if f.EndTime != nil {
@@ -121,7 +121,7 @@ func (s *OpsService) ListRequestDetails(ctx context.Context, filter *OpsRequestD
 			Items:    []*OpsRequestDetail{},
 			Total:    0,
 			Page:     1,
-			PageSize: 50,
+			PageSize: 200,
 		}, nil
 	}
 

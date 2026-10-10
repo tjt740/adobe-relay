@@ -16,7 +16,7 @@ import type { ApiKey, CreateApiKeyRequest, UpdateApiKeyRequest, PaginatedRespons
  */
 export async function list(
   page: number = 1,
-  pageSize: number = 10,
+  pageSize: number = 200,
   filters?: {
     search?: string
     status?: string

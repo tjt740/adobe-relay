@@ -75,7 +75,7 @@ describe('useTableLoader', () => {
       expect(loading.value).toBe(false)
     })
 
-    it('使用默认 pageSize=20', async () => {
+    it('使用默认 pageSize=200', async () => {
       const fetchFn = createMockFetchFn()
       const { load, pagination } = useTableLoader({ fetchFn })
 
@@ -83,11 +83,11 @@ describe('useTableLoader', () => {
 
       expect(fetchFn).toHaveBeenCalledWith(
         1,
-        20,
+        200,
         expect.anything(),
         expect.objectContaining({ signal: expect.any(AbortSignal) })
       )
-      expect(pagination.page_size).toBe(20)
+      expect(pagination.page_size).toBe(200)
     })
 
     it('可自定义 pageSize', async () => {
@@ -120,7 +120,7 @@ describe('useTableLoader', () => {
       expect(pagination.page).toBe(3)
       // 等待 load 完成
       await vi.runAllTimersAsync()
-      expect(fetchFn).toHaveBeenCalledWith(3, 20, expect.anything(), expect.anything())
+      expect(fetchFn).toHaveBeenCalledWith(3, 200, expect.anything(), expect.anything())
     })
 
     it('handlePageSizeChange 重置到第1页并加载', async () => {
