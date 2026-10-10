@@ -210,7 +210,7 @@ func TestExistingAccountsBindWithoutChangingSchedulingState(t *testing.T) {
  (8,NULL,'error',false,$1,NOW()-INTERVAL '1 day')`, allocationWaitingMessage)
 	require.NoError(t, err)
 	_, err = db.Exec(`UPDATE accounts SET proxy_auto_paused=true WHERE id=8;
- INSERT INTO accounts(id,proxy_id,platform) VALUES(10,4,'openai');
+ INSERT INTO accounts(id,proxy_id,platform,type) VALUES(10,4,'openai','api_key');
  INSERT INTO accounts(id,proxy_id,deleted_at) VALUES(11,1,NOW());`)
 	require.NoError(t, err)
 	snapshot := func() string {
@@ -223,7 +223,7 @@ func TestExistingAccountsBindWithoutChangingSchedulingState(t *testing.T) {
 	before := snapshot()
 	policy, err := m.SaveAllocation(ctx, AllocationPolicy{Enabled: true})
 	require.NoError(t, err)
-	require.Equal(t, 8, policy.Accounts, "existing disabled, expired and error accounts are included")
+	require.Equal(t, 9, policy.Accounts, "existing disabled, expired, error, and other-platform accounts are included")
 	require.Equal(t, 6, policy.BindingOnlyAccounts)
 	var failed bool
 	m.probe = func(_ context.Context, p proxy) health {
@@ -238,14 +238,14 @@ func TestExistingAccountsBindWithoutChangingSchedulingState(t *testing.T) {
 		require.Equal(t, before, snapshot(), "proxy changes must preserve every original scheduling/error/expiry field")
 		var other int64
 		require.NoError(t, db.QueryRow(`SELECT proxy_id FROM accounts WHERE id=10`).Scan(&other))
-		require.EqualValues(t, 4, other, "other platforms are never reallocated")
+		require.EqualValues(t, 4, other, "an existing healthy binding is preserved across account types")
 		require.NoError(t, db.QueryRow(`SELECT proxy_id FROM accounts WHERE id=11`).Scan(&other))
 		require.EqualValues(t, 1, other, "deleted accounts are never changed")
 	}
 	check()
 	v, err := m.GetAllocation(ctx)
 	require.NoError(t, err)
-	require.Equal(t, 8, v.Assigned)
+	require.Equal(t, 9, v.Assigned)
 	require.Zero(t, v.Waiting)
 	require.Equal(t, 6, v.BindingOnlyAccounts, "an expired allocator-paused account can have an IP without being resumed")
 	for _, node := range v.Nodes {
@@ -260,20 +260,20 @@ func TestExistingAccountsBindWithoutChangingSchedulingState(t *testing.T) {
 	check() // first failure keeps existing routes, including an expired auto-paused account
 	v, err = m.GetAllocation(ctx)
 	require.NoError(t, err)
-	require.Equal(t, 8, v.Assigned)
+	require.Equal(t, 9, v.Assigned)
 	require.Zero(t, v.Waiting)
 	age()
 	check() // second failure detaches unavailable routes, preserving stopped account states
 	v, err = m.GetAllocation(ctx)
 	require.NoError(t, err)
-	require.Equal(t, 8, v.Waiting)
+	require.Equal(t, 9, v.Waiting)
 	require.Zero(t, v.Assigned)
 	failed = false
 	age()
 	check() // capacity recovery binds existing inactive accounts too
 	v, err = m.GetAllocation(ctx)
 	require.NoError(t, err)
-	require.Equal(t, 8, v.Assigned)
+	require.Equal(t, 9, v.Assigned)
 	require.Zero(t, v.Waiting)
 	// Background rounds are idempotent once all existing accounts have routes.
 	var eventsBefore, eventsAfter int
