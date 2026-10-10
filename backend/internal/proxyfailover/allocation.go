@@ -174,10 +174,12 @@ type allocationAccount struct {
 func loadAllocationAccounts(ctx context.Context, q queryer) ([]allocationAccount, error) {
 	rows, err := q.QueryContext(ctx, `SELECT id,COALESCE(proxy_id,0),
  true,
- COALESCE(proxy_auto_paused AND status='error' AND NOT schedulable AND error_message=$1,false),
- NOT ((auto_pause_on_expired IS NOT TRUE OR expires_at IS NULL OR expires_at>NOW()) AND
- ((status='active' AND schedulable) OR COALESCE(proxy_auto_paused AND status='error' AND NOT schedulable AND error_message=$1,false)))
- FROM accounts WHERE deleted_at IS NULL ORDER BY id`, allocationWaitingMessage)
+	 COALESCE(proxy_auto_paused AND status='error' AND NOT schedulable AND error_message=$1,false)
+	 OR COALESCE(status='error' AND schedulable AND NOT proxy_auto_paused AND error_message=$1,false),
+	 NOT ((auto_pause_on_expired IS NOT TRUE OR expires_at IS NULL OR expires_at>NOW()) AND
+	 ((status='active' AND schedulable) OR COALESCE(proxy_auto_paused AND status='error' AND NOT schedulable AND error_message=$1,false)
+	 OR COALESCE(status='error' AND schedulable AND NOT proxy_auto_paused AND error_message=$1,false)))
+	 FROM accounts WHERE deleted_at IS NULL ORDER BY id`, allocationWaitingMessage)
 	if err != nil {
 		return nil, err
 	}
