@@ -2,6 +2,7 @@ package clash
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -45,6 +46,41 @@ proxies:
 	}
 	_, err = parseSubscription([]byte(strings.Repeat("x", maxBody+1)))
 	require.Error(t, err)
+}
+
+func TestParseBase64URISubscription(t *testing.T) {
+	raw := "vless://uuid@example.com:443?type=ws&security=tls&sni=example.com&host=ws.example.com&path=%2Fedge#%E5%89%A9%E4%BD%99%E6%B5%81%E9%87%8F%EF%BC%9A1%20GB\n" +
+		"vless://uuid@example.com:443?type=ws&security=tls&sni=example.com&host=ws.example.com&path=%2Fedge#Japan\n" +
+		"hysteria2://password@example.net:443/?insecure=false&sni=example.net&pinSHA256=abc#m\n"
+	body := []byte(base64.StdEncoding.EncodeToString([]byte(raw)))
+	nodes, err := parseSubscription(body)
+	require.NoError(t, err)
+	require.Len(t, nodes, 2)
+	require.Equal(t, "Japan", nodes[0].Name)
+	require.Equal(t, "vless", nodes[0].Type)
+	require.Equal(t, "/edge", nodes[0].Config["ws-opts"].(map[string]any)["path"])
+	require.Equal(t, "hysteria2", nodes[1].Type)
+	require.Equal(t, "password", nodes[1].Config["password"])
+}
+
+func TestFetchMultipleSubscriptions(t *testing.T) {
+	responses := []string{
+		base64.StdEncoding.EncodeToString([]byte("vless://one@example.com:443?type=ws#Japan\n")),
+		base64.StdEncoding.EncodeToString([]byte("vless://two@example.com:443?type=ws#Japan\n")),
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/one" {
+			_, _ = w.Write([]byte(responses[0]))
+			return
+		}
+		_, _ = w.Write([]byte(responses[1]))
+	}))
+	defer server.Close()
+	nodes, err := fetchSubscription(context.Background(), server.Client(), server.URL+"/one\n"+server.URL+"/two")
+	require.NoError(t, err)
+	require.Len(t, nodes, 2)
+	require.Equal(t, "订阅1 · Japan", nodes[0].Name)
+	require.Equal(t, "订阅2 · Japan", nodes[1].Name)
 }
 
 func TestSubscriptionURLSafety(t *testing.T) {
