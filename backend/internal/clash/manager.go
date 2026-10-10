@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
@@ -18,6 +19,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 type State struct {
@@ -44,14 +47,15 @@ type ImportRequest struct {
 }
 
 type Manager struct {
-	controllerListen string
-	db               *sql.DB
-	controller       string
-	secret           string
-	host             string
-	portStart        int
-	client           *http.Client
-	fetchClient      *http.Client
+	controllerListen  string
+	db                *sql.DB
+	controller        string
+	secret            string
+	subscriptionToken string
+	host              string
+	portStart         int
+	client            *http.Client
+	fetchClient       *http.Client
 }
 
 func NewManager(db *sql.DB) *Manager {
@@ -67,7 +71,7 @@ func NewManager(db *sql.DB) *Manager {
 	if listen == "" {
 		listen = "0.0.0.0:9090"
 	}
-	return &Manager{controllerListen: listen, db: db, controller: strings.TrimRight(os.Getenv("CLASH_CONTROLLER_URL"), "/"), secret: os.Getenv("CLASH_CONTROLLER_SECRET"), host: host, portStart: start, client: &http.Client{Timeout: 15 * time.Second, Transport: &http.Transport{Proxy: nil}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, fetchClient: subscriptionClient()}
+	return &Manager{controllerListen: listen, db: db, controller: strings.TrimRight(os.Getenv("CLASH_CONTROLLER_URL"), "/"), secret: os.Getenv("CLASH_CONTROLLER_SECRET"), subscriptionToken: strings.TrimSpace(os.Getenv("CLASH_SUBSCRIPTION_TOKEN")), host: host, portStart: start, client: &http.Client{Timeout: 15 * time.Second, Transport: &http.Transport{Proxy: nil}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, fetchClient: subscriptionClient()}
 }
 
 func (m *Manager) configured() bool {
@@ -130,6 +134,49 @@ func (m *Manager) Status(ctx context.Context) (View, error) {
 		}
 	}
 	return v, nil
+}
+
+// ExportSubscription returns the current enabled node pool as a Clash YAML
+// document. The token is a bearer credential, so callers that do not know it
+// receive the same response as an unavailable endpoint.
+func (m *Manager) ExportSubscription(ctx context.Context, token string) ([]byte, bool, error) {
+	expected := strings.TrimSpace(m.subscriptionToken)
+	provided := strings.TrimSpace(token)
+	if expected == "" || provided == "" || subtle.ConstantTimeCompare([]byte(expected), []byte(provided)) != 1 {
+		return nil, false, nil
+	}
+	s, err := loadState(ctx, m.db, false)
+	if err != nil {
+		return nil, true, err
+	}
+	body, err := yaml.Marshal(publicSubscriptionConfig(s))
+	return body, true, err
+}
+
+func publicSubscriptionConfig(s State) map[string]any {
+	proxies := make([]map[string]any, 0, len(s.Nodes))
+	names := make([]string, 0, len(s.Nodes))
+	for _, n := range s.Nodes {
+		if !n.Enabled {
+			continue
+		}
+		cfg := make(map[string]any, len(n.Config)+1)
+		for key, value := range n.Config {
+			cfg[key] = value
+		}
+		cfg["name"] = n.Name
+		proxies = append(proxies, cfg)
+		names = append(names, n.Name)
+	}
+	return map[string]any{
+		"proxies": proxies,
+		"proxy-groups": []map[string]any{{
+			"name":    "全部节点",
+			"type":    "select",
+			"proxies": names,
+		}},
+		"rules": []string{"MATCH,全部节点"},
+	}
 }
 
 func (m *Manager) Preview(ctx context.Context, raw string) (View, error) {
