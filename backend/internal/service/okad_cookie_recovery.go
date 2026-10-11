@@ -10,6 +10,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -61,11 +62,18 @@ func isAdobeCookieRecoveryCandidate(a *Account) bool {
 	if a == nil || a.Platform != PlatformAdobe || a.Type != AccountTypeOAuth || a.Status != StatusError {
 		return false
 	}
-	if a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now()) {
+	if a.Extra["okad_manual_pause"] == true || (a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now())) {
 		return false
 	}
 	if strings.TrimSpace(a.GetCredential("cookie")) == "" || adobeRecoveryEmail(a) == "" {
 		return false
+	}
+	if retry, ok := a.Extra["okad_recovery"].(map[string]any); ok {
+		if next, ok := retry["next_check_at"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, next); err == nil && t.After(time.Now()) {
+				return false
+			}
+		}
 	}
 	msg := strings.ToLower(a.ErrorMessage)
 	if a.ErrorMessage == AdobeCookieRecoveryExhausted {
@@ -127,6 +135,12 @@ func (s *OkadCookieRecovery) recover(ctx context.Context, snapshot *Account) (bo
 		if latest.GetCredential("cookie") != snapshot.GetCredential("cookie") && latest.Status == StatusActive {
 			return true, nil
 		}
+		if s.client.managed {
+			if err := s.client.Preflight(ctx, latest); err != nil {
+				s.recordManagedState(ctx, latest, err)
+				return false, nil
+			}
+		}
 		attempt, err := updater.ClaimAdobeCookieRecovery(ctx, latest, s.client.timeout)
 		if err != nil {
 			// Fail closed: never contact Okad without a durable reservation.
@@ -148,6 +162,19 @@ func (s *OkadCookieRecovery) recover(ctx context.Context, snapshot *Account) (bo
 			}
 		}()
 		slog.Info("adobe_okad_login_attempt", "account_id", latest.ID, "attempt", attempt.Count, "max_attempts", AdobeCookieRecoveryMaxAttempts)
+		if s.client.managed {
+			err := s.client.RefreshManaged(ctx, latest, attempt.ID)
+			if err != nil {
+				s.recordManagedState(ctx, latest, err)
+				queueCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+				defer cancel()
+				_ = s.queue(queueCtx, updater, latest, attempt.Count)
+				return false, err
+			}
+			loginOK = true
+			// Okad's durable outbox owns delivery and validation in V2.
+			return true, nil
+		}
 		cookie, err := s.client.RefreshCookie(ctx, email)
 		if err != nil {
 			queueCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
@@ -237,7 +264,7 @@ func (s *OkadCookieRecovery) run(ctx context.Context) {
 // separately; collect the pages before recovering so updates do not shift offsets.
 func (s *OkadCookieRecovery) sweep(ctx context.Context) {
 	var candidates []Account
-	for page := 1; page <= 10; page++ {
+	for page := 1; ; page++ {
 		accounts, info, err := s.repo.ListWithFilters(ctx, pagination.PaginationParams{Page: page, PageSize: 200, SortBy: "id", SortOrder: "asc"}, PlatformAdobe, AccountTypeOAuth, StatusError, "", 0, "")
 		if err != nil {
 			slog.Warn("adobe_okad_recovery_scan_failed")
@@ -248,17 +275,27 @@ func (s *OkadCookieRecovery) sweep(ctx context.Context) {
 			break
 		}
 	}
+	var workers errgroup.Group
+	limit := s.client.workers
+	if limit < 1 || limit > 10 {
+		limit = 3
+	}
+	workers.SetLimit(limit)
 	for i := range candidates {
 		a := &candidates[i]
 		if !isAdobeCookieRecoveryCandidate(a) {
 			continue
 		}
 		if ctx.Err() != nil {
-			return
+			break
 		}
-		_, err := s.recover(ctx, a)
-		if err != nil {
-			slog.Warn("adobe_okad_cookie_recovery_failed", "account_id", a.ID, "error", err)
-		}
+		workers.Go(func() error {
+			_, err := s.recover(ctx, a)
+			if err != nil {
+				slog.Warn("adobe_okad_cookie_recovery_failed", "account_id", a.ID, "error", err)
+			}
+			return nil
+		})
 	}
+	_ = workers.Wait()
 }

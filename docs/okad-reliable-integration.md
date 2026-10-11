@@ -1,0 +1,56 @@
+# Okad 可靠联动
+
+迭代名称：**Okad–Sub2 可靠联动一期**（`okad-sub2-reliability-20261012`）。开发分支：`codex/okad-sub2-reliability`。发布及双项目回滚说明见 [发布记录](../deploy/primary/okad-sub2-reliability-20261012.md)。
+
+## 本机测试入口
+
+- Sub2：<http://127.0.0.1:18000>
+- Okad：<http://127.0.0.1:18001>
+- 联动中心：Okad 左侧菜单，或 <http://127.0.0.1:18001/integration>（原 `integration.html` 自动跳转）
+- 登录信息保存在本仓库忽略目录 `deploy/data/reliability-dev/测试登录信息.txt`。
+
+Sub2 使用独立 PostgreSQL（15439）与 Redis（16389）；Okad 使用其原有本机 SQLite 的副本。后续压测另行低频读取了线上账号的脱敏状态，在独立测试库回放；没有修改线上业务数据，也没有自动对现有 Adobe 账号发起登录。
+
+首次进入 Sub2，请自行阅读并处理原有管理员合规确认。本机已准备「本地联动测试」Adobe 分组，并在 Okad 配好该分组、本地管理员登录令牌和两端联动专用密钥。管理员令牌过期时，可在原有「Sub2 管理」更新。首次创建账号仍使用原有管理员授权，专用密钥不能创建或删除账号。
+
+## 建议测试场景
+
+| 场景 | 操作 | 预期 |
+| --- | --- | --- |
+| 首次入库 | 联动中心选择一个有 Cookie 的账号，点「推送入库」 | 先等待同步，再用 Sub2 当前代理验证身份、Token 与实时额度；通过后才恢复可调度 |
+| 手动验证码 | 查看手动 OTP 账号 | 显示需要人工处理；从「手动验证码登录」进入原有外部子号界面 |
+| 同步故障 | 暂停本地 Sub2 后提交同步，再启动 | Cookie 保留，退避补推；不会为了推送再登录 |
+| 人工暂停 | Sub2 暂停账号，再在 Okad 点「同步与验证」 | 凭据可更新，账号继续暂停 |
+| 远端删除 | 删除已建立关联的测试账号，再补推 | 显示关联不存在，不会自动重建；明确重新关联走原有人工入口 |
+| 多入口并发登录 | 同账号同时从人工入口和自动恢复发起 | 相同来源加入已有任务；不同登录协议或来源返回忙，不同时发验证码 |
+| 新旧 Cookie 乱序 | 自动化测试模拟旧推送晚到 | 旧版本不能覆盖新版本；旧验证不能覆盖新的暂停、代理或凭据状态 |
+| 配置变更 | 登录期间修改联动目标 | 登录开始时绑定的目标不变，旧任务停止，不发送到新目标 |
+
+「凭据验证通过」仅表示真实身份、Token 与实时额度检查通过。模型出图能力仍需用指定模型实际测试，页面会明确提示。
+
+## 配置与协议
+
+Sub2 配置项（Viper 环境变量映射）：
+
+```text
+GATEWAY_OKAD_INTEGRATION_API_KEY=<专用联动密钥>
+GATEWAY_OKAD_SITE_ID=<稳定且唯一的站点标识>
+GATEWAY_OKAD_COOKIE_REFRESH_URL=<Okad 地址>/api/v1/adobe/cookie/refresh
+GATEWAY_OKAD_COOKIE_REFRESH_API_KEY=<Okad 外部接口密钥>
+GATEWAY_OKAD_RECOVERY_WORKERS=3
+```
+
+联动接口位于 `/api/v1/integrations/okad`，使用 `X-Integration-Key`。仅提供能力查询、无凭据库存、带版本凭据更新和主动验证。`issuer + source_key + version` 共同约束更新，回执不含 Cookie 或 Token。Okad 的机器登录请求携带持久化 `request_id`，重试查询同一任务。
+
+Cookie 与 Okad 本地发送任务同事务保存。发送与登录分开执行，发送失败指数退避。Sub2 保留原有每次故障最多两次自动登录、失败冷却和恢复验证窗口；无法自动登录的账号在申请次数前拦截。
+
+## 本次验证
+
+- Okad 全部后端测试：433 项通过（含新增 15 个基础流程用例）。
+- Sub2 使用 `-tags unit -race` 的 Adobe / Okad / Proxy 等相关 Go 测试通过；PostgreSQL 隔离 schema 验证乱序、人工暂停、关联冲突、配置保留与库存脱敏。原 IP 分配/故障切换 9 个测试通过，真实 Adobe 探测跳过。
+- Sub2 原账号前端 215 项测试和类型检查通过；本机浏览器验证旧任务终态、远端暂停及联动中心状态。
+- 未自动执行真实 Adobe 重新登录或付费模型出图；这部分留作人工账号测试。
+
+2026-10-11 的线上脱敏数据回放及 2026-10-12 的基础流程复查、压力指标和修复详见 [压测报告](okad-reliability-stress-report.md)。
+
+后端启动脚本与日志在各仓库忽略目录中：Sub2 为 `deploy/data/reliability-dev/`，Okad 为 `.local/reliability-dev/`。这些本机凭据、数据库和日志不会进入提交。

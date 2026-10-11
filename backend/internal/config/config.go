@@ -955,6 +955,9 @@ const (
 
 // GatewayConfig API网关相关配置
 type GatewayConfig struct {
+	OkadIntegrationAPIKey string `mapstructure:"okad_integration_api_key"`
+	OkadSiteID            string `mapstructure:"okad_site_id"`
+	OkadRecoveryWorkers   int    `mapstructure:"okad_recovery_workers"`
 	// OkadCookieRefreshURL accepts the trusted Okad login endpoint. Empty disables recovery.
 	OkadCookieRefreshURL            string `mapstructure:"okad_cookie_refresh_url"`
 	OkadCookieRefreshAPIKey         string `mapstructure:"okad_cookie_refresh_api_key"`
@@ -2034,6 +2037,9 @@ func configureConfigSource(setConfigFile, addConfigPath func(string)) {
 }
 
 func setDefaults() {
+	viper.SetDefault("gateway.okad_integration_api_key", "")
+	viper.SetDefault("gateway.okad_site_id", "primary")
+	viper.SetDefault("gateway.okad_recovery_workers", 3)
 	viper.SetDefault("gateway.okad_cookie_refresh_url", "")
 	viper.SetDefault("gateway.okad_cookie_refresh_api_key", "")
 	viper.SetDefault("gateway.okad_cookie_refresh_timeout_seconds", 300)

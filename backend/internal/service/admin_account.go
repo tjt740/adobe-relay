@@ -435,6 +435,15 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 		Status:      StatusActive,
 		Schedulable: true,
 	}
+	// Explicit native imports can request quarantine until the integration
+	// receiver validates their credentials through the selected proxy.
+	if account.Platform == PlatformAdobe && account.Type == AccountTypeOAuth && account.Extra["okad_initial_verification"] == true {
+		account.Status = StatusError
+		account.Schedulable = false
+		account.ErrorMessage = OkadVerificationPending
+		account.Extra["okad"] = map[string]any{"resume": true}
+		delete(account.Extra, "okad_initial_verification")
+	}
 	if input.ProbeEnabled != nil && *input.ProbeEnabled {
 		if !isUpstreamBillingProbeAccount(account) {
 			return nil, ErrUpstreamBillingProbeAccountInvalid

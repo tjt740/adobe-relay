@@ -459,6 +459,16 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 		// applying the generic OAuth failure policy; the sweeper also retries
 		// historical errors and failures from the IMS/background refresh path.
 		if authAccount.Platform == PlatformAdobe && authAccount.Type == AccountTypeOAuth && s.okadRecovery != nil {
+			// Managed recovery never makes the user wait for an OTP/login.
+			if s.okadRecovery.client.managed {
+				if repo, ok := s.accountRepo.(AdobeCookieRecoveryRepository); ok {
+					stateCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+					_, _ = repo.QueueAdobeCookieRecoveryIfUnchanged(stateCtx, authAccount)
+					cancel()
+				}
+				shouldDisable = true
+				break
+			}
 			recovered, err := s.okadRecovery.recover(ctx, authAccount)
 			if err != nil {
 				slog.Warn("adobe_okad_cookie_refresh_failed", "account_id", authAccount.ID, "error", err)

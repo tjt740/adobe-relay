@@ -46,8 +46,11 @@ jobs:
           bash -n deploy/online/renew-ip-certificate.sh
           python3 -m unittest discover -s deploy/clash -p 'test_*.py'
           python3 -m unittest discover -s deploy/primary -p 'test_*.py'
+          bash -n deploy/primary/okad-release.sh
+          bash -n deploy/primary/rollback-okad-sub2.sh
           cd backend
           go test -race ./internal/clash ./internal/proxyfailover
+          go test -tags unit -race ./internal/service ./internal/repository ./internal/handler/admin ./internal/server/routes -run 'Okad|Adobe|Proxy|Schedulable|BulkUpdate'
           go test ./internal/repository -run 'TestExpiryRespectsLiveFailoverPolicy|TestProxyUpdate|TestOkadRecoveryPostgres|TestRecoverAdobeCookieUses|TestAccountConnectionTest'
           go test -tags unit ./internal/service -run 'Test(GetAdobeUsage|AdobeUsage|BuildAdobeDegradedUsage|TestAccountConnectionAdobe|FormatAdobeTestError|AccountTestServiceSendErrorAndEnd|AccountConnectionTest|OkadRecovery)'
       - name: Check frontend workflows

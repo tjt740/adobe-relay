@@ -17,6 +17,8 @@ import (
 // and returns the freshly issued browser cookie. The API key is only sent over
 // the configured trusted connection and is never included in errors or logs.
 type OkadCookieRefreshClient struct {
+	managed bool
+	workers int
 	url     string
 	apiKey  string
 	timeout time.Duration
@@ -37,6 +39,8 @@ func NewOkadCookieRefreshClient(cfg *config.Config) *OkadCookieRefreshClient {
 		timeout = 5 * time.Minute
 	}
 	return &OkadCookieRefreshClient{
+		managed: cfg.Gateway.OkadIntegrationAPIKey != "",
+		workers: cfg.Gateway.OkadRecoveryWorkers,
 		url:     endpoint,
 		apiKey:  apiKey,
 		timeout: timeout,

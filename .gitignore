@@ -144,6 +144,8 @@ deploy/online/*.tar.gz
 .gocache/
 vite.config.js
 docs/*
+!docs/okad-reliable-integration.md
+!docs/okad-reliability-stress-report.md
 !docs/PAYMENT.md
 !docs/PAYMENT_CN.md
 !docs/ADMIN_PAYMENT_INTEGRATION_API.md
