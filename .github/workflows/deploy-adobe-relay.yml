@@ -39,6 +39,7 @@ jobs:
       - name: Check deployment scripts and backend
         env:
           PROXY_FAILOVER_TEST_DATABASE_URL: postgres://postgres:failover-test@localhost:5432/postgres?sslmode=disable
+          OKAD_RECOVERY_TEST_DATABASE_URL: postgres://postgres:failover-test@localhost:5432/postgres?sslmode=disable
         run: |
           bash -n deploy/clash/release-online.sh
           bash -n deploy/primary/release.sh
@@ -47,8 +48,8 @@ jobs:
           python3 -m unittest discover -s deploy/primary -p 'test_*.py'
           cd backend
           go test -race ./internal/clash ./internal/proxyfailover
-          go test ./internal/repository -run 'TestExpiryRespectsLiveFailoverPolicy|TestProxyUpdate'
-          go test -tags unit ./internal/service -run 'Test(GetAdobeUsage|AdobeUsage|BuildAdobeDegradedUsage|AccountTestServiceSendErrorAndEnd)'
+          go test ./internal/repository -run 'TestExpiryRespectsLiveFailoverPolicy|TestProxyUpdate|TestOkadRecoveryPostgres|TestRecoverAdobeCookieUses'
+          go test -tags unit ./internal/service -run 'Test(GetAdobeUsage|AdobeUsage|BuildAdobeDegradedUsage|AccountTestServiceSendErrorAndEnd|OkadRecovery)'
       - name: Check frontend workflows
         run: |
           npm install -g pnpm@9.15.9
