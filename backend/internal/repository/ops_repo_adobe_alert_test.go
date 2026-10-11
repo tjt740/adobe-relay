@@ -66,3 +66,80 @@ func TestOkadRecoveryPostgresCooldownDoesNotSpendLoginBudget(t *testing.T) {
 	require.Zero(t, attempts)
 	require.InDelta(t, 900, seconds, 2)
 }
+
+func TestAdobeAlertPostgresUnionsTestsAndBusinessWithoutDoubleCountingAccounts(t *testing.T) {
+	db := newOkadRecoveryPostgres(t)
+	_, err := db.Exec(`ALTER TABLE accounts ADD COLUMN name text;
+ INSERT INTO accounts(id,name,status) SELECT n,'fixture','active' FROM generate_series(1,10) n;
+ CREATE TABLE ops_error_logs(id bigint,created_at timestamptz,account_id bigint,group_id bigint,platform text,upstream_status_code int,upstream_error_message text,upstream_errors jsonb,error_owner text,error_source text);`)
+	require.NoError(t, err)
+	now := time.Now().UTC()
+	start := now.Add(-10 * time.Minute)
+	_, err = db.Exec(`INSERT INTO ops_error_logs VALUES(1,$1,1,7,'adobe',401,'invalid_credentials','[]','provider','upstream_http');
+ `, now.Add(-time.Minute))
+	require.NoError(t, err)
+	for _, id := range []int{1, 1, 2, 3, 4, 5} {
+		_, err = db.Exec(`INSERT INTO adobe_account_test_errors(created_at,account_id,group_ids,status_code,reason,is_timeout) VALUES($1,$2,'{7,8}',408,'',true)`, now.Add(-time.Minute), id)
+		require.NoError(t, err)
+	}
+	// Boundaries, captured groups and 401 category from typed test errors.
+	_, err = db.Exec(`INSERT INTO adobe_account_test_errors(created_at,account_id,group_ids,status_code,reason) VALUES
+ ($1,6,'{7}',408,''),($2,7,'{7}',401,'adobe_auth'),($3,8,'{8}',401,'adobe_quota_exhausted'),($4,5,'{7}',401,'adobe_not_entitled')`, start.Add(-time.Microsecond), now, now.Add(-time.Minute), start)
+	require.NoError(t, err)
+	r := &opsRepository{db: db}
+	group := int64(7)
+	rows, err := r.GetAdobeErrorAccounts(context.Background(), start, now, &group)
+	require.NoError(t, err)
+	require.Len(t, rows, 5, "one account in both sources is still one affected account")
+	require.EqualValues(t, 1, rows[0].AccountID)
+	require.EqualValues(t, 1, rows[0].BusinessErrors)
+	require.EqualValues(t, 2, rows[0].TestErrors)
+	require.EqualValues(t, 2, rows[0].TestTimeouts)
+	require.EqualValues(t, 1, rows[0].Auth401)
+	require.EqualValues(t, 5, rows[1].AccountID)
+	require.EqualValues(t, 1, rows[1].Entitled401)
+	all, err := r.GetAdobeErrorAccounts(context.Background(), start, now, nil)
+	require.NoError(t, err)
+	require.Len(t, all, 6)
+	_, err = r.GetAdobeErrorAccounts(context.Background(), now, now, nil)
+	require.Error(t, err)
+}
+
+func TestAdobeAlertPostgresConcurrentBatchHistory(t *testing.T) {
+	db := newOkadRecoveryPostgres(t)
+	db.SetMaxOpenConns(10)
+	_, err := db.Exec(`ALTER TABLE accounts ADD COLUMN name text;
+ INSERT INTO accounts(id,name,platform,status) SELECT n,'fixture','adobe','active' FROM generate_series(1,200) n;
+ INSERT INTO account_groups SELECT n,7 FROM generate_series(1,200) n;
+ CREATE TABLE ops_error_logs(id bigint,created_at timestamptz,account_id bigint,group_id bigint,platform text,upstream_status_code int,upstream_error_message text,upstream_errors jsonb,error_owner text,error_source text);`)
+	require.NoError(t, err)
+	start := time.Now().Add(-time.Second)
+	recorder := &accountRepository{sql: db}
+	results := make(chan error, 10)
+	for worker := 0; worker < 10; worker++ {
+		go func(worker int) {
+			for id := worker + 1; id <= 200; id += 10 {
+				for _, code := range []int{401, 408} {
+					if err := recorder.RecordAdobeConnectionTestError(context.Background(), int64(id), code, "", code == 408); err != nil {
+						results <- err
+						return
+					}
+				}
+			}
+			results <- nil
+		}(worker)
+	}
+	for worker := 0; worker < 10; worker++ {
+		require.NoError(t, <-results)
+	}
+	rows, err := (&opsRepository{db: db}).GetAdobeErrorAccounts(context.Background(), start, time.Now(), nil)
+	require.NoError(t, err)
+	require.Len(t, rows, 200)
+	for _, row := range rows {
+		require.EqualValues(t, 1, row.Count401)
+		require.EqualValues(t, 1, row.Count408)
+		require.EqualValues(t, 2, row.TestErrors)
+		require.Zero(t, row.BusinessErrors)
+	}
+	t.Logf("200 accounts, 400 failures, 10 concurrent writers: %s", time.Since(start)-time.Second)
+}

@@ -533,7 +533,7 @@ export default {
           groupAvailableRatio: 'Available account ratio in the selected group (0-100, requires group_id).',
           groupRateLimitRatio: 'Rate-limited account ratio in the selected group (0-100, requires group_id).',
           accountRateLimitedCount: 'Number of rate-limited accounts within the window.',
-          adobeErrorAccounts: 'Distinct Adobe accounts in saved upstream error records, including recovered failovers. Reads logs only; never tests or logs in accounts.',
+          adobeErrorAccounts: 'Distinct Adobe accounts across saved business and account test (including bulk) 401/408 errors. Test timeouts count as 408. Reads existing records only; never starts tests or logins.',
           accountErrorCount: 'Number of error accounts within the window (excluding temporarily unschedulable).',
           accountErrorRatio: 'Error account ratio within the window (0-100).',
           accountTempUnscheduledCount: 'Number of accounts currently temporarily unschedulable (e.g. proxy/credential failure auto-eviction).',

@@ -26,16 +26,22 @@ WITH recent AS MATERIALIZED (
    COALESCE(NULLIF(ev->>'platform',''),r.platform) AS platform,
    CASE WHEN ev->>'upstream_status_code' IN ('401','408') THEN (ev->>'upstream_status_code')::int ELSE 0 END AS code,
    COALESCE(ev->>'reason','') AS reason,
-   LOWER(COALESCE(ev->>'message','')) AS message
+   LOWER(COALESCE(ev->>'message','')) AS message,
+   'business'::text AS source, FALSE AS is_timeout
  FROM recent r CROSS JOIN LATERAL jsonb_array_elements(
    CASE WHEN jsonb_typeof(r.upstream_errors) = 'array' THEN r.upstream_errors ELSE '[]'::jsonb END
  ) ev
  UNION ALL
- SELECT r.id, r.created_at, r.account_id, r.platform, r.upstream_status_code, '', LOWER(COALESCE(r.upstream_error_message,''))
+ SELECT r.id, r.created_at, r.account_id, r.platform, r.upstream_status_code, '', LOWER(COALESCE(r.upstream_error_message,'')), 'business', FALSE
  FROM recent r
  WHERE (r.error_owner = 'provider' OR r.error_source = 'upstream_http')
    AND r.upstream_status_code IN (401,408)
    AND CASE WHEN jsonb_typeof(r.upstream_errors) = 'array' THEN jsonb_array_length(r.upstream_errors) = 0 ELSE TRUE END
+ UNION ALL
+ SELECT id, created_at, account_id, 'adobe', status_code, reason, '', 'test', is_timeout
+ FROM adobe_account_test_errors
+ WHERE created_at >= $1 AND created_at < $2
+   AND ($3::bigint IS NULL OR $3 = ANY(group_ids))
 ), classified AS (
  SELECT *, CASE
    WHEN reason = 'adobe_quota_exhausted' OR message LIKE '%quota exhausted%' OR message LIKE '%credits exhausted%' OR message LIKE '%taste_exhausted%' THEN 'quota'
@@ -50,6 +56,9 @@ SELECT e.account_id, COALESCE(a.name,''), COALESCE(a.status,'deleted'),
  COUNT(*) FILTER (WHERE code=401 AND category='quota'),
  COUNT(*) FILTER (WHERE code=401 AND category='entitled'),
  COUNT(*) FILTER (WHERE code=401 AND category='unknown'),
+ COUNT(*) FILTER (WHERE source='business'),
+ COUNT(*) FILTER (WHERE source='test'),
+ COUNT(*) FILTER (WHERE source='test' AND is_timeout),
  MIN(e.created_at), MAX(e.created_at)
 FROM classified e LEFT JOIN accounts a ON a.id=e.account_id
 GROUP BY e.account_id, a.name, a.status
@@ -67,7 +76,7 @@ func (r *opsRepository) GetAdobeErrorAccounts(ctx context.Context, start, end ti
 	accounts := make([]service.OpsAdobeAccountErrors, 0)
 	for rows.Next() {
 		var a service.OpsAdobeAccountErrors
-		if err := rows.Scan(&a.AccountID, &a.Name, &a.Status, &a.Count401, &a.Count408, &a.Auth401, &a.Quota401, &a.Entitled401, &a.Unknown401, &a.FirstSeen, &a.LastSeen); err != nil {
+		if err := rows.Scan(&a.AccountID, &a.Name, &a.Status, &a.Count401, &a.Count408, &a.Auth401, &a.Quota401, &a.Entitled401, &a.Unknown401, &a.BusinessErrors, &a.TestErrors, &a.TestTimeouts, &a.FirstSeen, &a.LastSeen); err != nil {
 			return nil, err
 		}
 		accounts = append(accounts, a)

@@ -63,7 +63,7 @@ func TestAdobeAlertEmailThresholdCooldownRestartAndFailedSend(t *testing.T) {
 	settings := newNotificationEmailMemorySettingRepo()
 	require.NoError(t, settings.Set(ctx, SettingKeyOpsEmailNotificationConfig, `{"alert":{"enabled":true,"recipients":[],"rate_limit_per_hour":10}}`))
 	// Start without SMTP to prove delivery can recover on a later evaluation.
-	r := &adobeAlertTestRepo{rule: &OpsAlertRule{ID: 1, Name: "Adobe 401/408", Enabled: true, Severity: "P1", MetricType: OpsMetricAdobeErrorAccounts, Operator: ">=", Threshold: 5, WindowMinutes: 10, CooldownMinutes: 30, NotifyEmail: true, Filters: map[string]any{"email_recipient": "owner@example.test"}}}
+	r := &adobeAlertTestRepo{rule: &OpsAlertRule{ID: 1, Name: "Adobe 401/408", Enabled: true, Severity: "P1", MetricType: OpsMetricAdobeErrorAccounts, Operator: ">=", Threshold: 5, WindowMinutes: 10, CooldownMinutes: 5, NotifyEmail: true, Filters: map[string]any{"email_recipient": "owner@example.test"}}}
 	ops := &OpsService{settingRepo: settings}
 	email := NewEmailService(settings, nil)
 	newEvaluator := func() *OpsAlertEvaluatorService { return NewOpsAlertEvaluatorService(ops, r, email, nil, nil, nil) }
@@ -75,7 +75,7 @@ func TestAdobeAlertEmailThresholdCooldownRestartAndFailedSend(t *testing.T) {
 		eval.evaluateOnce(time.Minute)
 	}
 	for i := 1; i <= 4; i++ {
-		r.accounts = append(r.accounts, OpsAdobeAccountErrors{AccountID: int64(i), Name: "fixture", Count408: 7, Status: "active", LastSeen: time.Now()})
+		r.accounts = append(r.accounts, OpsAdobeAccountErrors{AccountID: int64(i), Name: "fixture", Count408: 7, TestErrors: 7, TestTimeouts: 2, Status: "active", LastSeen: time.Now()})
 	}
 	evaluate()
 	require.Zero(t, r.created, "28 errors from 4 accounts do not meet the 5-account threshold")
@@ -84,7 +84,7 @@ func TestAdobeAlertEmailThresholdCooldownRestartAndFailedSend(t *testing.T) {
 	eval.ruleStates[r.rule.ID].LastEvaluatedAt = time.Now().Add(-119500 * time.Millisecond)
 	eval.evaluateOnce(time.Minute)
 	require.Equal(t, 2, r.queries, "scheduler jitter must not defer a two-minute evaluation for another minute")
-	r.accounts = append(r.accounts, OpsAdobeAccountErrors{AccountID: 5, Name: "<script>alert(1)</script>", Count401: 2, Auth401: 1, Quota401: 1, Count408: 1, Status: "error", LastSeen: time.Now()})
+	r.accounts = append(r.accounts, OpsAdobeAccountErrors{AccountID: 5, Name: "<script>alert(1)</script>", Count401: 2, Auth401: 1, Quota401: 1, Count408: 1, BusinessErrors: 3, Status: "error", LastSeen: time.Now()})
 	evaluate()
 	require.Equal(t, 1, r.created)
 	require.False(t, r.active.EmailSent)
@@ -96,6 +96,7 @@ func TestAdobeAlertEmailThresholdCooldownRestartAndFailedSend(t *testing.T) {
 	require.Contains(t, r.active.Description, "受影响账号：5 个")
 	require.Contains(t, r.active.Description, "401：1 个账号，2 条")
 	require.Contains(t, r.active.Description, "408：5 个账号，29 条")
+	require.Contains(t, r.active.Description, "业务请求 3 条；账号检测（含批量）28 条，其中检测超时 8 条")
 	newEvaluator().evaluateOnce(2 * time.Minute)
 	require.EqualValues(t, 1, smtp.messageCount(), "restart must not resend an active delivered incident")
 	r.accounts = nil
@@ -104,9 +105,10 @@ func TestAdobeAlertEmailThresholdCooldownRestartAndFailedSend(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		r.accounts = append(r.accounts, OpsAdobeAccountErrors{AccountID: int64(i + 1), Count408: 1})
 	}
+	r.latest.FiredAt = time.Now().Add(-4 * time.Minute)
 	evaluate()
 	require.Equal(t, 1, r.created, "a new incident inside the cooldown remains quiet")
-	r.latest.FiredAt = time.Now().Add(-31 * time.Minute)
+	r.latest.FiredAt = time.Now().Add(-5*time.Minute - time.Second)
 	evaluate()
 	require.Equal(t, 2, r.created)
 	require.EqualValues(t, 2, smtp.messageCount())
