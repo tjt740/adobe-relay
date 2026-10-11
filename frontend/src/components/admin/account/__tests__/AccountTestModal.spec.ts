@@ -221,6 +221,32 @@ describe('AccountTestModal', () => {
     })
   })
 
+  it('检查返回 408 时向账号管理页发出状态码事件', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      createStreamResponse([
+        'data: {"type":"error","error":"Adobe upstream returned 408"}\n'
+      ])
+    ) as any
+
+    const wrapper = mountModal({
+      id: 42,
+      name: 'Adobe Firefly',
+      platform: 'adobe',
+      type: 'oauth',
+      status: 'active'
+    })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    const startButton = wrapper.findAll('button').find((button) => button.text().includes('admin.accounts.startTest'))
+    expect(startButton).toBeTruthy()
+    await startButton!.trigger('click')
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.emitted('status-code')).toEqual([[408]])
+  })
+
   // Step 11：Adobe 的这三条曾经写在 src/components/account/AccountTestModal.vue 的 spec 里，
   // 而那个组件根本没被渲染（AccountsView 用的是 admin/account/ 下的这个）。
   // 结果是「测试通过但功能不存在」——所以用例必须跟着组件走。

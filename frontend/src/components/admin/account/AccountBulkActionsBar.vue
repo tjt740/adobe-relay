@@ -44,7 +44,20 @@
     </div>
     <div class="flex gap-2">
       <template v-if="selectedIds.length > 0">
-        <button @click="$emit('delete')" class="btn btn-danger btn-sm">{{ t('admin.accounts.bulkActions.delete') }}</button>
+        <button
+          data-testid="bulk-export-accounts"
+          @click="$emit('export')"
+          class="btn btn-secondary btn-sm"
+        >
+          {{ t('admin.accounts.bulkActions.export') }}
+        </button>
+        <button
+          data-testid="bulk-delete-accounts"
+          @click="$emit('delete')"
+          class="btn btn-danger btn-sm"
+        >
+          {{ t('admin.accounts.bulkActions.delete') }}
+        </button>
         <button @click="$emit('reset-status')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.resetStatus') }}</button>
         <button @click="$emit('refresh-token')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.refreshToken') }}</button>
         <button @click="$emit('probe-upstream-billing')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.probeUpstreamBilling') }}</button>
@@ -71,6 +84,7 @@ defineProps<{
 
 defineEmits([
   'delete',
+  'export',
   'edit-selected',
   'edit-filtered',
   'clear',

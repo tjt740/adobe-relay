@@ -397,6 +397,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
+  (e: 'status-code', statusCode: number): void
 }>()
 
 const terminalRef = ref<HTMLElement | null>(null)
@@ -827,6 +828,19 @@ const addLine = (text: string, className: string = 'text-gray-300') => {
   scrollToBottom()
 }
 
+const emitRequestTimeoutIfPresent = (...values: unknown[]) => {
+  for (const value of values) {
+    if (typeof value === 'number' && value === 408) {
+      emit('status-code', 408)
+      return
+    }
+    if (typeof value === 'string' && /\b408\b/.test(value)) {
+      emit('status-code', 408)
+      return
+    }
+  }
+}
+
 const scrollToBottom = async () => {
   await nextTick()
   if (terminalRef.value) {
@@ -902,6 +916,7 @@ const startTest = async () => {
     })
 
     if (!response.ok) {
+      emitRequestTimeoutIfPresent(response.status)
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
@@ -953,6 +968,7 @@ const handleEvent = (event: {
   model?: string
   success?: boolean
   error?: string
+  status_code?: number | string
   image_url?: string
   audio_url?: string
   video_url?: string
@@ -1042,12 +1058,14 @@ const handleEvent = (event: {
       } else {
         status.value = 'error'
         errorMessage.value = event.error || t('admin.accounts.testFailed')
+        emitRequestTimeoutIfPresent(event.status_code, event.error)
       }
       break
 
     case 'error':
       status.value = 'error'
       errorMessage.value = event.error || t('common.unknownError')
+      emitRequestTimeoutIfPresent(event.status_code, event.error)
       if (streamingContent.value) {
         addLine(streamingContent.value, 'text-green-300')
         streamingContent.value = ''

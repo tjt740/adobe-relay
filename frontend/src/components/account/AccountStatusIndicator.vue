@@ -12,6 +12,11 @@
       <span class="text-[11px] text-gray-400 dark:text-gray-500">{{ overloadCountdown }}</span>
     </div>
 
+    <!-- Request timeout display (408) -->
+    <div v-else-if="isRequestTimeout" class="flex flex-col items-center gap-1">
+      <span :class="['badge text-xs', statusClass]">{{ statusText }}</span>
+    </div>
+
     <div v-else-if="kiroQuotaBadgeLabel" class="flex flex-col items-center gap-1">
       <span :class="['badge text-xs', kiroQuotaBadgeClass]">{{ kiroQuotaBadgeLabel }}</span>
       <span v-if="kiroQuotaHint" class="text-[11px] text-gray-400 dark:text-gray-500">{{ kiroQuotaHint }}</span>
@@ -155,6 +160,24 @@
         class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 whitespace-normal rounded bg-gray-900 px-3 py-2 text-center text-xs leading-relaxed text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-700"
       >
         {{ t('admin.accounts.status.overloadedUntil', { time: formatTime(account.overload_until) }) }}
+        <div
+          class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Request timeout indicator (408) -->
+    <div v-if="isRequestTimeout" class="group relative">
+      <span
+        class="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+      >
+        <Icon name="exclamationTriangle" size="xs" :stroke-width="2" />
+        408
+      </span>
+      <div
+        class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 whitespace-normal rounded bg-gray-900 px-3 py-2 text-center text-xs leading-relaxed text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-700"
+      >
+        {{ t('admin.accounts.status.requestTimeoutHint') }}
         <div
           class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"
         ></div>
@@ -304,6 +327,42 @@ const isOverloaded = computed(() => {
   return new Date(props.account.overload_until) > new Date()
 })
 
+const parseStatusCode = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isInteger(value)) return value
+  if (typeof value !== 'string') return null
+  const match = value.match(/\b408\b/)
+  return match ? 408 : null
+}
+
+const accountStatusCode = computed(() => {
+  const extra = props.account.extra as Record<string, unknown> | undefined
+  const extraKeys = [
+    'last_check_status_code',
+    'last_status_code',
+    'status_code',
+    'upstream_status_code',
+    'adobe_last_status_code'
+  ]
+  for (const key of extraKeys) {
+    const statusCode = parseStatusCode(extra?.[key])
+    if (statusCode === 408) return statusCode
+  }
+
+  if (props.account.temp_unschedulable_reason) {
+    try {
+      const reason = JSON.parse(props.account.temp_unschedulable_reason) as Record<string, unknown>
+      if (parseStatusCode(reason.status_code) === 408) return 408
+    } catch {
+      // Older records may contain plain text instead of JSON.
+      if (parseStatusCode(props.account.temp_unschedulable_reason) === 408) return 408
+    }
+  }
+
+  return parseStatusCode(props.account.error_message)
+})
+
+const isRequestTimeout = computed(() => accountStatusCode.value === 408)
+
 // Computed: is temp unschedulable
 const isTempUnschedulable = computed(() => {
   if (!props.account.temp_unschedulable_until) return false
@@ -378,6 +437,9 @@ const tempUnschedRecoveryText = computed(() => {
 
 // Computed: status badge class
 const statusClass = computed(() => {
+  if (isRequestTimeout.value) {
+    return 'badge-warning'
+  }
   if (isKiroRuntimeSuspended.value) {
     return 'badge-danger'
   }
@@ -401,6 +463,9 @@ const statusClass = computed(() => {
 
 // Computed: status text
 const statusText = computed(() => {
+  if (isRequestTimeout.value) {
+    return t('admin.accounts.status.requestTimeout')
+  }
   if (isKiroRuntimeSuspended.value) {
     return t('admin.accounts.forbidden')
   }

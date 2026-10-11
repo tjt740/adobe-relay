@@ -2,6 +2,7 @@ package proxyfailover
 
 import (
 	"context"
+	"database/sql"
 	"sync"
 	"testing"
 	"time"
@@ -210,8 +211,9 @@ func TestExistingAccountsBindWithoutChangingSchedulingState(t *testing.T) {
  (8,NULL,'error',false,$1,NOW()-INTERVAL '1 day')`, allocationWaitingMessage)
 	require.NoError(t, err)
 	_, err = db.Exec(`UPDATE accounts SET proxy_auto_paused=true WHERE id=8;
-	 INSERT INTO accounts(id,proxy_id,platform,type,status,schedulable,error_message) VALUES(10,4,'openai','api_key','error',true,$1);
 	 INSERT INTO accounts(id,proxy_id,deleted_at) VALUES(11,1,NOW());`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO accounts(id,proxy_id,platform,type,status,schedulable,error_message) VALUES(10,4,'openai','api_key','error',true,$1)`, allocationWaitingMessage)
 	require.NoError(t, err)
 	snapshot := func() string {
 		t.Helper()
@@ -232,22 +234,31 @@ func TestExistingAccountsBindWithoutChangingSchedulingState(t *testing.T) {
 		}
 		return health{Status: "healthy", LatencyMS: p.ID * 10}
 	}
-	check := func() {
+	check := func(bound bool) {
 		t.Helper()
 		require.NoError(t, m.check(ctx))
 		require.Equal(t, before, snapshot(), "proxy changes must preserve every original scheduling/error/expiry field")
-		var other int64
+		var other sql.NullInt64
 		require.NoError(t, db.QueryRow(`SELECT proxy_id FROM accounts WHERE id=10`).Scan(&other))
-		require.EqualValues(t, 4, other, "an existing healthy binding is preserved across account types")
+		require.Equal(t, bound, other.Valid, "other account types follow the same proxy health policy")
 		var status string
 		var message *string
 		require.NoError(t, db.QueryRow(`SELECT status,error_message FROM accounts WHERE id=10`).Scan(&status, &message))
-		require.Equal(t, "active", status, "a stale allocation wait state is cleared after binding")
-		require.Nil(t, message, "a stale allocation wait message is cleared after binding")
+		if bound {
+			require.Equal(t, "active", status, "a stale allocation wait state is cleared after binding")
+			require.Nil(t, message, "a stale allocation wait message is cleared after binding")
+		} else {
+			require.Equal(t, "error", status)
+			require.NotNil(t, message)
+			require.Equal(t, allocationWaitingMessage, *message)
+		}
 		require.NoError(t, db.QueryRow(`SELECT proxy_id FROM accounts WHERE id=11`).Scan(&other))
-		require.EqualValues(t, 1, other, "deleted accounts are never changed")
+		require.Equal(t, sql.NullInt64{Int64: 1, Valid: true}, other, "deleted accounts are never changed")
 	}
-	check()
+	check(true)
+	var originalProxy int64
+	require.NoError(t, db.QueryRow(`SELECT proxy_id FROM accounts WHERE id=10`).Scan(&originalProxy))
+	require.EqualValues(t, 4, originalProxy, "an existing healthy binding is preserved across account types")
 	v, err := m.GetAllocation(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 9, v.Assigned)
@@ -262,20 +273,22 @@ func TestExistingAccountsBindWithoutChangingSchedulingState(t *testing.T) {
 	}
 	failed = true
 	age()
-	check() // first failure keeps existing routes, including an expired auto-paused account
+	check(true) // first failure keeps existing routes, including an expired auto-paused account
+	require.NoError(t, db.QueryRow(`SELECT proxy_id FROM accounts WHERE id=10`).Scan(&originalProxy))
+	require.EqualValues(t, 4, originalProxy, "the first probe failure preserves the existing route")
 	v, err = m.GetAllocation(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 9, v.Assigned)
 	require.Zero(t, v.Waiting)
 	age()
-	check() // second failure detaches unavailable routes, preserving stopped account states
+	check(false) // second failure detaches unavailable routes, preserving stopped account states
 	v, err = m.GetAllocation(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 9, v.Waiting)
 	require.Zero(t, v.Assigned)
 	failed = false
 	age()
-	check() // capacity recovery binds existing inactive accounts too
+	check(true) // capacity recovery binds existing inactive accounts too
 	v, err = m.GetAllocation(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 9, v.Assigned)
@@ -283,7 +296,7 @@ func TestExistingAccountsBindWithoutChangingSchedulingState(t *testing.T) {
 	// Background rounds are idempotent once all existing accounts have routes.
 	var eventsBefore, eventsAfter int
 	require.NoError(t, db.QueryRow(`SELECT count(*) FROM proxy_failover_events`).Scan(&eventsBefore))
-	check()
+	check(true)
 	require.NoError(t, db.QueryRow(`SELECT count(*) FROM proxy_failover_events`).Scan(&eventsAfter))
 	require.Equal(t, eventsBefore, eventsAfter)
 }

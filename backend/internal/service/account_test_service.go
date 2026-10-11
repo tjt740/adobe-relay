@@ -42,6 +42,7 @@ import (
 // sseDataPrefix matches SSE data lines with optional whitespace after colon.
 // Some upstream APIs return non-standard "data:" without space (should be "data: ").
 var sseDataPrefix = regexp.MustCompile(`^data:\s*`)
+var accountTest408Pattern = regexp.MustCompile(`\b408\b`)
 
 const (
 	testClaudeAPIURL            = "https://api.anthropic.com/v1/messages?beta=true"
@@ -58,12 +59,13 @@ type TestEvent struct {
 	Code     string `json:"code,omitempty"`
 	ImageURL string `json:"image_url,omitempty"`
 	// AudioURL / VideoURL are data: or https URLs for in-browser media players.
-	AudioURL string `json:"audio_url,omitempty"`
-	VideoURL string `json:"video_url,omitempty"`
-	MimeType string `json:"mime_type,omitempty"`
-	Data     any    `json:"data,omitempty"`
-	Success  bool   `json:"success,omitempty"`
-	Error    string `json:"error,omitempty"`
+	AudioURL   string `json:"audio_url,omitempty"`
+	VideoURL   string `json:"video_url,omitempty"`
+	MimeType   string `json:"mime_type,omitempty"`
+	Data       any    `json:"data,omitempty"`
+	Success    bool   `json:"success,omitempty"`
+	Error      string `json:"error,omitempty"`
+	StatusCode int    `json:"status_code,omitempty"`
 }
 
 // AccountTestOptions carries optional media for admin connectivity tests.
@@ -3450,7 +3452,11 @@ func (s *AccountTestService) sendEvent(c *gin.Context, event TestEvent) {
 // sendErrorAndEnd sends an error event and ends the stream
 func (s *AccountTestService) sendErrorAndEnd(c *gin.Context, errorMsg string) error {
 	log.Printf("Account test error: %s", errorMsg)
-	s.sendEvent(c, TestEvent{Type: "error", Error: errorMsg})
+	event := TestEvent{Type: "error", Error: errorMsg}
+	if accountTest408Pattern.MatchString(errorMsg) {
+		event.StatusCode = http.StatusRequestTimeout
+	}
+	s.sendEvent(c, event)
 	return fmt.Errorf("%s", errorMsg)
 }
 

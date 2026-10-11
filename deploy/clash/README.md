@@ -4,29 +4,9 @@ IP 管理中的「Clash 订阅」支持预览、选择节点导入、刷新和�
 
 节点经独立的 [Mihomo](https://github.com/MetaCubeX/mihomo/releases/tag/v1.19.31) 服务运行，每个节点有固定的 HTTP/SOCKS 入口及独立随机凭据。分配到账号的代理协议显示为 HTTP，这是应用到 Mihomo 的入口；出口仍使用订阅节点的实际协议。
 
-## 国内、国外同时发布
+## 正式发布
 
-以后所有正式发布都以 `main` 为准，由 `.github/workflows/deploy-adobe-relay.yml` 同时发布到以下两台服务器：
-
-| 目标 | 网页 | API Base URL |
-| --- | --- | --- |
-| 国内 | https://47.106.176.71:6660 | https://47.106.176.71:6660/v1 |
-| 国外（马尼拉） | https://8.212.129.43 | https://8.212.129.43/v1 |
-
-两台服务器目录均为 `/home/admin/sub2api-online`，Compose 项目均为 `sub2api-online`，数据库、账号、密钥及订阅独立保存。只发布程序，不同步用户数据。保留各服务器现有 `deploy/online/compose.yml`、`.env` 与 Nginx HTTPS 配置；旧 `deploy/adobe-relay` 9500 端口流程不用于当前站点。
-
-GitHub Actions 在推送 `main` 时自动触发，也可在 Actions → Deploy Adobe Relay 选择 main 手动运行。先运行相关测试、构建一个 amd64 应用镜像，将固定版本 Mihomo 一起打包，再分别部署两台服务器。两边独立报告结果，一台失败不会取消另一台。
-
-仓库 Secrets：`DOMESTIC_SSH_KEY`、`DOMESTIC_KNOWN_HOSTS`、`OVERSEAS_SSH_KEY`、`OVERSEAS_KNOWN_HOSTS`。使用各服务器专属的 CI SSH 密钥和已核验的主机公钥，不关闭主机验证。SSH 用户为 `admin`，使用现有免密 sudo 执行 Docker 和发布脚本。
-
-应急手动发布：上传 `deploy/clash/compose.yml`、`init_env.py`、`release-online.sh` 后，在服务器加载新应用镜像及 `metacubex/mihomo:v1.19.31` 镜像，再执行：
-
-```sh
-cd /home/admin/sub2api-online
-sudo -n bash deploy/clash/release-online.sh adobe-relay:COMMIT
-```
-
-脚本先备份并验证数据库、保存应用数据和原环境文件，再只补充缺失的 Clash 控制密钥，更新应用和独立 Mihomo。备份位于权限受限的 `deploy/clash/backups.local/`。应用或运行服务健康校验失败时回退应用镜像，数据库迁移不自动回退。后续重启或更新必须同时使用下面两个 Compose 文件，避免丢失 Clash 配置。
+本项目以后仅发布到主服务器 **173.234.15.150（https://creative.cheap）**。国内及菲律宾服务器不再自动发布。工作流、备份和操作说明见 [主服务器发布](../primary/README.md)。
 
 ## Docker Compose（现有 online 部署）
 

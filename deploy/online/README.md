@@ -19,7 +19,7 @@ curl --fail http://127.0.0.1:6666/health
 
 初始化脚本只在 `.env` 不存在时生成独立随机密码和固定加密密钥；文件权限为 0600，重复运行不会重置凭据。管理员邮箱默认为 `admin@sub2api.local`，初始密码见服务器的 `deploy/online/.env` 中 `ADMIN_PASSWORD`。
 
-`.env`、运行数据、日志和镜像归档均不应提交到 GitHub。正式发布通过 GitHub Actions 在推送 `main` 时自动更新国内、国外两台服务器，参见 [Clash 与双机发布说明](../clash/README.md)。本文的 IP 与 Nginx 模板对应国内服务器；已有站点发布时保留各服务器现有的 `.env`、Nginx 和证书续期配置。
+`.env`、运行数据、日志和镜像归档均不应提交到 GitHub。正式发布通过 GitHub Actions 在推送 `main` 时仅更新主服务器 `173.234.15.150`，参见 [主服务器发布说明](../primary/README.md)。本文的 IP 与 Nginx 模板对应国内服务器；已有站点发布时保留各服务器现有的 `.env`、Nginx 和证书续期配置。
 
 ## HTTPS / IP 访问
 
