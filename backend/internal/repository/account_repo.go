@@ -2057,10 +2057,15 @@ func (r *accountRepository) ClearError(ctx context.Context, id int64) error {
 	    ) THEN TRUE ELSE schedulable END,
 	    status = 'active', error_message = '', updated_at = NOW()
 	  WHERE id = $1 AND deleted_at IS NULL
+	    -- A cookie push may follow the recovery CAS after the allocation trigger
+	    -- has queued the account. Keep that queue intact until the allocator
+	    -- resumes it; clearing it would strand an active, unschedulable account.
+	    AND NOT (proxy_auto_paused IS TRUE AND status = 'error' AND COALESCE(error_message, '') = $3)
 	  RETURNING id
 	 )
 	 INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
-	 SELECT $2, id, NULL, NULL FROM updated`, id, service.SchedulerOutboxEventAccountChanged)
+	 SELECT $2, id, NULL, NULL FROM updated`, id, service.SchedulerOutboxEventAccountChanged,
+		"自动代理分配：等待可用节点（每个节点最多 3 个账号）")
 	if err != nil {
 		return err
 	}
