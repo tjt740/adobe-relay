@@ -19,17 +19,31 @@ var okadCookieRecoveries singleflight.Group
 type AdobeCookieRecoveryRepository interface {
 	RecoverAdobeCookieIfUnchanged(context.Context, *Account, string) (bool, error)
 	QueueAdobeCookieRecoveryIfUnchanged(context.Context, *Account) (bool, error)
+	ClaimAdobeCookieRecovery(context.Context, *Account, time.Duration) (*AdobeCookieRecoveryAttempt, error)
+	FinishAdobeCookieRecovery(context.Context, int64, string, bool) error
+	SetAdobeCookieRecoveryErrorIfUnchanged(context.Context, *Account, string) (bool, error)
 }
 
-type okadRecoveryAttempt struct {
-	cookie string
-	next   time.Time
+const (
+	AdobeCookieRecoveryMaxAttempts  = 2
+	AdobeCookieRecoveryRetryDelay   = 5 * time.Minute
+	AdobeCookieRecoveryHealthyDelay = 15 * time.Minute
+	AdobeCookieRecoveryPending      = "Authentication failed (401): Okad recovery pending"
+	AdobeCookieRecoveryExhausted    = "Authentication failed (401): Okad automatic login limit reached (2/2); manual reauthorization required"
+)
+
+// A durable reservation is shared by every caller and process. Cookie rotation
+// and a successful Okad response do not reset the attempt budget.
+type AdobeCookieRecoveryAttempt struct {
+	ID       string
+	Count    int
+	Allowed  bool
+	InFlight bool
 }
 
 type OkadCookieRecovery struct {
 	repo        AccountRepository
 	client      *OkadCookieRefreshClient
-	retry       map[int64]okadRecoveryAttempt // owned by the scanner goroutine
 	invalidator TokenCacheInvalidator
 }
 
@@ -38,7 +52,7 @@ func newOkadCookieRecovery(repo AccountRepository, cfg *config.Config) *OkadCook
 	if repo == nil || client == nil {
 		return nil
 	}
-	return &OkadCookieRecovery{repo: repo, client: client, retry: make(map[int64]okadRecoveryAttempt)}
+	return &OkadCookieRecovery{repo: repo, client: client}
 }
 
 // Match authentication failures only. Proxy removal, quota/entitlement failures,
@@ -54,6 +68,9 @@ func isAdobeCookieRecoveryCandidate(a *Account) bool {
 		return false
 	}
 	msg := strings.ToLower(a.ErrorMessage)
+	if a.ErrorMessage == AdobeCookieRecoveryExhausted {
+		return false
+	}
 	if strings.HasPrefix(msg, "oauth 401 (no refresh_token):") || strings.HasPrefix(msg, "authentication failed (401):") {
 		return true
 	}
@@ -110,10 +127,37 @@ func (s *OkadCookieRecovery) recover(ctx context.Context, snapshot *Account) (bo
 		if latest.GetCredential("cookie") != snapshot.GetCredential("cookie") && latest.Status == StatusActive {
 			return true, nil
 		}
-		cookie, err := s.client.RefreshCookie(ctx, email)
+		attempt, err := updater.ClaimAdobeCookieRecovery(ctx, latest, s.client.timeout)
 		if err != nil {
+			// Fail closed: never contact Okad without a durable reservation.
 			return false, err
 		}
+		if !attempt.Allowed {
+			if attempt.InFlight {
+				return true, nil // another process owns the current login
+			}
+			return false, s.queue(ctx, updater, latest, attempt.Count)
+		}
+		// A cancelled user request must not lose the completion/cooldown write.
+		loginOK := false
+		defer func() {
+			finishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			defer cancel()
+			if err := updater.FinishAdobeCookieRecovery(finishCtx, latest.ID, attempt.ID, loginOK); err != nil {
+				slog.Warn("adobe_okad_recovery_finish_failed", "account_id", latest.ID, "error", err)
+			}
+		}()
+		slog.Info("adobe_okad_login_attempt", "account_id", latest.ID, "attempt", attempt.Count, "max_attempts", AdobeCookieRecoveryMaxAttempts)
+		cookie, err := s.client.RefreshCookie(ctx, email)
+		if err != nil {
+			queueCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			defer cancel()
+			if queueErr := s.queue(queueCtx, updater, latest, attempt.Count); queueErr != nil {
+				slog.Warn("adobe_okad_queue_failed", "account_id", latest.ID, "error", queueErr)
+			}
+			return false, err
+		}
+		loginOK = true
 		applied, err := updater.RecoverAdobeCookieIfUnchanged(ctx, latest, cookie)
 		if err != nil {
 			return false, err
@@ -142,6 +186,34 @@ func (s *OkadCookieRecovery) recover(ctx context.Context, snapshot *Account) (bo
 	}
 	recovered, _ := result.(bool)
 	return recovered, nil
+}
+
+func (s *OkadCookieRecovery) queue(ctx context.Context, repo AdobeCookieRecoveryRepository, a *Account, count int) error {
+	message := AdobeCookieRecoveryPending
+	if count >= AdobeCookieRecoveryMaxAttempts {
+		message = AdobeCookieRecoveryExhausted
+	}
+	_, err := repo.SetAdobeCookieRecoveryErrorIfUnchanged(ctx, a, message)
+	return err
+}
+
+// Only a real authenticated Adobe response after the stabilization period may
+// close an incident. Cached usage, clearing an error, or pushing a cookie cannot.
+func confirmAdobeCookieRecovery(ctx context.Context, repo AccountRepository, a *Account) {
+	if a == nil || a.Platform != PlatformAdobe || a.Type != AccountTypeOAuth {
+		return
+	}
+	if confirmer, ok := repo.(interface {
+		ConfirmAdobeCookieRecovery(context.Context, *Account) error
+	}); ok {
+		if err := confirmer.ConfirmAdobeCookieRecovery(ctx, a); err != nil {
+			slog.Warn("adobe_okad_recovery_confirmation_failed", "account_id", a.ID, "error", err)
+		}
+	}
+}
+
+func (s *GatewayService) ConfirmAdobeCookieRecovery(ctx context.Context, a *Account) {
+	confirmAdobeCookieRecovery(ctx, s.accountRepo, a)
 }
 
 func (s *OkadCookieRecovery) run(ctx context.Context) {
@@ -176,33 +248,17 @@ func (s *OkadCookieRecovery) sweep(ctx context.Context) {
 			break
 		}
 	}
-	seen := make(map[int64]bool)
 	for i := range candidates {
 		a := &candidates[i]
 		if !isAdobeCookieRecoveryCandidate(a) {
 			continue
 		}
-		seen[a.ID] = true
-		prior, ok := s.retry[a.ID]
-		if ok && prior.cookie == a.GetCredential("cookie") && time.Now().Before(prior.next) {
-			continue
-		}
 		if ctx.Err() != nil {
 			return
 		}
-		recovered, err := s.recover(ctx, a)
-		// Persisted error remains eligible for a later retry, with a bounded cadence.
-		s.retry[a.ID] = okadRecoveryAttempt{cookie: a.GetCredential("cookie"), next: time.Now().Add(5 * time.Minute)}
+		_, err := s.recover(ctx, a)
 		if err != nil {
 			slog.Warn("adobe_okad_cookie_recovery_failed", "account_id", a.ID, "error", err)
-		}
-		if recovered {
-			delete(s.retry, a.ID)
-		}
-	}
-	for id := range s.retry {
-		if !seen[id] {
-			delete(s.retry, id)
 		}
 	}
 }

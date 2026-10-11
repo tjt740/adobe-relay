@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -23,6 +24,62 @@ type okadRecoveryRepo struct {
 	mu         sync.Mutex
 	accounts   map[int64]*Account
 	beforeSave func(*Account)
+	attempts   map[int64]*testOkadAttempt
+	claimErr   error
+}
+
+type testOkadAttempt struct {
+	AdobeCookieRecoveryAttempt
+	next     time.Time
+	finished time.Time
+}
+
+func (r *okadRecoveryRepo) ClaimAdobeCookieRecovery(_ context.Context, a *Account, timeout time.Duration) (*AdobeCookieRecoveryAttempt, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.claimErr != nil {
+		return nil, r.claimErr
+	}
+	if r.attempts == nil {
+		r.attempts = make(map[int64]*testOkadAttempt)
+	}
+	prior := r.attempts[a.ID]
+	if prior != nil && (prior.Count >= 2 || time.Now().Before(prior.next)) {
+		return &AdobeCookieRecoveryAttempt{Count: prior.Count, InFlight: prior.finished.IsZero() && time.Now().Before(prior.next)}, nil
+	}
+	count := 1
+	if prior != nil {
+		count += prior.Count
+	}
+	claim := AdobeCookieRecoveryAttempt{ID: time.Now().String(), Count: count, Allowed: true}
+	r.attempts[a.ID] = &testOkadAttempt{AdobeCookieRecoveryAttempt: claim, next: time.Now().Add(timeout + AdobeCookieRecoveryRetryDelay)}
+	return &claim, nil
+}
+
+func (r *okadRecoveryRepo) FinishAdobeCookieRecovery(_ context.Context, id int64, attemptID string, success bool) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	a := r.attempts[id]
+	if a.ID == attemptID {
+		a.finished = time.Now()
+		delay := AdobeCookieRecoveryRetryDelay
+		if success {
+			delay = AdobeCookieRecoveryHealthyDelay
+		}
+		a.next = a.finished.Add(delay)
+	}
+	return nil
+}
+
+func (r *okadRecoveryRepo) SetAdobeCookieRecoveryErrorIfUnchanged(_ context.Context, a *Account, message string) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	latest := r.accounts[a.ID]
+	if latest.Status != a.Status || latest.ErrorMessage != a.ErrorMessage || latest.Schedulable != a.Schedulable || latest.GetCredential("cookie") != a.GetCredential("cookie") {
+		return false, nil
+	}
+	latest.Status, latest.Schedulable, latest.ErrorMessage = StatusError, false, message
+	return true, nil
 }
 
 func (r *okadRecoveryRepo) QueueAdobeCookieRecoveryIfUnchanged(_ context.Context, a *Account) (bool, error) {
@@ -155,12 +212,13 @@ func TestOkadRecoveryFailureRetriesWithBackoff(t *testing.T) {
 	require.EqualValues(t, 1, calls.Load())
 	require.Equal(t, StatusError, a.Status)
 	require.Equal(t, "old", a.GetCredential("cookie"))
-	s.retry[904] = okadRecoveryAttempt{cookie: "old", next: time.Now().Add(-time.Minute)}
+	repo.attempts[904].next = time.Now().Add(-time.Minute)
 	s.sweep(context.Background())
 	require.EqualValues(t, 2, calls.Load())
+	require.Equal(t, AdobeCookieRecoveryExhausted, a.ErrorMessage)
 	_, err := s.recover(context.Background(), a)
-	require.Error(t, err)
-	require.NotContains(t, err.Error(), "sensitive-cookie")
+	require.NoError(t, err)
+	require.EqualValues(t, 2, calls.Load())
 }
 func TestOkadRecoveryHonorsConcurrentPushOrDisable(t *testing.T) {
 	for _, disable := range []bool{false, true} {
@@ -232,4 +290,99 @@ func TestOkadRecoveryFailed401QueuesWithoutOverridingManualPause(t *testing.T) {
 			require.True(t, isAdobeCookieRecoveryCandidate(a))
 		}
 	}
+}
+
+func TestOkadRecoverySharesBudgetAcross401ScannerAndRestart(t *testing.T) {
+	a := recoveryFixtureAccount(908)
+	a.Status, a.ErrorMessage, a.Schedulable = StatusActive, "", true
+	repo := &okadRecoveryRepo{accounts: map[int64]*Account{a.ID: a}}
+	var calls atomic.Int32
+	s := newTestOkadRecovery(t, repo, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		_, _ = w.Write([]byte(`{"ok":false,"message":"sensitive-cookie"}`))
+	})
+	snapshot, err := repo.GetByID(context.Background(), a.ID)
+	require.NoError(t, err)
+	_, err = s.recover(context.Background(), snapshot)
+	require.Error(t, err)
+	require.NotContains(t, err.Error(), "sensitive-cookie")
+	require.EqualValues(t, 1, calls.Load())
+	// A separate background service (or restarted process) shares the DB budget.
+	restarted := &OkadCookieRecovery{repo: repo, client: s.client}
+	restarted.sweep(context.Background())
+	require.EqualValues(t, 1, calls.Load())
+	repo.attempts[a.ID].next = time.Now().Add(-time.Second)
+	restarted.sweep(context.Background())
+	require.EqualValues(t, 2, calls.Load())
+	require.Equal(t, AdobeCookieRecoveryExhausted, a.ErrorMessage)
+	require.False(t, a.Schedulable)
+	// Clearing the error or changing the cookie does not renew the budget.
+	a.Status, a.ErrorMessage, a.Schedulable = StatusActive, "", true
+	a.Credentials["cookie"] = "different"
+	repo.attempts[a.ID].next = time.Now().Add(-time.Hour)
+	_, err = restarted.recover(context.Background(), a)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, calls.Load())
+	require.Equal(t, AdobeCookieRecoveryExhausted, a.ErrorMessage)
+}
+
+func TestOkadRecoverySuccessfulLoginDoesNotRenewBudget(t *testing.T) {
+	a := recoveryFixtureAccount(909)
+	repo := &okadRecoveryRepo{accounts: map[int64]*Account{a.ID: a}}
+	var calls atomic.Int32
+	s := newTestOkadRecovery(t, repo, func(w http.ResponseWriter, r *http.Request) {
+		n := calls.Add(1)
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "cookie": fmt.Sprintf("cookie-%d", n)})
+	})
+	s.sweep(context.Background())
+	require.EqualValues(t, 1, calls.Load())
+	require.WithinDuration(t, time.Now().Add(AdobeCookieRecoveryHealthyDelay), repo.attempts[a.ID].next, time.Second)
+	// Immediate 401 is quarantined without a second login.
+	_, err := s.recover(context.Background(), a)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, calls.Load())
+	require.Equal(t, StatusError, a.Status)
+	repo.attempts[a.ID].next = time.Now().Add(-time.Second)
+	s.sweep(context.Background())
+	require.EqualValues(t, 2, calls.Load())
+	require.Equal(t, StatusActive, a.Status)
+	_, err = s.recover(context.Background(), a)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, calls.Load())
+	require.Equal(t, AdobeCookieRecoveryExhausted, a.ErrorMessage)
+}
+
+func TestOkadRecoveryFailsClosedWithoutDurableReservation(t *testing.T) {
+	a := recoveryFixtureAccount(910)
+	repo := &okadRecoveryRepo{accounts: map[int64]*Account{a.ID: a}, claimErr: errors.New("database unavailable")}
+	var calls atomic.Int32
+	s := newTestOkadRecovery(t, repo, func(w http.ResponseWriter, r *http.Request) { calls.Add(1) })
+	_, err := s.recover(context.Background(), a)
+	require.Error(t, err)
+	require.Zero(t, calls.Load())
+}
+
+func TestOkadRecoveryConcurrentCallersOnlyLoginOnce(t *testing.T) {
+	a := recoveryFixtureAccount(911)
+	repo := &okadRecoveryRepo{accounts: map[int64]*Account{a.ID: a}}
+	var calls atomic.Int32
+	entered, release := make(chan struct{}), make(chan struct{})
+	s := newTestOkadRecovery(t, repo, func(w http.ResponseWriter, r *http.Request) {
+		if calls.Add(1) == 1 {
+			close(entered)
+		}
+		<-release
+		_, _ = w.Write([]byte(`{"ok":false}`))
+	})
+	snapshot, err := repo.GetByID(context.Background(), a.ID)
+	require.NoError(t, err)
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() { defer wg.Done(); _, _ = s.recover(context.Background(), snapshot) }()
+	}
+	<-entered
+	close(release)
+	wg.Wait()
+	require.EqualValues(t, 1, calls.Load())
 }

@@ -500,6 +500,7 @@ func (h *GatewayHandler) runAdobeImagesFailover(
 		result, err := h.adobeImageService.GenerateCall(requestCtx, account, token, req.call)
 		releaseAccount()
 		if err == nil {
+			h.gatewayService.ConfirmAdobeCookieRecovery(requestCtx, account)
 			h.finishAdobeImagesSuccess(c, reqLog, apiKey, subject, subscription, account, result, req)
 			return
 		}
