@@ -35,14 +35,21 @@ func TestOkadRecoveryPostgres(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 	_, err = db.Exec(`CREATE TABLE accounts(id bigint PRIMARY KEY,platform text,type text,status text,error_message text,schedulable bool,credentials jsonb,extra jsonb,proxy_id bigint,expires_at timestamptz,deleted_at timestamptz,updated_at timestamptz);
+ CREATE TABLE proxies(id bigint PRIMARY KEY);
  CREATE TABLE scheduler_outbox(event_type text,account_id bigint,group_id bigint,payload jsonb);`)
 	require.NoError(t, err)
+	for _, name := range []string{"241_account_proxy_failover.sql", "242_proxy_auto_allocation.sql", "243_proxy_auto_allocation_all_accounts.sql", "244_proxy_auto_allocation_allocator_bypass.sql"} {
+		migration, err := os.ReadFile("../../migrations/" + name)
+		require.NoError(t, err)
+		_, err = db.Exec(string(migration))
+		require.NoError(t, err, name)
+	}
 	repo := &accountRepository{sql: db}
 	ctx := context.Background()
 	message := "OAuth 401 (no refresh_token): Invalid bearer token"
 	reset := func(status, message string, schedulable bool) {
-		_, err = db.Exec(`TRUNCATE accounts, scheduler_outbox;
- INSERT INTO accounts VALUES(1,'adobe','oauth','error','',false,'{"cookie":"old","email":"test@example.test","access_token":"rejected","model_mapping":{"gpt-image-2":"keep"}}','{}',NULL,NULL,NULL,NOW())`)
+		_, err = db.Exec(`TRUNCATE accounts, scheduler_outbox CASCADE;
+ INSERT INTO accounts(id,platform,type,status,error_message,schedulable,credentials,extra,proxy_id,expires_at,deleted_at,updated_at) VALUES(1,'adobe','oauth','error','',false,'{"cookie":"old","email":"test@example.test","access_token":"rejected","model_mapping":{"gpt-image-2":"keep"}}','{}',NULL,NULL,NULL,NOW())`)
 		require.NoError(t, err)
 		_, err = db.Exec("UPDATE accounts SET status=$1,error_message=$2,schedulable=$3", status, message, schedulable)
 		require.NoError(t, err)
@@ -101,6 +108,39 @@ func TestOkadRecoveryPostgres(t *testing.T) {
 		applied, err = repo.QueueAdobeCookieRecoveryIfUnchanged(ctx, &active)
 		require.NoError(t, err)
 		require.Equal(t, mutation == "", applied, mutation)
+	}
+	// Reproduce both orders of the real recovery/Okad push using the production
+	// allocation trigger. Clearing a proxy wait must not destroy queue ownership.
+	_, err = db.Exec("UPDATE proxy_auto_allocation SET enabled=true")
+	require.NoError(t, err)
+	for _, callbackFirst := range []bool{false, true} {
+		reset(service.StatusError, message, false)
+		if callbackFirst {
+			_, err = db.Exec(`UPDATE accounts SET credentials=credentials || '{"cookie":"fresh"}'`)
+			require.NoError(t, err)
+			require.NoError(t, repo.ClearError(ctx, 1))
+		}
+		_, err = repo.RecoverAdobeCookieIfUnchanged(ctx, snapshot, "fresh")
+		require.NoError(t, err)
+		require.NoError(t, repo.ClearError(ctx, 1))
+		var queued bool
+		var errorMessage string
+		require.NoError(t, db.QueryRow("SELECT status,schedulable,proxy_auto_paused,error_message FROM accounts WHERE id=1").Scan(&status, &schedulable, &queued, &errorMessage))
+		require.Equal(t, service.StatusError, status)
+		require.False(t, schedulable)
+		require.True(t, queued)
+		require.Equal(t, "自动代理分配：等待可用节点（每个节点最多 3 个账号）", errorMessage)
+		// The allocator can now pick this queued account up and resume it.
+		tx, err := db.Begin()
+		require.NoError(t, err)
+		_, err = tx.Exec("SELECT set_config('sub2api.proxy_allocator','on',true)")
+		require.NoError(t, err)
+		_, err = tx.Exec("UPDATE accounts SET status='active',schedulable=true,proxy_id=7,proxy_auto_paused=false,error_message=NULL")
+		require.NoError(t, err)
+		require.NoError(t, tx.Commit())
+		require.NoError(t, repo.ClearError(ctx, 1))
+		require.NoError(t, db.QueryRow("SELECT schedulable FROM accounts WHERE id=1").Scan(&schedulable))
+		require.True(t, schedulable)
 	}
 	// The outbox failure rolls back the account mutation too.
 	reset(service.StatusError, message, false)
