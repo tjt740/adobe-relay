@@ -564,6 +564,7 @@ export default {
         edit: 'Bulk Edit',
         delete: 'Bulk Delete',
         export: 'Bulk Export Accounts',
+        accountColumn: 'Account',
         exported: 'Accounts exported successfully',
         confirmDelete: 'Delete the selected {count} account(s)? This action cannot be undone.',
         deleteSuccess: 'Deleted {count} account(s)',

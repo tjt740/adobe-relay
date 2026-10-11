@@ -694,6 +694,7 @@ export default {
         edit: '批量编辑账号',
         delete: '批量删除',
         export: '批量导出账号',
+        accountColumn: '账号',
         exported: '账号导出成功',
         confirmDelete: '确认删除选中的 {count} 个账号吗？此操作不可恢复。',
         deleteSuccess: '已成功删除 {count} 个账号',

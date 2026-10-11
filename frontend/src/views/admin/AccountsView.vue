@@ -2404,9 +2404,19 @@ const handleBulkExportAccounts = async () => {
       ids: selIds.value,
       includeProxies: false
     }))
+    const XLSX = await import('xlsx')
+    const sheet = XLSX.utils.aoa_to_sheet([
+      [t('admin.accounts.bulkActions.accountColumn')],
+      ...dataPayload.accounts.map(account => [accountDisplayEmail(account) || account.name])
+    ])
+    sheet['!cols'] = [{ wch: 40 }]
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Accounts')
     const timestamp = formatExportTimestamp()
-    const filename = `sub2api-accounts-${timestamp}.json`
-    const blob = new Blob([JSON.stringify(dataPayload, null, 2)], { type: 'application/json' })
+    const filename = `sub2api-accounts-${timestamp}.xlsx`
+    const blob = new Blob([XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url

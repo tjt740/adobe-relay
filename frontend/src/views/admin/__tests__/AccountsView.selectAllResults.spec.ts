@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import * as XLSX from 'xlsx'
 
 import AccountsView from '../AccountsView.vue'
 
@@ -7,6 +8,7 @@ const {
   listAccounts,
   listWithEtag,
   batchRefresh,
+  exportData,
   getBatchTodayStats,
   getUpstreamBillingProbeSettings,
   getAllProxies,
@@ -16,6 +18,7 @@ const {
   listAccounts: vi.fn(),
   listWithEtag: vi.fn(),
   batchRefresh: vi.fn(),
+  exportData: vi.fn(),
   getBatchTodayStats: vi.fn(),
   getUpstreamBillingProbeSettings: vi.fn(),
   getAllProxies: vi.fn(),
@@ -33,6 +36,7 @@ vi.mock('@/api/admin', () => ({
       batchDelete: vi.fn(),
       batchClearError: vi.fn(),
       batchRefresh,
+      exportData,
       bulkUpdate: vi.fn()
     },
     proxies: {
@@ -81,7 +85,7 @@ const makeAccounts = (count: number) => Array.from({ length: count }, (_, index)
 
 const AccountBulkActionsBarStub = {
   props: ['selectedIds', 'totalResults', 'selectingAll', 'allResultsSelected'],
-  emits: ['select-all-results', 'select-page', 'clear', 'refresh-token'],
+  emits: ['select-all-results', 'select-page', 'clear', 'refresh-token', 'export'],
   template: `
     <div>
       <span data-test="selected-count">{{ selectedIds.length }}</span>
@@ -91,6 +95,7 @@ const AccountBulkActionsBarStub = {
       <button data-test="select-all-results" @click="$emit('select-all-results')">select all</button>
       <button data-test="clear" @click="$emit('clear')">clear</button>
       <button data-test="refresh-token" @click="$emit('refresh-token')">refresh token</button>
+      <button data-test="export" @click="$emit('export')">export accounts</button>
     </div>
   `
 }
@@ -142,7 +147,8 @@ const mountView = () => mount(AccountsView, {
       AccountTodayStatsCell: true,
       AccountGroupsCell: true,
       AccountUsageCell: true,
-      Icon: true
+      Icon: true,
+      Teleport: true
     }
   }
 })
@@ -153,6 +159,7 @@ describe('admin AccountsView select all filtered results', () => {
     listAccounts.mockReset()
     listWithEtag.mockReset()
     batchRefresh.mockReset()
+    exportData.mockReset()
     getBatchTodayStats.mockReset()
     getUpstreamBillingProbeSettings.mockReset()
     getAllProxies.mockReset()
@@ -172,6 +179,7 @@ describe('admin AccountsView select all filtered results', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it.each([
@@ -205,8 +213,26 @@ describe('admin AccountsView select all filtered results', () => {
     wrapper.unmount()
   })
 
-  it('selects all matching IDs in one commit and clears the selection when filters change', async () => {
+  it('exports all selected results to a single account column in Excel and clears selection when filters change', async () => {
     const allAccounts = makeAccounts(45)
+    const expectedAccounts = allAccounts.map(account => account.name)
+    expectedAccounts.splice(0, 6, 'preferred@example.com', 'extra@example.com', 'credential@example.com', '中文账号', '000123', '=1+1')
+    const exportedAccounts = allAccounts.map((account, index) => ({
+      ...account,
+      name: expectedAccounts[index],
+      credentials: { cookie: 'private-cookie', password: 'private-password' },
+      notes: 'private-note',
+      proxy_key: 'private-proxy'
+    }))
+    Object.assign(exportedAccounts[0], {
+      name: 'display name',
+      extra: { email_address: expectedAccounts[0], email: 'lower-priority@example.com' },
+      credentials: { email: 'credentials-lower-priority@example.com', cookie: 'private-cookie' }
+    })
+    Object.assign(exportedAccounts[1], { name: 'display name', extra: { email: expectedAccounts[1] } })
+    Object.assign(exportedAccounts[2], { name: 'display name', credentials: { email: expectedAccounts[2] } })
+    exportData.mockResolvedValue({ accounts: exportedAccounts, proxies: [], exported_at: '2026-10-11T00:00:00Z' })
+    const download = mockDownload()
     listAccounts.mockImplementation(async (_page: number, pageSize: number) => {
       if (pageSize === 1000) {
         return {
@@ -240,10 +266,51 @@ describe('admin AccountsView select all filtered results', () => {
       include_scheduler_score: '0'
     }))
 
+    await wrapper.get('[data-test="export"]').trigger('click')
+    await vi.waitFor(() => expect(download.click).toHaveBeenCalledTimes(1))
+    expect(exportData).toHaveBeenCalledWith({ ids: allAccounts.map(account => account.id), includeProxies: false })
+    expect(download.filename()).toMatch(/^sub2api-accounts-\d{14}\.xlsx$/)
+    const blob = download.blob()
+    expect(blob.type).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    const workbook = XLSX.read(await readBlob(blob), { type: 'array' })
+    expect(workbook.SheetNames).toEqual(['Accounts'])
+    const sheet = workbook.Sheets.Accounts
+    expect(XLSX.utils.sheet_to_json(sheet, { header: 1 })).toEqual([
+      ['admin.accounts.bulkActions.accountColumn'],
+      ...expectedAccounts.map(account => [account])
+    ])
+    expect(sheet.A6).toMatchObject({ t: 's', v: '000123' })
+    expect(sheet.A7).toMatchObject({ t: 's', v: '=1+1' })
+    expect(sheet.A7.f).toBeUndefined()
+    expect(download.revokeObjectURL).toHaveBeenCalledWith('blob:account-export')
+
     await wrapper.get('[data-test="change-filter"]').trigger('click')
 
     expect(wrapper.get('[data-test="selected-count"]').text()).toBe('0')
     expect(wrapper.get('[data-test="all-results-selected"]').text()).toBe('false')
+    await wrapper.get('[data-test="export"]').trigger('click')
+    expect(exportData).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
+
+  it('keeps the More Actions export as JSON with its proxy option', async () => {
+    listAccounts.mockResolvedValue({ items: makeAccounts(1), total: 1, page: 1, page_size: 20, pages: 1 })
+    const payload = { accounts: [{ name: 'account-1', credentials: { cookie: 'backup-cookie' } }], proxies: [{ name: 'backup-proxy' }], exported_at: '2026-10-11T00:00:00Z' }
+    exportData.mockResolvedValue(payload)
+    const download = mockDownload()
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-test="select-page"]').trigger('click')
+    await wrapper.get('[title="admin.accounts.moreActions"]').trigger('click')
+    await wrapper.findAll('.account-tools-menu-item').find(button => button.text().includes('admin.accounts.dataExportSelected'))!.trigger('click')
+    await wrapper.get('[data-test="confirm-dialog"]').trigger('click')
+    await flushPromises()
+
+    expect(exportData).toHaveBeenCalledWith({ ids: [1], includeProxies: true })
+    expect(download.filename()).toMatch(/^sub2api-account-\d{14}\.json$/)
+    expect(download.blob().type).toBe('application/json')
+    expect(JSON.parse(await readBlob(download.blob(), true) as string)).toEqual(payload)
+    wrapper.unmount()
   })
 
   it('keeps the original page selection when loading all results fails', async () => {
@@ -275,3 +342,27 @@ describe('admin AccountsView select all filtered results', () => {
     expect(showError).toHaveBeenCalledWith('admin.accounts.bulkActions.selectAllFailed')
   })
 })
+
+function mockDownload() {
+  const createObjectURL = vi.fn((_blob: Blob) => 'blob:account-export')
+  const revokeObjectURL = vi.fn()
+  vi.stubGlobal('URL', class extends URL {
+    static createObjectURL = createObjectURL
+    static revokeObjectURL = revokeObjectURL
+  })
+  let filename = ''
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    filename = this.download
+  })
+  return { click, revokeObjectURL, filename: () => filename, blob: () => createObjectURL.mock.calls[0][0] as Blob }
+}
+
+function readBlob(blob: Blob, asText = false): Promise<string | ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string | ArrayBuffer)
+    reader.onerror = () => reject(reader.error)
+    if (asText) reader.readAsText(blob)
+    else reader.readAsArrayBuffer(blob)
+  })
+}
