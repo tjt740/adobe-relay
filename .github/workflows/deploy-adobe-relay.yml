@@ -44,6 +44,7 @@ jobs:
           bash -n deploy/primary/release.sh
           bash -n deploy/online/renew-ip-certificate.sh
           python3 -m unittest discover -s deploy/clash -p 'test_*.py'
+          python3 -m unittest discover -s deploy/primary -p 'test_*.py'
           cd backend
           go test -race ./internal/clash ./internal/proxyfailover
           go test ./internal/repository -run 'TestExpiryRespectsLiveFailoverPolicy|TestProxyUpdate'
