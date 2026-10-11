@@ -134,7 +134,7 @@ const mountView = () => mount(AccountsView, {
       ReAuthAccountModal: true,
       AccountTestModal: true,
       AccountBulkTestModal: {
-        name: 'AccountBulkTestModal', props: ['show', 'targets'], emits: ['completed'],
+        name: 'AccountBulkTestModal', props: ['show', 'targets', 'runId'], emits: ['completed', 'open', 'close', 'running-change'],
         template: '<button v-if="show" data-test="bulk-test-complete" @click="$emit(\'completed\')">complete</button>'
       },
       AccountStatsModal: true,
@@ -198,6 +198,22 @@ describe('admin AccountsView select all filtered results', () => {
     await wrapper.get('[data-test="bulk-test"]').trigger('click')
     const modal = wrapper.findComponent({ name: 'AccountBulkTestModal' })
     expect(modal.props('targets').map((row: { id: number }) => row.id)).toEqual(makeAccounts(45).map(row => row.id))
+    expect(modal.props('runId')).toBe(1)
+    modal.vm.$emit('running-change', true)
+    modal.vm.$emit('close')
+    await flushPromises()
+    expect(modal.props('show')).toBe(false)
+    await wrapper.get('[data-test="clear"]').trigger('click')
+    await wrapper.get('[data-test="bulk-test"]').trigger('click')
+    expect(modal.props('show')).toBe(true)
+    expect(modal.props('runId')).toBe(1)
+    expect(modal.props('targets')).toHaveLength(45)
+    modal.vm.$emit('close')
+    await flushPromises()
+    modal.vm.$emit('open')
+    await flushPromises()
+    expect(modal.props('show')).toBe(true)
+    expect(modal.props('runId')).toBe(1)
     const before = listAccounts.mock.calls.length
     await wrapper.get('[data-test="bulk-test-complete"]').trigger('click')
     await flushPromises()

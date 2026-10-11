@@ -468,7 +468,15 @@
     <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" />
     <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" />
     <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
-    <AccountBulkTestModal :show="showBulkTest" :targets="bulkTestTargets" @close="showBulkTest = false" @completed="reload" />
+    <AccountBulkTestModal
+      :show="showBulkTest"
+      :targets="bulkTestTargets"
+      :run-id="bulkTestRunId"
+      @open="showBulkTest = true"
+      @close="showBulkTest = false"
+      @running-change="bulkTestRunning = $event"
+      @completed="reload"
+    />
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" @status-code="handleAccountTestStatusCode" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
     <ScheduledTestsPanel :show="showSchedulePanel" :account-id="scheduleAcc?.id ?? null" :model-options="scheduleModelOptions" @close="closeSchedulePanel" />
@@ -651,6 +659,8 @@ const showReAuth = ref(false)
 const showTest = ref(false)
 const showBulkTest = ref(false)
 const bulkTestTargets = ref<{ id: number; name: string }[]>([])
+const bulkTestRunId = ref(0)
+const bulkTestRunning = ref(false)
 const showStats = ref(false)
 const showErrorPassthrough = ref(false)
 const showTLSFingerprintProfiles = ref(false)
@@ -1930,9 +1940,14 @@ const toggleSelectAllVisible = (event: Event) => {
   toggleVisible(target.checked)
 }
 const handleBulkTest = () => {
+  if (bulkTestRunning.value) {
+    showBulkTest.value = true
+    return
+  }
   if (!selIds.value.length || showBulkTest.value) return
   const names = new Map(accounts.value.map(account => [account.id, account.name]))
   bulkTestTargets.value = selIds.value.map(id => ({ id, name: names.get(id) ?? t('admin.accounts.account') }))
+  bulkTestRunId.value++
   showBulkTest.value = true
 }
 const handleBulkDelete = async () => {
