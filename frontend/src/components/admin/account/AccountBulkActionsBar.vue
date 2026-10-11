@@ -44,11 +44,11 @@
     </div>
     <div class="flex flex-wrap gap-2">
       <template v-if="selectedIds.length > 0">
-        <button data-testid="bulk-test-accounts" @click="$emit('test')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.test') }}</button>
+        <button data-testid="bulk-test-accounts" @click="$emit('test')" class="btn btn-sm bg-pink-600 text-white shadow-sm hover:bg-pink-700 focus:ring-pink-500/50">{{ t('admin.accounts.bulkActions.test') }}</button>
         <button
           data-testid="bulk-export-accounts"
           @click="$emit('export')"
-          class="btn btn-secondary btn-sm"
+          class="btn btn-sm bg-blue-600 text-white shadow-sm hover:bg-blue-700 focus:ring-blue-500/50"
         >
           {{ t('admin.accounts.bulkActions.export') }}
         </button>
