@@ -66,6 +66,16 @@ function makeAccount(overrides: Partial<Account>): Account {
 }
 
 describe('AccountStatusIndicator', () => {
+  it('shows persisted test results independently of scheduling status', async () => {
+    const wrapper = mount(AccountStatusIndicator, {
+      props: { account: makeAccount({ extra: { last_check_success: false, last_check_status_code: 401, last_check_at: '2026-10-11T03:00:00Z' } }) },
+      global: { stubs: { Icon: true } }
+    })
+    expect(wrapper.get('[data-testid="account-last-check"]').text()).toContain('401')
+    await wrapper.setProps({ account: makeAccount({ extra: { last_check_success: true, last_check_status_code: 200 } }) })
+    expect(wrapper.get('[data-testid="account-last-check"]').text()).toContain('bulkTest.passed')
+    expect(wrapper.text()).not.toContain('401')
+  })
   it('账号检查返回 408 时显示请求超时状态和状态码', () => {
     const wrapper = mount(AccountStatusIndicator, {
       props: {

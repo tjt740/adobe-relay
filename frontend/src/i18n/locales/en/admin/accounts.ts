@@ -554,6 +554,7 @@ export default {
       bulkSchedulablePartial: 'Scheduling updated partially: {success} succeeded, {failed} failed',
       bulkSchedulableResultUnknown: 'Bulk scheduling result incomplete. Please retry or refresh.',
       bulkActions: {
+        test: 'Bulk Test',
         selected: '{count} account(s) selected',
         selectedAll: 'All {count} account(s) selected',
         selectCurrentPage: 'Select this page',
@@ -576,6 +577,21 @@ export default {
         resetStatusSuccess: 'Successfully reset {count} account(s) status',
         refreshTokenSuccess: 'Successfully refreshed {count} account(s) token',
         partialSuccess: 'Partially completed: {success} succeeded, {failed} failed'
+      },
+      bulkTest: {
+        title: 'Bulk Account Test',
+        hint: 'Run Test Connection with each account’s default model, up to 3 accounts at a time. Tests make real upstream requests and use quota; Adobe accounts generate a test image.',
+        progress: 'Completed {done} / {total}',
+        summary: 'Passed {success} · Failed {failed} · Stopped {cancelled}',
+        result: 'Test result',
+        stop: 'Stop testing',
+        stopAndClose: 'Stop and close',
+        sessionExpired: 'Your admin session expired or access was denied. Testing stopped; please sign in again.',
+        failedHint: 'The test failed or returned an incomplete result. Open Test Connection for details.',
+        passed: 'Test passed',
+        failed: 'Test failed',
+        checkedAt: 'Last tested: {time}',
+        states: { pending: 'Pending', running: 'Testing', success: 'Passed', failed: 'Failed', cancelled: 'Stopped' }
       },
       bulkEdit: {
         title: 'Bulk Edit Accounts',

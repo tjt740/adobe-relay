@@ -58,6 +58,8 @@ describe('AccountBulkActionsBar', () => {
       }
     })
 
+    await wrapper.get('[data-testid="bulk-test-accounts"]').trigger('click')
+    expect(wrapper.emitted('test')).toHaveLength(1)
     await wrapper.get('[data-testid="bulk-export-accounts"]').trigger('click')
     await wrapper.get('[data-testid="bulk-delete-accounts"]').trigger('click')
 
