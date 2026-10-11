@@ -41,17 +41,18 @@ jobs:
           PROXY_FAILOVER_TEST_DATABASE_URL: postgres://postgres:failover-test@localhost:5432/postgres?sslmode=disable
         run: |
           bash -n deploy/clash/release-online.sh
+          bash -n deploy/primary/release.sh
           bash -n deploy/online/renew-ip-certificate.sh
           python3 -m unittest discover -s deploy/clash -p 'test_*.py'
           cd backend
           go test -race ./internal/clash ./internal/proxyfailover
           go test ./internal/repository -run 'TestExpiryRespectsLiveFailoverPolicy|TestProxyUpdate'
-          go test -tags unit ./internal/service -run 'Test(GetAdobeUsage|AdobeUsage|BuildAdobeDegradedUsage)'
+          go test -tags unit ./internal/service -run 'Test(GetAdobeUsage|AdobeUsage|BuildAdobeDegradedUsage|AccountTestServiceSendErrorAndEnd)'
       - name: Check frontend workflows
         run: |
           npm install -g pnpm@9.15.9
           pnpm --dir frontend install --frozen-lockfile --ignore-scripts
-          pnpm --dir frontend exec vitest run src/__tests__/integration/clash-subscription.spec.ts src/views/admin/__tests__/ProxiesView.filters.spec.ts src/components/account/__tests__/ProxyFailoverPanel.spec.ts src/components/admin/proxy/__tests__/ProxyAllocationModal.spec.ts src/components/account/__tests__/EditAccountModal.spec.ts src/components/account/__tests__/AccountUsageCell.spec.ts src/components/common/__tests__/ProxySelector.testing.spec.ts src/views/admin/__tests__/AccountsView
+          pnpm --dir frontend exec vitest run src/__tests__/integration/clash-subscription.spec.ts src/views/admin/__tests__/ProxiesView.filters.spec.ts src/components/account/__tests__/ProxyFailoverPanel.spec.ts src/components/admin/proxy/__tests__/ProxyAllocationModal.spec.ts src/components/account/__tests__/EditAccountModal.spec.ts src/components/account/__tests__/AccountUsageCell.spec.ts src/components/common/__tests__/ProxySelector.testing.spec.ts src/views/admin/__tests__/AccountsView src/components/admin/account/__tests__/AccountBulkActionsBar.spec.ts src/components/admin/account/__tests__/AccountTestModal.spec.ts src/components/account/__tests__/AccountStatusIndicator.spec.ts
       - uses: docker/setup-buildx-action@v3
       - name: Build amd64 image
         uses: docker/build-push-action@v6
@@ -67,12 +68,11 @@ jobs:
             NPM_CONFIG_REGISTRY=https://registry.npmjs.org
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Bundle application and Clash runtime
+      - name: Bundle application
         env:
           IMAGE: adobe-relay:${{ github.sha }}
         run: |
-          docker pull --platform linux/amd64 metacubex/mihomo:v1.19.31
-          docker save "$IMAGE" metacubex/mihomo:v1.19.31 | gzip > release-images.tar.gz
+          docker save "$IMAGE" | gzip > release-images.tar.gz
           sha256sum release-images.tar.gz > release-images.tar.gz.sha256
       - uses: actions/upload-artifact@v4
         with:
@@ -87,21 +87,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: domestic
-            host: 47.106.176.71
-            ssh_key: DOMESTIC_SSH_KEY
-            known_hosts: DOMESTIC_KNOWN_HOSTS
-            health_url: https://47.106.176.71:6660/health
-          - target: overseas
-            host: 8.212.129.43
-            ssh_key: OVERSEAS_SSH_KEY
-            known_hosts: OVERSEAS_KNOWN_HOSTS
-            health_url: https://8.212.129.43/health
-    name: Deploy ${{ matrix.target }}
+    name: Deploy primary
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -109,8 +95,8 @@ jobs:
           name: release-images
       - name: Verify image archive and configure SSH
         env:
-          SSH_KEY: ${{ secrets[matrix.ssh_key] }}
-          KNOWN_HOSTS: ${{ secrets[matrix.known_hosts] }}
+          SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           sha256sum -c release-images.tar.gz.sha256
@@ -121,19 +107,19 @@ jobs:
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
       - name: Upload, back up and deploy
         env:
-          DEPLOY_HOST: ${{ matrix.host }}
+          DEPLOY_HOST: 173.234.15.150
           IMAGE: adobe-relay:${{ github.sha }}
         run: |
           set -euo pipefail
-          target="admin@$DEPLOY_HOST"
+          target="root@$DEPLOY_HOST"
           ssh_opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=20)
-          ssh "${ssh_opts[@]}" "$target" 'mkdir -p /home/admin/sub2api-online/deploy/clash'
-          scp "${ssh_opts[@]}" deploy/clash/{compose.yml,init_env.py,release-online.sh,README.md} "$target:/home/admin/sub2api-online/deploy/clash/"
-          gzip -dc release-images.tar.gz | ssh "${ssh_opts[@]}" "$target" 'sudo -n docker load'
-          ssh "${ssh_opts[@]}" "$target" "cd /home/admin/sub2api-online && sudo -n bash deploy/clash/release-online.sh '$IMAGE'"
+          ssh "${ssh_opts[@]}" "$target" 'mkdir -p /opt/adobe-relay/deploy/primary'
+          scp "${ssh_opts[@]}" deploy/primary/{release.sh,README.md} "$target:/opt/adobe-relay/deploy/primary/"
+          gzip -dc release-images.tar.gz | ssh "${ssh_opts[@]}" "$target" 'docker load'
+          ssh "${ssh_opts[@]}" "$target" "bash /opt/adobe-relay/deploy/primary/release.sh '$IMAGE'"
       - name: Verify public HTTPS endpoint
         env:
-          HEALTH_URL: ${{ matrix.health_url }}
+          HEALTH_URL: https://creative.cheap/health
         run: curl --fail --show-error --retry 6 --retry-delay 5 --max-time 30 "$HEALTH_URL"
       - name: Remove runner SSH key
         if: always()
