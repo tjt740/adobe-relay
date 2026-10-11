@@ -48,6 +48,22 @@ const saving = ref(false)
 const editingId = ref<number | null>(null)
 const draft = ref<AlertRule | null>(null)
 
+function adobeRatio(rule: AlertRule): number | null {
+  if (rule.metric_type !== 'adobe_401_408_accounts') return null
+  const value = rule.filters?.adobe_error_ratio_percent
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 100 ? value : null
+}
+
+const draftAdobeRatio = computed<number | string>({
+  get: () => draft.value?.filters?.adobe_error_ratio_percent ?? '',
+  set(value) {
+    if (!draft.value) return
+    if (!draft.value.filters) draft.value.filters = {}
+    if (value === '') delete draft.value.filters.adobe_error_ratio_percent
+    else draft.value.filters.adobe_error_ratio_percent = Number(value)
+  }
+})
+
 type MetricGroup = 'system' | 'group' | 'account'
 
 interface MetricDefinition {
@@ -342,6 +358,9 @@ const editorValidation = computed(() => {
   if (!r.operator) errors.push(t('admin.ops.alertRules.validation.operatorRequired'))
   if (!(typeof r.threshold === 'number' && Number.isFinite(r.threshold)))
     errors.push(t('admin.ops.alertRules.validation.thresholdRequired'))
+  if (r.metric_type === 'adobe_401_408_accounts' && r.filters?.adobe_error_ratio_percent !== undefined && adobeRatio(r) === null) {
+    errors.push(t('admin.ops.alertRules.adobeRatioInvalid'))
+  }
   if (!(typeof r.window_minutes === 'number' && Number.isFinite(r.window_minutes) && [1, 5, 10, 60].includes(r.window_minutes))) {
     errors.push(t('admin.ops.alertRules.validation.windowRange'))
   }
@@ -458,6 +477,9 @@ function cancelDelete() {
               <span class="font-mono">{{ row.metric_type }}</span>
               <span class="mx-1 text-gray-400">{{ row.operator }}</span>
               <span class="font-mono">{{ row.threshold }}</span>
+              <div v-if="adobeRatio(row) !== null" class="mt-1 text-xs">
+                {{ t('admin.ops.alertRules.adobeRatioSummary', { percent: adobeRatio(row) }) }}
+              </div>
             </div>
             <div class="flex items-center justify-between gap-2">
               <span class="text-xs text-gray-700 dark:text-gray-200">
@@ -508,6 +530,9 @@ function cancelDelete() {
                 <span class="font-mono">{{ row.metric_type }}</span>
                 <span class="mx-1 text-gray-400">{{ row.operator }}</span>
                 <span class="font-mono">{{ row.threshold }}</span>
+                <div v-if="adobeRatio(row) !== null" class="mt-1 text-xs">
+                  {{ t('admin.ops.alertRules.adobeRatioSummary', { percent: adobeRatio(row) }) }}
+                </div>
               </td>
               <td class="whitespace-nowrap px-4 py-3 text-xs font-bold text-gray-700 dark:text-gray-200">
                 {{ row.severity }}
@@ -592,6 +617,12 @@ function cancelDelete() {
           <div>
             <label class="input-label">{{ t('admin.ops.alertRules.form.threshold') }}</label>
             <input v-model.number="draft!.threshold" class="input" type="number" />
+          </div>
+
+          <div v-if="draft?.metric_type === 'adobe_401_408_accounts'" class="md:col-span-2">
+            <label class="input-label" for="adobe-alert-ratio">{{ t('admin.ops.alertRules.adobeRatioLabel') }}</label>
+            <input id="adobe-alert-ratio" v-model.number="draftAdobeRatio" class="input" type="number" min="0.01" max="100" step="any" />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.ops.alertRules.adobeRatioHint') }}</p>
           </div>
 
           <div>

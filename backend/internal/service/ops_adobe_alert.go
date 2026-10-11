@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/mail"
 	"strings"
 	"time"
@@ -45,6 +46,36 @@ type OpsAdobeErrorRepository interface {
 	GetAdobeErrorAccounts(context.Context, time.Time, time.Time, *int64) ([]OpsAdobeAccountErrors, error)
 }
 
+type OpsAdobeErrorPopulationRepository interface {
+	GetAdobeErrorAccountPopulation(context.Context, time.Time, time.Time, *int64) ([]OpsAdobeAccountErrors, int64, error)
+}
+
+const OpsAdobeAlertRatioFilter = "adobe_error_ratio_percent"
+
+// Missing keeps existing count-only rules compatible. Invalid configuration
+// fails closed instead of unexpectedly reverting to the lower count threshold.
+func OpsAdobeAlertRatioThreshold(filters map[string]any) (float64, bool, error) {
+	value, exists := filters[OpsAdobeAlertRatioFilter]
+	if !exists {
+		return 0, false, nil
+	}
+	var percent float64
+	switch v := value.(type) {
+	case float64:
+		percent = v
+	case int:
+		percent = float64(v)
+	case int64:
+		percent = float64(v)
+	default:
+		return 0, true, fmt.Errorf("filters.%s must be a number between 0 (exclusive) and 100", OpsAdobeAlertRatioFilter)
+	}
+	if math.IsNaN(percent) || math.IsInf(percent, 0) || percent <= 0 || percent > 100 {
+		return 0, true, fmt.Errorf("filters.%s must be a number between 0 (exclusive) and 100", OpsAdobeAlertRatioFilter)
+	}
+	return percent, true, nil
+}
+
 type OpsAdobeAccountErrors struct {
 	AccountID      int64
 	Name           string
@@ -62,16 +93,40 @@ type OpsAdobeAccountErrors struct {
 	LastSeen       time.Time
 }
 
-func (s *OpsAlertEvaluatorService) adobeErrorMetric(ctx context.Context, start, end time.Time, groupID *int64) (float64, string, error) {
+func (s *OpsAlertEvaluatorService) adobeErrorMetric(ctx context.Context, start, end time.Time, groupID *int64, filters map[string]any) (value float64, detail string, ratioEnabled, ratioBreached bool, err error) {
+	percent, enabled, err := OpsAdobeAlertRatioThreshold(filters)
+	if err != nil {
+		return 0, "", false, false, err
+	}
+	if enabled {
+		repo, ok := s.opsRepo.(OpsAdobeErrorPopulationRepository)
+		if !ok {
+			return 0, "", true, false, fmt.Errorf("Adobe account population repository unavailable")
+		}
+		accounts, total, err := repo.GetAdobeErrorAccountPopulation(ctx, start, end, groupID)
+		if err != nil {
+			return 0, "", true, false, err
+		}
+		if total < 0 || int64(len(accounts)) > total {
+			return 0, "", true, false, fmt.Errorf("inconsistent Adobe account population")
+		}
+		ratio := float64(0)
+		if total > 0 {
+			ratio = float64(len(accounts)) * 100 / float64(total)
+		}
+		detail = buildAdobeErrorAlertDescription(accounts, start, end)
+		detail += fmt.Sprintf("\n异常占比：%d / %d = %.2f%%；占比达到 %g%% 且满足账号数量门槛时触发，低于 %g%% 恢复。分母为统计范围内全部未删除的 Adobe 账号，包含暂停和异常账号。", len(accounts), total, ratio, percent, percent)
+		return float64(len(accounts)), detail, true, total > 0 && float64(len(accounts))*100 >= float64(total)*percent, nil
+	}
 	repo, ok := s.opsRepo.(OpsAdobeErrorRepository)
 	if !ok {
-		return 0, "", fmt.Errorf("Adobe error summary repository unavailable")
+		return 0, "", false, false, fmt.Errorf("Adobe error summary repository unavailable")
 	}
 	accounts, err := repo.GetAdobeErrorAccounts(ctx, start, end, groupID)
 	if err != nil {
-		return 0, "", err
+		return 0, "", false, false, err
 	}
-	return float64(len(accounts)), buildAdobeErrorAlertDescription(accounts, start, end), nil
+	return float64(len(accounts)), buildAdobeErrorAlertDescription(accounts, start, end), false, false, nil
 }
 
 func buildAdobeErrorAlertDescription(accounts []OpsAdobeAccountErrors, start, end time.Time) string {

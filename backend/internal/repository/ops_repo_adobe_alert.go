@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -61,14 +62,49 @@ SELECT e.account_id, COALESCE(a.name,''), COALESCE(a.status,'deleted'),
  COUNT(*) FILTER (WHERE source='test' AND is_timeout),
  MIN(e.created_at), MAX(e.created_at)
 FROM classified e LEFT JOIN accounts a ON a.id=e.account_id
+WHERE (NOT $4::boolean OR (a.platform='adobe' AND a.deleted_at IS NULL
+ AND ($3::bigint IS NULL OR EXISTS (
+   SELECT 1 FROM account_groups ag WHERE ag.account_id=a.id AND ag.group_id=$3
+ ))))
 GROUP BY e.account_id, a.name, a.status
 ORDER BY COUNT(*) DESC, e.account_id`
 
 func (r *opsRepository) GetAdobeErrorAccounts(ctx context.Context, start, end time.Time, groupID *int64) ([]service.OpsAdobeAccountErrors, error) {
+	return queryAdobeErrorAccounts(ctx, r.db, start, end, groupID, false)
+}
+
+// Numerator and denominator share one read-only snapshot. Paused and error
+// accounts remain in the population; deleted/non-Adobe accounts do not.
+func (r *opsRepository) GetAdobeErrorAccountPopulation(ctx context.Context, start, end time.Time, groupID *int64) ([]service.OpsAdobeAccountErrors, int64, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var total int64
+	err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM accounts a
+ WHERE a.platform='adobe' AND a.deleted_at IS NULL
+ AND ($1::bigint IS NULL OR EXISTS (SELECT 1 FROM account_groups ag WHERE ag.account_id=a.id AND ag.group_id=$1))`, groupID).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+	accounts, err := queryAdobeErrorAccounts(ctx, tx, start, end, groupID, true)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, 0, err
+	}
+	return accounts, total, nil
+}
+
+func queryAdobeErrorAccounts(ctx context.Context, db interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}, start, end time.Time, groupID *int64, currentPopulationOnly bool) ([]service.OpsAdobeAccountErrors, error) {
 	if start.IsZero() || !end.After(start) || end.Sub(start) > 24*time.Hour {
 		return nil, fmt.Errorf("Adobe alert window must be between 0 and 24 hours")
 	}
-	rows, err := r.db.QueryContext(ctx, adobeErrorAccountsSQL, start.UTC(), end.UTC(), groupID)
+	rows, err := db.QueryContext(ctx, adobeErrorAccountsSQL, start.UTC(), end.UTC(), groupID, currentPopulationOnly)
 	if err != nil {
 		return nil, err
 	}

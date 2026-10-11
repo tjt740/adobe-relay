@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +20,13 @@ type adobeAlertTestRepo struct {
 	accounts       []OpsAdobeAccountErrors
 	created        int
 	queries        int
+	total          int64
+	populationErr  error
+}
+
+func (r *adobeAlertTestRepo) GetAdobeErrorAccountPopulation(context.Context, time.Time, time.Time, *int64) ([]OpsAdobeAccountErrors, int64, error) {
+	r.queries++
+	return r.accounts, r.total, r.populationErr
 }
 
 func (r *adobeAlertTestRepo) GetAdobeErrorAccounts(context.Context, time.Time, time.Time, *int64) ([]OpsAdobeAccountErrors, error) {
@@ -156,4 +164,111 @@ func TestAdobeAlertDedicatedTransportDoesNotEnableOtherMail(t *testing.T) {
 	rule.Filters["email_recipient"] = "someone-else@example.test"
 	require.False(t, eval.maybeSendAlertEmail(ctx, nil, rule, event), "dedicated transport must not send to another recipient")
 	require.EqualValues(t, 1, smtp.messageCount())
+}
+
+func adobeAlertFixtureRows(n int) []OpsAdobeAccountErrors {
+	rows := make([]OpsAdobeAccountErrors, n)
+	for i := range rows {
+		rows[i] = OpsAdobeAccountErrors{AccountID: int64(i + 1), Count408: 1, TestErrors: 1}
+	}
+	return rows
+}
+
+func TestAdobeAlertRatioRecoveryDoesNotReopenBelowTwentyPercent(t *testing.T) {
+	ctx := context.Background()
+	settings := newNotificationEmailMemorySettingRepo()
+	require.NoError(t, settings.Set(ctx, SettingKeyOpsEmailNotificationConfig, `{"alert":{"enabled":true,"recipients":[]}}`))
+	smtp := startNotificationEmailTestSMTPServer(t)
+	r := &adobeAlertTestRepo{total: 204, rule: &OpsAlertRule{ID: 1, Name: "Adobe", Enabled: true, MetricType: OpsMetricAdobeErrorAccounts, Operator: ">=", Threshold: 5, WindowMinutes: 10, CooldownMinutes: 5, NotifyEmail: true, Filters: map[string]any{OpsAdobeAlertRatioFilter: float64(20), "email_recipient": "owner@example.test"}}}
+	newEvaluator := func() *OpsAlertEvaluatorService {
+		return NewOpsAlertEvaluatorService(&OpsService{settingRepo: settings}, r, NewEmailService(settings, nil), nil, nil, nil)
+	}
+	eval := newEvaluator()
+	evaluate := func(n int) {
+		r.accounts = adobeAlertFixtureRows(n)
+		if state := eval.ruleStates[1]; state != nil {
+			state.LastEvaluatedAt = time.Now().Add(-2 * time.Minute)
+		}
+		eval.evaluateOnce(time.Minute)
+	}
+	for _, n := range []int{0, 4, 5, 10, 40, 40} {
+		evaluate(n)
+		require.Zero(t, r.created)
+	}
+	evaluate(41)
+	require.Equal(t, 1, r.created)
+	require.False(t, r.active.EmailSent, "delivery failure keeps the incident pending")
+	require.NoError(t, settings.SetMultiple(ctx, smtp.settings()))
+	evaluate(41)
+	require.Equal(t, 1, r.created, "retry uses the same incident")
+	require.True(t, r.active.EmailSent)
+	require.EqualValues(t, 1, smtp.messageCount())
+	require.Contains(t, r.active.Description, "41 / 204 = 20.10%")
+	require.Contains(t, r.active.Description, "包含暂停和异常账号")
+	evaluate(60)
+	evaluate(41)
+	require.EqualValues(t, 1, smtp.messageCount(), "ongoing incidents stay quiet")
+	// Failed population queries must not falsely resolve a real incident.
+	r.populationErr = errors.New("database unavailable")
+	evaluate(0)
+	require.NotNil(t, r.active)
+	r.populationErr = nil
+	evaluate(40)
+	require.Nil(t, r.active)
+	r.latest.FiredAt = time.Now().Add(-6 * time.Minute)
+	for i := 0; i < 3; i++ {
+		evaluate(40)
+		require.Equal(t, 1, r.created)
+	}
+	eval = newEvaluator()
+	evaluate(40)
+	require.Equal(t, 1, r.created, "restart must not turn 40/204 into a new incident")
+	r.latest.FiredAt = time.Now().Add(-4 * time.Minute)
+	evaluate(41)
+	require.Equal(t, 1, r.created, "new crossing respects the five-minute cooldown")
+	r.latest.FiredAt = time.Now().Add(-5*time.Minute - time.Second)
+	evaluate(41)
+	require.Equal(t, 2, r.created)
+	require.EqualValues(t, 2, smtp.messageCount())
+	// The floor gates new events, not recovery: 4/10 is still above 20%.
+	r.total = 10
+	evaluate(4)
+	require.NotNil(t, r.active)
+	evaluate(2)
+	require.NotNil(t, r.active, "exactly 20% is not recovery")
+	evaluate(1)
+	require.Nil(t, r.active)
+	r.latest.FiredAt = time.Now().Add(-6 * time.Minute)
+	evaluate(4)
+	require.Equal(t, 2, r.created, "at least five accounts are required to open an incident")
+	evaluate(5)
+	require.Equal(t, 3, r.created)
+	r.total = 0
+	evaluate(0)
+	require.Nil(t, r.active, "empty population recovers without division by zero")
+}
+
+func TestAdobeAlertRatioStrictBoundaryAndInvalidConfiguration(t *testing.T) {
+	for _, tc := range []struct {
+		total    int64
+		affected int
+		breached bool
+	}{
+		{100, 19, false}, {100, 20, true}, {204, 40, false}, {204, 41, true}, {206, 41, false}, {206, 42, true}, {0, 0, false},
+	} {
+		r := &adobeAlertTestRepo{total: tc.total, accounts: adobeAlertFixtureRows(tc.affected)}
+		s := NewOpsAlertEvaluatorService(nil, r, nil, nil, nil, nil)
+		count, _, enabled, breached, err := s.adobeErrorMetric(context.Background(), time.Now().Add(-10*time.Minute), time.Now(), nil, map[string]any{OpsAdobeAlertRatioFilter: 20})
+		require.NoError(t, err)
+		require.True(t, enabled)
+		require.EqualValues(t, tc.affected, count)
+		require.Equal(t, tc.breached, breached)
+	}
+	for _, v := range []any{nil, "20", true, float64(0), float64(-1), float64(101)} {
+		_, _, err := OpsAdobeAlertRatioThreshold(map[string]any{OpsAdobeAlertRatioFilter: v})
+		require.Error(t, err)
+	}
+	r := &adobeAlertTestRepo{total: 0, accounts: adobeAlertFixtureRows(1)}
+	_, _, _, _, err := NewOpsAlertEvaluatorService(nil, r, nil, nil, nil, nil).adobeErrorMetric(context.Background(), time.Now().Add(-time.Minute), time.Now(), nil, map[string]any{OpsAdobeAlertRatioFilter: 20})
+	require.Error(t, err, "inconsistent snapshots must not generate false recovery")
 }

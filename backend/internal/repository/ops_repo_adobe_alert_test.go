@@ -143,3 +143,47 @@ func TestAdobeAlertPostgresConcurrentBatchHistory(t *testing.T) {
 	}
 	t.Logf("200 accounts, 400 failures, 10 concurrent writers: %s", time.Since(start)-time.Second)
 }
+
+func TestAdobeAlertPostgresPopulationIncludesPausedAndExcludesDeletedAccounts(t *testing.T) {
+	db := newOkadRecoveryPostgres(t)
+	_, err := db.Exec(`ALTER TABLE accounts ADD COLUMN name text;
+ INSERT INTO accounts(id,name,platform,type,status,schedulable,deleted_at) VALUES
+ (1,'active','adobe','oauth','active',true,NULL),
+ (2,'paused','adobe','oauth','active',false,NULL),
+ (3,'error','adobe','oauth','error',false,NULL),
+ (4,'deleted','adobe','oauth','active',true,NOW()),
+ (5,'other','openai','oauth','active',true,NULL),
+ (6,'relay','adobe','apikey','active',true,NULL);
+ INSERT INTO account_groups VALUES(1,7),(2,7),(2,7),(3,8),(4,7),(5,7),(6,8);
+ CREATE TABLE ops_error_logs(id bigint,created_at timestamptz,account_id bigint,group_id bigint,platform text,upstream_status_code int,upstream_error_message text,upstream_errors jsonb,error_owner text,error_source text);
+ INSERT INTO ops_error_logs SELECT id,NOW()-INTERVAL '1 minute',id,7,'adobe',401,'invalid_credentials','[]','provider','upstream_http' FROM accounts WHERE id<=5;
+ INSERT INTO adobe_account_test_errors(created_at,account_id,group_ids,status_code) VALUES(NOW()-INTERVAL '1 minute',6,'{8}',408);`)
+	require.NoError(t, err)
+	repo := &opsRepository{db: db}
+	ctx := context.Background()
+	end := time.Now()
+	start := end.Add(-10 * time.Minute)
+	accounts, total, err := repo.GetAdobeErrorAccountPopulation(ctx, start, end, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 4, total)
+	require.Len(t, accounts, 4)
+	ids := make([]int64, 0)
+	for _, a := range accounts {
+		ids = append(ids, a.AccountID)
+	}
+	require.ElementsMatch(t, []int64{1, 2, 3, 6}, ids)
+	group := int64(7)
+	accounts, total, err = repo.GetAdobeErrorAccountPopulation(ctx, start, end, &group)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, total)
+	require.Len(t, accounts, 2)
+	legacy, err := repo.GetAdobeErrorAccounts(ctx, start, end, nil)
+	require.NoError(t, err)
+	require.Len(t, legacy, 6, "legacy count-only rules retain their historical scope")
+	_, err = db.Exec(`TRUNCATE ops_error_logs,adobe_account_test_errors`)
+	require.NoError(t, err)
+	accounts, total, err = repo.GetAdobeErrorAccountPopulation(ctx, start, end, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 4, total)
+	require.Empty(t, accounts)
+}

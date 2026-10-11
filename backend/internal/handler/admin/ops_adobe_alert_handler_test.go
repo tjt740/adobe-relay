@@ -16,6 +16,11 @@ func TestAdobeAlertRuleValidation(t *testing.T) {
 	}{
 		{"recipient", `{"email_recipient":"owner@example.com","platform":"adobe"}`, true},
 		{"global", `{}`, true},
+		{"ratio", `{"adobe_error_ratio_percent":20}`, true},
+		{"zero ratio", `{"adobe_error_ratio_percent":0}`, false},
+		{"excess ratio", `{"adobe_error_ratio_percent":101}`, false},
+		{"text ratio", `{"adobe_error_ratio_percent":"20"}`, false},
+		{"null ratio", `{"adobe_error_ratio_percent":null}`, false},
 		{"invalid recipient", `{"email_recipient":"not-an-email"}`, false},
 		{"wrong type", `{"email_recipient":["owner@example.com"]}`, false},
 		{"multiple recipients", `{"email_recipient":"a@example.com,b@example.com"}`, false},
