@@ -51,3 +51,39 @@ func recoveryMarker(a *service.Account) string {
 	marker, _ := a.Extra["adobeteam_external_email"].(string)
 	return marker
 }
+
+// QueueAdobeCookieRecoveryIfUnchanged preserves concurrent manual pauses and
+// successful pushes when a request-side login fails or is cancelled.
+func (r *accountRepository) QueueAdobeCookieRecoveryIfUnchanged(ctx context.Context, a *service.Account) (bool, error) {
+	if r == nil || r.sql == nil || a == nil || a.Platform != service.PlatformAdobe ||
+		a.Type != service.AccountTypeOAuth || a.Status != service.StatusActive || !a.Schedulable {
+		return false, nil
+	}
+	result, err := r.sql.ExecContext(ctx, `
+ WITH updated AS (
+  UPDATE accounts AS a
+  SET status = 'error', schedulable = FALSE,
+      error_message = 'Authentication failed (401): Okad recovery pending', updated_at = NOW()
+  WHERE a.id = $1 AND a.deleted_at IS NULL AND a.platform = 'adobe' AND a.type = 'oauth'
+    AND a.status = 'active' AND a.schedulable = TRUE
+    AND COALESCE(a.error_message, '') = $2
+    AND a.credentials->>'cookie' = $3
+    AND COALESCE(a.credentials->>'email', '') = $4
+    AND a.proxy_id IS NOT DISTINCT FROM $5
+    AND COALESCE(a.extra->>'adobeteam_external_email', '') = $6
+    AND (a.expires_at IS NULL OR a.expires_at > NOW())
+  RETURNING a.id
+ )
+ INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
+ SELECT $7, id, NULL, NULL FROM updated`, a.ID, a.ErrorMessage, a.GetCredential("cookie"),
+		a.GetCredential("email"), a.ProxyID, recoveryMarker(a), service.SchedulerOutboxEventAccountChanged)
+	if err != nil {
+		return false, err
+	}
+	n, err := result.RowsAffected()
+	if err != nil || n == 0 {
+		return false, err
+	}
+	r.syncSchedulerAccountSnapshotDetached(ctx, a.ID)
+	return true, nil
+}

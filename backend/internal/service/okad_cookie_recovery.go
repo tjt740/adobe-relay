@@ -18,6 +18,7 @@ var okadCookieRecoveries singleflight.Group
 
 type AdobeCookieRecoveryRepository interface {
 	RecoverAdobeCookieIfUnchanged(context.Context, *Account, string) (bool, error)
+	QueueAdobeCookieRecoveryIfUnchanged(context.Context, *Account) (bool, error)
 }
 
 type okadRecoveryAttempt struct {
