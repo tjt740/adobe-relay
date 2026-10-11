@@ -481,6 +481,10 @@ export default {
         }
       },
       alertRules: {
+        adobeRatioLabel: 'Adobe affected-account threshold (%, optional)',
+        adobeRatioHint: 'Both the account count and percentage must meet their thresholds to trigger. Recover below the percentage. The population includes all undeleted Adobe accounts in scope, including paused and error accounts. Leave blank for count-only rules.',
+        adobeRatioSummary: 'and affected ratio ≥ {percent}%; recover below {percent}%',
+        adobeRatioInvalid: 'Adobe affected percentage must be greater than 0 and at most 100',
         title: 'Alert Rules',
         description: 'Create and manage threshold-based system alerts (email-only)',
         loading: 'Loading...',

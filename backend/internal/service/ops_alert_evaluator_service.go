@@ -247,10 +247,11 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 
 		var metricValue float64
 		var detail string
+		var adobeRatioEnabled, adobeRatioBreached bool
 		var ok bool
 		if rule.MetricType == OpsMetricAdobeErrorAccounts {
 			var err error
-			metricValue, detail, err = s.adobeErrorMetric(ctx, windowStart, windowEnd, scopeGroupID)
+			metricValue, detail, adobeRatioEnabled, adobeRatioBreached, err = s.adobeErrorMetric(ctx, windowStart, windowEnd, scopeGroupID, rule.Filters)
 			ok = err == nil
 			if err != nil {
 				logger.LegacyPrintf("service.ops_alert_evaluator", "[OpsAlertEvaluator] Adobe summary failed (rule=%d): %v", rule.ID, err)
@@ -265,6 +266,9 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 		rulesEvaluated++
 
 		breachedNow := compareMetric(metricValue, rule.Operator, rule.Threshold)
+		if adobeRatioEnabled {
+			breachedNow = breachedNow && adobeRatioBreached
+		}
 		required := requiredSustainedBreaches(rule.SustainedMinutes, ruleInterval)
 		consecutive := s.updateRuleBreaches(rule.ID, now, ruleInterval, breachedNow)
 
@@ -339,6 +343,11 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 			continue
 		}
 
+		// The minimum count only gates new incidents. An active ratio incident
+		// recovers strictly below its percentage, even if the pool shrinks.
+		if adobeRatioEnabled && adobeRatioBreached {
+			continue
+		}
 		// Not breached: resolve active event if present.
 		if activeEvent != nil {
 			resolvedAt := now
@@ -486,7 +495,7 @@ func (s *OpsAlertEvaluatorService) computeRuleMetric(
 	}
 	switch strings.TrimSpace(rule.MetricType) {
 	case OpsMetricAdobeErrorAccounts:
-		value, _, err := s.adobeErrorMetric(ctx, start, end, groupID)
+		value, _, _, _, err := s.adobeErrorMetric(ctx, start, end, groupID, rule.Filters)
 		return value, err == nil
 	case "cpu_usage_percent":
 		if systemMetrics != nil && systemMetrics.CPUUsagePercent != nil {

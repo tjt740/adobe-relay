@@ -481,6 +481,10 @@ export default {
         }
       },
       alertRules: {
+        adobeRatioLabel: 'Adobe 异常占比门槛（%，可选）',
+        adobeRatioHint: '同时满足账号数量和占比门槛才触发，低于占比门槛恢复。分母为统计范围内全部未删除的 Adobe 账号，包含暂停和异常账号；留空则仅按数量判断。',
+        adobeRatioSummary: '且异常占比 ≥ {percent}%；低于 {percent}% 恢复',
+        adobeRatioInvalid: 'Adobe 异常占比必须大于 0 且不超过 100',
         title: '告警规则',
         description: '创建与管理系统阈值告警（仅邮件通知）',
         loading: '加载中...',

@@ -243,6 +243,9 @@ func validateOpsAlertRulePayload(raw map[string]json.RawMessage) (*opsAlertRuleV
 		if _, err := service.OpsAlertEmailRecipient(filters); err != nil {
 			return nil, err
 		}
+		if _, _, err := service.OpsAdobeAlertRatioThreshold(filters); err != nil {
+			return nil, err
+		}
 	}
 	return validated, nil
 }
