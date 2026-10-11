@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -44,6 +45,7 @@ func TestAccountConnectionTestAdobeEndpointPreservesCookieOnToken401(t *testing.
 	require.Error(t, err)
 	require.Contains(t, response.Body.String(), `"status_code":401`)
 	require.Equal(t, []int{401}, repo.codes)
+	require.Equal(t, []int{401}, repo.alertCodes)
 	require.Equal(t, []bool{false}, repo.successes)
 	require.Empty(t, account.ErrorMessage)
 	require.Empty(t, repo.attempts)
@@ -51,8 +53,22 @@ func TestAccountConnectionTestAdobeEndpointPreservesCookieOnToken401(t *testing.
 
 type connectionTestResultRepo struct {
 	*okadRecoveryRepo
-	codes     []int
-	successes []bool
+	codes         []int
+	successes     []bool
+	alertCodes    []int
+	alertReasons  []string
+	alertTimeouts []bool
+}
+
+func (r *connectionTestResultRepo) SetTempUnschedulable(context.Context, int64, time.Time, string) error {
+	return nil
+}
+
+func (r *connectionTestResultRepo) RecordAdobeConnectionTestError(_ context.Context, _ int64, code int, reason string, timeout bool) error {
+	r.alertCodes = append(r.alertCodes, code)
+	r.alertReasons = append(r.alertReasons, reason)
+	r.alertTimeouts = append(r.alertTimeouts, timeout)
+	return nil
 }
 
 func (r *connectionTestResultRepo) RecordConnectionTestResult(_ context.Context, _ int64, success bool, code int) error {
@@ -88,7 +104,9 @@ func TestAccountConnectionTestCancellationAndConcurrentPause(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	svc.recordConnectionTestResult(ctx, a, errors.New("context canceled"))
+	svc.recordConnectionTestResult(context.Background(), a, fmt.Errorf("test stopped: %w", context.Canceled))
 	require.Empty(t, repo.codes)
+	require.Empty(t, repo.alertCodes)
 	snapshot, err := repo.GetByID(context.Background(), a.ID)
 	require.NoError(t, err)
 	a.Schedulable = false
@@ -96,4 +114,44 @@ func TestAccountConnectionTestCancellationAndConcurrentPause(t *testing.T) {
 	require.Equal(t, StatusActive, a.Status)
 	require.False(t, a.Schedulable)
 	require.Empty(t, a.ErrorMessage)
+}
+
+func TestAccountConnectionTestAdobeAlertSourcesAndClassification(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		err     error
+		code    int
+		reason  string
+		timeout bool
+	}{
+		{"success", nil, 0, "", false},
+		{"auth", adobe.NewAuthError("rejected", 401), 401, "adobe_auth", false},
+		{"quota", adobe.NewQuotaExhaustedError("quota", 401), 401, "adobe_quota_exhausted", false},
+		{"entitlement", adobe.NewNotEntitledError("plan", 401, ""), 401, "adobe_not_entitled", false},
+		{"upstream 408", &adobe.RequestError{Message: "overloaded", StatusCode: 408}, 408, "adobe_request", false},
+		{"text 408", errors.New("API returned 408"), 408, "", false},
+		{"generation timeout", errors.New("Adobe generation timed out after 1m30s"), 408, "", true},
+		{"deadline", context.DeadlineExceeded, 408, "", true},
+		{"unrelated 403", adobe.NewAuthError("forbidden", 403), 0, "", false},
+		{"no response", errors.New("connection refused"), 0, "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a := recoveryFixtureAccount(1)
+			repo := &connectionTestResultRepo{okadRecoveryRepo: &okadRecoveryRepo{accounts: map[int64]*Account{1: a}}}
+			svc := &AccountTestService{accountRepo: repo}
+			svc.recordConnectionTestResult(context.Background(), a, tc.err)
+			if tc.code == 0 {
+				require.Empty(t, repo.alertCodes)
+			} else {
+				require.Equal(t, []int{tc.code}, repo.alertCodes)
+				require.Equal(t, []string{tc.reason}, repo.alertReasons)
+				require.Equal(t, []bool{tc.timeout}, repo.alertTimeouts)
+			}
+			require.Empty(t, repo.attempts, "alert observation cannot spend a login attempt")
+			a.Platform = PlatformOpenAI
+			repo.alertCodes = nil
+			svc.recordConnectionTestResult(context.Background(), a, tc.err)
+			require.Empty(t, repo.alertCodes, "exclude non-Adobe tests")
+		})
+	}
 }

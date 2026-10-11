@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
 )
@@ -33,7 +34,7 @@ func connectionTestStatusCode(err error) int {
 }
 
 func (s *AccountTestService) recordConnectionTestResult(ctx context.Context, account *Account, testErr error) {
-	if ctx.Err() != nil || account == nil {
+	if ctx.Err() != nil || errors.Is(testErr, context.Canceled) || account == nil {
 		return
 	} // closing/stopping a test is not an account failure
 	code := connectionTestStatusCode(testErr)
@@ -42,6 +43,25 @@ func (s *AccountTestService) recordConnectionTestResult(ctx context.Context, acc
 	}); ok {
 		if err := recorder.RecordConnectionTestResult(ctx, account.ID, testErr == nil, code); err != nil {
 			slog.Warn("account_test_result_save_failed", "account_id", account.ID, "error", err)
+		}
+	}
+	if account.Platform == PlatformAdobe && testErr != nil && (code == 401 || code == 408) {
+		if recorder, ok := s.accountRepo.(interface {
+			RecordAdobeConnectionTestError(context.Context, int64, int, string, bool) error
+		}); ok {
+			reason := ""
+			if failure := classifyAdobeError(testErr); failure.Failover != nil {
+				reason = string(failure.Failover.Reason)
+			}
+			var upstream *adobe.RequestError
+			explicitHTTP := errors.As(testErr, &upstream) && upstream.StatusCode > 0
+			isTimeout := code == 408 && !explicitHTTP && !connectionTestHTTPCode.MatchString(testErr.Error())
+			// Telemetry failure must not hold a finished test open indefinitely.
+			recordCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+			defer cancel()
+			if err := recorder.RecordAdobeConnectionTestError(recordCtx, account.ID, code, reason, isTimeout); err != nil {
+				slog.Warn("adobe_test_alert_record_save_failed", "account_id", account.ID, "error", err)
+			}
 		}
 	}
 	if account.Platform == PlatformAdobe && account.Type == AccountTypeOAuth {

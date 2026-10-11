@@ -327,6 +327,7 @@ func (s *OpsCleanupService) runCleanupOnce(ctx context.Context) (opsCleanupDelet
 
 	targets := []opsCleanupTarget{
 		{effective.ErrorLogRetentionDays, "ops_error_logs", "created_at", false, &out.errorLogs},
+		{effective.ErrorLogRetentionDays, "adobe_account_test_errors", "created_at", false, &out.accountTestErrors},
 		{effective.ErrorLogRetentionDays, "ops_ingress_reject_aggregates", "bucket_start", false, &out.ingressRejects},
 		{effective.ErrorLogRetentionDays, "ops_alert_events", "created_at", false, &out.alertEvents},
 		{effective.SystemLogRetentionDays, "ops_system_logs", "created_at", false, &out.systemLogs},

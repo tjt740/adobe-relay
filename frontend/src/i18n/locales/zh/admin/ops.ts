@@ -533,7 +533,7 @@ export default {
           groupAvailableRatio: '指定分组中可用账号占比（0~100，需要 group_id 过滤）。',
           groupRateLimitRatio: '指定分组中账号被限流的比例（0~100，需要 group_id 过滤）。',
           accountRateLimitedCount: '统计窗口内被限流的账号数量。',
-          adobeErrorAccounts: '按已有上游业务错误记录去重统计 Adobe 账号，包含换号后成功的请求；仅读取日志，不测试账号或触发登录。',
+          adobeErrorAccounts: '合并业务请求与账号检测（含批量）的 401/408 记录，按 Adobe 账号去重；检测超时按 408 归类。仅读取已有记录，不主动检测或触发登录。',
           accountErrorCount: '统计窗口内产生错误的账号数量（不含临时不可调度）。',
           accountErrorRatio: '统计窗口内错误账号占比（0~100）。',
           accountTempUnscheduledCount: '当前处于临时不可调度状态的账号数量（如代理/凭据故障被自动摘除）。',
