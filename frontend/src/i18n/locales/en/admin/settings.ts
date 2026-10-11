@@ -147,7 +147,7 @@ export default {
         },
       },
       emailTabDisabledTitle: 'Email Verification Not Enabled',
-      emailTabDisabledHint: 'Enable email verification in the Security tab to configure SMTP settings.',
+      emailTabDisabledHint: 'SMTP can still be configured for operations alerts and other notifications without enabling signup email verification.',
       registration: {
         title: 'Registration Settings',
         description: 'Control user registration and verification',

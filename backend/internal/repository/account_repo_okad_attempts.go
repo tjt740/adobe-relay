@@ -113,3 +113,11 @@ func scanOkadRecoveryRow(rows *sql.Rows, err error, dest ...any) error {
 	}
 	return rows.Scan(dest...)
 }
+
+// A cooldown response explicitly means Okad did not attempt a login.
+func (r *accountRepository) PostponeAdobeCookieRecovery(ctx context.Context, id int64, attemptID string, next time.Time) error {
+	_, err := r.sql.ExecContext(ctx, `UPDATE adobe_cookie_recovery_attempts
+ SET attempts=GREATEST(attempts-1,0), finished_at=NOW(), next_attempt_at=$3
+ WHERE account_id=$1 AND attempt_id=$2 AND finished_at IS NULL`, id, attemptID, next)
+	return err
+}

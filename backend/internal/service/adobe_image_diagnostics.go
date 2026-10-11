@@ -64,6 +64,9 @@ func RecordAdobeImageFailure(c *gin.Context, account *Account, model string, err
 		UpstreamStatusCode: status, UpstreamRequestID: requestID,
 		Kind: "request_error", Stage: stage, Reason: errorType, Message: message, Detail: string(detail),
 	}
+	if failure := classifyAdobeError(err); failure.Failover != nil {
+		ev.Reason = string(failure.Failover.Reason)
+	}
 	if account != nil {
 		ev.AccountID, ev.AccountName = account.ID, account.Name
 	}

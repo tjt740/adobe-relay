@@ -76,6 +76,12 @@ func isAdobeCookieRecoveryCandidate(a *Account) bool {
 		}
 	}
 	msg := strings.ToLower(a.ErrorMessage)
+	// Historical generic 401 rows can contain a non-auth Adobe reason.
+	for _, marker := range []string{"taste_exhausted", "quota exhausted", "credits exhausted", "model_not_entitled", "user_not_entitled", "not entitled"} {
+		if strings.Contains(msg, marker) {
+			return false
+		}
+	}
 	if a.ErrorMessage == AdobeCookieRecoveryExhausted {
 		return false
 	}
@@ -154,7 +160,11 @@ func (s *OkadCookieRecovery) recover(ctx context.Context, snapshot *Account) (bo
 		}
 		// A cancelled user request must not lose the completion/cooldown write.
 		loginOK := false
+		postponed := false
 		defer func() {
+			if postponed {
+				return
+			}
 			finishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 			defer cancel()
 			if err := updater.FinishAdobeCookieRecovery(finishCtx, latest.ID, attempt.ID, loginOK); err != nil {
@@ -165,6 +175,10 @@ func (s *OkadCookieRecovery) recover(ctx context.Context, snapshot *Account) (bo
 		if s.client.managed {
 			err := s.client.RefreshManaged(ctx, latest, attempt.ID)
 			if err != nil {
+				if s.postponeCooldown(ctx, latest, attempt.ID, err) {
+					postponed = true
+					return false, nil
+				}
 				s.recordManagedState(ctx, latest, err)
 				queueCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 				defer cancel()
@@ -177,6 +191,10 @@ func (s *OkadCookieRecovery) recover(ctx context.Context, snapshot *Account) (bo
 		}
 		cookie, err := s.client.RefreshCookie(ctx, email)
 		if err != nil {
+			if s.postponeCooldown(ctx, latest, attempt.ID, err) {
+				postponed = true
+				return false, nil
+			}
 			queueCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 			defer cancel()
 			if queueErr := s.queue(queueCtx, updater, latest, attempt.Count); queueErr != nil {
@@ -298,4 +316,31 @@ func (s *OkadCookieRecovery) sweep(ctx context.Context) {
 		})
 	}
 	_ = workers.Wait()
+}
+
+// A confirmed cooldown rejection performed no login and must not consume the
+// two-attempt budget. Retain a durable row to prevent immediate re-reservation.
+func (s *OkadCookieRecovery) postponeCooldown(ctx context.Context, a *Account, attemptID string, err error) bool {
+	var typed *OkadRecoveryError
+	if !errors.As(err, &typed) || typed.Code != "login_cooldown" {
+		return false
+	}
+	repo, ok := s.repo.(interface {
+		PostponeAdobeCookieRecovery(context.Context, int64, string, time.Time) error
+	})
+	if !ok {
+		return false
+	}
+	now := time.Now()
+	next := typed.RetryAfter
+	if next.Before(now.Add(time.Minute)) || next.After(now.Add(time.Hour)) {
+		next = now.Add(15 * time.Minute)
+	}
+	save, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := repo.PostponeAdobeCookieRecovery(save, a.ID, attemptID, next); err != nil {
+		return false
+	}
+	s.recordManagedState(save, a, typed)
+	return true
 }

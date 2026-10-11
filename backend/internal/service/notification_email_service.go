@@ -1413,7 +1413,7 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 <p><strong>Status</strong>: {{alert_status}}</p>
 <p><strong>Metric</strong>: {{metric_type}} {{operator}} {{metric_value}} (threshold {{threshold_value}})</p>
 <p><strong>Fired at</strong>: {{triggered_at}}</p>
-<p><strong>Description</strong>: {{alert_description}}</p>`),
+<div style="white-space:pre-wrap"><strong>Description</strong>: {{alert_description}}</div>`),
 		},
 		notificationEmailLocaleChinese: {
 			Subject: "[运维告警][{{severity}}] {{rule_name}}",
@@ -1423,7 +1423,7 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 <p><strong>状态</strong>：{{alert_status}}</p>
 <p><strong>指标</strong>：{{metric_type}} {{operator}} {{metric_value}}（阈值 {{threshold_value}}）</p>
 <p><strong>触发时间</strong>：{{triggered_at}}</p>
-<p><strong>说明</strong>：{{alert_description}}</p>`),
+<div style="white-space:pre-wrap"><strong>说明</strong>：{{alert_description}}</div>`),
 		},
 	},
 	NotificationEmailEventOpsScheduledReport: {

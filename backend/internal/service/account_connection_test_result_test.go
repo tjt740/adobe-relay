@@ -33,7 +33,7 @@ func TestAccountConnectionTestStatusCode(t *testing.T) {
 	}
 }
 
-func TestAccountConnectionTestAdobeEndpointPersistsAndQueues401(t *testing.T) {
+func TestAccountConnectionTestAdobeEndpointPreservesCookieOnToken401(t *testing.T) {
 	account := adobeTestConnAccount(map[string]any{"cookie": "fixture-cookie", "access_token": adobeTestJWT(t, time.Now().Add(time.Hour))})
 	repo := &connectionTestResultRepo{okadRecoveryRepo: &okadRecoveryRepo{accounts: map[int64]*Account{account.ID: account}}}
 	api := &adobeFakeTransport{handler: func(*adobe.Request, int) (*adobe.Response, error) {
@@ -45,7 +45,7 @@ func TestAccountConnectionTestAdobeEndpointPersistsAndQueues401(t *testing.T) {
 	require.Contains(t, response.Body.String(), `"status_code":401`)
 	require.Equal(t, []int{401}, repo.codes)
 	require.Equal(t, []bool{false}, repo.successes)
-	require.Equal(t, AdobeCookieRecoveryPending, account.ErrorMessage)
+	require.Empty(t, account.ErrorMessage)
 	require.Empty(t, repo.attempts)
 }
 
@@ -61,7 +61,7 @@ func (r *connectionTestResultRepo) RecordConnectionTestResult(_ context.Context,
 	return nil
 }
 
-func TestAccountConnectionTestRecordsResultAndQueues401WithoutLoggingIn(t *testing.T) {
+func TestAccountConnectionTestRecordsStatusWithoutInferringCookieFailure(t *testing.T) {
 	for _, code := range []int{200, 401, 403, 408} {
 		a := recoveryFixtureAccount(int64(code))
 		a.Status, a.ErrorMessage, a.Schedulable = StatusActive, "", true
@@ -74,11 +74,8 @@ func TestAccountConnectionTestRecordsResultAndQueues401WithoutLoggingIn(t *testi
 		svc.recordConnectionTestResult(context.Background(), a, testErr)
 		require.Equal(t, []int{code}, repo.codes)
 		require.Equal(t, []bool{code == 200}, repo.successes)
-		if code == 401 {
-			require.Equal(t, AdobeCookieRecoveryPending, a.ErrorMessage)
-		} else {
-			require.Equal(t, StatusActive, a.Status)
-		}
+		require.Equal(t, StatusActive, a.Status)
+		require.Empty(t, a.ErrorMessage)
 		require.Empty(t, repo.attempts, "testing must not reserve extra Okad login attempts")
 	}
 }

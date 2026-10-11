@@ -14,7 +14,10 @@ import (
 	"time"
 )
 
-type OkadRecoveryError struct{ Code string }
+type OkadRecoveryError struct {
+	Code       string
+	RetryAfter time.Time
+}
 
 func (e *OkadRecoveryError) Error() string { return "Okad recovery: " + e.Code }
 func (c *OkadCookieRefreshClient) managedCall(ctx context.Context, method, path string, body any) (map[string]any, error) {
@@ -118,12 +121,12 @@ func (s *OkadCookieRecovery) recordManagedState(ctx context.Context, a *Account,
 	if errors.As(err, &typed) {
 		code = typed.Code
 	}
-	allowed := map[string]bool{"awaiting_sync": true, "service_unavailable": true, "configuration": true, "protocol": true, "not_registered": true, "ambiguous": true, "needs_manual": true, "missing_mail": true, "identity_mismatch": true, "busy": true, "outcome_unknown": true, "rate_limited": true, "login_failed": true, "internal": true, "account_disabled": true}
+	allowed := map[string]bool{"awaiting_sync": true, "service_unavailable": true, "configuration": true, "protocol": true, "not_registered": true, "ambiguous": true, "needs_manual": true, "missing_mail": true, "identity_mismatch": true, "busy": true, "outcome_unknown": true, "rate_limited": true, "login_cooldown": true, "login_failed": true, "internal": true, "account_disabled": true}
 	if !allowed[code] {
 		code = "internal"
 	}
 	wait := time.Minute
-	if code == "needs_manual" || code == "not_registered" || code == "missing_mail" || code == "ambiguous" {
+	if code == "login_cooldown" || code == "needs_manual" || code == "not_registered" || code == "missing_mail" || code == "ambiguous" {
 		wait = 15 * time.Minute
 	}
 	save, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)

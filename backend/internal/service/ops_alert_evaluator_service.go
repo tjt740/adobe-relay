@@ -216,6 +216,21 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 			continue
 		}
 		rulesEnabled++
+		ruleInterval := interval
+		if rule.MetricType == OpsMetricAdobeErrorAccounts {
+			if ruleInterval < 2*time.Minute {
+				ruleInterval = 2 * time.Minute
+			}
+			s.mu.Lock()
+			state := s.ruleStates[rule.ID]
+			// Allow scheduler jitter so a nominal 120-second tick does not
+			// accidentally defer this rule to the next 60-second global tick.
+			due := state == nil || now.Add(time.Second).Sub(state.LastEvaluatedAt) >= ruleInterval
+			s.mu.Unlock()
+			if !due {
+				continue
+			}
+		}
 
 		scopePlatform, scopeGroupID, scopeRegion := parseOpsAlertRuleScope(rule.Filters)
 
@@ -225,8 +240,24 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 		}
 		windowStart := safeEnd.Add(-time.Duration(windowMinutes) * time.Minute)
 		windowEnd := safeEnd
+		if rule.MetricType == OpsMetricAdobeErrorAccounts {
+			windowEnd = now // raw error records do not need a completed-minute bucket
+			windowStart = now.Add(-time.Duration(windowMinutes) * time.Minute)
+		}
 
-		metricValue, ok := s.computeRuleMetric(ctx, rule, systemMetrics, windowStart, windowEnd, scopePlatform, scopeGroupID)
+		var metricValue float64
+		var detail string
+		var ok bool
+		if rule.MetricType == OpsMetricAdobeErrorAccounts {
+			var err error
+			metricValue, detail, err = s.adobeErrorMetric(ctx, windowStart, windowEnd, scopeGroupID)
+			ok = err == nil
+			if err != nil {
+				logger.LegacyPrintf("service.ops_alert_evaluator", "[OpsAlertEvaluator] Adobe summary failed (rule=%d): %v", rule.ID, err)
+			}
+		} else {
+			metricValue, ok = s.computeRuleMetric(ctx, rule, systemMetrics, windowStart, windowEnd, scopePlatform, scopeGroupID)
+		}
 		if !ok {
 			s.resetRuleState(rule.ID, now)
 			continue
@@ -234,8 +265,8 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 		rulesEvaluated++
 
 		breachedNow := compareMetric(metricValue, rule.Operator, rule.Threshold)
-		required := requiredSustainedBreaches(rule.SustainedMinutes, interval)
-		consecutive := s.updateRuleBreaches(rule.ID, now, interval, breachedNow)
+		required := requiredSustainedBreaches(rule.SustainedMinutes, ruleInterval)
+		consecutive := s.updateRuleBreaches(rule.ID, now, ruleInterval, breachedNow)
 
 		activeEvent, err := s.opsRepo.GetActiveAlertEvent(ctx, rule.ID)
 		if err != nil {
@@ -245,6 +276,11 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 
 		if breachedNow && consecutive >= required {
 			if activeEvent != nil {
+				// Failed delivery is retried on later evaluations. A delivered
+				// active incident stays quiet, including across process restarts.
+				if !activeEvent.EmailSent && s.maybeSendAlertEmail(ctx, runtimeCfg, rule, activeEvent) {
+					emailsSent++
+				}
 				continue
 			}
 
@@ -282,6 +318,10 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 				Dimensions:     buildOpsAlertDimensions(scopePlatform, scopeGroupID),
 				FiredAt:        now,
 				CreatedAt:      now,
+			}
+
+			if detail != "" {
+				firedEvent.Description = detail
 			}
 
 			created, err := s.opsRepo.CreateAlertEvent(ctx, firedEvent)
@@ -445,6 +485,9 @@ func (s *OpsAlertEvaluatorService) computeRuleMetric(
 		return 0, false
 	}
 	switch strings.TrimSpace(rule.MetricType) {
+	case OpsMetricAdobeErrorAccounts:
+		value, _, err := s.adobeErrorMetric(ctx, start, end, groupID)
+		return value, err == nil
 	case "cpu_usage_percent":
 		if systemMetrics != nil && systemMetrics.CPUUsagePercent != nil {
 			return *systemMetrics.CPUUsagePercent, true
@@ -691,7 +734,13 @@ func (s *OpsAlertEvaluatorService) maybeSendAlertEmail(ctx context.Context, runt
 		return false
 	}
 
-	if len(emailCfg.Alert.Recipients) == 0 {
+	recipients := emailCfg.Alert.Recipients
+	if recipient, err := OpsAlertEmailRecipient(rule.Filters); err != nil {
+		return false
+	} else if recipient != "" {
+		recipients = []string{recipient}
+	}
+	if len(recipients) == 0 {
 		return false
 	}
 	if !shouldSendOpsAlertEmailByMinSeverity(strings.TrimSpace(emailCfg.Alert.MinSeverity), strings.TrimSpace(rule.Severity)) {
@@ -711,7 +760,7 @@ func (s *OpsAlertEvaluatorService) maybeSendAlertEmail(ctx context.Context, runt
 	body := buildOpsAlertEmailBody(rule, event)
 
 	anySent := false
-	for _, to := range emailCfg.Alert.Recipients {
+	for _, to := range recipients {
 		addr := strings.TrimSpace(to)
 		if addr == "" {
 			continue
@@ -816,7 +865,7 @@ func buildOpsAlertEmailBody(rule *OpsAlertRule, event *OpsAlertEvent) string {
 		htmlEscape(rule.Operator),
 		htmlEscape(fmt.Sprintf("%s (threshold %s)", value, threshold)),
 		event.FiredAt.Format(time.RFC3339),
-		htmlEscape(event.Description),
+		strings.ReplaceAll(htmlEscape(event.Description), "\n", "<br>"),
 	)
 }
 

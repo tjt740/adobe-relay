@@ -71,7 +71,7 @@ func (s *AccountTestService) adobeTestAccessToken(ctx context.Context, c *gin.Co
 	// token 字段，不会把管理员刚改的 cookie / model_mapping 覆盖回旧值。
 	refreshed, err := s.adobeTestTokenProvider().GetAccessToken(ctx, account)
 	if err != nil {
-		return "", errors.New(formatAdobeTestError(err))
+		return "", err
 	}
 	s.sendEvent(c, TestEvent{Type: "status", Text: "Fresh access_token obtained from cookie."})
 	return refreshed, nil
@@ -109,7 +109,7 @@ func (s *AccountTestService) testAdobeAccountConnection(
 
 	token, err := s.adobeTestAccessToken(ctx, c, account)
 	if err != nil {
-		return s.sendErrorAndEnd(c, err.Error())
+		return s.sendAdobeTestError(c, err)
 	}
 
 	requestedModel := strings.TrimSpace(modelID)
@@ -125,7 +125,7 @@ func (s *AccountTestService) testAdobeAccountConnection(
 	upstreamModelID := account.GetMappedModel(requestedModel)
 	conf, resolveErr := adobe.ResolveImage(adobe.ImageRequest{ModelID: upstreamModelID, Size: adobeTestSize})
 	if resolveErr != nil {
-		return s.sendErrorAndEnd(c, formatAdobeTestError(resolveErr))
+		return s.sendAdobeTestError(c, resolveErr)
 	}
 
 	s.prepareGrokTestSSE(c)
@@ -155,7 +155,7 @@ func (s *AccountTestService) testAdobeAccountConnection(
 		},
 	})
 	if err != nil {
-		return s.sendErrorAndEnd(c, formatAdobeTestError(err))
+		return s.sendAdobeTestError(c, err)
 	}
 	if generated == nil || len(generated.Bytes) == 0 {
 		return s.sendErrorAndEnd(c, "Adobe returned an empty image")
@@ -203,4 +203,15 @@ func formatAdobeTestError(err error) string {
 	default:
 		return err.Error()
 	}
+}
+
+// Keep the cause available to state persistence while preserving the UI message.
+type adobeAccountTestError struct{ cause error }
+
+func (e *adobeAccountTestError) Error() string { return formatAdobeTestError(e.cause) }
+func (e *adobeAccountTestError) Unwrap() error { return e.cause }
+func (s *AccountTestService) sendAdobeTestError(c *gin.Context, err error) error {
+	wrapped := &adobeAccountTestError{cause: err}
+	s.sendEvent(c, TestEvent{Type: "error", Error: wrapped.Error(), StatusCode: connectionTestStatusCode(err)})
+	return wrapped
 }
