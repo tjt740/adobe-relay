@@ -1,6 +1,12 @@
 # Adobe Cookie 自动恢复
 
-当 Sub2 收到 Adobe 401，或 IMS 换 token 确认 Cookie 无效时，使用 Okad 外部子号的同一邮箱重新登录并更新 Cookie。后台在启动时和每轮结束后的扫描周期检查历史鉴权错误；扫描间隔为 30 秒，单账号失败后至少间隔 5 分钟重试。未配置接口时维持原行为。
+当 Sub2 收到 Adobe 401，或 IMS 换 token 确认 Cookie 无效时，使用 Okad 外部子号的同一邮箱重新登录并更新 Cookie。后台在启动时和每轮结束后的扫描周期检查历史鉴权错误；扫描间隔为 30 秒。未配置接口时维持原行为。
+
+同一账号、同一轮鉴权故障最多自动登录 **2 次（包含首次）**。实时 401 与后台扫描共用 PostgreSQL 的原子计数和冷却时间，重启、更换 Cookie、清错以及并发请求都不会绕过上限。未能持久化预留次数时不会请求 Okad。失败后至少等 5 分钟，取得新 Cookie 后冷却 15 分钟；登录进行中由持久化租约排除第二个进程，进程异常退出也不会丢失已消耗的次数。
+
+第二次失败或第二次换 Cookie 后仍出现 401，会停止自动登录，并显示 `Okad automatic login limit reached (2/2); manual reauthorization required`，账号暂停调度。Okad 的自动刷新接口关闭额外的代理网络重登重试，因此一次回调只有一次完整登录尝试；平台手动登录功能保持原有行为。
+
+Okad 返回成功只代表取到了 Cookie，不立即清空计数。只有冷却满 15 分钟后，用当前 Cookie 成功访问 Adobe 实时额度接口或成功出图，且账号已恢复 active，才结束这一轮故障、恢复下一轮的 2 次预算。缓存额度不算验证成功。达到上限后可在 Okad 人工检查并重新授权推送；成功验证后恢复后续自动处理。单纯等待、重启或点清错不会重置上限。异常退出没有写入完成时间时，需等预留租约结束再经过 15 分钟，实际验证成功才可重置。
 
 在服务器持久化的 `gateway` 配置中设置：
 
@@ -18,7 +24,7 @@ Okad 的既有异步推送也可先于同步响应到达。原生重新授权清
 
 ```sh
 cd backend
-go test -tags unit ./internal/service -run TestOkadRecovery -count=1
+go test -race -tags unit ./internal/service -run TestOkadRecovery -count=1
 OKAD_RECOVERY_TEST_DATABASE_URL='postgres://USER@127.0.0.1:PORT/DB?sslmode=disable' \
   go test ./internal/repository -run 'TestOkadRecoveryPostgres|TestRecoverAdobeCookieUses' -count=1
 ```

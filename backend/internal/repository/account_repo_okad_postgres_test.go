@@ -14,18 +14,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOkadRecoveryPostgres(t *testing.T) {
+func newOkadRecoveryPostgres(t *testing.T) *sql.DB {
+	t.Helper()
 	dsn := os.Getenv("OKAD_RECOVERY_TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("set OKAD_RECOVERY_TEST_DATABASE_URL to a disposable PostgreSQL instance")
 	}
 	root, err := sql.Open("postgres", dsn)
 	require.NoError(t, err)
-	defer root.Close()
+	t.Cleanup(func() { _ = root.Close() })
 	schema := fmt.Sprintf("okad_recovery_%d", time.Now().UnixNano())
 	_, err = root.Exec("CREATE SCHEMA " + schema)
 	require.NoError(t, err)
-	defer root.Exec("DROP SCHEMA " + schema + " CASCADE")
+	t.Cleanup(func() { _, _ = root.Exec("DROP SCHEMA " + schema + " CASCADE") })
 	u, err := url.Parse(dsn)
 	require.NoError(t, err)
 	q := u.Query()
@@ -33,17 +34,23 @@ func TestOkadRecoveryPostgres(t *testing.T) {
 	u.RawQuery = q.Encode()
 	db, err := sql.Open("postgres", u.String())
 	require.NoError(t, err)
-	defer db.Close()
+	t.Cleanup(func() { _ = db.Close() })
 	_, err = db.Exec(`CREATE TABLE accounts(id bigint PRIMARY KEY,platform text,type text,status text,error_message text,schedulable bool,credentials jsonb,extra jsonb,proxy_id bigint,expires_at timestamptz,deleted_at timestamptz,updated_at timestamptz);
  CREATE TABLE proxies(id bigint PRIMARY KEY);
  CREATE TABLE scheduler_outbox(event_type text,account_id bigint,group_id bigint,payload jsonb);`)
 	require.NoError(t, err)
-	for _, name := range []string{"241_account_proxy_failover.sql", "242_proxy_auto_allocation.sql", "243_proxy_auto_allocation_all_accounts.sql", "244_proxy_auto_allocation_allocator_bypass.sql"} {
+	for _, name := range []string{"241_account_proxy_failover.sql", "242_proxy_auto_allocation.sql", "243_proxy_auto_allocation_all_accounts.sql", "244_proxy_auto_allocation_allocator_bypass.sql", "245_adobe_cookie_recovery_attempts.sql"} {
 		migration, err := os.ReadFile("../../migrations/" + name)
 		require.NoError(t, err)
 		_, err = db.Exec(string(migration))
 		require.NoError(t, err, name)
 	}
+	return db
+}
+
+func TestOkadRecoveryPostgres(t *testing.T) {
+	db := newOkadRecoveryPostgres(t)
+	var err error
 	repo := &accountRepository{sql: db}
 	ctx := context.Background()
 	message := "OAuth 401 (no refresh_token): Invalid bearer token"

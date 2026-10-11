@@ -131,6 +131,7 @@ func (s *AccountUsageService) fetchAndCacheAdobeUsage(ctx context.Context, accou
 		return nil, err
 	}
 
+	confirmAdobeCookieRecovery(ctx, s.accountRepo, account)
 	now := time.Now()
 	info := &UsageInfo{
 		UpdatedAt:    &now,

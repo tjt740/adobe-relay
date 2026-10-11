@@ -45,10 +45,34 @@ func (c *stubAdobeCreditsClient) lastAccessToken() string {
 // adobeUsageTestRepo 记录 SetTempUnschedulable 调用，用于断言调度联动。
 type adobeUsageTestRepo struct {
 	AccountRepository
-	mu      sync.Mutex
-	calls   []adobeCooldownCall
-	updated map[string]any
-	account *Account
+	mu            sync.Mutex
+	calls         []adobeCooldownCall
+	updated       map[string]any
+	account       *Account
+	confirmations atomic.Int32
+}
+
+func (r *adobeUsageTestRepo) ConfirmAdobeCookieRecovery(context.Context, *Account) error {
+	r.confirmations.Add(1)
+	return nil
+}
+
+func TestGetAdobeUsageOnlyFreshSuccessConfirmsRecovery(t *testing.T) {
+	client := &stubAdobeCreditsClient{balance: &adobe.CreditsBalance{Available: int64Ptr(10)}}
+	repo := &adobeUsageTestRepo{}
+	svc := newAdobeUsageTestService(t, repo, client)
+	a := adobeAccountWithToken()
+	_, err := svc.getAdobeUsage(context.Background(), a, "active", true)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, repo.confirmations.Load())
+	_, err = svc.getAdobeUsage(context.Background(), a, "active", false)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, repo.confirmations.Load(), "cached 200 cannot reset the login budget")
+	client.err = adobe.NewAuthError("expired", http.StatusUnauthorized)
+	info, err := svc.getAdobeUsage(context.Background(), a, "active", true)
+	require.NoError(t, err)
+	require.NotEmpty(t, info.Error)
+	require.EqualValues(t, 1, repo.confirmations.Load(), "degraded cached data cannot reset the login budget")
 }
 
 type adobeCooldownCall struct {
