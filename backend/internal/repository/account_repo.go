@@ -2038,17 +2038,31 @@ func (r *accountRepository) syncSchedulerAccountSnapshots(ctx context.Context, a
 	}
 }
 
+// ClearError also resumes Adobe accounts quarantined by authentication errors.
+// Evaluate the old status/message in the same statement as clearing them so a
+// reauthorization push cannot leave an active account permanently unschedulable.
+// Other pauses (manual, proxy, quota) keep their existing scheduling setting.
 func (r *accountRepository) ClearError(ctx context.Context, id int64) error {
-	_, err := r.client.Account.Update().
-		Where(dbaccount.IDEQ(id)).
-		SetStatus(service.StatusActive).
-		SetErrorMessage("").
-		Save(ctx)
+	_, err := r.sql.ExecContext(ctx, `
+	 WITH updated AS (
+	  UPDATE accounts
+	  SET schedulable = CASE WHEN platform = 'adobe' AND type = 'oauth' AND status = 'error'
+	    AND (expires_at IS NULL OR expires_at > NOW())
+	    AND (
+	      LOWER(error_message) LIKE 'oauth 401 (no refresh_token):%'
+	      OR LOWER(error_message) LIKE 'authentication failed (401):%'
+	      OR (LOWER(error_message) LIKE 'token refresh failed (non-retryable): adobe cookie is no longer valid%'
+	          AND LOWER(error_message) NOT LIKE '%invalid_client%'
+	          AND LOWER(error_message) NOT LIKE '%invalid_scope%')
+	    ) THEN TRUE ELSE schedulable END,
+	    status = 'active', error_message = '', updated_at = NOW()
+	  WHERE id = $1 AND deleted_at IS NULL
+	  RETURNING id
+	 )
+	 INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
+	 SELECT $2, id, NULL, NULL FROM updated`, id, service.SchedulerOutboxEventAccountChanged)
 	if err != nil {
 		return err
-	}
-	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventAccountChanged, &id, nil, nil); err != nil {
-		logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue clear error failed: account=%d err=%v", id, err)
 	}
 	r.syncSchedulerAccountSnapshot(ctx, id)
 	return nil
