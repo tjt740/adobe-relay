@@ -72,9 +72,84 @@ describe('AccountStatusIndicator', () => {
       global: { stubs: { Icon: true } }
     })
     expect(wrapper.get('[data-testid="account-last-check"]').text()).toContain('401')
+    expect(wrapper.text()).toContain('admin.accounts.status.active')
+    expect(wrapper.find('[data-testid="account-auth-status"]').exists()).toBe(false)
     await wrapper.setProps({ account: makeAccount({ extra: { last_check_success: true, last_check_status_code: 200 } }) })
     expect(wrapper.get('[data-testid="account-last-check"]').text()).toContain('bulkTest.passed')
     expect(wrapper.text()).not.toContain('401')
+    wrapper.unmount()
+  })
+
+  it('shows Adobe invalid_credentials as a red 401 and reveals the full error on hover', async () => {
+    const error = 'Token refresh failed (non-retryable): adobe cookie is no longer valid, re-export it from the browser: refresh response missing access_token (keys=error) error=invalid_credentials'
+    const wrapper = mount(AccountStatusIndicator, {
+      props: { account: makeAccount({ platform: 'adobe', status: 'error', error_message: error }) },
+      global: { stubs: { Icon: true, teleport: true } }
+    })
+
+    expect(wrapper.get('.badge-danger').text()).toBe('admin.accounts.status.cookieInvalid')
+    expect(wrapper.get('[data-testid="account-auth-status"]').classes()).toContain('bg-red-100')
+    expect(wrapper.get('[role="tooltip"]').isVisible()).toBe(false)
+    await wrapper.get('[data-testid="account-error-details"]').trigger('mouseenter')
+    expect(wrapper.get('[role="tooltip"]').isVisible()).toBe(true)
+    expect(wrapper.get('[role="tooltip"]').text()).toBe(error)
+    await wrapper.get('[data-testid="account-error-details"]').trigger('mouseleave')
+    expect(wrapper.get('[role="tooltip"]').isVisible()).toBe(false)
+
+    await wrapper.setProps({ account: makeAccount({ platform: 'adobe', extra: { last_check_success: false, last_check_status_code: 401 } }) })
+    expect(wrapper.find('[data-testid="account-auth-status"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('admin.accounts.status.active')
+    expect(wrapper.get('[data-testid="account-last-check"]').text()).toContain('401')
+    expect(wrapper.get('[role="tooltip"]').text()).toBe('admin.accounts.status.lastCheckAuthenticationFailedHint')
+    await wrapper.setProps({ account: makeAccount({ platform: 'adobe', extra: { last_check_success: true, last_check_status_code: 200 } }) })
+    expect(wrapper.find('[data-testid="account-error-details"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it.each([
+    'API returned 401 while checking the account',
+    'Authentication failed (401): Okad automatic login limit reached (2/2); manual reauthorization required',
+    'OAuth 401 (no refresh_token): credentials rejected'
+  ])('shows current authentication errors ahead of an old 408: %s', (error) => {
+    const wrapper = mount(AccountStatusIndicator, {
+      props: { account: makeAccount({ status: 'error', error_message: error, extra: { last_check_status_code: 408, last_check_success: false } }) },
+      global: { stubs: { Icon: true, teleport: true } }
+    })
+    expect(wrapper.get('[data-testid="account-auth-status"]').text()).toBe('401')
+    expect(wrapper.text()).not.toContain('requestTimeout')
+    expect(wrapper.get('[role="tooltip"]').text()).toBe(error)
+    wrapper.unmount()
+  })
+
+  it('keeps the full temporary authentication error and ignores expired temporary failures', async () => {
+    const account = makeAccount({
+      temp_unschedulable_until: '2099-03-15T00:00:00Z',
+      temp_unschedulable_reason: JSON.stringify({ status_code: 401, error_message: 'upstream session expired', matched_keyword: 'session' })
+    })
+    const wrapper = mount(AccountStatusIndicator, {
+      props: { account },
+      global: { stubs: { Icon: true, teleport: true } }
+    })
+    expect(wrapper.get('[data-testid="account-auth-status"]').text()).toBe('401')
+    expect(wrapper.get('[role="tooltip"]').text()).toBe(account.temp_unschedulable_reason)
+    await wrapper.setProps({ account: { ...account, temp_unschedulable_until: '2020-03-15T00:00:00Z' } })
+    expect(wrapper.find('[data-testid="account-auth-status"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it.each([
+    'refresh response missing access_token (keys=error) error=invalid_client',
+    'refresh response missing access_token (keys=error) error=invalid_scope',
+    'account 401 failed to connect: network unavailable',
+    'API returned 403: permission denied'
+  ])('does not label unrelated errors as 401: %s', (error) => {
+    const wrapper = mount(AccountStatusIndicator, {
+      props: { account: makeAccount({ platform: 'adobe', status: 'error', error_message: error, extra: { last_check_status_code: 401, last_check_success: false } }) },
+      global: { stubs: { Icon: true, teleport: true } }
+    })
+    expect(wrapper.find('[data-testid="account-auth-status"]').exists()).toBe(false)
+    expect(wrapper.get('[role="tooltip"]').text()).toBe(error)
+    wrapper.unmount()
   })
   it('账号检查返回 408 时显示请求超时状态和状态码', () => {
     const wrapper = mount(AccountStatusIndicator, {

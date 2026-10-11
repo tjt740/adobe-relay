@@ -1,7 +1,19 @@
 <template>
   <div class="flex items-center gap-2">
+    <!-- Authentication failures include Adobe's invalid_credentials response. -->
+    <template v-if="isAuthenticationFailed">
+      <span class="badge text-xs badge-danger">{{ authenticationFailureText }}</span>
+      <span
+        data-testid="account-auth-status"
+        class="inline-flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400"
+      >
+        <Icon name="exclamationTriangle" size="xs" :stroke-width="2" />
+        401
+      </span>
+    </template>
+
     <!-- Rate Limit Display (429) - Two-line layout -->
-    <div v-if="isRateLimited" class="flex flex-col items-center gap-1">
+    <div v-else-if="isRateLimited" class="flex flex-col items-center gap-1">
       <span class="badge text-xs badge-warning">{{ t('admin.accounts.status.rateLimited') }}</span>
       <span class="text-[11px] text-gray-400 dark:text-gray-500">{{ rateLimitResumeText }}</span>
     </div>
@@ -43,7 +55,7 @@
     </template>
 
     <span
-      v-if="typeof account.extra?.last_check_success === 'boolean' && !isRequestTimeout"
+      v-if="typeof account.extra?.last_check_success === 'boolean' && !isRequestTimeout && !isAuthenticationFailed"
       data-testid="account-last-check"
       :class="['badge text-xs', account.extra.last_check_success ? 'badge-success' : 'badge-danger']"
       :title="t('admin.accounts.bulkTest.checkedAt', { time: formatDateTime(String(account.extra.last_check_at || '')) })"
@@ -53,33 +65,29 @@
     </span>
 
     <!-- Error Info Indicator -->
-    <div v-if="hasError && account.error_message" class="group/error relative">
-      <svg
-        class="h-4 w-4 cursor-help text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        stroke-width="2"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"
-        />
-      </svg>
-      <!-- Tooltip - 向下显示 -->
-      <div
-        class="invisible absolute left-0 top-full z-[100] mt-1.5 min-w-[200px] max-w-[300px] rounded-lg bg-gray-800 px-3 py-2 text-xs text-white opacity-0 shadow-xl transition-all duration-200 group-hover/error:visible group-hover/error:opacity-100 dark:bg-gray-900"
-      >
-        <div class="whitespace-pre-wrap break-words leading-relaxed text-gray-300">
-          {{ account.error_message }}
-        </div>
-        <!-- 上方小三角 -->
-        <div
-          class="absolute bottom-full left-3 border-[6px] border-transparent border-b-gray-800 dark:border-b-gray-900"
-        ></div>
-      </div>
-    </div>
+    <HelpTooltip
+      v-if="errorDetails"
+      data-testid="account-error-details"
+      width-class="w-80 max-w-[calc(100vw-2rem)]"
+    >
+      <template #trigger>
+        <svg
+          class="h-4 w-4 cursor-help text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+          :aria-label="t('admin.accounts.status.errorDetails')"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"
+          />
+        </svg>
+      </template>
+      <div class="whitespace-pre-wrap break-words">{{ errorDetails }}</div>
+    </HelpTooltip>
 
     <!-- Rate Limit Indicator (429) -->
     <div v-if="isRateLimited" class="group relative">
@@ -200,6 +208,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
+import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import type { Account } from '@/types'
 import { formatCountdown, formatDateTime, formatDateTimeToMinute, formatCountdownWithSuffix, formatTime } from '@/utils/format'
 
@@ -371,7 +380,59 @@ const accountStatusCode = computed(() => {
   return parseStatusCode(props.account.error_message)
 })
 
-const isRequestTimeout = computed(() => accountStatusCode.value === 408)
+const isAdobeCookieError = (message: string): boolean =>
+  props.account.platform === 'adobe' &&
+  /adobe cookie is no longer valid|\binvalid_credentials\b/i.test(message)
+
+const isAuthenticationError = (message: string): boolean => {
+  if (isAdobeCookieError(message)) return true
+  try {
+    const reason = JSON.parse(message) as Record<string, unknown> | null
+    if (reason && typeof reason === 'object' && Number(reason.status_code) === 401) return true
+  } catch {
+    // Error messages usually contain plain text, not JSON.
+  }
+  return /(?:^\s*|\(|\b(?:http|oauth|status(?:\s+code)?|returned|rejected|upstream|failed)\s*[:=]?\s*\(?)401\b/i.test(message)
+}
+
+const tempUnschedulableError = computed(() => {
+  if (!isTempUnschedulable.value) return ''
+  return props.account.temp_unschedulable_reason || ''
+})
+
+const authenticationError = computed(() => {
+  // Current errors take precedence over earlier connection checks.
+  const currentError = props.account.error_message || tempUnschedulableError.value
+  if (currentError) return isAuthenticationError(currentError) ? currentError : ''
+
+  const extra = props.account.extra
+  // A persisted connection check is historical and has its own badge; it must
+  // not turn a recovered account's current status back into an auth failure.
+  for (const key of ['last_status_code', 'status_code', 'upstream_status_code', 'adobe_last_status_code']) {
+    if (Number(extra?.[key]) === 401) return t('admin.accounts.status.authenticationFailedHint')
+  }
+  return ''
+})
+
+const isAuthenticationFailed = computed(() => Boolean(authenticationError.value))
+const authenticationFailureText = computed(() => t(
+  isAdobeCookieError(authenticationError.value)
+    ? 'admin.accounts.status.cookieInvalid'
+    : 'admin.accounts.status.authenticationFailed'
+))
+
+const isRequestTimeout = computed(() => !isAuthenticationFailed.value && accountStatusCode.value === 408)
+
+const errorDetails = computed(() => {
+  if (isAuthenticationFailed.value) return authenticationError.value
+  if (hasError.value || isRequestTimeout.value) {
+    return props.account.error_message || tempUnschedulableError.value
+  }
+  if (props.account.extra?.last_check_success === false && Number(props.account.extra.last_check_status_code) === 401) {
+    return t('admin.accounts.status.lastCheckAuthenticationFailedHint')
+  }
+  return ''
+})
 
 // Computed: is temp unschedulable
 const isTempUnschedulable = computed(() => {
