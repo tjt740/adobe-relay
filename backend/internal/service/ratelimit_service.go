@@ -466,8 +466,11 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 			if !recovered {
 				// The callback may have pushed a new cookie while the caller
 				// timed out. Do not overwrite that success with a stale error.
-				_, _ = setAdobeCookieRefreshError(ctx, s.accountRepo, authAccount,
-					"Authentication failed (401): Okad recovery pending")
+				if repo, ok := s.accountRepo.(AdobeCookieRecoveryRepository); ok {
+					if _, err := repo.QueueAdobeCookieRecoveryIfUnchanged(ctx, authAccount); err != nil {
+						slog.Warn("adobe_okad_queue_failed", "account_id", authAccount.ID)
+					}
+				}
 			}
 			shouldDisable = true
 			break

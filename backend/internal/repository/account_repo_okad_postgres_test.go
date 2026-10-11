@@ -47,7 +47,7 @@ func TestOkadRecoveryPostgres(t *testing.T) {
 		_, err = db.Exec("UPDATE accounts SET status=$1,error_message=$2,schedulable=$3", status, message, schedulable)
 		require.NoError(t, err)
 	}
-	snapshot := &service.Account{ID: 1, Status: service.StatusError, ErrorMessage: message, Credentials: map[string]any{"cookie": "old", "email": "test@example.test"}}
+	snapshot := &service.Account{ID: 1, Platform: service.PlatformAdobe, Type: service.AccountTypeOAuth, Status: service.StatusError, ErrorMessage: message, Credentials: map[string]any{"cookie": "old", "email": "test@example.test"}}
 	reset(service.StatusError, message, false)
 	applied, err := repo.RecoverAdobeCookieIfUnchanged(ctx, snapshot, "fresh")
 	require.NoError(t, err)
@@ -87,6 +87,20 @@ func TestOkadRecoveryPostgres(t *testing.T) {
 		require.NoError(t, repo.ClearError(ctx, 1))
 		require.NoError(t, db.QueryRow("SELECT schedulable FROM accounts WHERE id=1").Scan(&schedulable))
 		require.Equal(t, tc.resume, schedulable, tc.message)
+	}
+	// Failed logins may queue only the exact active snapshot, never a pause or
+	// credential/identity/proxy edit made while the login was running.
+	active := *snapshot
+	active.Status, active.ErrorMessage, active.Schedulable = service.StatusActive, "", true
+	for _, mutation := range []string{"", "UPDATE accounts SET status='disabled'", "UPDATE accounts SET schedulable=false", "UPDATE accounts SET credentials=credentials || '{\"cookie\":\"newer\"}'", "UPDATE accounts SET proxy_id=9"} {
+		reset(service.StatusActive, "", true)
+		if mutation != "" {
+			_, err = db.Exec(mutation)
+			require.NoError(t, err)
+		}
+		applied, err = repo.QueueAdobeCookieRecoveryIfUnchanged(ctx, &active)
+		require.NoError(t, err)
+		require.Equal(t, mutation == "", applied, mutation)
 	}
 	// The outbox failure rolls back the account mutation too.
 	reset(service.StatusError, message, false)

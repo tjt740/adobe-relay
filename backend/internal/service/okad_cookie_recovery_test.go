@@ -25,6 +25,19 @@ type okadRecoveryRepo struct {
 	beforeSave func(*Account)
 }
 
+func (r *okadRecoveryRepo) QueueAdobeCookieRecoveryIfUnchanged(_ context.Context, a *Account) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	latest := r.accounts[a.ID]
+	if latest.Status != StatusActive || !latest.Schedulable || latest.GetCredential("cookie") != a.GetCredential("cookie") {
+		return false, nil
+	}
+	latest.Status = StatusError
+	latest.Schedulable = false
+	latest.ErrorMessage = "Authentication failed (401): Okad recovery pending"
+	return true, nil
+}
+
 func (r *okadRecoveryRepo) GetByID(_ context.Context, id int64) (*Account, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -192,4 +205,31 @@ func TestOkadRecoveryRateLimit401UsesCallback(t *testing.T) {
 }
 func TestOkadRecoveryDisabledWithoutConfiguration(t *testing.T) {
 	require.Nil(t, newOkadCookieRecovery(&okadRecoveryRepo{}, &config.Config{}))
+}
+
+func TestOkadRecoveryFailed401QueuesWithoutOverridingManualPause(t *testing.T) {
+	for _, paused := range []bool{false, true} {
+		a := recoveryFixtureAccount(907)
+		a.Status, a.ErrorMessage, a.Schedulable = StatusActive, "", true
+		repo := &okadRecoveryRepo{accounts: map[int64]*Account{907: a}}
+		snapshot, err := repo.GetByID(context.Background(), a.ID)
+		require.NoError(t, err)
+		s := newTestOkadRecovery(t, repo, func(w http.ResponseWriter, r *http.Request) {
+			if paused {
+				repo.mu.Lock()
+				a.Status, a.Schedulable = "disabled", false
+				repo.mu.Unlock()
+			}
+			_, _ = w.Write([]byte(`{"ok":false,"message":"login failed"}`))
+		})
+		rate := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+		rate.okadRecovery = s
+		require.True(t, rate.HandleUpstreamError(context.Background(), snapshot, 401, http.Header{}, nil))
+		if paused {
+			require.Equal(t, "disabled", a.Status)
+			require.Empty(t, a.ErrorMessage)
+		} else {
+			require.True(t, isAdobeCookieRecoveryCandidate(a))
+		}
+	}
 }
