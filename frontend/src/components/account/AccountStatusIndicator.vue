@@ -42,6 +42,16 @@
       </span>
     </template>
 
+    <span
+      v-if="typeof account.extra?.last_check_success === 'boolean' && !isRequestTimeout"
+      data-testid="account-last-check"
+      :class="['badge text-xs', account.extra.last_check_success ? 'badge-success' : 'badge-danger']"
+      :title="t('admin.accounts.bulkTest.checkedAt', { time: formatDateTime(String(account.extra.last_check_at || '')) })"
+    >
+      {{ t(account.extra.last_check_success ? 'admin.accounts.bulkTest.passed' : 'admin.accounts.bulkTest.failed') }}
+      <span v-if="Number(account.extra.last_check_status_code) >= 400">{{ account.extra.last_check_status_code }}</span>
+    </span>
+
     <!-- Error Info Indicator -->
     <div v-if="hasError && account.error_message" class="group/error relative">
       <svg

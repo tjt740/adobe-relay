@@ -684,6 +684,7 @@ export default {
       bulkSchedulablePartial: '部分调度更新成功：成功 {success} 个，失败 {failed} 个',
       bulkSchedulableResultUnknown: '批量调度结果不完整，请稍后重试或刷新列表',
       bulkActions: {
+        test: '批量检测',
         selected: '已选择 {count} 个账号',
         selectedAll: '已选择全部 {count} 个账号',
         selectCurrentPage: '本页全选',
@@ -706,6 +707,21 @@ export default {
         resetStatusSuccess: '已成功重置 {count} 个账号状态',
         refreshTokenSuccess: '已成功刷新 {count} 个账号令牌',
         partialSuccess: '操作部分完成：{success} 成功，{failed} 失败'
+      },
+      bulkTest: {
+        title: '批量检测账号',
+        hint: '使用各账号的默认模型调用「测试连接」，每次最多同时检测 3 个账号。检测会真实调用上游并消耗相应额度；Adobe 账号会生成测试图。',
+        progress: '已完成 {done} / {total}',
+        summary: '通过 {success} · 失败 {failed} · 已停止 {cancelled}',
+        result: '检测结果',
+        stop: '停止检测',
+        stopAndClose: '停止并关闭',
+        sessionExpired: '管理登录会话已失效或没有权限，检测已停止，请重新登录。',
+        failedHint: '检测未通过或未收到完整结果，请使用单账号测试连接查看详情。',
+        passed: '检测通过',
+        failed: '检测失败',
+        checkedAt: '最近检测：{time}',
+        states: { pending: '等待检测', running: '检测中', success: '通过', failed: '失败', cancelled: '已停止' }
       },
       bulkEdit: {
         title: '批量编辑账号',

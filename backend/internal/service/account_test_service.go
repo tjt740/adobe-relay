@@ -372,7 +372,7 @@ func createTestPayload(modelID string) (map[string]any, error) {
 // modelID is optional - if empty, defaults to claude.DefaultTestModel
 // mode is optional - "compact" routes OpenAI accounts to the /responses/compact probe path
 // opts is optional media (image/audio data URLs for real generation / STT).
-func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int64, modelID string, prompt string, mode string, opts ...AccountTestOptions) error {
+func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int64, modelID string, prompt string, mode string, opts ...AccountTestOptions) (testErr error) {
 	ctx := c.Request.Context()
 	testOpts := firstAccountTestOptions(opts)
 
@@ -381,6 +381,7 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Account not found")
 	}
+	defer func() { s.recordConnectionTestResult(ctx, account, testErr) }()
 
 	// Synthetic UI load-test accounts exercise the real SSE parsing and modal
 	// interactions, but intentionally do not send their placeholder credentials
@@ -3453,9 +3454,7 @@ func (s *AccountTestService) sendEvent(c *gin.Context, event TestEvent) {
 func (s *AccountTestService) sendErrorAndEnd(c *gin.Context, errorMsg string) error {
 	log.Printf("Account test error: %s", errorMsg)
 	event := TestEvent{Type: "error", Error: errorMsg}
-	if accountTest408Pattern.MatchString(errorMsg) {
-		event.StatusCode = http.StatusRequestTimeout
-	}
+	event.StatusCode = connectionTestStatusCode(errors.New(errorMsg))
 	s.sendEvent(c, event)
 	return fmt.Errorf("%s", errorMsg)
 }

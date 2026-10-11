@@ -85,7 +85,7 @@ const makeAccounts = (count: number) => Array.from({ length: count }, (_, index)
 
 const AccountBulkActionsBarStub = {
   props: ['selectedIds', 'totalResults', 'selectingAll', 'allResultsSelected'],
-  emits: ['select-all-results', 'select-page', 'clear', 'refresh-token', 'export'],
+  emits: ['select-all-results', 'select-page', 'clear', 'refresh-token', 'export', 'test'],
   template: `
     <div>
       <span data-test="selected-count">{{ selectedIds.length }}</span>
@@ -95,6 +95,7 @@ const AccountBulkActionsBarStub = {
       <button data-test="select-all-results" @click="$emit('select-all-results')">select all</button>
       <button data-test="clear" @click="$emit('clear')">clear</button>
       <button data-test="refresh-token" @click="$emit('refresh-token')">refresh token</button>
+      <button data-test="bulk-test" @click="$emit('test')">test accounts</button>
       <button data-test="export" @click="$emit('export')">export accounts</button>
     </div>
   `
@@ -132,6 +133,10 @@ const mountView = () => mount(AccountsView, {
       ImportDataModal: true,
       ReAuthAccountModal: true,
       AccountTestModal: true,
+      AccountBulkTestModal: {
+        name: 'AccountBulkTestModal', props: ['show', 'targets'], emits: ['completed'],
+        template: '<button v-if="show" data-test="bulk-test-complete" @click="$emit(\'completed\')">complete</button>'
+      },
       AccountStatsModal: true,
       ScheduledTestsPanel: true,
       SyncFromCrsModal: true,
@@ -180,6 +185,24 @@ describe('admin AccountsView select all filtered results', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+  })
+
+  it('passes every selected ID to bulk testing and refreshes the list on completion', async () => {
+    listAccounts.mockImplementation(async (_page: number, pageSize: number) => ({
+      items: makeAccounts(pageSize === 1000 ? 45 : 20), total: 45, page: 1, page_size: pageSize, pages: pageSize === 1000 ? 1 : 3
+    }))
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-test="select-all-results"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="bulk-test"]').trigger('click')
+    const modal = wrapper.findComponent({ name: 'AccountBulkTestModal' })
+    expect(modal.props('targets').map((row: { id: number }) => row.id)).toEqual(makeAccounts(45).map(row => row.id))
+    const before = listAccounts.mock.calls.length
+    await wrapper.get('[data-test="bulk-test-complete"]').trigger('click')
+    await flushPromises()
+    expect(listAccounts.mock.calls.length).toBe(before + 1)
+    wrapper.unmount()
   })
 
   it.each([

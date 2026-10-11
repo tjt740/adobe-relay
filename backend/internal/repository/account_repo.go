@@ -73,6 +73,9 @@ var schedulerNeutralExtraKeys = map[string]struct{}{
 	"codex_referral_snapshot":    {},
 	"grok_billing_snapshot":      {},
 	"session_window_utilization": {},
+	"last_check_success":         {},
+	"last_check_status_code":     {},
+	"last_check_at":              {},
 }
 
 const postgresParameterBatchSize = 50000
