@@ -2050,6 +2050,7 @@ func (r *accountRepository) ClearError(ctx context.Context, id int64) error {
 	 WITH updated AS (
 	  UPDATE accounts
 	  SET schedulable = CASE WHEN platform = 'adobe' AND type = 'oauth' AND status = 'error'
+        AND COALESCE(extra->>'okad_manual_pause','false') <> 'true'
 	    AND (expires_at IS NULL OR expires_at > NOW())
 	    AND (
 	      LOWER(error_message) LIKE 'oauth 401 (no refresh_token):%'
@@ -2888,10 +2889,9 @@ func (r *accountRepository) UpdateSessionWindowEnd(ctx context.Context, id int64
 }
 
 func (r *accountRepository) SetSchedulable(ctx context.Context, id int64, schedulable bool) error {
-	_, err := r.client.Account.Update().
-		Where(dbaccount.IDEQ(id)).
-		SetSchedulable(schedulable).
-		Save(ctx)
+	_, err := r.sql.ExecContext(ctx, `UPDATE accounts SET schedulable=$2,
+        extra=CASE WHEN platform='adobe' THEN COALESCE(extra,'{}'::jsonb)||jsonb_build_object('okad_manual_pause',NOT $2) ELSE extra END,
+        updated_at=NOW() WHERE id=$1 AND deleted_at IS NULL`, id, schedulable)
 	if err != nil {
 		return err
 	}
@@ -3278,6 +3278,10 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 		idx++
 	}
 	if updates.Schedulable != nil {
+		if updates.Extra == nil {
+			updates.Extra = map[string]any{}
+		}
+		updates.Extra["okad_manual_pause"] = !*updates.Schedulable
 		setClauses = append(setClauses, "schedulable = $"+itoa(idx))
 		args = append(args, *updates.Schedulable)
 		idx++

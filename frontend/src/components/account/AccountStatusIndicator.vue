@@ -64,6 +64,8 @@
       <span v-if="Number(account.extra.last_check_status_code) >= 400">{{ account.extra.last_check_status_code }}</span>
     </span>
 
+    <OkadIntegrationStatus v-if="account.platform === 'adobe'" :account="account" />
+
     <!-- Error Info Indicator -->
     <HelpTooltip
       v-if="errorDetails"
@@ -208,6 +210,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
+import OkadIntegrationStatus from './OkadIntegrationStatus.vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import type { Account } from '@/types'
 import { formatCountdown, formatDateTime, formatDateTimeToMinute, formatCountdownWithSuffix, formatTime } from '@/utils/format'
