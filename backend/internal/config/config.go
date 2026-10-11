@@ -955,6 +955,11 @@ const (
 
 // GatewayConfig API网关相关配置
 type GatewayConfig struct {
+	// OkadCookieRefreshURL accepts the trusted Okad login endpoint. Empty disables recovery.
+	OkadCookieRefreshURL            string `mapstructure:"okad_cookie_refresh_url"`
+	OkadCookieRefreshAPIKey         string `mapstructure:"okad_cookie_refresh_api_key"`
+	OkadCookieRefreshTimeoutSeconds int    `mapstructure:"okad_cookie_refresh_timeout_seconds"`
+
 	// 等待上游响应头的超时时间（秒），0表示无超时
 	// 注意：这不影响流式数据传输，只控制等待响应头的时间
 	ResponseHeaderTimeout int `mapstructure:"response_header_timeout"`
@@ -2029,6 +2034,10 @@ func configureConfigSource(setConfigFile, addConfigPath func(string)) {
 }
 
 func setDefaults() {
+	viper.SetDefault("gateway.okad_cookie_refresh_url", "")
+	viper.SetDefault("gateway.okad_cookie_refresh_api_key", "")
+	viper.SetDefault("gateway.okad_cookie_refresh_timeout_seconds", 300)
+
 	viper.SetDefault("run_mode", RunModeStandard)
 	viper.SetDefault("simple_mode.auto_create_default_groups", true)
 	viper.SetDefault("simple_mode_key_rate_limit_enabled", false)

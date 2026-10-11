@@ -20,6 +20,8 @@ import (
 
 // RateLimitService 处理限流和过载状态管理
 type RateLimitService struct {
+	okadRecovery *OkadCookieRecovery
+
 	accountRepo           AccountRepository
 	usageRepo             UsageLogRepository
 	cfg                   *config.Config
@@ -99,6 +101,7 @@ const (
 // NewRateLimitService 创建RateLimitService实例
 func NewRateLimitService(accountRepo AccountRepository, usageRepo UsageLogRepository, cfg *config.Config, geminiQuotaService *GeminiQuotaService, tempUnschedCache TempUnschedCache) *RateLimitService {
 	return &RateLimitService{
+		okadRecovery:       newOkadCookieRecovery(accountRepo, cfg),
 		accountRepo:        accountRepo,
 		usageRepo:          usageRepo,
 		cfg:                cfg,
@@ -130,6 +133,9 @@ func (s *RateLimitService) SetSettingService(settingService *SettingService) {
 // SetTokenCacheInvalidator 设置 token 缓存清理器（可选依赖）
 func (s *RateLimitService) SetTokenCacheInvalidator(invalidator TokenCacheInvalidator) {
 	s.tokenCacheInvalidator = invalidator
+	if s.okadRecovery != nil {
+		s.okadRecovery.invalidator = invalidator
+	}
 }
 
 func (s *RateLimitService) SetAccountRuntimeBlocker(blocker AccountRuntimeBlocker) {
@@ -446,6 +452,26 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 				msg = "Unauthorized (401): " + upstreamMsg
 			}
 			s.handleAuthError(ctx, authAccount, msg)
+			shouldDisable = true
+			break
+		}
+		// Adobe cookies do not have refresh_token. Recover via Okad before
+		// applying the generic OAuth failure policy; the sweeper also retries
+		// historical errors and failures from the IMS/background refresh path.
+		if authAccount.Platform == PlatformAdobe && authAccount.Type == AccountTypeOAuth && s.okadRecovery != nil {
+			recovered, err := s.okadRecovery.recover(ctx, authAccount)
+			if err != nil {
+				slog.Warn("adobe_okad_cookie_refresh_failed", "account_id", authAccount.ID, "error", err)
+			}
+			if !recovered {
+				// The callback may have pushed a new cookie while the caller
+				// timed out. Do not overwrite that success with a stale error.
+				if repo, ok := s.accountRepo.(AdobeCookieRecoveryRepository); ok {
+					if _, err := repo.QueueAdobeCookieRecoveryIfUnchanged(ctx, authAccount); err != nil {
+						slog.Warn("adobe_okad_queue_failed", "account_id", authAccount.ID)
+					}
+				}
+			}
 			shouldDisable = true
 			break
 		}
