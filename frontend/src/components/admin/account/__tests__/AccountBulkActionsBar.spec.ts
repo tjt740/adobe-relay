@@ -47,4 +47,26 @@ describe('AccountBulkActionsBar', () => {
     await button!.trigger('click')
     expect(wrapper.emitted('probe-upstream-billing')).toHaveLength(1)
   })
+
+  it('exposes export and delete actions for the selected accounts', async () => {
+    const wrapper = mount(AccountBulkActionsBar, {
+      props: {
+        selectedIds: [1, 2],
+        totalResults: 45,
+        selectingAll: false,
+        allResultsSelected: false
+      }
+    })
+
+    await wrapper.get('[data-testid="bulk-export-accounts"]').trigger('click')
+    await wrapper.get('[data-testid="bulk-delete-accounts"]').trigger('click')
+
+    expect(wrapper.emitted('export')).toHaveLength(1)
+    expect(wrapper.emitted('delete')).toHaveLength(1)
+    expect(
+      wrapper.findAll('button').findIndex((button) => button.attributes('data-testid') === 'bulk-export-accounts')
+    ).toBeLessThan(
+      wrapper.findAll('button').findIndex((button) => button.attributes('data-testid') === 'bulk-delete-accounts')
+    )
+  })
 })

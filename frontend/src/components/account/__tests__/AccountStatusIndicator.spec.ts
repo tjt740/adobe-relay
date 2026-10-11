@@ -66,6 +66,44 @@ function makeAccount(overrides: Partial<Account>): Account {
 }
 
 describe('AccountStatusIndicator', () => {
+  it('账号检查返回 408 时显示请求超时状态和状态码', () => {
+    const wrapper = mount(AccountStatusIndicator, {
+      props: {
+        account: makeAccount({
+          error_message: 'API returned 408 while checking the account'
+        })
+      },
+      global: {
+        stubs: {
+          Icon: true
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('admin.accounts.status.requestTimeout')
+    expect(wrapper.text()).toContain('408')
+  })
+
+  it('临时不可调度原因中的 408 也显示请求超时状态', () => {
+    const wrapper = mount(AccountStatusIndicator, {
+      props: {
+        account: makeAccount({
+          temp_unschedulable_until: '2099-03-15T00:00:00Z',
+          temp_unschedulable_reason: JSON.stringify({ status_code: 408 })
+        })
+      },
+      global: {
+        stubs: {
+          Icon: true
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('admin.accounts.status.requestTimeout')
+    expect(wrapper.text()).toContain('408')
+    expect(wrapper.text()).not.toContain('admin.accounts.status.tempUnschedulable')
+  })
+
   it('Claude 5 系列模型限流时显示 Opus 和 Sonnet 的短别名', () => {
     const wrapper = mount(AccountStatusIndicator, {
       props: {

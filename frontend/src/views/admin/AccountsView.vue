@@ -181,6 +181,7 @@
           :selecting-all="selectingAllResults"
           :all-results-selected="allResultsSelected"
           @delete="handleBulkDelete"
+          @export="handleBulkExportAccounts"
           @reset-status="handleBulkResetStatus"
           @refresh-token="handleBulkRefreshToken"
           @probe-upstream-billing="handleBulkProbeUpstreamBilling"
@@ -466,7 +467,7 @@
     <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" />
     <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" />
     <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
-    <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
+    <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" @status-code="handleAccountTestStatusCode" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
     <ScheduledTestsPanel :show="showSchedulePanel" :account-id="scheduleAcc?.id ?? null" :model-options="scheduleModelOptions" @close="closeSchedulePanel" />
     <AccountActionMenu :show="menu.show" :account="menu.acc" :anchor-rect="menu.anchorRect" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @create-spark-shadow="handleCreateSparkShadow" />
@@ -2395,6 +2396,44 @@ const handleExportData = async () => {
   }
 }
 const accountExportStepUp = useStepUp()
+const handleBulkExportAccounts = async () => {
+  if (exportingData.value || selIds.value.length === 0) return
+  exportingData.value = true
+  try {
+    const dataPayload = await accountExportStepUp.run(() => adminAPI.accounts.exportData({
+      ids: selIds.value,
+      includeProxies: false
+    }))
+    const timestamp = formatExportTimestamp()
+    const filename = `sub2api-accounts-${timestamp}.json`
+    const blob = new Blob([JSON.stringify(dataPayload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(url)
+    if (dataPayload.skipped_shadows && dataPayload.skipped_shadows > 0) {
+      appStore.showWarning(t('admin.accounts.dataExportedSkippedShadows', { count: dataPayload.skipped_shadows }))
+    } else {
+      appStore.showSuccess(t('admin.accounts.bulkActions.exported'))
+    }
+  } catch (error: any) {
+    if (isStepUpCancelled(error)) {
+      // 用户主动取消 step-up 验证，静默返回，不弹错误提示。
+    } else if (isStepUpBlocked(error)) {
+      appStore.showError(
+        stepUpBlockReason(error) === 'STEP_UP_ADMIN_API_KEY_FORBIDDEN'
+          ? t('stepUp.adminApiKeyForbidden')
+          : t('stepUp.notEnabled')
+      )
+    } else {
+      appStore.showError(error?.message || t('admin.accounts.dataExportFailed'))
+    }
+  } finally {
+    exportingData.value = false
+  }
+}
 const closeTestModal = () => { showTest.value = false; testingAcc.value = null }
 const closeStatsModal = () => { showStats.value = false; statsAcc.value = null }
 const closeReAuthModal = () => { showReAuth.value = false; reAuthAcc.value = null }
@@ -2403,6 +2442,19 @@ const handleTest = async (a: AccountListItem) => {
   if (!account) return
   testingAcc.value = account
   showTest.value = true
+}
+const handleAccountTestStatusCode = (statusCode: number) => {
+  if (statusCode !== 408 || !testingAcc.value) return
+  const rowIndex = accounts.value.findIndex((row) => row.id === testingAcc.value?.id)
+  if (rowIndex < 0) return
+  const row = accounts.value[rowIndex]
+  accounts.value[rowIndex] = {
+    ...row,
+    extra: {
+      ...(row.extra ?? {}),
+      last_check_status_code: 408
+    }
+  }
 }
 const handleViewStats = async (a: AccountListItem) => {
   const account = await loadAccountDetails(a)
