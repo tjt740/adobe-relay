@@ -147,7 +147,7 @@ export default {
         },
       },
       emailTabDisabledTitle: '邮箱验证未启用',
-      emailTabDisabledHint: '仍可配置 SMTP，用于运维告警和其他邮件通知；无需启用注册邮箱验证。',
+      emailTabDisabledHint: '请在「安全与认证」选项卡中启用邮箱验证后，再配置 SMTP 设置。',
       registration: {
         title: '注册设置',
         description: '控制用户注册和验证',

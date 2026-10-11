@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/mail"
 	"strings"
@@ -9,6 +11,33 @@ import (
 )
 
 const OpsMetricAdobeErrorAccounts = "adobe_401_408_accounts"
+
+// Private transport: never expose this value in rule filters or API responses,
+// and never reuse it for signup, password reset, reports, or other alert metrics.
+const SettingKeyOpsAdobeAlertMail = "ops_adobe_alert_mail_private"
+
+type OpsAdobeAlertMail struct {
+	Recipient string     `json:"recipient"`
+	SMTP      SMTPConfig `json:"smtp"`
+}
+
+func (s *EmailService) getAdobeAlertMail(ctx context.Context) (*OpsAdobeAlertMail, error) {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyOpsAdobeAlertMail)
+	if errors.Is(err, ErrSettingNotFound) || (err == nil && strings.TrimSpace(value) == "") {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("Adobe alert mail settings unavailable")
+	}
+	var config OpsAdobeAlertMail
+	if json.Unmarshal([]byte(value), &config) != nil {
+		return nil, fmt.Errorf("invalid Adobe alert mail settings")
+	}
+	if _, err := OpsAlertEmailRecipient(map[string]any{"email_recipient": config.Recipient}); err != nil || config.Recipient == "" || config.SMTP.Host == "" || config.SMTP.Port < 1 || config.SMTP.Port > 65535 {
+		return nil, fmt.Errorf("invalid Adobe alert mail settings")
+	}
+	return &config, nil
+}
 
 // This port reads saved business telemetry only. It must never probe Adobe,
 // refresh credentials, test accounts, or invoke the recovery service.

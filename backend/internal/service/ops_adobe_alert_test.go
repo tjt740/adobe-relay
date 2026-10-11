@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -123,4 +124,34 @@ func TestAdobeAlertDescriptionBoundedAndEscaped(t *testing.T) {
 	require.NotContains(t, body, "<tag>")
 	require.Contains(t, body, "&lt;tag&gt;")
 	require.Contains(t, body, "<br>")
+}
+
+func TestAdobeAlertDedicatedTransportDoesNotEnableOtherMail(t *testing.T) {
+	ctx := context.Background()
+	settings := newNotificationEmailMemorySettingRepo()
+	require.NoError(t, settings.Set(ctx, SettingKeyOpsEmailNotificationConfig, `{"alert":{"enabled":true,"recipients":[]}}`))
+	smtp := startNotificationEmailTestSMTPServer(t)
+	transportSettings := newNotificationEmailMemorySettingRepo()
+	require.NoError(t, transportSettings.SetMultiple(ctx, smtp.settings()))
+	transport, err := NewEmailService(transportSettings, nil).GetSMTPConfig(ctx)
+	require.NoError(t, err)
+	private, err := json.Marshal(OpsAdobeAlertMail{Recipient: "owner@example.test", SMTP: *transport})
+	require.NoError(t, err)
+	require.NoError(t, settings.Set(ctx, SettingKeyOpsAdobeAlertMail, string(private)))
+	email := NewEmailService(settings, nil)
+	rule := &OpsAlertRule{ID: 1, MetricType: OpsMetricAdobeErrorAccounts, NotifyEmail: true, Filters: map[string]any{"email_recipient": "owner@example.test"}}
+	event := &OpsAlertEvent{ID: 1}
+	r := &adobeAlertTestRepo{active: event}
+	eval := NewOpsAlertEvaluatorService(&OpsService{settingRepo: settings}, r, email, nil, nil, nil)
+	require.True(t, eval.maybeSendAlertEmail(ctx, nil, rule, event))
+	require.EqualValues(t, 1, smtp.messageCount())
+	_, err = email.GetSMTPConfig(ctx)
+	require.ErrorIs(t, err, ErrEmailNotConfigured, "global mail settings must remain unchanged")
+	event.EmailSent = false
+	rule.MetricType = "error_rate"
+	require.False(t, eval.maybeSendAlertEmail(ctx, nil, rule, event), "other alerts must not use this transport")
+	rule.MetricType = OpsMetricAdobeErrorAccounts
+	rule.Filters["email_recipient"] = "someone-else@example.test"
+	require.False(t, eval.maybeSendAlertEmail(ctx, nil, rule, event), "dedicated transport must not send to another recipient")
+	require.EqualValues(t, 1, smtp.messageCount())
 }

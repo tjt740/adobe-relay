@@ -278,7 +278,7 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 			if activeEvent != nil {
 				// Failed delivery is retried on later evaluations. A delivered
 				// active incident stays quiet, including across process restarts.
-				if !activeEvent.EmailSent && s.maybeSendAlertEmail(ctx, runtimeCfg, rule, activeEvent) {
+				if rule.MetricType == OpsMetricAdobeErrorAccounts && !activeEvent.EmailSent && s.maybeSendAlertEmail(ctx, runtimeCfg, rule, activeEvent) {
 					emailsSent++
 				}
 				continue
@@ -758,6 +758,13 @@ func (s *OpsAlertEvaluatorService) maybeSendAlertEmail(ctx context.Context, runt
 
 	subject := fmt.Sprintf("[Ops Alert][%s] %s", strings.TrimSpace(rule.Severity), strings.TrimSpace(rule.Name))
 	body := buildOpsAlertEmailBody(rule, event)
+	var adobeMail *OpsAdobeAlertMail
+	if rule.MetricType == OpsMetricAdobeErrorAccounts {
+		adobeMail, err = s.emailService.getAdobeAlertMail(ctx)
+		if err != nil {
+			return false
+		}
+	}
 
 	anySent := false
 	for _, to := range recipients {
@@ -765,7 +772,16 @@ func (s *OpsAlertEvaluatorService) maybeSendAlertEmail(ctx context.Context, runt
 		if addr == "" {
 			continue
 		}
+		if adobeMail != nil && !strings.EqualFold(addr, adobeMail.Recipient) {
+			continue // This transport is authorized for its sole recipient only.
+		}
 		if !s.emailLimiter.Allow(time.Now().UTC()) {
+			continue
+		}
+		if adobeMail != nil {
+			if err := s.emailService.SendEmailWithConfig(&adobeMail.SMTP, addr, subject, body); err == nil {
+				anySent = true
+			}
 			continue
 		}
 		if s.emailService.notificationEmailService != nil {

@@ -8578,8 +8578,8 @@
             </div>
           </div>
 
-          <!-- SMTP is also used by operations alerts, independently of signup verification. -->
-          <div class="card">
+          <!-- SMTP Settings - Only show when email verification is enabled -->
+          <div v-if="form.email_verify_enabled" class="card">
             <div
               class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-dark-700"
             >
@@ -8741,8 +8741,8 @@
             </div>
           </div>
 
-          <!-- Test the shared mail transport independently of signup verification. -->
-          <div class="card">
+          <!-- Send Test Email - Only show when email verification is enabled -->
+          <div v-if="form.email_verify_enabled" class="card">
             <div
               class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
             >
