@@ -57,6 +57,8 @@ type GrokOAuthRefreshMutationRepository interface {
 // TokenRefreshService OAuth token自动刷新服务
 // 定期检查并刷新即将过期的token
 type TokenRefreshService struct {
+	okadRecovery *OkadCookieRecovery
+
 	accountRepo      AccountRepository
 	candidatePager   OAuthRefreshCandidatePager
 	registrations    []tokenRefreshRegistration
@@ -107,6 +109,7 @@ func NewTokenRefreshService(
 	}
 	runCtx, runCancel := context.WithCancel(context.Background())
 	s := &TokenRefreshService{
+		okadRecovery:     newOkadCookieRecovery(accountRepo, cfg),
 		accountRepo:      accountRepo,
 		refreshPolicy:    DefaultBackgroundRefreshPolicy(),
 		cfg:              refreshCfg,
@@ -116,6 +119,9 @@ func NewTokenRefreshService(
 		stopCh:           make(chan struct{}),
 		runCtx:           runCtx,
 		runCancel:        runCancel,
+	}
+	if s.okadRecovery != nil {
+		s.okadRecovery.invalidator = cacheInvalidator
 	}
 	if pager, ok := accountRepo.(OAuthRefreshCandidatePager); ok {
 		s.candidatePager = pager
@@ -221,6 +227,16 @@ func (s *TokenRefreshService) notifyAccountSchedulingBlockCleared(accountID int6
 
 // Start 启动后台刷新服务
 func (s *TokenRefreshService) Start() {
+	// Error accounts are excluded from normal token-refresh candidates and
+	// cannot generate another request/401. Recover them independently.
+	if s.okadRecovery != nil {
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			s.okadRecovery.run(s.runCtx)
+		}()
+	}
+
 	if s.cfg == nil || !s.cfg.Enabled {
 		slog.Info("token_refresh.service_disabled")
 		return
