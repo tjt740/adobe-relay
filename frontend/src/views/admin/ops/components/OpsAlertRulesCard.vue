@@ -109,6 +109,16 @@ const draftGroupId = computed<number | null>({
   }
 })
 
+const draftEmailRecipient = computed<string>({
+  get: () => String(draft.value?.filters?.email_recipient || ''),
+  set(value) {
+    if (!draft.value) return
+    if (!draft.value.filters) draft.value.filters = {}
+    if (value.trim()) draft.value.filters.email_recipient = value.trim()
+    else delete draft.value.filters.email_recipient
+  }
+})
+
 const groupOptions = computed<SelectOption[]>(() => {
   if (isGroupMetricSelected.value) return groupOptionsBase.value
   return [{ value: null, label: t('admin.ops.alertRules.form.allGroups') }, ...groupOptionsBase.value]
@@ -201,6 +211,14 @@ const metricDefinitions = computed(() => {
 
     // Account-level metrics
     {
+      type: 'adobe_401_408_accounts',
+      group: 'account',
+      label: t('admin.ops.alertRules.metrics.adobeErrorAccounts'),
+      description: t('admin.ops.alertRules.metricDescriptions.adobeErrorAccounts'),
+      recommendedOperator: '>=',
+      recommendedThreshold: 5
+    },
+    {
       type: 'account_rate_limited_count',
       group: 'account',
       label: t('admin.ops.alertRules.metrics.accountRateLimitedCount'),
@@ -280,7 +298,7 @@ const severityOptions = computed(() => {
 })
 
 const windowOptions = computed(() => {
-  const windows = [1, 5, 60]
+  const windows = [1, 5, 10, 60]
   return windows.map((m) => ({ value: m, label: `${m}m` }))
 })
 
@@ -324,7 +342,7 @@ const editorValidation = computed(() => {
   if (!r.operator) errors.push(t('admin.ops.alertRules.validation.operatorRequired'))
   if (!(typeof r.threshold === 'number' && Number.isFinite(r.threshold)))
     errors.push(t('admin.ops.alertRules.validation.thresholdRequired'))
-  if (!(typeof r.window_minutes === 'number' && Number.isFinite(r.window_minutes) && [1, 5, 60].includes(r.window_minutes))) {
+  if (!(typeof r.window_minutes === 'number' && Number.isFinite(r.window_minutes) && [1, 5, 10, 60].includes(r.window_minutes))) {
     errors.push(t('admin.ops.alertRules.validation.windowRange'))
   }
   if (!(typeof r.sustained_minutes === 'number' && Number.isFinite(r.sustained_minutes) && r.sustained_minutes >= 1 && r.sustained_minutes <= 1440)) {
@@ -599,6 +617,11 @@ function cancelDelete() {
           <div class="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-dark-800/50 md:col-span-2">
             <span class="text-xs font-bold text-gray-700 dark:text-gray-200">{{ t('admin.ops.alertRules.form.enabled') }}</span>
             <input v-model="draft!.enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="input-label">{{ t('admin.ops.alertRules.form.emailRecipient') }}</label>
+            <input v-model="draftEmailRecipient" class="input" type="email" maxlength="254" />
           </div>
 
           <div class="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-dark-800/50 md:col-span-2">

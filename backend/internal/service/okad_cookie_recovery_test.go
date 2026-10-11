@@ -185,6 +185,8 @@ func TestOkadRecoverySkipsNonAuthenticationStates(t *testing.T) {
 			a.ErrorMessage = "Clash 订阅节点已移除，请重新选择代理并恢复账号调度"
 		}},
 		{"quota", func(a *Account) { a.ErrorMessage = "Quota exhausted (401)" }},
+		{"historical quota", func(a *Account) { a.ErrorMessage = "OAuth 401 (no refresh_token): taste_exhausted" }},
+		{"historical entitlement", func(a *Account) { a.ErrorMessage = "Authentication failed (401): model_not_entitled" }},
 		{"disabled", func(a *Account) { a.Status = "disabled" }},
 		{"different platform", func(a *Account) { a.Platform = PlatformOpenAI }},
 		{"missing email", func(a *Account) { delete(a.Credentials, "email") }},
@@ -248,48 +250,8 @@ func TestOkadRecoveryHonorsConcurrentPushOrDisable(t *testing.T) {
 		}
 	}
 }
-func TestOkadRecoveryRateLimit401UsesCallback(t *testing.T) {
-	a := recoveryFixtureAccount(906)
-	a.Status = StatusActive
-	a.ErrorMessage = ""
-	a.Schedulable = true
-	repo := &okadRecoveryRepo{accounts: map[int64]*Account{906: a}}
-	s := newTestOkadRecovery(t, repo, func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(`{"ok":true,"cookie":"fresh"}`)) })
-	rate := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
-	rate.okadRecovery = s
-	require.True(t, rate.HandleUpstreamError(context.Background(), a, 401, http.Header{}, []byte(`{"error":"Invalid bearer token"}`)))
-	require.Equal(t, StatusActive, a.Status)
-	require.Equal(t, "fresh", a.GetCredential("cookie"))
-}
 func TestOkadRecoveryDisabledWithoutConfiguration(t *testing.T) {
 	require.Nil(t, newOkadCookieRecovery(&okadRecoveryRepo{}, &config.Config{}))
-}
-
-func TestOkadRecoveryFailed401QueuesWithoutOverridingManualPause(t *testing.T) {
-	for _, paused := range []bool{false, true} {
-		a := recoveryFixtureAccount(907)
-		a.Status, a.ErrorMessage, a.Schedulable = StatusActive, "", true
-		repo := &okadRecoveryRepo{accounts: map[int64]*Account{907: a}}
-		snapshot, err := repo.GetByID(context.Background(), a.ID)
-		require.NoError(t, err)
-		s := newTestOkadRecovery(t, repo, func(w http.ResponseWriter, r *http.Request) {
-			if paused {
-				repo.mu.Lock()
-				a.Status, a.Schedulable = "disabled", false
-				repo.mu.Unlock()
-			}
-			_, _ = w.Write([]byte(`{"ok":false,"message":"login failed"}`))
-		})
-		rate := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
-		rate.okadRecovery = s
-		require.True(t, rate.HandleUpstreamError(context.Background(), snapshot, 401, http.Header{}, nil))
-		if paused {
-			require.Equal(t, "disabled", a.Status)
-			require.Empty(t, a.ErrorMessage)
-		} else {
-			require.True(t, isAdobeCookieRecoveryCandidate(a))
-		}
-	}
 }
 
 func TestOkadRecoverySharesBudgetAcross401ScannerAndRestart(t *testing.T) {
@@ -385,4 +347,46 @@ func TestOkadRecoveryConcurrentCallersOnlyLoginOnce(t *testing.T) {
 	close(release)
 	wg.Wait()
 	require.EqualValues(t, 1, calls.Load())
+}
+
+func (r *okadRecoveryRepo) PostponeAdobeCookieRecovery(_ context.Context, id int64, attemptID string, next time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	a := r.attempts[id]
+	if a.ID == attemptID && a.finished.IsZero() {
+		a.Count--
+		a.finished = time.Now()
+		a.next = next
+	}
+	return nil
+}
+func TestOkadRecoveryCooldownResponsePreservesBudget(t *testing.T) {
+	for _, managed := range []bool{false, true} {
+		t.Run(fmt.Sprint(managed), func(t *testing.T) {
+			a := recoveryFixtureAccount(991)
+			r := &okadRecoveryRepo{accounts: map[int64]*Account{a.ID: a}}
+			calls := 0
+			s := newTestOkadRecovery(t, r, func(w http.ResponseWriter, req *http.Request) {
+				if req.Method == "GET" {
+					_, _ = w.Write([]byte(`{"ok":true,"email":"fixture@example.test","source_key":"external:1"}`))
+					return
+				}
+				calls++
+				if managed {
+					var body map[string]any
+					require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"managed": true, "ok": false, "state": "failed", "code": "login_cooldown", "job_id": body["request_id"], "email": "fixture@example.test"}))
+				} else {
+					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"ok": false, "code": "login_cooldown", "retry_after": time.Now().Add(15 * time.Minute).Unix()}))
+				}
+			})
+			s.client.managed = managed
+			s.sweep(context.Background())
+			s.sweep(context.Background())
+			require.Equal(t, 1, calls)
+			require.Zero(t, r.attempts[a.ID].Count)
+			require.Greater(t, time.Until(r.attempts[a.ID].next), 14*time.Minute)
+			require.NotEqual(t, AdobeCookieRecoveryExhausted, a.ErrorMessage)
+		})
+	}
 }

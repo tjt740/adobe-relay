@@ -514,6 +514,7 @@ export default {
           groupAvailableRatio: 'Group Available Ratio (%)',
           groupRateLimitRatio: 'Group Rate Limit Ratio (%)',
           accountRateLimitedCount: 'Rate-limited Accounts',
+          adobeErrorAccounts: 'Adobe accounts with 401/408 errors',
           accountErrorCount: 'Error Accounts (excluding temporarily unschedulable)',
           accountErrorRatio: 'Error Account Ratio (%)',
           accountTempUnscheduledCount: 'Temporarily Unschedulable Accounts',
@@ -532,6 +533,7 @@ export default {
           groupAvailableRatio: 'Available account ratio in the selected group (0-100, requires group_id).',
           groupRateLimitRatio: 'Rate-limited account ratio in the selected group (0-100, requires group_id).',
           accountRateLimitedCount: 'Number of rate-limited accounts within the window.',
+          adobeErrorAccounts: 'Distinct Adobe accounts in saved upstream error records, including recovered failovers. Reads logs only; never tests or logs in accounts.',
           accountErrorCount: 'Number of error accounts within the window (excluding temporarily unschedulable).',
           accountErrorRatio: 'Error account ratio within the window (0-100).',
           accountTempUnscheduledCount: 'Number of accounts currently temporarily unschedulable (e.g. proxy/credential failure auto-eviction).',
@@ -563,6 +565,7 @@ export default {
           sustained: 'Sustained (samples)',
           cooldown: 'Cooldown (minutes)',
           enabled: 'Enabled',
+          emailRecipient: 'Recipient for this rule (blank uses global recipients)',
           notifyEmail: 'Send email notifications'
         },
         validation: {

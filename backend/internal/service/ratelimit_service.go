@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/tidwall/gjson"
 )
@@ -455,33 +456,13 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 			shouldDisable = true
 			break
 		}
-		// Adobe cookies do not have refresh_token. Recover via Okad before
-		// applying the generic OAuth failure policy; the sweeper also retries
-		// historical errors and failures from the IMS/background refresh path.
-		if authAccount.Platform == PlatformAdobe && authAccount.Type == AccountTypeOAuth && s.okadRecovery != nil {
-			// Managed recovery never makes the user wait for an OTP/login.
-			if s.okadRecovery.client.managed {
-				if repo, ok := s.accountRepo.(AdobeCookieRecoveryRepository); ok {
-					stateCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-					_, _ = repo.QueueAdobeCookieRecoveryIfUnchanged(stateCtx, authAccount)
-					cancel()
-				}
-				shouldDisable = true
-				break
-			}
-			recovered, err := s.okadRecovery.recover(ctx, authAccount)
-			if err != nil {
-				slog.Warn("adobe_okad_cookie_refresh_failed", "account_id", authAccount.ID, "error", err)
-			}
-			if !recovered {
-				// The callback may have pushed a new cookie while the caller
-				// timed out. Do not overwrite that success with a stale error.
-				if repo, ok := s.accountRepo.(AdobeCookieRecoveryRepository); ok {
-					if _, err := repo.QueueAdobeCookieRecoveryIfUnchanged(ctx, authAccount); err != nil {
-						slog.Warn("adobe_okad_queue_failed", "account_id", authAccount.ID)
-					}
-				}
-			}
+		if authAccount.Platform == PlatformAdobe && authAccount.Type == AccountTypeOAuth {
+			// Match the native image path: quota/entitlement must not cause login.
+			// A rejected access token is refreshed from the existing cookie first;
+			// only a terminal cookie exchange failure is eligible for Okad recovery.
+			failure := classifyAdobeError(adobe.ClassifyAuthResponse(statusCode, headers.Get("x-access-error"), string(responseBody)))
+			applyAdobeCooldown(ctx, s.accountRepo, authAccount.ID, failure)
+			applyAdobeTokenInvalidation(ctx, s.accountRepo, authAccount.ID, authAccount.GetCredential("access_token"), failure)
 			shouldDisable = true
 			break
 		}

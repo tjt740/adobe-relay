@@ -17,6 +17,7 @@ import (
 )
 
 var validOpsAlertMetricTypes = []string{
+	service.OpsMetricAdobeErrorAccounts,
 	"success_rate",
 	"error_rate",
 	"upstream_error_rate",
@@ -202,9 +203,9 @@ func validateOpsAlertRulePayload(raw map[string]json.RawMessage) (*opsAlertRuleV
 			return nil, fmt.Errorf("window_minutes must be an integer")
 		}
 		switch validated.WindowMinutes {
-		case 1, 5, 60:
+		case 1, 5, 10, 60:
 		default:
-			return nil, fmt.Errorf("window_minutes must be one of: 1, 5, 60")
+			return nil, fmt.Errorf("window_minutes must be one of: 1, 5, 10, 60")
 		}
 	} else {
 		validated.WindowMinutes = 1
@@ -234,6 +235,15 @@ func validateOpsAlertRulePayload(raw map[string]json.RawMessage) (*opsAlertRuleV
 		validated.CooldownMinutes = 0
 	}
 
+	if v, ok := raw["filters"]; ok {
+		var filters map[string]any
+		if err := json.Unmarshal(v, &filters); err != nil {
+			return nil, fmt.Errorf("filters must be an object")
+		}
+		if _, err := service.OpsAlertEmailRecipient(filters); err != nil {
+			return nil, err
+		}
+	}
 	return validated, nil
 }
 

@@ -2,10 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
 )
 
 var connectionTestHTTPCode = regexp.MustCompile(`(?i)(?:\b(?:HTTP|status(?:\s+code)?|returned|rejected)\s*[:=!]?[\s(]*|\()(4\d\d|5\d\d)\b`)
@@ -13,6 +16,10 @@ var connectionTestHTTPCode = regexp.MustCompile(`(?i)(?:\b(?:HTTP|status(?:\s+co
 func connectionTestStatusCode(err error) int {
 	if err == nil {
 		return 200
+	}
+	var upstream *adobe.RequestError
+	if errors.As(err, &upstream) && upstream.StatusCode > 0 {
+		return upstream.StatusCode
 	}
 	message := err.Error()
 	if match := connectionTestHTTPCode.FindStringSubmatch(message); len(match) > 1 {
@@ -37,13 +44,12 @@ func (s *AccountTestService) recordConnectionTestResult(ctx context.Context, acc
 			slog.Warn("account_test_result_save_failed", "account_id", account.ID, "error", err)
 		}
 	}
-	if code == 401 && account.Platform == PlatformAdobe && account.Type == AccountTypeOAuth {
-		if recovery, ok := s.accountRepo.(AdobeCookieRecoveryRepository); ok {
-			// This CAS protects manual pauses/new cookies. The existing scanner
-			// applies the shared durable two-attempt budget; never login here.
-			if _, err := recovery.QueueAdobeCookieRecoveryIfUnchanged(ctx, account); err != nil {
-				slog.Warn("account_test_recovery_queue_failed", "account_id", account.ID, "error", err)
-			}
-		}
+	if account.Platform == PlatformAdobe && account.Type == AccountTypeOAuth {
+		// Preserve typed Adobe semantics. Display strings and HTTP 401 alone
+		// cannot authorize a fresh login. Dead cookies are marked by the shared
+		// token provider and recovered by the scanner under its durable budget.
+		failure := classifyAdobeError(testErr)
+		applyAdobeCooldown(ctx, s.accountRepo, account.ID, failure)
+		applyAdobeTokenInvalidation(ctx, s.accountRepo, account.ID, account.GetCredential("access_token"), failure)
 	}
 }

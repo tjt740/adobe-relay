@@ -53,10 +53,11 @@ type okadCookieRefreshRequest struct {
 }
 
 type okadCookieRefreshResponse struct {
-	OK      bool   `json:"ok"`
-	Cookie  string `json:"cookie"`
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	RetryAfter float64 `json:"retry_after"`
+	OK         bool    `json:"ok"`
+	Cookie     string  `json:"cookie"`
+	Code       string  `json:"code"`
+	Message    string  `json:"message"`
 }
 
 func (c *OkadCookieRefreshClient) Enabled() bool {
@@ -96,6 +97,9 @@ func (c *OkadCookieRefreshClient) RefreshCookie(ctx context.Context, email strin
 	var result okadCookieRefreshResponse
 	if err := json.Unmarshal(body, &result); err != nil {
 		return "", fmt.Errorf("okad refresh response status %d is invalid", resp.StatusCode)
+	}
+	if resp.StatusCode == http.StatusOK && !result.OK && result.Code == "login_cooldown" {
+		return "", &OkadRecoveryError{Code: "login_cooldown", RetryAfter: time.Unix(int64(result.RetryAfter), 0)}
 	}
 	if resp.StatusCode != http.StatusOK || !result.OK || strings.TrimSpace(result.Cookie) == "" {
 		// Do not copy remote response text into logs: it may contain credentials.

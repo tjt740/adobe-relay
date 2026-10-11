@@ -714,23 +714,28 @@ func classifyAdobeHTTPError(status int, body, message string) error {
 // authOrQuotaError 区分「配额耗尽」「权益不足」「token 失效」：三者共用 401/403，
 // 但处置完全不同——冷却账号、换更高套餐号、刷新凭据，不能混为一谈。
 func authOrQuotaError(resp *Response) error {
-	accessError := resp.Header("x-access-error")
-	if accessError == "taste_exhausted" {
-		return NewQuotaExhaustedError("Adobe quota exhausted for this account", resp.StatusCode)
+	return ClassifyAuthResponse(resp.StatusCode, resp.Header("x-access-error"), resp.BodyPreview())
+}
+
+// ClassifyAuthResponse keeps every Adobe HTTP entry point on the same policy.
+// A shared 401/403 status alone does not distinguish quota, entitlement and auth.
+func ClassifyAuthResponse(status int, accessError, preview string) error {
+	accessError = strings.ToLower(strings.TrimSpace(accessError))
+	if accessError == "taste_exhausted" || ErrorCode(preview) == "taste_exhausted" {
+		return NewQuotaExhaustedError("Adobe quota exhausted for this account", status)
 	}
-	preview := resp.BodyPreview()
 	if IsNotEntitledCode(accessError) || IsNotEntitledBody(preview) {
 		message := "Adobe account is not entitled to the requested model or quality"
 		if preview != "" {
-			message = fmt.Sprintf("%s: %s", message, preview)
+			message += ": " + preview
 		}
-		return NewNotEntitledError(message, resp.StatusCode, "")
+		return NewNotEntitledError(message, status, "")
 	}
 	message := "Token invalid or expired"
 	if preview != "" {
 		message += ": " + preview
 	}
-	authErr := NewAuthError(message, resp.StatusCode)
+	authErr := NewAuthError(message, status)
 	authErr.UserMessage = "Adobe account authentication failed"
 	return authErr
 }

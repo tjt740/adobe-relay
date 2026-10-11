@@ -514,6 +514,7 @@ export default {
           groupAvailableRatio: '分组可用比例 (%)',
           groupRateLimitRatio: '分组限流比例 (%)',
           accountRateLimitedCount: '限流账号数',
+          adobeErrorAccounts: 'Adobe 401/408 异常账号数',
           accountErrorCount: '错误账号数（不含临时不可调度）',
           accountErrorRatio: '错误账号比例 (%)',
           accountTempUnscheduledCount: '临时不可调度账号数',
@@ -532,6 +533,7 @@ export default {
           groupAvailableRatio: '指定分组中可用账号占比（0~100，需要 group_id 过滤）。',
           groupRateLimitRatio: '指定分组中账号被限流的比例（0~100，需要 group_id 过滤）。',
           accountRateLimitedCount: '统计窗口内被限流的账号数量。',
+          adobeErrorAccounts: '按已有上游业务错误记录去重统计 Adobe 账号，包含换号后成功的请求；仅读取日志，不测试账号或触发登录。',
           accountErrorCount: '统计窗口内产生错误的账号数量（不含临时不可调度）。',
           accountErrorRatio: '统计窗口内错误账号占比（0~100）。',
           accountTempUnscheduledCount: '当前处于临时不可调度状态的账号数量（如代理/凭据故障被自动摘除）。',
@@ -563,6 +565,7 @@ export default {
           sustained: '连续样本数（每分钟）',
           cooldown: '冷却期（分钟）',
           enabled: '启用',
+          emailRecipient: '此规则收件邮箱（留空使用全局设置）',
           notifyEmail: '发送邮件通知'
         },
         validation: {
@@ -573,7 +576,7 @@ export default {
           groupIdRequired: '分组级别指标必须指定 group_id',
           operatorRequired: '运算符不能为空',
           thresholdRequired: '阈值必须为数字',
-          windowRange: '统计窗口必须为 1 / 5 / 60 分钟之一',
+          windowRange: '统计窗口必须为 1 / 5 / 10 / 60 分钟之一',
           sustainedRange: '连续样本数必须在 1 到 1440 之间',
           cooldownRange: '冷却期必须在 0 到 1440 分钟之间'
         }
