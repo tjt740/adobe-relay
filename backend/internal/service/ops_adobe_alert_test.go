@@ -179,7 +179,7 @@ func TestAdobeAlertRatioRecoveryDoesNotReopenBelowTwentyPercent(t *testing.T) {
 	settings := newNotificationEmailMemorySettingRepo()
 	require.NoError(t, settings.Set(ctx, SettingKeyOpsEmailNotificationConfig, `{"alert":{"enabled":true,"recipients":[]}}`))
 	smtp := startNotificationEmailTestSMTPServer(t)
-	r := &adobeAlertTestRepo{total: 204, rule: &OpsAlertRule{ID: 1, Name: "Adobe", Enabled: true, MetricType: OpsMetricAdobeErrorAccounts, Operator: ">=", Threshold: 5, WindowMinutes: 10, CooldownMinutes: 5, NotifyEmail: true, Filters: map[string]any{OpsAdobeAlertRatioFilter: float64(20), "email_recipient": "owner@example.test"}}}
+	r := &adobeAlertTestRepo{total: 204, rule: &OpsAlertRule{ID: 1, Name: "Adobe", Enabled: true, MetricType: OpsMetricAdobeErrorAccounts, Operator: ">=", Threshold: 5, WindowMinutes: 10, CooldownMinutes: 5, NotifyEmail: true, Filters: map[string]any{OpsAdobeQuietNotificationsFilter: false, OpsAdobeAlertRatioFilter: float64(20), "email_recipient": "owner@example.test"}}}
 	newEvaluator := func() *OpsAlertEvaluatorService {
 		return NewOpsAlertEvaluatorService(&OpsService{settingRepo: settings}, r, NewEmailService(settings, nil), nil, nil, nil)
 	}
@@ -258,17 +258,17 @@ func TestAdobeAlertRatioStrictBoundaryAndInvalidConfiguration(t *testing.T) {
 	} {
 		r := &adobeAlertTestRepo{total: tc.total, accounts: adobeAlertFixtureRows(tc.affected)}
 		s := NewOpsAlertEvaluatorService(nil, r, nil, nil, nil, nil)
-		count, _, enabled, breached, err := s.adobeErrorMetric(context.Background(), time.Now().Add(-10*time.Minute), time.Now(), nil, map[string]any{OpsAdobeAlertRatioFilter: 20})
+		count, _, enabled, breached, err := s.adobeErrorMetric(context.Background(), time.Now().Add(-10*time.Minute), time.Now(), nil, map[string]any{OpsAdobeQuietNotificationsFilter: false, OpsAdobeAlertRatioFilter: 20})
 		require.NoError(t, err)
 		require.True(t, enabled)
 		require.EqualValues(t, tc.affected, count)
 		require.Equal(t, tc.breached, breached)
 	}
 	for _, v := range []any{nil, "20", true, float64(0), float64(-1), float64(101)} {
-		_, _, err := OpsAdobeAlertRatioThreshold(map[string]any{OpsAdobeAlertRatioFilter: v})
+		_, _, err := OpsAdobeAlertRatioThreshold(map[string]any{OpsAdobeQuietNotificationsFilter: false, OpsAdobeAlertRatioFilter: v})
 		require.Error(t, err)
 	}
 	r := &adobeAlertTestRepo{total: 0, accounts: adobeAlertFixtureRows(1)}
-	_, _, _, _, err := NewOpsAlertEvaluatorService(nil, r, nil, nil, nil, nil).adobeErrorMetric(context.Background(), time.Now().Add(-time.Minute), time.Now(), nil, map[string]any{OpsAdobeAlertRatioFilter: 20})
+	_, _, _, _, err := NewOpsAlertEvaluatorService(nil, r, nil, nil, nil, nil).adobeErrorMetric(context.Background(), time.Now().Add(-time.Minute), time.Now(), nil, map[string]any{OpsAdobeQuietNotificationsFilter: false, OpsAdobeAlertRatioFilter: 20})
 	require.Error(t, err, "inconsistent snapshots must not generate false recovery")
 }

@@ -32,7 +32,7 @@ func TestAdobeHealthAlertRequiresSuccessForRecovery(t *testing.T) {
 	for id := 1; id <= 5; id++ {
 		r.report.Accounts = append(r.report.Accounts, AdobeHealthAccount{ID: int64(id), Pending: true, AlertPending: true, FailedAt: &failure, AlertFailedAt: &failure})
 	}
-	r.rule = &OpsAlertRule{ID: 1, Enabled: true, MetricType: OpsMetricAdobeErrorAccounts, Operator: ">=", Threshold: 5, WindowMinutes: 10, CooldownMinutes: 5, Filters: map[string]any{OpsAdobeAlertRatioFilter: 20}}
+	r.rule = &OpsAlertRule{ID: 1, Enabled: true, MetricType: OpsMetricAdobeErrorAccounts, Operator: ">=", Threshold: 5, WindowMinutes: 10, CooldownMinutes: 5, Filters: map[string]any{OpsAdobeQuietNotificationsFilter: false, OpsAdobeAlertRatioFilter: 20}}
 	settings := newNotificationEmailMemorySettingRepo()
 	eval := NewOpsAlertEvaluatorService(&OpsService{settingRepo: settings}, r, nil, nil, nil, nil)
 	evaluate := func() {
@@ -96,22 +96,24 @@ func TestAdobeHealthReasonsNeverPersistUpstreamSecrets(t *testing.T) {
 	}
 }
 
-func TestAdobeHealthEmailReadableEscapedAndBounded(t *testing.T) {
+func TestAdobeHealthEmailReadableEscapedAndComplete(t *testing.T) {
 	now := time.Now()
 	report := &AdobeHealthReport{GeneratedAt: now, WindowStart: now.Add(-10 * time.Minute), Total: 108, Pending: 39, RecentPending: 39, Unknown: 69, Historical: 39, Ratio: 36.11, Threshold: 20, Minimum: 5}
 	for i := 0; i < 60; i++ {
 		report.Accounts = append(report.Accounts, AdobeHealthAccount{ID: int64(i%39 + 1), Name: "<script>unsafe</script>", Code: 408, Reason: "upstream", Source: "business", FailedAt: &now, Pending: true})
 	}
 	body := buildOpsAlertEmailBody(&OpsAlertRule{MetricType: OpsMetricAdobeErrorAccounts}, &OpsAlertEvent{Dimensions: map[string]any{"adobe_health": report}})
-	require.Contains(t, body, "39 个账号仍有失败待验证")
+	require.Contains(t, body, "全部仍待成功验证 39 个")
 	require.Contains(t, body, "36.11%")
 	require.Contains(t, body, "20%")
-	require.Contains(t, body, "先做什么")
-	require.Contains(t, body, "另有 48 条")
+	require.Contains(t, body, "异常分类与处理建议")
+	require.NotContains(t, body, "另有")
+	require.NotContains(t, body, "？")
+	require.NotContains(t, body, "你提供")
 	require.NotContains(t, body, "<script>")
 	require.Contains(t, body, "&lt;script&gt;")
 	require.NotContains(t, body, "Metric</b>")
-	require.Equal(t, 12, strings.Count(body, "unsafe"))
+	require.Equal(t, 60, strings.Count(body, "unsafe"))
 	if path := os.Getenv("ADOBE_HEALTH_EMAIL_PREVIEW"); path != "" {
 		require.NoError(t, os.WriteFile(path, []byte(body), 0600))
 	}

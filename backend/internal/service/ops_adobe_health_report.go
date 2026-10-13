@@ -25,18 +25,23 @@ type AdobeHealthAccount struct {
 }
 
 type AdobeHealthReport struct {
-	GeneratedAt   time.Time            `json:"generated_at"`
-	WindowStart   time.Time            `json:"window_start"`
-	Total         int64                `json:"total"`
-	Pending       int                  `json:"pending"`
-	RecentPending int                  `json:"recent_pending"`
-	Recovered     int                  `json:"recovered"`
-	Unknown       int                  `json:"unknown"`
-	Historical    int                  `json:"historical"`
-	Ratio         float64              `json:"ratio"`
-	Threshold     float64              `json:"threshold"`
-	Minimum       int                  `json:"minimum"`
-	Accounts      []AdobeHealthAccount `json:"accounts"`
+	WindowAccounts              []OpsAdobeAccountErrors `json:"window_accounts"`
+	RecoveryThreshold           float64                 `json:"recovery_threshold"`
+	ConfirmationMinutes         int                     `json:"confirmation_minutes"`
+	NotificationCooldownMinutes int                     `json:"notification_cooldown_minutes"`
+	QuietNotifications          bool                    `json:"quiet_notifications"`
+	GeneratedAt                 time.Time               `json:"generated_at"`
+	WindowStart                 time.Time               `json:"window_start"`
+	Total                       int64                   `json:"total"`
+	Pending                     int                     `json:"pending"`
+	RecentPending               int                     `json:"recent_pending"`
+	Recovered                   int                     `json:"recovered"`
+	Unknown                     int                     `json:"unknown"`
+	Historical                  int                     `json:"historical"`
+	Ratio                       float64                 `json:"ratio"`
+	Threshold                   float64                 `json:"threshold"`
+	Minimum                     int                     `json:"minimum"`
+	Accounts                    []AdobeHealthAccount    `json:"accounts"`
 }
 
 type AdobeHealthReportRepository interface {
@@ -88,8 +93,7 @@ func (s *OpsService) AdobeHealthReport(ctx context.Context) (*AdobeHealthReport,
 		if err != nil {
 			return nil, err
 		}
-		r.Threshold = ratio
-		r.Minimum = int(rule.Threshold)
+		configureAdobeHealthReport(r, rule, ratio)
 		return r, nil
 	}
 	return nil, fmt.Errorf("no enabled Adobe ratio rule")

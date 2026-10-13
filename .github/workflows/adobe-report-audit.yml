@@ -1,0 +1,55 @@
+name: Adobe report notification verification
+on:
+  push:
+    branches: [codex/adobe-alert-report-policy]
+  workflow_dispatch:
+    inputs:
+      phase:
+        type: choice
+        options: [before, after]
+        default: after
+        required: true
+      application_sha:
+        type: string
+        description: 已部署应用提交（仅审计或文档更新时填写）
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: adobe-relay-production
+  cancel-in-progress: false
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure primary SSH
+        env:
+          SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+      - name: Audit protected state and verify runtime
+        env:
+          PHASE: ${{ inputs.phase || 'before' }}
+          EXPECTED_SHA: ${{ inputs.application_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15)
+          target=root@173.234.15.150
+          ssh "${opts[@]}" "$target" 'mkdir -p /opt/adobe-relay/releases/adobe-report-notifications-20261014'
+          scp "${opts[@]}" deploy/primary/adobe-report-{audit,policy,rollback}.py "$target:/opt/adobe-relay/releases/adobe-report-notifications-20261014/"
+          if [ "$PHASE" = before ]; then
+            ssh "${opts[@]}" "$target" "python3 /opt/adobe-relay/releases/adobe-report-notifications-20261014/adobe-report-audit.py before"
+          else
+            ssh "${opts[@]}" "$target" "python3 /opt/adobe-relay/releases/adobe-report-notifications-20261014/adobe-report-policy.py '$EXPECTED_SHA'"
+            ssh "${opts[@]}" "$target" "python3 /opt/adobe-relay/releases/adobe-report-notifications-20261014/adobe-report-audit.py after '$EXPECTED_SHA'"
+          fi
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

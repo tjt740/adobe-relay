@@ -59,6 +59,7 @@ type OpsAlertEvaluatorService struct {
 
 type opsAlertRuleState struct {
 	LastEvaluatedAt     time.Time
+	FirstBreachedAt     time.Time
 	ConsecutiveBreaches int
 }
 
@@ -261,8 +262,7 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 				if err == nil && adobeRatioEnabled {
 					healthReport, err = repo.GetAdobeHealthReport(ctx, windowStart, windowEnd, scopeGroupID)
 					if err == nil {
-						healthReport.Threshold = percent
-						healthReport.Minimum = int(rule.Threshold)
+						configureAdobeHealthReport(healthReport, rule, percent)
 						metricValue = float64(healthReport.RecentPending)
 						adobeRatioBreached = healthReport.Total > 0 && metricValue*100 >= float64(healthReport.Total)*percent
 						detail = healthReport.Summary()
@@ -318,7 +318,11 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 			}
 		}
 
-		if breachedNow && consecutive >= required {
+		confirmed := consecutive >= required
+		if adobeQuietNotifications(rule) {
+			confirmed = healthReport != nil && s.adobeConfirmationReady(rule.ID, now, rule.SustainedMinutes)
+		}
+		if breachedNow && confirmed {
 			if activeEvent != nil {
 				// Failed delivery is retried on later evaluations. A delivered
 				// active incident stays quiet, including across process restarts.
@@ -344,8 +348,12 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 				logger.LegacyPrintf("service.ops_alert_evaluator", "[OpsAlertEvaluator] get latest event failed (rule=%d): %v", rule.ID, err)
 				continue
 			}
-			if latestEvent != nil && rule.CooldownMinutes > 0 {
-				cooldown := time.Duration(rule.CooldownMinutes) * time.Minute
+			cooldownMinutes := rule.CooldownMinutes
+			if adobeQuietNotifications(rule) {
+				cooldownMinutes = max(60, cooldownMinutes)
+			}
+			if latestEvent != nil && cooldownMinutes > 0 {
+				cooldown := time.Duration(cooldownMinutes) * time.Minute
 				if now.Sub(latestEvent.FiredAt) < cooldown {
 					continue
 				}
@@ -399,7 +407,7 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 		}
 		if activeEvent != nil && healthReport != nil {
 			// A quiet window, pool growth/deletion or status reset is not success.
-			if healthReport.Total == 0 || float64(healthReport.Pending)*100 >= float64(healthReport.Total)*healthReport.Threshold || !adobeIncidentRecovered(healthReport, activeEvent) {
+			if healthReport.Total == 0 || float64(healthReport.Pending)*100 >= float64(healthReport.Total)*healthReport.RecoveryThreshold || !adobeIncidentRecovered(healthReport, activeEvent) {
 				continue
 			}
 		}
@@ -449,6 +457,7 @@ func (s *OpsAlertEvaluatorService) resetRuleState(ruleID int64, now time.Time) {
 	}
 	state.LastEvaluatedAt = now
 	state.ConsecutiveBreaches = 0
+	state.FirstBreachedAt = time.Time{}
 }
 
 func (s *OpsAlertEvaluatorService) updateRuleBreaches(ruleID int64, now time.Time, interval time.Duration, breached bool) int {
@@ -467,14 +476,19 @@ func (s *OpsAlertEvaluatorService) updateRuleBreaches(ruleID int64, now time.Tim
 	if !state.LastEvaluatedAt.IsZero() && interval > 0 {
 		if now.Sub(state.LastEvaluatedAt) > interval*2 {
 			state.ConsecutiveBreaches = 0
+			state.FirstBreachedAt = time.Time{}
 		}
 	}
 
 	state.LastEvaluatedAt = now
 	if breached {
+		if state.FirstBreachedAt.IsZero() {
+			state.FirstBreachedAt = now
+		}
 		state.ConsecutiveBreaches++
 	} else {
 		state.ConsecutiveBreaches = 0
+		state.FirstBreachedAt = time.Time{}
 	}
 	return state.ConsecutiveBreaches
 }
@@ -832,6 +846,37 @@ func (s *OpsAlertEvaluatorService) maybeSendAlertEmail(ctx context.Context, runt
 		if err != nil {
 			return false
 		}
+	}
+
+	if adobeQuietNotifications(rule) {
+		r := adobeReportFromEvent(event)
+		if adobeMail == nil || r == nil || event.Status != OpsAlertStatusFiring || r.Total <= 0 || r.RecentPending < r.Minimum || float64(r.RecentPending)*100 < float64(r.Total)*r.Threshold || time.Since(r.GeneratedAt) > 5*time.Minute {
+			return false
+		}
+		allowed := false
+		for _, recipient := range recipients {
+			if strings.EqualFold(strings.TrimSpace(recipient), adobeMail.Recipient) {
+				allowed = true
+			}
+		}
+		if !allowed || !s.emailLimiter.Allow(time.Now().UTC()) {
+			return false
+		}
+		receipts, available := s.opsRepo.(AdobeAlertDeliveryRepository)
+		if !available {
+			return false
+		}
+		claimed, err := receipts.ClaimAdobeAlertEmail(ctx, event.ID, rule.ID, time.Now().UTC(), time.Duration(max(60, rule.CooldownMinutes))*time.Minute)
+		if err != nil || !claimed {
+			return false
+		}
+		err = s.emailService.sendAdobeReport(&adobeMail.SMTP, adobeMail.Recipient, subject, body)
+		receiptCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if finishErr := receipts.FinishAdobeAlertEmail(receiptCtx, event.ID, err == nil); finishErr != nil {
+			logger.LegacyPrintf("service.ops_alert_evaluator", "[OpsAlertEvaluator] Adobe delivery receipt unavailable (event=%d)", event.ID)
+		}
+		return err == nil
 	}
 
 	anySent := false

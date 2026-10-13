@@ -1,0 +1,43 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{margin:0;background:#edf1f6;color:#20324a;font:14px Arial,'Microsoft YaHei',sans-serif}
+.report{max-width:1080px;margin:24px auto;background:#fff;border:1px solid #e1e8f0;border-radius:16px;overflow:hidden}
+.header{padding:30px;background:#14283f;color:white}.header p{color:#c1cfde;font-size:12px;line-height:1.8}.header h1{font-size:28px;margin:14px 0}
+.body{padding:24px}.metrics{width:100%;border-spacing:6px;table-layout:fixed}.metrics td{padding:16px;background:#f5f7fa;border-radius:8px;vertical-align:top}.value{font-size:32px;font-weight:bold;margin:12px 0}.sub{font-size:12px;color:#697a8f;line-height:1.7}
+.red{background:#ffe6e9!important;color:#c52334}.yellow{background:#fff0ac!important;color:#856000}.badge{display:inline-block;padding:5px 9px;border-radius:5px;font-weight:bold;font-size:12px}
+h2{font-size:18px;margin:25px 0 13px}.note{padding:15px;background:#f4f7fa;color:#5e7189;font-size:12px;line-height:1.9;border-radius:8px;margin:16px 0}
+.details{width:100%;border-collapse:collapse;font-size:12px;word-break:break-word}.details th{background:#f3f6fa;text-align:left;color:#64758b}.details th,.details td{padding:11px 8px;border-bottom:1px solid #e5ebf1;vertical-align:top}.details small{display:block;color:#8190a4;margin-top:5px;line-height:1.7}.footer{padding:20px 30px;background:#fbfcfd;color:#7b8da2;font-size:12px;line-height:1.8}
+</style></head><body><div class="report">
+<div class="header"><p>ADOBE · 账号运行监控</p><h1>{{.Heading}}</h1>{{with .Report}}<p>统计时段 {{stamp .WindowStart}} — {{stamp .GeneratedAt}}（北京时间）</p>{{end}}</div>
+<div class="body">{{if .Report}}{{$r := .Report}}
+<table class="metrics" role="presentation"><tr>
+<td>近期异常待验证<div class="value">{{$r.RecentPending}}</div><div class="sub">个账号 · 统计窗口内有失败</div></td>
+<td>本次触发占比<div class="value">{{printf "%.2f" .TriggerRatio}}%</div><div class="sub">{{$r.RecentPending}} / {{$r.Total}} · 阈值 {{$r.Threshold}}%</div></td>
+<td class="red">401 认证或权限异常<div class="value">{{.Accounts401}}</div><div class="sub">窗口内账号数 · {{.Errors401}} 条错误</div></td>
+<td class="yellow">408 请求超时<div class="value">{{.Accounts408}}</div><div class="sub">窗口内账号数 · {{.Errors408}} 条错误</div></td>
+</tr></table>
+<div class="note"><b>账号状态</b>　全部仍待成功验证 {{$r.Pending}} 个（{{printf "%.2f" $r.Ratio}}%），已有恢复证据 {{$r.Recovered}} 个，尚无完整记录 {{$r.Unknown}} 个。<br>
+<b>统计口径</b>　窗口内共有 {{$r.Historical}} 个账号报过错，包含随后恢复的账号；同一账号的 401、408 合并去重，分类数量不相加。分母包含全部未删除的 Adobe 账号（含暂停账号）。</div>
+<h2>异常分类与处理建议</h2>
+<table class="details"><tr><th class="red">401 认证或权限异常</th><th class="yellow">408 请求超时</th></tr><tr>
+<td>鉴权 {{.Auth}} 条 · 额度不足 {{.Quota}} 条 · 权益不足 {{.Entitlement}} 条 · 原因待确认 {{.Unknown}} 条。<small>按具体原因检查 Cookie、剩余额度或模型权限，避免将所有 401 当成需要重新登录。</small></td>
+<td>共 {{.Errors408}} 条，其中检测超时 {{.Timeouts}} 条。<small>检查上游服务、代理及网络。检测超时按 408 统计，不代表 Adobe 明确返回 HTTP 408。</small></td>
+</tr></table>
+<div class="note">业务请求错误 {{.Business}} 条 · 账号检测错误 {{.Tests}} 条。错误次数与账号数量分别统计。</div>
+<h2>完整窗口明细 · {{$r.Historical}} 个账号</h2>
+<table class="details"><thead><tr><th>账号</th><th class="red">401</th><th class="yellow">408</th><th>记录分布</th><th>最后报错</th></tr></thead><tbody>
+{{range $r.WindowAccounts}}<tr><td>#{{.AccountID}} {{.Name}}</td><td>{{if .Count401}}<span class="badge red">{{.Count401}} 次</span>{{else}}—{{end}}</td><td>{{if .Count408}}<span class="badge yellow">{{.Count408}} 次</span>{{else}}—{{end}}</td><td>业务 {{.BusinessErrors}} / 检测 {{.TestErrors}}<small>检测超时 {{.TestTimeouts}}</small></td><td>{{stamp .LastSeen}}</td></tr>{{else}}<tr><td colspan="5">本次报表没有窗口错误明细。</td></tr>{{end}}
+</tbody></table>
+<h2>完整状态与成功证据 · {{len $r.Accounts}} 条模型记录</h2>
+<table class="details"><thead><tr><th>账号 / 模型</th><th>失败原因 / 来源</th><th>验证状态</th><th>失败与成功时间</th></tr></thead><tbody>
+{{range $r.Accounts}}<tr><td>#{{.ID}} {{.Name}}<small>{{if .Scope}}{{.Scope}}{{else}}模型未记录{{end}}</small></td>
+<td>{{if .FailedAt}}{{if eq .Code 401}}<span class="badge red">401</span>{{else if eq .Code 408}}<span class="badge yellow">408</span>{{else if .Code}}{{.Code}}{{end}} {{reason .Reason}}{{else}}成功记录{{end}}<small>{{source .Source}} · {{stage .Stage}}{{if eq .Reason "timeout"}} · 本地超时{{end}}</small></td>
+<td>{{if .Pending}}仍待验证{{else if .FailedAt}}已有后续成功{{else}}请求成功{{end}}{{if .AlertPending}}<small>401/408 仍待验证</small>{{end}}</td>
+<td>失败 {{at .FailedAt}}<small>成功 {{at .SuccessAt}}{{if and .Pending .SuccessAt}}（早于或不足以确认本次恢复）{{end}}</small></td></tr>{{else}}<tr><td colspan="4">尚无完整的账号成功或失败证据。</td></tr>{{end}}
+</tbody></table>
+<div class="note"><b>通知策略</b><br>
+近期待验证账号达到 {{$r.Threshold}}% 且至少 {{$r.Minimum}} 个{{if $r.QuietNotifications}}，持续确认至少 {{$r.ConfirmationMinutes}} 分钟后通知。同一轮异常成功通知一次，新邮件至少间隔 {{$r.NotificationCooldownMinutes}} 分钟。{{else}}时触发。{{end}}<br>
+<b>恢复判定</b><br>全部待验证比例严格低于 {{$r.RecoveryThreshold}}%，并有本轮受影响账号的真实成功记录，告警才结束。模型相关问题需对应模型成功。更新 Cookie、重置状态及没有新请求均不能单独证明恢复。告警结束不代表所有账号都已恢复。</div>
+{{else}}<h2>告警记录</h2><p class="sub">本记录未包含完整的账号状态证据。</p><pre style="white-space:pre-wrap;word-break:break-word">{{.Legacy}}</pre>{{end}}
+</div><div class="footer">Sub2 · Adobe 账号运行报告<br>管理后台 → 运维监控 → Adobe 账号异常报表{{with .Report}}<br>数据截至 {{stamp .GeneratedAt}}（北京时间）{{end}}</div>
+</div></body></html>

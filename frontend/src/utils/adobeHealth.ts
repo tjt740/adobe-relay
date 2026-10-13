@@ -3,9 +3,16 @@ export interface HealthObservation {
 }
 export interface AdobeHealthAccount {
   id: number; name: string; scope: string; code: number; reason: string; stage: string; source: string
-  failed_at?: string; success_at?: string; pending: boolean
+  failed_at?: string; success_at?: string; pending: boolean; alert_pending?: boolean; alert_failed_at?: string
+}
+export interface AdobeWindowAccount {
+  account_id: number; name: string; status: string; count_401: number; count_408: number
+  auth_401: number; quota_401: number; entitled_401: number; unknown_401: number
+  business_errors: number; test_errors: number; test_timeouts: number; first_seen: string; last_seen: string
 }
 export interface AdobeHealthReport {
+  window_accounts?: AdobeWindowAccount[]; recovery_threshold?: number; confirmation_minutes?: number
+  notification_cooldown_minutes?: number; quiet_notifications?: boolean
   generated_at: string; window_start: string; total: number; pending: number; recent_pending: number
   recovered: number; unknown: number; historical: number; ratio: number; threshold: number; minimum: number
   accounts: AdobeHealthAccount[]
