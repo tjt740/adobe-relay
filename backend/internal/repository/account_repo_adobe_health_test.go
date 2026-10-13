@@ -106,6 +106,15 @@ func TestAdobeHealthPostgresRevisionAndPopulation(t *testing.T) {
 	require.Equal(t, 1, p.Pending)
 	require.Equal(t, 2, p.Unknown)
 	require.InDelta(t, 100.0/3, p.Ratio, 0.001)
+	require.NoError(t, r.RecordAdobeHealth(ctx, &service.Account{ID: 2}, service.AdobeHealthObservation{Success: true, Source: "business", StartedAt: now, CheckedAt: now}))
+	p, err = (&opsRepository{db: db}).GetAdobeHealthReport(ctx, now.Add(-time.Minute), now.Add(time.Second), nil)
+	require.NoError(t, err)
+	for _, a := range p.Accounts {
+		if a.ID == 2 {
+			require.Equal(t, "business", a.Source, "first successful record must retain its real source")
+		}
+	}
+
 }
 
 func TestAdobeHealthPostgresMigrationKeepsOpenIncidentFailures(t *testing.T) {
