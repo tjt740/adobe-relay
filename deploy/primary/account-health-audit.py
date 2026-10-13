@@ -1,4 +1,5 @@
-import datetime, fcntl, hashlib, json, pathlib, subprocess, sys
+import datetime, fcntl, hashlib, json, pathlib, sqlite3, subprocess, sys
+from urllib.parse import quote
 
 ROOT = pathlib.Path('/opt/adobe-relay/releases/account-health-20261013')
 ROOT.mkdir(parents=True, exist_ok=True)
@@ -29,8 +30,19 @@ for name in ['adobe-relay-app-1','adobe-team-cookie-app-1','adobe-relay-postgres
     out['containers'][name] = {'id':data['Id'],'image':data['Config']['Image'],'image_id':data['Image'],'started':data['State']['StartedAt'],'health':data['State'].get('Health',{}).get('Status'),'restarts':data['RestartCount']}
 for path in ['/opt/adobe-relay/shared/.env','/opt/adobe-relay/shared/compose.yml','/opt/adobe-relay/shared/data/config.yaml','/opt/adobe-relay/shared/clash.yml','/opt/adobe-relay/shared/resources.yml','/opt/adobe-team-cookie/.env','/opt/adobe-team-cookie/compose.yml']:
     out['config_hashes'][path] = digest(pathlib.Path(path).read_bytes())
-probe = "from app.db.session import engine; from sqlalchemy import text; import hashlib,json; c=engine.connect(); rows=[tuple(r) for r in c.execute(text(\"SELECT key,value FROM settings WHERE key LIKE 'sub2_%' OR key LIKE '%integration%' ORDER BY key\"))]; print(hashlib.sha256(json.dumps(rows,ensure_ascii=False).encode()).hexdigest()); c.close()"
-out['okad_link_hash'] = subprocess.check_output(['docker','exec','adobe-team-cookie-app-1','python','-c',probe],text=True).strip()
+# Read the same mounted SQLite database without importing Okad's application
+# inside its memory-limited container. Read-only mode retains WAL visibility.
+okad = json.loads(subprocess.check_output(['docker','inspect','adobe-team-cookie-app-1']))[0]
+db_url = next(value.split('=',1)[1] for value in okad['Config']['Env'] if value.startswith('DATABASE_URL='))
+assert db_url.startswith('sqlite:///'), 'Expected deployed Okad SQLite storage'
+db_path = pathlib.PurePosixPath(db_url[len('sqlite:///'):])
+assert db_path.is_absolute()
+mounts = sorted(okad['Mounts'], key=lambda m:len(m['Destination']), reverse=True)
+mount = next(m for m in mounts if db_path.is_relative_to(m['Destination']))
+host_path = pathlib.Path(mount['Source']) / str(db_path.relative_to(mount['Destination']))
+with sqlite3.connect('file:'+quote(str(host_path))+'?mode=ro', uri=True, timeout=5) as connection:
+    rows = connection.execute("SELECT key,value FROM settings WHERE key LIKE 'sub2_%' OR key LIKE '%integration%' ORDER BY key").fetchall()
+out['okad_link_hash'] = digest(json.dumps(rows,ensure_ascii=False).encode())
 out['sub2_env_without_image'] = digest('\n'.join(line for line in pathlib.Path('/opt/adobe-relay/shared/.env').read_text().splitlines() if not line.startswith('SUB2API_IMAGE=')).encode())
 out['pagination'] = json.loads(sql("SELECT COALESCE(json_object_agg(key,value),'{}') FROM settings WHERE key IN ('table_default_page_size','table_page_size_options')"))
 out['mail_hash'] = sql("SELECT md5(COALESCE(string_agg(key||':'||value,',' ORDER BY key),'')) FROM settings WHERE key LIKE 'smtp_%' OR key IN ('ops_adobe_alert_mail_private','ops_email_notification_config','email_verify_enabled','ops_alert_runtime_settings')")

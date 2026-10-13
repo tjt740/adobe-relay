@@ -9,6 +9,10 @@ on:
         options: [after, send-report]
         default: after
         required: true
+      application_sha:
+        type: string
+        description: 已部署应用提交（仅审计或文档更新时填写）
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -32,9 +36,10 @@ jobs:
       - name: Audit protected state and verify runtime
         env:
           PHASE: ${{ inputs.phase || 'before' }}
-          EXPECTED_SHA: ${{ github.sha }}
+          EXPECTED_SHA: ${{ inputs.application_sha || github.sha }}
         run: |
           set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
           opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15)
           target=root@173.234.15.150
           ssh "${opts[@]}" "$target" 'mkdir -p /opt/adobe-relay/releases/account-health-20261013'
