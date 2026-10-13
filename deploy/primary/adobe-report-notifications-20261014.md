@@ -25,3 +25,13 @@
 正式发布使用主服务器 173.234.15.150，站点 https://creative.cheap。服务器审计目录 `/opt/adobe-relay/releases/adobe-report-notifications-20261014/`，包含 before/after、policy-verification、expected-sha。预检和发布流程共享 Actions 并发组，并核对两项目服务器锁、应用版本、邮件摘要、配置摘要、Okad 镜像及联动配置。
 
 回退镜像 `adobe-relay:before-adobe-report-notifications-20261014`；回退命令：`python3 /opt/adobe-relay/releases/adobe-report-notifications-20261014/adobe-report-rollback.py`。脚本核对版本与规则，只恢复本次代码和三个规则字段，保留当前业务数据、健康证据、通知回执、SMTP 和 Okad。不能绕过后续版本检查。
+
+## 已发布核验
+
+- 功能 PR #38，实际应用与发布标签 `release/adobe-report-notifications-20261014` 指向 `265e6badcca7c8071787045711e0a84128dfb799`。发布前主干标签 `rollback/adobe-report-notifications-20261014-before-main` 指向 `63094d549793ac5efa8b2ad36a763995b4b80ac9`。
+- 正式发布工作流 `38428671341` 成功，北京时间 2026-10-14 00:28 完成切换。后端相关 race、数据库、SMTP 检查及 313 项前端回归通过；镜像构建的 TypeScript 和 3 项 i18n 检查通过。
+- 配置核验 `38430824391`、只读运行核验 `38431174687` 均成功。规则 ID 9 实际为 20%、至少 5 个、10 分钟窗口、4 分钟持续确认、60 分钟邮件间隔，恢复线为严格低于 10%。全局和专属邮件配置、Sub2 非镜像配置、Okad 实际镜像/容器/配置、可靠联动设置均保留。Okad 没有新增重启。
+- 与实际切换备份对照，108 个账号 ID 及所有代理绑定完全一致，无 mock 数据。最初预检的代理摘要与切换后不同，但切换前备份与切换后相同，差异发生于本次部署之前；没有恢复或覆盖运行中的业务数据。
+- 00:31 的只读核验显示：108 个账号、20 个仍待验证、0 个近 10 分钟待验证、0 个已有恢复证据、88 个无完整记录。这是核验时的数字，不代表 108 个账号均正常；旧失败没有因为窗口安静而标为恢复。告警任务心跳和实时事件流正常，未产生证据保存错误。本次验证没有发送邮件，也没有主动请求 Adobe。
+- 切换备份：`/opt/adobe-relay/backups/20261013T162753Z-265e6badcca7c8071787045711e0a84128dfb799`。审计目录还包含 `runtime-verification.json`、`proxy-audit.json`；后续核验工作流使用 `phase=verify` 和实际应用 SHA，可只读重复检查，无需更新规则、发邮件或重启应用。
+- 后续归档只更新审计脚本和说明，通过 `[skip ci]` 避免重复构建/部署；实际应用仍为上述提交，不把文档提交当成线上镜像。
