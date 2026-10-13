@@ -212,8 +212,12 @@ func (s *OkadCookieRecovery) recover(ctx context.Context, snapshot *Account) (bo
 			if err != nil {
 				return false, err
 			}
-			if current == nil || current.Status != StatusActive || !current.Schedulable || current.Platform != PlatformAdobe || current.Type != AccountTypeOAuth ||
-				!strings.EqualFold(adobeRecoveryEmail(current), email) || current.GetCredential("cookie") == latest.GetCredential("cookie") {
+			if current == nil || current.Platform != PlatformAdobe || current.Type != AccountTypeOAuth ||
+				!strings.EqualFold(adobeRecoveryEmail(current), email) || current.GetCredential("cookie") != cookie {
+				return false, nil
+			}
+			check, _ := current.Extra["okad_connection_test"].(map[string]any)
+			if check["key"] != OkadConnectionTestKey(current) {
 				return false, nil
 			}
 			latest = current

@@ -62,6 +62,11 @@ type AdobeConditionalErrorRepository interface {
 // setAdobeCookieRefreshError 把 cookie 失效落到账号 error。仓储支持条件写入时按 cookie
 // 做 CAS；否则（测试替身等）退回无条件 SetError。
 func setAdobeCookieRefreshError(ctx context.Context, repo AccountRepository, account *Account, errorMsg string) (applied bool, err error) {
+	if conditional, ok := repo.(interface {
+		SetAdobeErrorIfCurrent(context.Context, *Account, string) (bool, error)
+	}); ok {
+		return conditional.SetAdobeErrorIfCurrent(ctx, account, errorMsg)
+	}
 	if conditional, ok := repo.(AdobeConditionalErrorRepository); ok {
 		// 原样比较：与 UpdateAdobeTokenIfCookieUnchanged 一致，不做 trim。
 		if cookie := account.GetCredential("cookie"); strings.TrimSpace(cookie) != "" {

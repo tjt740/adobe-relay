@@ -24,8 +24,8 @@ func TestRecoverAdobeCookieUsesConditionalMergeAndAtomicOutbox(t *testing.T) {
 			defer db.Close()
 			repo := &accountRepository{sql: db}
 			proxy := int64(7)
-			a := &service.Account{ID: 233, Status: service.StatusError, ErrorMessage: "OAuth 401 (no refresh_token): Invalid bearer token", ProxyID: &proxy, Credentials: map[string]any{"cookie": "old", "email": "fixture@example.test"}}
-			e := mock.ExpectExec(`(?s)WITH updated AS.*credentials = .* - 'access_token' - 'expires_at' - '_token_version'.*a.status = \$3.*error_message.*\$4.*a.credentials->>'cookie' = \$5.*a.credentials->>'email'.*\$6.*a.schedulable = \$7.*a.proxy_id IS NOT DISTINCT FROM \$8.*adobeteam_external_email.*\$9.*INSERT INTO scheduler_outbox.*SELECT \$10`).WithArgs("fresh", int64(233), a.Status, a.ErrorMessage, "old", "fixture@example.test", false, proxy, "", service.SchedulerOutboxEventAccountChanged)
+			a := &service.Account{ID: 233, Platform: service.PlatformAdobe, Type: service.AccountTypeOAuth, Status: service.StatusError, ErrorMessage: "OAuth 401 (no refresh_token): Invalid bearer token", ProxyID: &proxy, Credentials: map[string]any{"cookie": "old", "email": "fixture@example.test"}}
+			e := mock.ExpectExec(`(?s)WITH updated AS.*credentials = .* - 'access_token' - 'expires_at' - '_token_version'.*a.status = \$3.*error_message.*\$4.*a.credentials->>'cookie'.* = \$5.*a.credentials->>'email'.*\$6.*a.schedulable = \$7.*a.proxy_id IS NOT DISTINCT FROM \$8.*adobeteam_external_email.*\$9.*INSERT INTO scheduler_outbox.*SELECT \$10`).WithArgs("fresh", int64(233), a.Status, a.ErrorMessage, "old", "fixture@example.test", false, proxy, "", service.SchedulerOutboxEventAccountChanged, sqlmock.AnyArg(), true, service.OkadConnectionTestPending, "false", sqlmock.AnyArg(), "fixture@example.test")
 			if tc.err != nil {
 				e.WillReturnError(tc.err)
 			} else {

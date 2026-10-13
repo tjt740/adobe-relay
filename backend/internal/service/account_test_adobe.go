@@ -31,6 +31,14 @@ const (
 // 测试要的是原始字节，直接塞进 SSE 的 data: URL 给浏览器。
 var adobeTestClients = &adobeClientCache{}
 
+type adobeAccountTestContextKey struct{}
+
+// Diagnostics may exchange a Cookie while quarantined, without enabling it.
+func isAdobeAccountTest(ctx context.Context, a *Account) bool {
+	return ctx.Value(adobeAccountTestContextKey{}) == true && a.Platform == PlatformAdobe && a.Type == AccountTypeOAuth && a.Status == StatusError &&
+		(a.ExpiresAt == nil || a.ExpiresAt.After(time.Now()))
+}
+
 // resolveAdobeTestPrompt 与 resolveGrokImagePrompt 同形：空则用其它生图渠道同一句默认。
 func resolveAdobeTestPrompt(prompt string) string {
 	if trimmed := strings.TrimSpace(prompt); trimmed != "" {
@@ -105,11 +113,11 @@ func (s *AccountTestService) testAdobeAccountConnection(
 		return s.testOpenAIImageAPIKey(c, c.Request.Context(), account, testModel, resolveAdobeTestPrompt(prompt))
 	}
 
-	ctx := c.Request.Context()
+	ctx := context.WithValue(c.Request.Context(), adobeAccountTestContextKey{}, true)
 
 	token, err := s.adobeTestAccessToken(ctx, c, account)
 	if err != nil {
-		return s.sendAdobeTestError(c, err)
+		return s.sendAdobeTestError(c, &adobe.OperationError{Stage: "token", Err: err})
 	}
 
 	requestedModel := strings.TrimSpace(modelID)

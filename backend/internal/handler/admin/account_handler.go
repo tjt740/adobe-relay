@@ -1689,6 +1689,33 @@ func (h *AccountHandler) ApplyOAuthCredentials(c *gin.Context) {
 		return
 	}
 
+	marker, _ := req.Extra["adobeteam_external_email"].(string)
+	if marker == "" {
+		marker, _ = existing.Extra["adobeteam_external_email"].(string)
+	}
+	cookie, _ := req.Credentials["cookie"].(string)
+	if marker != "" && cookie != "" && existing.Platform == service.PlatformAdobe {
+		admin, available := h.adminService.(service.OkadLegacyCredentialAdmin)
+		if !available {
+			response.Error(c, 503, "凭据验证服务不可用，未修改账号")
+			return
+		}
+		updated, applyErr := admin.ApplyLegacyOkadCookie(ctx, accountID, cookie, marker)
+		if applyErr != nil {
+			if errors.Is(applyErr, service.ErrOkadConflict) {
+				response.Error(c, 409, "账号或凭据已变化，请重新读取后推送")
+			} else {
+				response.Error(c, 503, "凭据暂未写入，请查询状态后重试")
+			}
+			return
+		}
+		if h.tokenCacheInvalidator != nil {
+			_ = h.tokenCacheInvalidator.InvalidateToken(ctx, updated)
+		}
+		response.Success(c, h.buildAccountResponseWithRuntime(ctx, updated))
+		return
+	}
+
 	// Re-auth only returns authentication fields. Preserve account configuration
 	// stored alongside them (for example model_mapping), while allowing the new
 	// OAuth values to replace their existing counterparts.

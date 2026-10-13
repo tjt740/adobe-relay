@@ -70,6 +70,9 @@ func NewOpsAlertEvaluatorService(
 	cfg *config.Config,
 	proxyRepo ProxyRepository,
 ) *OpsAlertEvaluatorService {
+	if opsService != nil {
+		opsService.adobeReportEmail = emailService
+	}
 	return &OpsAlertEvaluatorService{
 		opsService:   opsService,
 		opsRepo:      opsRepo,
@@ -248,10 +251,28 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 		var metricValue float64
 		var detail string
 		var adobeRatioEnabled, adobeRatioBreached bool
+		var healthReport *AdobeHealthReport
 		var ok bool
 		if rule.MetricType == OpsMetricAdobeErrorAccounts {
 			var err error
-			metricValue, detail, adobeRatioEnabled, adobeRatioBreached, err = s.adobeErrorMetric(ctx, windowStart, windowEnd, scopeGroupID, rule.Filters)
+			if repo, available := s.opsRepo.(AdobeHealthReportRepository); available {
+				var percent float64
+				percent, adobeRatioEnabled, err = OpsAdobeAlertRatioThreshold(rule.Filters)
+				if err == nil && adobeRatioEnabled {
+					healthReport, err = repo.GetAdobeHealthReport(ctx, windowStart, windowEnd, scopeGroupID)
+					if err == nil {
+						healthReport.Threshold = percent
+						healthReport.Minimum = int(rule.Threshold)
+						metricValue = float64(healthReport.RecentPending)
+						adobeRatioBreached = healthReport.Total > 0 && metricValue*100 >= float64(healthReport.Total)*percent
+						detail = healthReport.Summary()
+					}
+				} else if err == nil {
+					metricValue, detail, adobeRatioEnabled, adobeRatioBreached, err = s.adobeErrorMetric(ctx, windowStart, windowEnd, scopeGroupID, rule.Filters)
+				}
+			} else {
+				metricValue, detail, adobeRatioEnabled, adobeRatioBreached, err = s.adobeErrorMetric(ctx, windowStart, windowEnd, scopeGroupID, rule.Filters)
+			}
 			ok = err == nil
 			if err != nil {
 				logger.LegacyPrintf("service.ops_alert_evaluator", "[OpsAlertEvaluator] Adobe summary failed (rule=%d): %v", rule.ID, err)
@@ -276,6 +297,25 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 		if err != nil {
 			logger.LegacyPrintf("service.ops_alert_evaluator", "[OpsAlertEvaluator] get active event failed (rule=%d): %v", rule.ID, err)
 			continue
+		}
+
+		if activeEvent != nil && healthReport != nil {
+			if activeEvent.Dimensions == nil {
+				activeEvent.Dimensions = map[string]any{}
+			}
+			if _, exists := activeEvent.Dimensions["adobe_incident_accounts"]; !exists {
+				activeEvent.Dimensions["adobe_incident_accounts"] = adobeInitialIncidentMembers(healthReport, activeEvent)
+			}
+			activeEvent.Dimensions["adobe_health"] = healthReport
+			activeEvent.Description = detail
+			activeEvent.Title = "Adobe 账号异常：等待成功验证"
+			if writer, available := s.opsRepo.(interface {
+				UpdateAdobeAlertReport(context.Context, *OpsAlertEvent) error
+			}); available {
+				if err := writer.UpdateAdobeAlertReport(ctx, activeEvent); err != nil {
+					continue
+				}
+			}
 		}
 
 		if breachedNow && consecutive >= required {
@@ -324,6 +364,15 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 				CreatedAt:      now,
 			}
 
+			if healthReport != nil {
+				firedEvent.Title = "Adobe 账号异常：需要关注"
+				if firedEvent.Dimensions == nil {
+					firedEvent.Dimensions = map[string]any{}
+				}
+				firedEvent.Dimensions["adobe_health"] = healthReport
+				firedEvent.Dimensions["adobe_incident_accounts"] = adobeIncidentMembers(healthReport)
+			}
+
 			if detail != "" {
 				firedEvent.Description = detail
 			}
@@ -348,6 +397,13 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 		if adobeRatioEnabled && adobeRatioBreached {
 			continue
 		}
+		if activeEvent != nil && healthReport != nil {
+			// A quiet window, pool growth/deletion or status reset is not success.
+			if healthReport.Total == 0 || float64(healthReport.Pending)*100 >= float64(healthReport.Total)*healthReport.Threshold || !adobeIncidentRecovered(healthReport, activeEvent) {
+				continue
+			}
+		}
+
 		// Not breached: resolve active event if present.
 		if activeEvent != nil {
 			resolvedAt := now
@@ -767,6 +823,9 @@ func (s *OpsAlertEvaluatorService) maybeSendAlertEmail(ctx context.Context, runt
 
 	subject := fmt.Sprintf("[Ops Alert][%s] %s", strings.TrimSpace(rule.Severity), strings.TrimSpace(rule.Name))
 	body := buildOpsAlertEmailBody(rule, event)
+	if rule.MetricType == OpsMetricAdobeErrorAccounts {
+		subject = "[Sub2告警] Adobe 账号异常，请查看处理建议"
+	}
 	var adobeMail *OpsAdobeAlertMail
 	if rule.MetricType == OpsMetricAdobeErrorAccounts {
 		adobeMail, err = s.emailService.getAdobeAlertMail(ctx)
@@ -864,6 +923,9 @@ func opsAlertEmailVariables(rule *OpsAlertRule, event *OpsAlertEvent) map[string
 func buildOpsAlertEmailBody(rule *OpsAlertRule, event *OpsAlertEvent) string {
 	if rule == nil || event == nil {
 		return ""
+	}
+	if rule.MetricType == OpsMetricAdobeErrorAccounts {
+		return buildAdobeHealthEmail(rule, event)
 	}
 	metric := strings.TrimSpace(rule.MetricType)
 	value := "-"

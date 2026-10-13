@@ -486,8 +486,10 @@ func (h *GatewayHandler) runAdobeImagesFailover(
 			return
 		}
 
+		healthStarted := time.Now()
 		token, _, err := h.gatewayService.GetAccessToken(requestCtx, account)
 		if err != nil {
+			h.gatewayService.RecordAdobeHealth(requestCtx, account, healthStarted, adobeHealthModel(account, req), err)
 			releaseAccount()
 			// 账号缺 token（刷新器还没跑到，或 cookie 已失效）：换下一个。
 			reqLog.Warn("adobe_images.token_unavailable",
@@ -498,6 +500,7 @@ func (h *GatewayHandler) runAdobeImagesFailover(
 
 		// 提交之后的阶段在 service 内脱离客户端连接：拿到产物就一定记账，即便客户端已断开。
 		result, err := h.adobeImageService.GenerateCall(requestCtx, account, token, req.call)
+		h.gatewayService.RecordAdobeHealth(requestCtx, account, healthStarted, adobeHealthModel(account, req), err)
 		releaseAccount()
 		if err == nil {
 			h.gatewayService.ConfirmAdobeCookieRecovery(requestCtx, account)
@@ -585,8 +588,16 @@ func (h *GatewayHandler) tryAdobeImagesRelay(
 		c.Request = c.Request.WithContext(forwardCtx)
 	}
 
+	healthStarted := time.Now()
 	result, err := h.openAIGatewayService.ForwardImages(
 		forwardCtx, c, account, req.forwardBody(), req.parsed, req.channelMapping.MappedModel)
+	if h.gatewayService != nil {
+		healthErr := err
+		if healthErr == nil && (result == nil || result.ImageCount == 0) {
+			healthErr = errors.New("upstream did not return an image")
+		}
+		h.gatewayService.RecordAdobeHealth(forwardCtx, account, healthStarted, adobeHealthModel(account, req), healthErr)
+	}
 	if err == nil {
 		if req.writesGemini() {
 			h.finishAdobeGeminiImagesRelaySuccess(c, reqLog, apiKey, subject, subscription, account, result, req, sink)
@@ -966,4 +977,13 @@ func adobeImagesError(c *gin.Context, status int, errType, message string) {
 		return
 	}
 	c.JSON(status, gin.H{"error": gin.H{"type": errType, "message": message}})
+}
+
+// Use the same channel and account mapping as the upstream attempt.
+func adobeHealthModel(account *service.Account, req *adobeImagesRequest) string {
+	model := req.parsed.Model
+	if mapped := strings.TrimSpace(req.channelMapping.MappedModel); mapped != "" {
+		model = mapped
+	}
+	return account.GetMappedModel(model)
 }

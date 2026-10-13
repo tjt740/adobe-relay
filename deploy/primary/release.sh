@@ -4,6 +4,7 @@ set -euo pipefail
 umask 077
 image="${1:?Usage: release.sh adobe-relay:COMMIT}"
 [[ "$image" =~ ^adobe-relay:[a-zA-Z0-9._-]+$ ]] || exit 2
+expected_current="${2:-}"
 root=/opt/adobe-relay
 env_file="$root/shared/.env"
 exec 9>"$root/.release.lock"
@@ -13,6 +14,10 @@ app_id=$(adobe-relay ps -q app)
 postgres_id=$(adobe-relay ps -q postgres)
 [[ -n "$app_id" && -n "$postgres_id" ]] || { echo 'An existing app and database are required.' >&2; exit 1; }
 old_image=$(docker inspect "$app_id" --format '{{.Config.Image}}')
+if [[ -n "$expected_current" && "$old_image" != "$expected_current" ]]; then
+  echo "Production changed since preflight; refusing to replace a later release." >&2
+  exit 1
+fi
 backup_dir="$root/backups/$(date -u +%Y%m%dT%H%M%SZ)-${image##*:}"
 mkdir -p "$backup_dir"
 cp -p "$env_file" "$backup_dir/environment"
