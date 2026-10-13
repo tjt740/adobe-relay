@@ -65,7 +65,7 @@
       <span v-if="Number(account.extra.last_check_status_code) >= 400">{{ account.extra.last_check_status_code }}</span>
     </span>
 
-    <OkadIntegrationStatus v-if="account.platform === 'adobe'" :account="account" />
+    <OkadIntegrationStatus v-if="showOkadDetails && account.platform === 'adobe'" :account="account" />
 
     <!-- Error Info Indicator -->
     <HelpTooltip
@@ -219,9 +219,12 @@ import { formatCountdown, formatDateTime, formatDateTimeToMinute, formatCountdow
 
 const { t } = useI18n()
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   account: Account
-}>()
+  showOkadDetails?: boolean
+}>(), {
+  showOkadDetails: false
+})
 
 const adobeHealthPending = computed(() => props.account.platform === 'adobe' && Boolean((props.account.extra?.adobe_health as { pending?: boolean } | undefined)?.pending))
 

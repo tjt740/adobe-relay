@@ -54,6 +54,8 @@ export default {
       dataActions: '数据操作',
       toolActions: '工具',
       viewColumns: '列显示',
+      showOkadDetails: '显示联动详情',
+      showOkadDetailsHint: '仅调整列表显示，后台联动继续运行',
       selectedCount: '已选 {count}',
       dataExportConfirmMessage: '导出的数据包含账号与代理的敏感信息，请妥善保存。',
       dataExportConfirm: '确认导出',
