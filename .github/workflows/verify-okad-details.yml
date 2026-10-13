@@ -1,0 +1,49 @@
+name: Verify Okad Details Display
+on:
+  push:
+    branches: [codex/verify-okad-details]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+      - name: Verify production assets and preservation
+        run: |
+          set -euo pipefail
+          target=root@173.234.15.150
+          ssh_opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=10)
+          ssh "${ssh_opts[@]}" "$target" 'python3 - after' < deploy/primary/verify-okad-details-snapshot.py > after.json
+          ssh "${ssh_opts[@]}" "$target" 'python3 -' < deploy/primary/verify-okad-details-assets.py > frontend-verification.json
+          python3 - <<'PY'
+          import json
+          report=json.load(open('after.json'))
+          assert report['containers']['adobe-relay-app-1']['tag']=='adobe-relay:f28f14480dc2a90fdd0e98ff7d85569a5b6649fd', 'Unexpected subsequent release'
+          assert report['containers']['adobe-relay-app-1']['health']=='healthy'
+          assert all(report['preserved'].values()), report['preserved']
+          print(json.dumps({'preserved':report['preserved'],'integration':report['integration'],'accounts':report['sub2_accounts']['count']}))
+          print(open('frontend-verification.json').read())
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: okad-details-verification
+          path: |
+            after.json
+            frontend-verification.json
+          retention-days: 7
+      - name: Remove runner key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
