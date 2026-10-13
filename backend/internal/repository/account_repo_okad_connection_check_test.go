@@ -19,6 +19,8 @@ func TestOkadConnectionTestQueuePostgres(t *testing.T) {
  '{"okad":{"verification":"pending","version":1},"keep":true}',7,NOW())`)
 	require.NoError(t, err)
 	a := &service.Account{ID: 1, Platform: "adobe", Type: "oauth", Credentials: map[string]any{"cookie": "cookie-1"}}
+	proxyID := int64(7)
+	a.ProxyID = &proxyID
 	key := service.OkadConnectionTestKey(a)
 	require.NoError(t, repo.QueueOkadConnectionTest(ctx, a, key, true))
 	job, err := repo.ClaimOkadConnectionTest(ctx)
@@ -28,7 +30,7 @@ func TestOkadConnectionTestQueuePostgres(t *testing.T) {
 	require.NoError(t, err)
 	job, err = repo.ClaimOkadConnectionTest(ctx)
 	require.NoError(t, err)
-	require.Equal(t, &service.OkadConnectionTestJob{AccountID: 1, Key: key}, job)
+	require.Equal(t, &service.OkadConnectionTestJob{AccountID: 1, Key: key, ProxyID: &proxyID}, job)
 	// Delivery retries and a new repository/process cannot re-claim a started job.
 	require.NoError(t, repo.QueueOkadConnectionTest(ctx, a, key, true))
 	restarted := &accountRepository{sql: db}

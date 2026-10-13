@@ -72,8 +72,8 @@ func TestOkadRecoveryPostgres(t *testing.T) {
 	var schedulable bool
 	var raw []byte
 	require.NoError(t, db.QueryRow("SELECT status,schedulable,credentials FROM accounts WHERE id=1").Scan(&status, &schedulable, &raw))
-	require.Equal(t, service.StatusActive, status)
-	require.True(t, schedulable)
+	require.Equal(t, service.StatusError, status)
+	require.False(t, schedulable)
 	var credentials map[string]any
 	require.NoError(t, json.Unmarshal(raw, &credentials))
 	require.Equal(t, "fresh", credentials["cookie"])
@@ -118,38 +118,21 @@ func TestOkadRecoveryPostgres(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, mutation == "", applied, mutation)
 	}
-	// Reproduce both orders of the real recovery/Okad push using the production
-	// allocation trigger. Clearing a proxy wait must not destroy queue ownership.
-	_, err = db.Exec("UPDATE proxy_auto_allocation SET enabled=true")
-	require.NoError(t, err)
+	// Duplicate callback/recovery ordering must leave a new Cookie gated.
 	for _, callbackFirst := range []bool{false, true} {
 		reset(service.StatusError, message, false)
 		if callbackFirst {
-			_, err = db.Exec(`UPDATE accounts SET credentials=credentials || '{"cookie":"fresh"}'`)
+			_, err = repo.StageOkadCookie(ctx, snapshot, "fresh")
 			require.NoError(t, err)
-			require.NoError(t, repo.ClearError(ctx, 1))
 		}
 		_, err = repo.RecoverAdobeCookieIfUnchanged(ctx, snapshot, "fresh")
 		require.NoError(t, err)
 		require.NoError(t, repo.ClearError(ctx, 1))
-		var queued bool
-		var errorMessage string
-		require.NoError(t, db.QueryRow("SELECT status,schedulable,proxy_auto_paused,error_message FROM accounts WHERE id=1").Scan(&status, &schedulable, &queued, &errorMessage))
+		var checkState string
+		require.NoError(t, db.QueryRow("SELECT status,schedulable,extra->'okad_connection_test'->>'state' FROM accounts WHERE id=1").Scan(&status, &schedulable, &checkState))
 		require.Equal(t, service.StatusError, status)
 		require.False(t, schedulable)
-		require.True(t, queued)
-		require.Equal(t, "自动代理分配：等待可用节点（每个节点最多 3 个账号）", errorMessage)
-		// The allocator can now pick this queued account up and resume it.
-		tx, err := db.Begin()
-		require.NoError(t, err)
-		_, err = tx.Exec("SELECT set_config('sub2api.proxy_allocator','on',true)")
-		require.NoError(t, err)
-		_, err = tx.Exec("UPDATE accounts SET status='active',schedulable=true,proxy_id=7,proxy_auto_paused=false,error_message=NULL")
-		require.NoError(t, err)
-		require.NoError(t, tx.Commit())
-		require.NoError(t, repo.ClearError(ctx, 1))
-		require.NoError(t, db.QueryRow("SELECT schedulable FROM accounts WHERE id=1").Scan(&schedulable))
-		require.True(t, schedulable)
+		require.Equal(t, "pending", checkState)
 	}
 	// The outbox failure rolls back the account mutation too.
 	reset(service.StatusError, message, false)

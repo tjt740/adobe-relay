@@ -447,7 +447,11 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 	// Native Okad imports carry this source marker. Persist the test with the
 	// account so an idempotent create replay or restart cannot lose the job.
 	if account.Platform == PlatformAdobe && account.Type == AccountTypeOAuth && account.GetCredential("cookie") != "" && account.Extra["adobeteam_external_email"] != nil {
-		account.Extra["okad_connection_test"] = newOkadConnectionTestState(account, account.ErrorMessage == OkadVerificationPending)
+		account.Extra["okad_connection_test"] = NewOkadConnectionTestState(account, account.ErrorMessage == OkadVerificationPending, true)
+		account.Status, account.Schedulable = StatusError, false
+		if account.ErrorMessage != OkadVerificationPending {
+			account.ErrorMessage = OkadConnectionTestPending
+		}
 	}
 	if input.ProbeEnabled != nil && *input.ProbeEnabled {
 		if !isUpstreamBillingProbeAccount(account) {

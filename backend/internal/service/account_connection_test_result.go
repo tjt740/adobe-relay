@@ -89,5 +89,21 @@ func (s *AccountTestService) recordConnectionTestResult(ctx context.Context, acc
 		failure := classifyAdobeError(testErr)
 		applyAdobeCooldown(ctx, s.accountRepo, account.ID, failure)
 		applyAdobeTokenInvalidation(ctx, s.accountRepo, account.ID, account.GetCredential("access_token"), failure)
+		if _, automatic := ctx.Value(okadConnectionTestContextKey{}).(OkadConnectionTestJob); !automatic {
+			check, _ := account.Extra["okad_connection_test"].(map[string]any)
+			if repo, ok := s.accountRepo.(OkadConnectionTestRepository); ok && check["gated"] == true && check["key"] == OkadConnectionTestKey(account) {
+				job := OkadConnectionTestJob{AccountID: account.ID, Key: OkadConnectionTestKey(account), ProxyID: account.ProxyID, Manual: true}
+				if account.Proxy != nil {
+					job.ProxyUpdatedAt = &account.Proxy.UpdatedAt
+				}
+				state := "failed"
+				if testErr == nil {
+					state = "success"
+				}
+				if err := repo.FinishOkadConnectionTest(ctx, job, state); err != nil {
+					slog.Warn("okad_manual_test_finish_failed", "account_id", account.ID, "error", err)
+				}
+			}
+		}
 	}
 }

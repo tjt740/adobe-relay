@@ -40,6 +40,11 @@ func TestOkadVersionedDeliveryPostgres(t *testing.T) {
 	applied, err = repo.CompleteOkadVerification(ctx, a, map[string]any{"access_token": "verified"}, "verified", "verified")
 	require.NoError(t, err)
 	require.True(t, applied)
+	require.False(t, read().Schedulable, "credential-only verification must not release the image-test gate")
+	job, err := repo.ClaimOkadConnectionTest(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	require.NoError(t, repo.FinishOkadConnectionTest(ctx, *job, "success"))
 	require.True(t, read().Schedulable)
 	require.Equal(t, "new", read().GetCredential("cookie"))
 	// Transient upstream timeouts must not take a previously healthy account out

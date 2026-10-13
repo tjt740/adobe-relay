@@ -383,7 +383,7 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		return s.sendErrorAndEnd(c, "Account not found")
 	}
 	if job, ok := ctx.Value(okadConnectionTestContextKey{}).(OkadConnectionTestJob); ok {
-		if account.Platform != PlatformAdobe || account.Type != AccountTypeOAuth || OkadConnectionTestKey(account) != job.Key {
+		if account.Platform != PlatformAdobe || account.Type != AccountTypeOAuth || OkadConnectionTestKey(account) != job.Key || !okadTestProxyMatches(account, job) {
 			return s.sendErrorAndEnd(c, "Cookie changed before the automatic test started")
 		}
 	}

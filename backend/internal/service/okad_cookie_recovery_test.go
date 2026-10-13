@@ -132,9 +132,10 @@ func (r *okadRecoveryRepo) RecoverAdobeCookieIfUnchanged(_ context.Context, a *A
 	for _, k := range []string{"access_token", "expires_at", "_token_version"} {
 		delete(latest.Credentials, k)
 	}
-	latest.Status = StatusActive
-	latest.ErrorMessage = ""
-	latest.Schedulable = true
+	latest.Status = StatusError
+	latest.ErrorMessage = OkadConnectionTestPending
+	latest.Schedulable = false
+	latest.Extra = map[string]any{"okad_connection_test": NewOkadConnectionTestState(latest, false, true)}
 	return true, nil
 }
 func recoveryFixtureAccount(id int64) *Account {
@@ -165,9 +166,9 @@ func TestOkadRecoverySweepsHistoricalAndIMSFailures(t *testing.T) {
 	s.sweep(context.Background())
 	require.EqualValues(t, 2, calls.Load())
 	for _, a := range repo.accounts {
-		require.Equal(t, StatusActive, a.Status)
-		require.True(t, a.Schedulable)
-		require.Empty(t, a.ErrorMessage)
+		require.Equal(t, StatusError, a.Status)
+		require.False(t, a.Schedulable)
+		require.Equal(t, OkadConnectionTestPending, a.ErrorMessage)
 		require.Equal(t, "new", a.GetCredential("cookie"))
 		require.Contains(t, a.Credentials, "model_mapping")
 		require.NotContains(t, a.Credentials, "access_token")
@@ -240,7 +241,7 @@ func TestOkadRecoveryHonorsConcurrentPushOrDisable(t *testing.T) {
 		})
 		recovered, err := s.recover(context.Background(), a)
 		require.NoError(t, err)
-		require.Equal(t, !disable, recovered)
+		require.False(t, recovered, "a different concurrent Cookie must not be claimed as this recovery")
 		if disable {
 			require.Equal(t, "disabled", a.Status)
 			require.Equal(t, "old", a.GetCredential("cookie"))
@@ -304,10 +305,16 @@ func TestOkadRecoverySuccessfulLoginDoesNotRenewBudget(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, 1, calls.Load())
 	require.Equal(t, StatusError, a.Status)
+	// A pending validation is not a reason to login again. Only a fresh IMS
+	// rejection may use the second budget slot after the cooldown.
 	repo.attempts[a.ID].next = time.Now().Add(-time.Second)
 	s.sweep(context.Background())
+	require.EqualValues(t, 1, calls.Load())
+	a.ErrorMessage = "Token refresh failed (non-retryable): adobe cookie is no longer valid: invalid_credentials"
+	s.sweep(context.Background())
 	require.EqualValues(t, 2, calls.Load())
-	require.Equal(t, StatusActive, a.Status)
+	require.Equal(t, OkadConnectionTestPending, a.ErrorMessage)
+	a.ErrorMessage = "Token refresh failed (non-retryable): adobe cookie is no longer valid: invalid_credentials"
 	_, err = s.recover(context.Background(), a)
 	require.NoError(t, err)
 	require.EqualValues(t, 2, calls.Load())

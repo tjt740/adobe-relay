@@ -39,13 +39,19 @@ func (r *accountRepository) ApplyOkadCredential(ctx context.Context, a *service.
 		resume = false
 	}
 	state := map[string]any{"issuer": p.Issuer, "source_key": p.SourceKey, "version": p.Version, "verification": "pending", "message": "Cookie 已写入，等待通过当前代理验证", "resume": resume, "received_at": time.Now().UTC().Format(time.RFC3339), "model_verified": false}
+	snapshot := *a
+	snapshot.Credentials = service.MergeCredentials(a.Credentials, map[string]any{"cookie": p.Cookie})
+	checkRaw, err := json.Marshal(service.NewOkadConnectionTestState(&snapshot, true, resume))
+	if err != nil {
+		return false, err
+	}
 	raw, err := json.Marshal(state)
 	if err != nil {
 		return false, err
 	}
 	result, err := r.sql.ExecContext(ctx, `WITH updated AS (
  UPDATE accounts a SET credentials=(COALESCE(credentials,'{}'::jsonb)-'access_token'-'expires_at'-'_token_version') || jsonb_build_object('cookie',$2::text),
- extra=(COALESCE(extra,'{}'::jsonb)-'okad_recovery')||jsonb_build_object('okad',$3::jsonb),
+ extra=(COALESCE(extra,'{}'::jsonb)-'okad_recovery'-'last_check_at'-'last_check_success'-'last_check_status_code')||jsonb_build_object('okad',$3::jsonb,'okad_connection_test',$12::jsonb),
  status=CASE WHEN $4 THEN 'error' ELSE status END,
  error_message=CASE WHEN $4 THEN $5 ELSE error_message END,
  schedulable=CASE WHEN $4 THEN FALSE ELSE schedulable END,updated_at=NOW()
@@ -54,7 +60,7 @@ func (r *accountRepository) ApplyOkadCredential(ctx context.Context, a *service.
  AND (COALESCE(extra->'okad'->>'issuer','')='' OR (extra->'okad'->>'issuer'=$8 AND extra->'okad'->>'source_key'=$9))
  AND (CASE WHEN COALESCE(extra->'okad'->>'version','') ~ '^[0-9]{1,16}$' THEN (extra->'okad'->>'version')::bigint ELSE 0 END)<$10
  RETURNING id)
- INSERT INTO scheduler_outbox(event_type,account_id,group_id,payload) SELECT $11,id,NULL,NULL FROM updated`, a.ID, p.Cookie, string(raw), resume, service.OkadVerificationPending, a.UpdatedAt, a.GetCredential("cookie"), p.Issuer, p.SourceKey, p.Version, service.SchedulerOutboxEventAccountChanged)
+ INSERT INTO scheduler_outbox(event_type,account_id,group_id,payload) SELECT $11,id,NULL,NULL FROM updated`, a.ID, p.Cookie, string(raw), resume, service.OkadVerificationPending, a.UpdatedAt, a.GetCredential("cookie"), p.Issuer, p.SourceKey, p.Version, service.SchedulerOutboxEventAccountChanged, string(checkRaw))
 	if err != nil {
 		return false, err
 	}
@@ -97,6 +103,9 @@ func (r *accountRepository) CompleteOkadVerification(ctx context.Context, a *ser
 	// the original auth quarantine still belongs to this integration.
 	ownsPause := prior["resume"] == true && a.Status == service.StatusError && !a.Schedulable && (a.ErrorMessage == service.OkadVerificationPending || strings.HasPrefix(a.ErrorMessage, "Authentication failed (401):"))
 	resume := ownsPause && a.Extra["okad_manual_pause"] != true && code == "verified" && (a.ExpiresAt == nil || a.ExpiresAt.After(time.Now()))
+	if check, ok := a.Extra["okad_connection_test"].(map[string]any); ok && check["gated"] == true && check["state"] != "success" {
+		resume = false // The image check, not a credential-only probe, owns release.
+	}
 	failAuth := (ownsPause || quarantine) && code == "auth_failed"
 	var proxyUpdatedAt *time.Time
 	if a.Proxy != nil {
@@ -127,7 +136,8 @@ func (r *accountRepository) ListOkadInventory(ctx context.Context, after int64, 
 	if limit < 1 || limit > 500 {
 		limit = 200
 	}
-	rows, err := r.sql.QueryContext(ctx, `SELECT a.id,COALESCE(a.credentials->>'email',a.extra->>'adobeteam_external_email',''),a.status,a.schedulable,a.proxy_id,COALESCE(a.extra->'okad','{}'::jsonb),COALESCE(r.attempts,0),r.next_attempt_at,a.updated_at
+	rows, err := r.sql.QueryContext(ctx, `SELECT a.id,COALESCE(a.credentials->>'email',a.extra->>'adobeteam_external_email',''),a.status,a.schedulable,a.proxy_id,COALESCE(a.extra->'okad','{}'::jsonb),COALESCE(r.attempts,0),r.next_attempt_at,a.updated_at,
+ COALESCE(a.extra->'okad_connection_test','{}'::jsonb)||jsonb_build_object('last_check_success',a.extra->'last_check_success','last_check_status_code',a.extra->'last_check_status_code','last_check_at',a.extra->'last_check_at')
  FROM accounts a LEFT JOIN adobe_cookie_recovery_attempts r ON r.account_id=a.id
  WHERE a.deleted_at IS NULL AND a.platform='adobe' AND a.type='oauth' AND a.id>$1 AND ($3::timestamptz IS NULL OR a.updated_at>=$3)
  ORDER BY a.id LIMIT $2`, after, limit, since)
@@ -139,10 +149,14 @@ func (r *accountRepository) ListOkadInventory(ctx context.Context, after int64, 
 	for rows.Next() {
 		var item service.OkadInventoryItem
 		var raw []byte
-		if err := rows.Scan(&item.ID, &item.Email, &item.Status, &item.Schedulable, &item.ProxyID, &raw, &item.Attempts, &item.NextAttemptAt, &item.UpdatedAt); err != nil {
+		var checkRaw []byte
+		if err := rows.Scan(&item.ID, &item.Email, &item.Status, &item.Schedulable, &item.ProxyID, &raw, &item.Attempts, &item.NextAttemptAt, &item.UpdatedAt, &checkRaw); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(raw, &item.State); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(checkRaw, &item.ConnectionTest); err != nil {
 			return nil, err
 		}
 		out = append(out, item)

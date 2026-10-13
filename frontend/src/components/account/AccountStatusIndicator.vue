@@ -1,7 +1,10 @@
 <template>
   <div class="flex items-center gap-2">
     <!-- Authentication failures include Adobe's invalid_credentials response. -->
-    <span v-if="adobeHealthPending" class="badge text-xs badge-warning">异常待成功验证</span>
+    <template v-if="isOkadCheckPending">
+      <span class="badge text-xs badge-warning">{{ okadCheckPhase === 'running' ? '正在验证 Cookie' : 'Cookie 待验证' }}</span>
+    </template>
+    <span v-else-if="adobeHealthPending" class="badge text-xs badge-warning">异常待成功验证</span>
     <template v-else-if="isAuthenticationFailed">
       <span class="badge text-xs badge-danger">{{ authenticationFailureText }}</span>
       <span
@@ -56,7 +59,7 @@
     </template>
 
     <span
-      v-if="typeof account.extra?.last_check_success === 'boolean' && !isRequestTimeout && !isAuthenticationFailed"
+      v-if="typeof account.extra?.last_check_success === 'boolean' && !isOkadCheckPending && !isRequestTimeout && !isAuthenticationFailed"
       data-testid="account-last-check"
       :class="['badge text-xs', account.extra.last_check_success ? 'badge-success' : 'badge-danger']"
       :title="t('admin.accounts.bulkTest.checkedAt', { time: formatDateTime(String(account.extra.last_check_at || '')) })"
@@ -363,6 +366,9 @@ const tempUnschedulableError = computed(() => {
 const accountStatusCode = computed(() => getAccountStatusCode(props.account))
 const authenticationError = computed(() => getAccountAuthenticationError(props.account, t('admin.accounts.status.authenticationFailedHint')))
 const isAdobeCookieError = (message: string) => isAdobeAccountCookieError(props.account, message)
+
+const okadCheckPhase = computed(() => String((props.account.extra?.okad_connection_test as Record<string, unknown> | undefined)?.state || ''))
+const isOkadCheckPending = computed(() => props.account.platform === 'adobe' && props.account.status === 'error' && ['pending', 'running'].includes(String((props.account.extra?.okad_connection_test as Record<string, unknown> | undefined)?.state || '')))
 
 const isAuthenticationFailed = computed(() => Boolean(authenticationError.value))
 const authenticationFailureText = computed(() => t(
