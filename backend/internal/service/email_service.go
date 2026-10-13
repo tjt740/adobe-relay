@@ -192,7 +192,10 @@ func (s *EmailService) SendEmailWithConfig(config *SMTPConfig, to, subject, body
 	if err != nil {
 		return err
 	}
+	return s.sendSMTPMessage(config, message)
+}
 
+func (s *EmailService) sendSMTPMessage(config *SMTPConfig, message smtpMessage) error {
 	client, err := s.connectSMTP(config)
 	if err != nil {
 		return err

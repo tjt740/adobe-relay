@@ -55,6 +55,11 @@ const OpsAdobeAlertRatioFilter = "adobe_error_ratio_percent"
 // Missing keeps existing count-only rules compatible. Invalid configuration
 // fails closed instead of unexpectedly reverting to the lower count threshold.
 func OpsAdobeAlertRatioThreshold(filters map[string]any) (float64, bool, error) {
+	if value, exists := filters[OpsAdobeQuietNotificationsFilter]; exists {
+		if _, ok := value.(bool); !ok {
+			return 0, false, fmt.Errorf("filters.%s must be a boolean", OpsAdobeQuietNotificationsFilter)
+		}
+	}
 	value, exists := filters[OpsAdobeAlertRatioFilter]
 	if !exists {
 		return 0, false, nil
@@ -77,20 +82,20 @@ func OpsAdobeAlertRatioThreshold(filters map[string]any) (float64, bool, error) 
 }
 
 type OpsAdobeAccountErrors struct {
-	AccountID      int64
-	Name           string
-	Status         string
-	Count401       int64
-	Count408       int64
-	Auth401        int64
-	Quota401       int64
-	Entitled401    int64
-	Unknown401     int64
-	BusinessErrors int64
-	TestErrors     int64
-	TestTimeouts   int64
-	FirstSeen      time.Time
-	LastSeen       time.Time
+	AccountID      int64     `json:"account_id"`
+	Name           string    `json:"name"`
+	Status         string    `json:"status"`
+	Count401       int64     `json:"count_401"`
+	Count408       int64     `json:"count_408"`
+	Auth401        int64     `json:"auth_401"`
+	Quota401       int64     `json:"quota_401"`
+	Entitled401    int64     `json:"entitled_401"`
+	Unknown401     int64     `json:"unknown_401"`
+	BusinessErrors int64     `json:"business_errors"`
+	TestErrors     int64     `json:"test_errors"`
+	TestTimeouts   int64     `json:"test_timeouts"`
+	FirstSeen      time.Time `json:"first_seen"`
+	LastSeen       time.Time `json:"last_seen"`
 }
 
 func (s *OpsAlertEvaluatorService) adobeErrorMetric(ctx context.Context, start, end time.Time, groupID *int64, filters map[string]any) (value float64, detail string, ratioEnabled, ratioBreached bool, err error) {

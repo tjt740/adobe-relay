@@ -478,7 +478,7 @@ function cancelDelete() {
               <span class="mx-1 text-gray-400">{{ row.operator }}</span>
               <span class="font-mono">{{ row.threshold }}</span>
               <div v-if="adobeRatio(row) !== null" class="mt-1 text-xs">
-                {{ t('admin.ops.alertRules.adobeRatioSummary', { percent: adobeRatio(row) }) }}
+                <template v-if="row.filters?.adobe_confirmed_notifications">占比达到 {{ adobeRatio(row) }}% 触发；低于 {{ Math.min(10, (adobeRatio(row) || 20) / 2) }}% 且有实际成功记录才结束。持续确认至少 {{ Math.max(4, row.sustained_minutes) }} 分钟，新邮件至少间隔 {{ Math.max(60, row.cooldown_minutes) }} 分钟。</template><template v-else>{{ t('admin.ops.alertRules.adobeRatioSummary', { percent: adobeRatio(row) }) }}</template>
               </div>
             </div>
             <div class="flex items-center justify-between gap-2">
@@ -531,7 +531,7 @@ function cancelDelete() {
                 <span class="mx-1 text-gray-400">{{ row.operator }}</span>
                 <span class="font-mono">{{ row.threshold }}</span>
                 <div v-if="adobeRatio(row) !== null" class="mt-1 text-xs">
-                  {{ t('admin.ops.alertRules.adobeRatioSummary', { percent: adobeRatio(row) }) }}
+                  <template v-if="row.filters?.adobe_confirmed_notifications">占比达到 {{ adobeRatio(row) }}% 触发；低于 {{ Math.min(10, (adobeRatio(row) || 20) / 2) }}% 且有实际成功记录才结束。持续确认至少 {{ Math.max(4, row.sustained_minutes) }} 分钟，新邮件至少间隔 {{ Math.max(60, row.cooldown_minutes) }} 分钟。</template><template v-else>{{ t('admin.ops.alertRules.adobeRatioSummary', { percent: adobeRatio(row) }) }}</template>
                 </div>
               </td>
               <td class="whitespace-nowrap px-4 py-3 text-xs font-bold text-gray-700 dark:text-gray-200">
@@ -622,7 +622,7 @@ function cancelDelete() {
           <div v-if="draft?.metric_type === 'adobe_401_408_accounts'" class="md:col-span-2">
             <label class="input-label" for="adobe-alert-ratio">{{ t('admin.ops.alertRules.adobeRatioLabel') }}</label>
             <input id="adobe-alert-ratio" v-model.number="draftAdobeRatio" class="input" type="number" min="0.01" max="100" step="any" />
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.ops.alertRules.adobeRatioHint') }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><template v-if="draft?.filters?.adobe_confirmed_notifications">已启用持续异常确认和邮件去重；恢复分界为触发占比的一半，最高 10%。</template><template v-else>{{ t('admin.ops.alertRules.adobeRatioHint') }}</template></p>
           </div>
 
           <div>

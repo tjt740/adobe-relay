@@ -77,6 +77,7 @@ func (r *opsRepository) GetAdobeHealthReport(ctx context.Context, start, end tim
 		return nil, err
 	}
 	report.Historical = len(history)
+	report.WindowAccounts = history
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -88,6 +89,9 @@ func (r *opsRepository) UpdateAdobeAlertReport(ctx context.Context, e *service.O
 	if err != nil {
 		return err
 	}
-	_, err = r.db.ExecContext(ctx, `UPDATE ops_alert_events SET title=$2,description=$3,dimensions=$4::jsonb WHERE id=$1 AND status='firing'`, e.ID, e.Title, e.Description, string(raw))
+	// Merge only report fields: concurrent delivery receipts must never be erased.
+	_, err = r.db.ExecContext(ctx, `UPDATE ops_alert_events SET title=$2,description=$3,
+ dimensions=COALESCE(dimensions,'{}'::jsonb) || jsonb_build_object('adobe_health',$4::jsonb->'adobe_health','adobe_incident_accounts',$4::jsonb->'adobe_incident_accounts')
+ WHERE id=$1 AND status='firing'`, e.ID, e.Title, e.Description, string(raw))
 	return err
 }
