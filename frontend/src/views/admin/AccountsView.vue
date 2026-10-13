@@ -155,6 +155,18 @@
                       </div>
                       <div class="grid grid-cols-1 gap-1">
                         <button
+                          type="button"
+                          :aria-pressed="showOkadDetails"
+                          @click="toggleOkadDetails"
+                          class="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-dark-700"
+                        >
+                          <span class="text-left">
+                            <span class="block">{{ t('admin.accounts.showOkadDetails') }}</span>
+                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.showOkadDetailsHint') }}</span>
+                          </span>
+                          <Icon v-if="showOkadDetails" name="check" size="sm" class="shrink-0 text-primary-500" />
+                        </button>
+                        <button
                           v-for="col in toggleableColumns"
                           :key="col.key"
                           @click="toggleColumn(col.key)"
@@ -307,7 +319,7 @@
           </template>
           <template #cell-status="{ row }">
             <div class="flex items-center gap-1.5">
-              <AccountStatusIndicator :account="row" @show-temp-unsched="handleShowTempUnsched" />
+              <AccountStatusIndicator :account="row" :show-okad-details="showOkadDetails" @show-temp-unsched="handleShowTempUnsched" />
             </div>
           </template>
           <template #cell-schedulable="{ row }">
@@ -722,6 +734,8 @@ const accountToolsDropdownStyle = computed(() => ({
   width: `${accountToolsDropdownPosition.width}px`
 }))
 const hiddenColumns = reactive<Set<string>>(new Set())
+const showOkadDetails = ref(false)
+const OKAD_DETAILS_STORAGE_KEY = 'account-show-okad-details'
 const DEFAULT_HIDDEN_COLUMNS = ['today_stats', 'proxy', 'notes', 'scheduler_score', 'rate_multiplier']
 const HIDDEN_COLUMNS_KEY = 'account-hidden-columns'
 // One-time migration: hide scheduler score for existing admins too, because showing it opt-ins to heavy backend scoring.
@@ -1065,6 +1079,23 @@ const saveColumnsToStorage = () => {
   }
 }
 
+const loadSavedOkadDetails = () => {
+  try {
+    showOkadDetails.value = localStorage.getItem(OKAD_DETAILS_STORAGE_KEY) === 'true'
+  } catch {
+    showOkadDetails.value = false
+  }
+}
+
+const toggleOkadDetails = () => {
+  showOkadDetails.value = !showOkadDetails.value
+  try {
+    localStorage.setItem(OKAD_DETAILS_STORAGE_KEY, String(showOkadDetails.value))
+  } catch {
+    // The display toggle still works when browser storage is unavailable.
+  }
+}
+
 const loadSavedAutoRefresh = () => {
   try {
     const saved = localStorage.getItem(AUTO_REFRESH_STORAGE_KEY)
@@ -1096,6 +1127,7 @@ const saveAutoRefreshToStorage = () => {
 
 if (typeof window !== 'undefined') {
   loadSavedColumns()
+  loadSavedOkadDetails()
   loadSavedAutoRefresh()
 }
 
