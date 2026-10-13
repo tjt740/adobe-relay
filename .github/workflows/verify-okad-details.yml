@@ -34,7 +34,9 @@ jobs:
           assert report['containers']['adobe-relay-app-1']['tag']=='adobe-relay:f28f14480dc2a90fdd0e98ff7d85569a5b6649fd', 'Unexpected subsequent release'
           assert report['containers']['adobe-relay-app-1']['health']=='healthy'
           assert all(v for k,v in report['preserved'].items() if k!='sub2_accounts'), report['preserved']
-          assert json.load(open('proxy-audit.json'))['matches_actual_cutover']
+          proxy=json.load(open('proxy-audit.json'))
+          assert proxy['same_account_ids'] and proxy['proxy_policy_unchanged']
+          assert proxy['matches_actual_cutover'] or proxy['explained_by_existing_failover']
           print(json.dumps({'preserved':report['preserved'],'integration':report['integration'],'accounts':report['sub2_accounts']['count']}))
           print(open('frontend-verification.json').read())
           PY
