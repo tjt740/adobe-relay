@@ -66,6 +66,25 @@ function makeAccount(overrides: Partial<Account>): Account {
 }
 
 describe('AccountStatusIndicator', () => {
+  it.each([
+    { status: 'error', error_message: 'Authentication failed (401): invalid_credentials' },
+    { extra: { adobe_health: { pending: true }, last_check_success: false, last_check_status_code: 408 } },
+    { extra: { last_check_success: false, last_check_status_code: 408 } },
+    { status: 'error', extra: { okad_connection_test: { state: 'pending' } } },
+    { rate_limit_reset_at: '2099-01-01T00:00:00Z' },
+    { overload_until: '2099-01-01T00:00:00Z' },
+    { temp_unschedulable_until: '2099-01-01T00:00:00Z' },
+    { schedulable: false },
+    { extra: { last_check_success: true, last_check_status_code: 200 } }
+  ] as Partial<Account>[])('keeps every status tag unchanged when descriptions move into details: %j', async (overrides) => {
+    const wrapper = mount(AccountStatusIndicator, { props: { account: makeAccount({ platform: 'adobe', ...overrides }) }, global: { stubs: { Icon: true, teleport: true } } })
+    const tags = () => wrapper.findAll('span.badge, span.inline-flex, button.badge').map(node => ({ text: node.text(), classes: node.classes() }))
+    const before = tags()
+    await wrapper.setProps({ detailsInDialog: true })
+    expect(tags()).toEqual(before)
+    expect(wrapper.find('[data-testid="account-error-details"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
   it('replaces a previous timeout with each new completed test result', async () => {
     const account = makeAccount({
       platform: 'adobe',
