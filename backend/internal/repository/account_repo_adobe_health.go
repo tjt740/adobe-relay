@@ -67,10 +67,11 @@ func (r *accountRepository) RecordAdobeHealth(ctx context.Context, a *service.Ac
 	}
 	// Keep the latest observation and an independent successful evidence record.
 	_, err = tx.ExecContext(ctx, `UPDATE accounts SET extra=COALESCE(extra,'{}'::jsonb)||jsonb_build_object('adobe_health',
- COALESCE(extra->'adobe_health','{}'::jsonb)||jsonb_build_object('latest',$2::jsonb,'pending',
+ COALESCE(extra->'adobe_health','{}'::jsonb)||jsonb_build_object('latest',CASE WHEN (extra->'adobe_health'->'latest'->>'checked_at')::timestamptz>$4 THEN extra->'adobe_health'->'latest' ELSE $2::jsonb END,'pending',
  EXISTS(SELECT 1 FROM adobe_account_health h WHERE h.account_id=$1 AND h.failed_at IS NOT NULL AND (h.success_started_at IS NULL OR h.success_started_at<=h.failed_at)))
- ||CASE WHEN $3 THEN jsonb_build_object('last_success',$2::jsonb) ELSE jsonb_build_object('last_failure',$2::jsonb) END),updated_at=NOW()
- WHERE id=$1`, id, string(raw), o.Success)
+ ||CASE WHEN $3 THEN CASE WHEN (extra->'adobe_health'->'last_success'->>'checked_at')::timestamptz>$4 THEN '{}'::jsonb ELSE jsonb_build_object('last_success',$2::jsonb) END
+ ELSE CASE WHEN (extra->'adobe_health'->'last_failure'->>'checked_at')::timestamptz>$4 THEN '{}'::jsonb ELSE jsonb_build_object('last_failure',$2::jsonb) END END),updated_at=NOW()
+ WHERE id=$1`, id, string(raw), o.Success, o.CheckedAt)
 	if err != nil {
 		return err
 	}

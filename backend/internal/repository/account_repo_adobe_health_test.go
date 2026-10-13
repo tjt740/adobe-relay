@@ -69,6 +69,11 @@ func TestAdobeHealthPostgresEvidenceSurvivesQuietWindowsAndStaleResults(t *testi
 	require.NoError(t, json.Unmarshal(raw, &health))
 	require.Equal(t, false, health["pending"])
 	require.Contains(t, health, "last_success")
+	record(false, "model-a", base, base.Add(time.Minute), 408)
+	require.NoError(t, db.QueryRow(`SELECT extra->'adobe_health' FROM accounts WHERE id=1`).Scan(&raw))
+	require.NoError(t, json.Unmarshal(raw, &health))
+	require.Equal(t, true, health["latest"].(map[string]any)["success"], "out-of-order persistence cannot replace newer displayed evidence")
+	require.Zero(t, report().Pending)
 	// An actual auth success can recover another model's account-wide auth failure.
 	require.NoError(t, r.RecordAdobeHealth(ctx, a, service.AdobeHealthObservation{Scope: "model-c", Code: 401, Reason: "auth", Source: "business", StartedAt: base.Add(10 * time.Minute), CheckedAt: base.Add(11 * time.Minute)}))
 	record(true, "model-a", base.Add(12*time.Minute), base.Add(13*time.Minute), 200)

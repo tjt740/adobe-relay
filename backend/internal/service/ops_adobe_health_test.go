@@ -98,20 +98,20 @@ func TestAdobeHealthReasonsNeverPersistUpstreamSecrets(t *testing.T) {
 
 func TestAdobeHealthEmailReadableEscapedAndBounded(t *testing.T) {
 	now := time.Now()
-	report := &AdobeHealthReport{GeneratedAt: now, WindowStart: now.Add(-10 * time.Minute), Total: 108, Pending: 39, Historical: 39, Ratio: 36.11, Threshold: 20, Minimum: 5}
+	report := &AdobeHealthReport{GeneratedAt: now, WindowStart: now.Add(-10 * time.Minute), Total: 108, Pending: 39, RecentPending: 39, Unknown: 69, Historical: 39, Ratio: 36.11, Threshold: 20, Minimum: 5}
 	for i := 0; i < 60; i++ {
-		report.Accounts = append(report.Accounts, AdobeHealthAccount{ID: int64(i + 1), Name: "<script>unsafe</script>", Code: 408, Reason: "upstream", Source: "business", FailedAt: &now, Pending: true})
+		report.Accounts = append(report.Accounts, AdobeHealthAccount{ID: int64(i%39 + 1), Name: "<script>unsafe</script>", Code: 408, Reason: "upstream", Source: "business", FailedAt: &now, Pending: true})
 	}
 	body := buildOpsAlertEmailBody(&OpsAlertRule{MetricType: OpsMetricAdobeErrorAccounts}, &OpsAlertEvent{Dimensions: map[string]any{"adobe_health": report}})
 	require.Contains(t, body, "39 个账号仍有失败待验证")
 	require.Contains(t, body, "36.11%")
 	require.Contains(t, body, "20%")
 	require.Contains(t, body, "先做什么")
-	require.Contains(t, body, "另有 10 条")
+	require.Contains(t, body, "另有 48 条")
 	require.NotContains(t, body, "<script>")
 	require.Contains(t, body, "&lt;script&gt;")
 	require.NotContains(t, body, "Metric</b>")
-	require.Equal(t, 50, strings.Count(body, "unsafe"))
+	require.Equal(t, 12, strings.Count(body, "unsafe"))
 	if path := os.Getenv("ADOBE_HEALTH_EMAIL_PREVIEW"); path != "" {
 		require.NoError(t, os.WriteFile(path, []byte(body), 0600))
 	}

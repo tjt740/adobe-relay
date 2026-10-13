@@ -9,7 +9,7 @@ import (
 
 func buildAdobeHealthEmail(rule *OpsAlertRule, event *OpsAlertEvent) string {
 	var b strings.Builder
-	b.WriteString(`<html lang="zh-CN"><body style="margin:0;background:#f1f5f9;font-family:Arial,'Microsoft YaHei',sans-serif;color:#1e293b"><div style="max-width:760px;margin:24px auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden"><div style="padding:28px;background:#0f172a;color:white"><p style="margin:0 0 8px;color:#94a3b8;font-size:12px">Sub2 · Adobe 账号运行报告</p><h1 style="font-size:23px;margin:0">`)
+	b.WriteString(`<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:#f1f5f9;font-family:Arial,'Microsoft YaHei',sans-serif;color:#1e293b"><div style="max-width:760px;margin:24px auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden"><div style="padding:28px;background:#0f172a;color:white"><p style="margin:0 0 8px;color:#94a3b8;font-size:12px">Sub2 · Adobe 账号运行报告</p><h1 style="font-size:23px;margin:0">`)
 	title := "账号出现异常，请查看下面的处理建议"
 	if event.Status == "report" {
 		title = "你要的账号状态报表"
@@ -39,7 +39,7 @@ func buildAdobeHealthEmail(rule *OpsAlertRule, event *OpsAlertEvent) string {
 			label, advice := AdobeHealthReason(reason)
 			fmt.Fprintf(&b, `<tr><td style="border-bottom:1px solid #e2e8f0">%s</td><td style="border-bottom:1px solid #e2e8f0">%d</td><td style="border-bottom:1px solid #e2e8f0">%s</td></tr>`, label, len(ids), advice)
 		}
-		b.WriteString(`</table><p style="font-size:12px;color:#64748b">一个账号可能涉及多个模型和原因，分类数量不直接相加。408 是请求超时或上游临时故障的线索，不能直接认定 Cookie 失效。</p><h2 style="font-size:17px;margin-top:28px">需要关注的账号</h2><table width="100%" cellpadding="9" cellspacing="0" style="border-collapse:collapse;font-size:12px;text-align:left;word-break:break-word"><tr style="background:#f1f5f9"><th>账号</th><th>问题 / 来源</th><th>最近失败<br>后续成功</th></tr>`)
+		b.WriteString(`</table><p style="font-size:12px;color:#64748b">下表也列出其他失败，只有 401 / 408 计入 20% 告警。一个账号可能涉及多个模型和原因，分类数量不直接相加。408 是请求超时或上游临时故障的线索，不能直接认定 Cookie 失效。</p><h2 style="font-size:17px;margin-top:28px">需要关注的账号</h2><table width="100%" cellpadding="9" cellspacing="0" style="border-collapse:collapse;font-size:12px;text-align:left;word-break:break-word"><tr style="background:#f1f5f9"><th>账号</th><th>问题 / 来源</th><th>最近失败<br>后续成功</th></tr>`)
 		shown := 0
 		totalRows := 0
 		for _, a := range r.Accounts {
@@ -47,7 +47,7 @@ func buildAdobeHealthEmail(rule *OpsAlertRule, event *OpsAlertEvent) string {
 				continue
 			}
 			totalRows++
-			if shown >= 50 {
+			if shown >= 12 {
 				continue
 			}
 			shown++
