@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -57,20 +58,44 @@ type okadVerificationClient interface {
 func probeOkadCredential(ctx context.Context, a *Account, client okadVerificationClient) (map[string]any, *adobe.CreditsBalance, error) {
 	result, err := client.RefreshAccessTokenFromCookie(ctx, a.GetCredential("cookie"), adobe.RefreshOptions{SkipAccountFetch: true})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, &adobe.OperationError{Stage: "token", Err: err}
 	}
 	identity, err := client.FetchAccountInfo(ctx, result.AccessToken)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, &adobe.OperationError{Stage: "identity", Err: err}
 	}
 	if identity == nil || !strings.EqualFold(strings.TrimSpace(identity.Email), adobeRecoveryEmail(a)) {
-		return nil, nil, errOkadIdentityMismatch
+		return nil, nil, &adobe.OperationError{Stage: "identity", Err: errOkadIdentityMismatch}
 	}
 	balance, err := client.FetchCreditsBalance(ctx, result.AccessToken)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, &adobe.OperationError{Stage: "credits", Err: err}
 	}
 	return map[string]any{"access_token": result.AccessToken, "expires_at": adobeTokenExpiryString(result)}, balance, nil
+}
+
+func okadVerificationStage(err error) string {
+	var op *adobe.OperationError
+	if errors.As(err, &op) {
+		switch op.Stage {
+		case "token", "identity", "credits":
+			return op.Stage
+		}
+	}
+	return "unknown"
+}
+
+func okadAuthVerificationMessage(err error) string {
+	switch okadVerificationStage(err) {
+	case "token":
+		return "Authentication failed (401): Adobe rejected the Cookie during token exchange"
+	case "identity":
+		return "Authentication failed (401): Adobe rejected the token during identity verification"
+	case "credits":
+		return "Authentication failed (401): Adobe rejected the token during credits verification"
+	default:
+		return "Authentication failed (401): Adobe rejected the new cookie"
+	}
 }
 
 func (s *adminServiceImpl) ApplyOkadCredential(ctx context.Context, id int64, p OkadCredentialUpdate) (*Account, error) {
@@ -149,7 +174,7 @@ func (s *AccountUsageService) VerifyOkadCredential(ctx context.Context, a *Accou
 		var auth *adobe.AuthError
 		var entitlement *adobe.NotEntitledError
 		if errors.As(err, &auth) && auth.StatusCode == 401 {
-			code, message = "auth_failed", "Authentication failed (401): Adobe rejected the new cookie"
+			code, message = "auth_failed", okadAuthVerificationMessage(err)
 		}
 		if errors.As(err, &entitlement) {
 			code, message = "entitlement_blocked", "凭据已更新，但缺少模型权益"
@@ -158,6 +183,9 @@ func (s *AccountUsageService) VerifyOkadCredential(ctx context.Context, a *Accou
 			code, message = "identity_mismatch", "Cookie 对应邮箱与关联账号不一致，请核对来源"
 		}
 		fields = nil
+		// Persist only allowlisted stage/result metadata in logs. The upstream
+		// body can contain credentials and must not be logged here.
+		slog.Warn("okad_credential_verification_failed", "account_id", a.ID, "version", okadVersion(state["version"]), "stage", okadVerificationStage(err), "result", code)
 	}
 	// Persist even when the HTTP client disconnects, but never apply a stale result.
 	persist, cancelPersist := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
