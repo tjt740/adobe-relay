@@ -444,6 +444,11 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 		account.Extra["okad"] = map[string]any{"resume": true}
 		delete(account.Extra, "okad_initial_verification")
 	}
+	// Native Okad imports carry this source marker. Persist the test with the
+	// account so an idempotent create replay or restart cannot lose the job.
+	if account.Platform == PlatformAdobe && account.Type == AccountTypeOAuth && account.GetCredential("cookie") != "" && account.Extra["adobeteam_external_email"] != nil {
+		account.Extra["okad_connection_test"] = newOkadConnectionTestState(account, account.ErrorMessage == OkadVerificationPending)
+	}
 	if input.ProbeEnabled != nil && *input.ProbeEnabled {
 		if !isUpstreamBillingProbeAccount(account) {
 			return nil, ErrUpstreamBillingProbeAccountInvalid

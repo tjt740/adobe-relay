@@ -71,8 +71,8 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeySiteLogo:                                  "",
 		SettingKeyPurchaseSubscriptionEnabled:               "false",
 		SettingKeyPurchaseSubscriptionURL:                   "",
-		SettingKeyTableDefaultPageSize:                      "20",
-		SettingKeyTablePageSizeOptions:                      "[10,20,50,100]",
+		SettingKeyTableDefaultPageSize:                      "300",
+		SettingKeyTablePageSizeOptions:                      "[10,20,50,100,300]",
 		SettingKeyCustomMenuItems:                           "[]",
 		SettingKeyCustomEndpoints:                           "[]",
 		SettingKeyWeChatConnectEnabled:                      "false",
@@ -1339,7 +1339,7 @@ func mergeProviderDefaultGrantSettings(globalDefaults ProviderDefaultGrantSettin
 }
 
 func parseTablePreferences(defaultPageSizeRaw, optionsRaw string) (int, []int) {
-	defaultPageSize := 20
+	defaultPageSize := 300
 	if v, err := strconv.Atoi(strings.TrimSpace(defaultPageSizeRaw)); err == nil {
 		defaultPageSize = v
 	}
@@ -1355,7 +1355,7 @@ func parseTablePreferences(defaultPageSizeRaw, optionsRaw string) (int, []int) {
 func normalizeTablePreferences(defaultPageSize int, options []int) (int, []int) {
 	const minPageSize = 5
 	const maxPageSize = 1000
-	const fallbackPageSize = 20
+	const fallbackPageSize = 300
 
 	seen := make(map[int]struct{}, len(options))
 	normalizedOptions := make([]int, 0, len(options))
@@ -1376,7 +1376,7 @@ func normalizeTablePreferences(defaultPageSize int, options []int) (int, []int) 
 	}
 
 	if len(normalizedOptions) == 0 {
-		normalizedOptions = []int{10, 20, 50}
+		normalizedOptions = []int{10, 20, 50, 100, 300}
 	}
 
 	return defaultPageSize, normalizedOptions

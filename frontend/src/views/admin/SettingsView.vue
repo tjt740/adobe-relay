@@ -9084,6 +9084,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { DEFAULT_TABLE_PAGE_SIZE, DEFAULT_TABLE_PAGE_SIZE_OPTIONS } from "@/utils/tablePreferences";
 import { adminAPI } from "@/api";
 import {
   appendAuthSourceDefaultsToUpdateRequest,
@@ -9320,7 +9321,7 @@ const testEmailAddress = ref("");
 const registrationEmailSuffixWhitelistTags = ref<string[]>([]);
 const registrationEmailSuffixWhitelistDraft = ref("");
 const forwardedClientIpHeaderDraft = ref("");
-const tablePageSizeOptionsInput = ref("10, 20, 50, 100");
+const tablePageSizeOptionsInput = ref(DEFAULT_TABLE_PAGE_SIZE_OPTIONS.join(", "));
 
 // Admin API Key 状态
 const adminApiKeyLoading = ref(true);
@@ -9428,7 +9429,7 @@ const openaiFastPolicyLoaded = ref(false);
 
 const tablePageSizeMin = 5;
 const tablePageSizeMax = 1000;
-const tablePageSizeDefault = 20;
+const tablePageSizeDefault = DEFAULT_TABLE_PAGE_SIZE;
 
 function defaultLoginAgreementDocuments(): LoginAgreementDocument[] {
   return [
@@ -9981,7 +9982,7 @@ const form = reactive<SettingsForm>({
   payment_alipay_force_qrcode: false,
   payment_alipay_mobile_precreate_deep_link: false,
   table_default_page_size: tablePageSizeDefault,
-  table_page_size_options: [10, 20, 50, 100],
+  table_page_size_options: [...DEFAULT_TABLE_PAGE_SIZE_OPTIONS],
   custom_menu_items: [] as Array<{
     id: string;
     label: string;
@@ -11270,7 +11271,7 @@ async function loadSettings() {
     tablePageSizeOptionsInput.value = formatTablePageSizeOptions(
       Array.isArray(settings.table_page_size_options)
         ? settings.table_page_size_options
-        : [10, 20, 50, 100],
+        : [...DEFAULT_TABLE_PAGE_SIZE_OPTIONS],
     );
     registrationEmailSuffixWhitelistDraft.value = "";
     form.smtp_password = "";
@@ -12018,7 +12019,7 @@ async function saveSettings() {
     tablePageSizeOptionsInput.value = formatTablePageSizeOptions(
       Array.isArray(updated.table_page_size_options)
         ? updated.table_page_size_options
-        : [10, 20, 50, 100],
+        : [...DEFAULT_TABLE_PAGE_SIZE_OPTIONS],
     );
     registrationEmailSuffixWhitelistDraft.value = "";
     form.smtp_password = "";

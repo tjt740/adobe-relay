@@ -48,6 +48,7 @@ func (s *ScheduledTestRunnerService) Start() {
 		return
 	}
 	s.startOnce.Do(func() {
+		s.accountTestSvc.startOkadConnectionTests()
 		loc := time.Local
 		if s.cfg != nil {
 			if parsed, err := time.LoadLocation(s.cfg.Timezone); err == nil && parsed != nil {
@@ -73,6 +74,7 @@ func (s *ScheduledTestRunnerService) Stop() {
 		return
 	}
 	s.stopOnce.Do(func() {
+		s.accountTestSvc.stopOkadConnectionTests()
 		if s.cron != nil {
 			ctx := s.cron.Stop()
 			select {

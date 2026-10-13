@@ -34,11 +34,29 @@ func connectionTestStatusCode(err error) int {
 }
 
 func (s *AccountTestService) recordConnectionTestResult(ctx context.Context, account *Account, testErr error) {
+	// The background worker's own deadline is a failed check (408); closing a
+	// browser or stopping the service is still cancellation, not account failure.
+	if _, automatic := ctx.Value(okadConnectionTestContextKey{}).(OkadConnectionTestJob); automatic && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		testErr = context.DeadlineExceeded
+	}
 	if ctx.Err() != nil || errors.Is(testErr, context.Canceled) || account == nil {
 		return
 	} // closing/stopping a test is not an account failure
 	code := connectionTestStatusCode(testErr)
 	if recorder, ok := s.accountRepo.(interface {
+		RecordConnectionTestResultIfCurrent(context.Context, *Account, bool, int) (bool, error)
+	}); ok {
+		applied, err := recorder.RecordConnectionTestResultIfCurrent(ctx, account, testErr == nil, code)
+		if err != nil {
+			slog.Warn("account_test_result_save_failed", "account_id", account.ID, "error", err)
+		}
+		if !applied {
+			return
+		}
+	} else if recorder, ok := s.accountRepo.(interface {
 		RecordConnectionTestResult(context.Context, int64, bool, int) error
 	}); ok {
 		if err := recorder.RecordConnectionTestResult(ctx, account.ID, testErr == nil, code); err != nil {

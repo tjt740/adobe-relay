@@ -117,6 +117,16 @@ export default {
       // Filter options
       allPlatforms: '全部平台',
       allTypes: '全部类型',
+      notTested: '未检测',
+      capacityFilter: {
+        label: '容量状态', all: '全部容量', idle: '空闲（未占用）', inUse: '使用中（未满）', full: '满载',
+        limitRange: '并发上限', min: '最小值', max: '最大值',
+        title: '容量筛选',
+        clear: '清除筛选',
+        rangeHint: '留空表示不限，范围包含两端。',
+        positiveInteger: '请输入大于 0 的整数。',
+        invalidRange: '最小值不能大于最大值。'
+      },
       allStatus: '全部状态',
       allGroups: '全部分组',
       ungroupedGroup: '未分配分组',

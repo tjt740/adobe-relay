@@ -570,7 +570,12 @@ func (h *AccountHandler) resolveExportAccounts(ctx context.Context, ids []int64,
 		}
 	}
 
-	return h.listAccountsFiltered(ctx, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+	runtimeFilters, err := runtimeFiltersFromQuery(c)
+	if err != nil {
+		return nil, err
+	}
+	accounts, _, _, err := h.listAccountsWithRuntimeFilters(ctx, 0, 0, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder, runtimeFilters)
+	return accounts, err
 }
 
 func (h *AccountHandler) resolveExportProxies(ctx context.Context, accounts []service.Account) ([]service.Proxy, error) {

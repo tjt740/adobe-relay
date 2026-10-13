@@ -193,6 +193,7 @@ type BulkUpdateAccountsRequest struct {
 }
 
 type BulkUpdateAccountFilters struct {
+	accountRuntimeFilters
 	Platform    string `json:"platform"`
 	Type        string `json:"type"`
 	Status      string `json:"status"`
@@ -706,7 +707,12 @@ func (h *AccountHandler) List(c *gin.Context) {
 		}
 	}
 
-	accounts, total, err := h.adminService.ListAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+	runtimeFilters, err := runtimeFiltersFromQuery(c)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	accounts, total, filteredConcurrency, err := h.listAccountsWithRuntimeFilters(c.Request.Context(), page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder, runtimeFilters)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -736,7 +742,10 @@ func (h *AccountHandler) List(c *gin.Context) {
 		accountIDs[i] = acc.ID
 	}
 
-	concurrencyCounts := make(map[int64]int)
+	concurrencyCounts := filteredConcurrency
+	if concurrencyCounts == nil {
+		concurrencyCounts = make(map[int64]int)
+	}
 	var windowCosts map[int64]float64
 	var activeSessions map[int64]int
 	var rpmCounts map[int64]int
@@ -756,7 +765,7 @@ func (h *AccountHandler) List(c *gin.Context) {
 	}
 
 	// 始终获取并发数（Redis ZCARD，极低开销）
-	if h.concurrencyService != nil {
+	if filteredConcurrency == nil && h.concurrencyService != nil {
 		if cc, ccErr := h.concurrencyService.GetAccountConcurrencyBatch(c.Request.Context(), accountIDs); ccErr == nil && cc != nil {
 			concurrencyCounts = cc
 		}
@@ -1746,6 +1755,12 @@ func (h *AccountHandler) ApplyOAuthCredentials(c *gin.Context) {
 		}
 	}
 
+	if req.Extra["adobeteam_external_email"] != nil {
+		if queueErr := h.accountTestService.QueueOkadConnectionTest(ctx, updatedAccount, false); queueErr != nil {
+			response.Error(c, 503, "Cookie 已写入，接口检测暂未排队，请重试推送")
+			return
+		}
+	}
 	response.Success(c, h.buildAccountResponseWithRuntime(ctx, updatedAccount))
 }
 
@@ -2391,6 +2406,40 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 	if !hasUpdates {
 		response.BadRequest(c, "No updates provided")
 		return
+	}
+
+	// Resolve runtime filters once, before any mutation changes membership.
+	if req.Filters != nil {
+		if err := req.Filters.accountRuntimeFilters.validate(); err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		if len(req.AccountIDs) == 0 && req.Filters.accountRuntimeFilters.needed(req.Filters.Status) {
+			groupID := int64(0)
+			if group := strings.TrimSpace(req.Filters.Group); group == accountListGroupUngroupedQueryValue {
+				groupID = service.AccountListGroupUngrouped
+			} else if group != "" {
+				parsed, err := strconv.ParseInt(group, 10, 64)
+				if err != nil || parsed < 0 {
+					response.BadRequest(c, "invalid group filter")
+					return
+				}
+				groupID = parsed
+			}
+			accounts, _, _, err := h.listAccountsWithRuntimeFilters(c.Request.Context(), 0, 0, req.Filters.Platform, req.Filters.Type, req.Filters.Status, req.Filters.Search, groupID, req.Filters.PrivacyMode, "id", "asc", req.Filters.accountRuntimeFilters)
+			if err != nil {
+				response.ErrorFrom(c, err)
+				return
+			}
+			if len(accounts) == 0 {
+				response.Success(c, &service.BulkUpdateAccountsResult{Results: []service.BulkUpdateAccountResult{}})
+				return
+			}
+			for _, account := range accounts {
+				req.AccountIDs = append(req.AccountIDs, account.ID)
+			}
+			req.Filters = nil
+		}
 	}
 
 	result, err := h.adminService.BulkUpdateAccounts(c.Request.Context(), &service.BulkUpdateAccountsInput{

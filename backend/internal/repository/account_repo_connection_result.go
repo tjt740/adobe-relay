@@ -2,8 +2,33 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/service"
 )
+
+// A result from an older Cookie must not overwrite the newly pushed account.
+func (r *accountRepository) RecordConnectionTestResultIfCurrent(ctx context.Context, a *service.Account, success bool, statusCode int) (bool, error) {
+	if a.Platform != service.PlatformAdobe || a.Type != service.AccountTypeOAuth {
+		err := r.RecordConnectionTestResult(ctx, a.ID, success, statusCode)
+		return err == nil, err
+	}
+	payload, err := json.Marshal(map[string]any{
+		"last_check_success": success, "last_check_status_code": statusCode,
+		"last_check_at": time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	if err != nil {
+		return false, err
+	}
+	result, err := r.sql.ExecContext(ctx, `UPDATE accounts SET extra=COALESCE(extra,'{}'::jsonb)||$2::jsonb,updated_at=NOW()
+ WHERE id=$1 AND deleted_at IS NULL AND COALESCE(credentials->>'cookie','')=$3`, a.ID, string(payload), a.GetCredential("cookie"))
+	if err != nil {
+		return false, err
+	}
+	n, err := result.RowsAffected()
+	return n > 0, err
+}
 
 func (r *accountRepository) RecordConnectionTestResult(ctx context.Context, id int64, success bool, statusCode int) error {
 	return r.UpdateExtra(ctx, id, map[string]any{
