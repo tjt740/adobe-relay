@@ -21,7 +21,7 @@ func (r *opsRepository) GetAdobeHealthReport(ctx context.Context, start, end tim
 	if err != nil {
 		return nil, err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT a.id,a.name,h.scope,h.status_code,h.reason,h.stage,h.source,h.failed_at,h.success_at,
+	rows, err := tx.QueryContext(ctx, `SELECT a.id,a.name,h.scope,h.status_code,h.reason,h.stage,CASE WHEN h.failed_at IS NULL THEN h.success_source ELSE h.source END,h.failed_at,h.success_at,
  h.failed_at IS NOT NULL AND (h.success_started_at IS NULL OR h.success_started_at<=h.failed_at) AS pending,
  h.alert_failed_at IS NOT NULL AND (h.success_started_at IS NULL OR h.success_started_at<=h.alert_failed_at),h.alert_failed_at
  FROM adobe_account_health h JOIN accounts a ON a.id=h.account_id
