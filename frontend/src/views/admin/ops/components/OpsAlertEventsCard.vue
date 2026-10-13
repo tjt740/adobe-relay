@@ -8,6 +8,8 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { opsAPI, type AlertEventsQuery } from '@/api/admin/ops'
 import type { AlertEvent } from '../types'
+import AdobeHealthReportCard from './AdobeHealthReportCard.vue'
+import type { AdobeHealthReport } from '@/utils/adobeHealth'
 import { formatDateTime } from '../utils/opsFormatters'
 
 const { t } = useI18n()
@@ -563,6 +565,7 @@ const empty = computed(() => events.value.length === 0 && !loading.value)
       </div>
 
       <div v-else class="space-y-5">
+        <AdobeHealthReportCard v-if="selected.dimensions?.adobe_health" :snapshot="selected.dimensions.adobe_health as AdobeHealthReport" />
         <div class="rounded-xl bg-gray-50 p-4 dark:bg-dark-900">
           <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -577,7 +580,7 @@ const empty = computed(() => events.value.length === 0 && !loading.value)
               <div class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
                 {{ selected.title || '-' }}
               </div>
-              <div v-if="selected.description" class="mt-1 whitespace-pre-wrap text-xs text-gray-600 dark:text-gray-300">
+              <div v-if="selected.description && !selected.dimensions?.adobe_health" class="mt-1 whitespace-pre-wrap text-xs text-gray-600 dark:text-gray-300">
                 {{ selected.description }}
               </div>
             </div>

@@ -388,6 +388,14 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		}
 	}
 	defer func() { s.recordConnectionTestResult(ctx, account, testErr) }()
+	healthStarted := time.Now()
+	defer func() {
+		source := "test"
+		if _, automatic := ctx.Value(okadConnectionTestContextKey{}).(OkadConnectionTestJob); automatic {
+			source = "okad"
+		}
+		recordAdobeHealth(ctx, s.accountRepo, account, healthStarted, source, adobeHealthTestModel(account, modelID), testErr)
+	}()
 
 	// Synthetic UI load-test accounts exercise the real SSE parsing and modal
 	// interactions, but intentionally do not send their placeholder credentials

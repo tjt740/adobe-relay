@@ -27,6 +27,7 @@
             @create="showCreate = true"
           >
             <template #after>
+              <span class="hidden text-xs sm:inline" :class="liveConnected ? 'text-teal-600' : 'text-amber-600'" :title="liveUpdated ? `上次同步 ${liveUpdated.toLocaleTimeString()}` : '等待首次同步'">{{ liveConnected ? '状态实时同步中' : '状态同步重连中' }}</span>
               <!-- Auto Refresh Dropdown -->
               <div class="relative" ref="autoRefreshDropdownRef">
                 <button
@@ -307,7 +308,7 @@
           </template>
           <template #cell-status="{ row }">
             <div class="flex items-center gap-1.5">
-              <AccountStatusIndicator :account="row" @show-temp-unsched="handleShowTempUnsched" />
+              <div><AccountStatusIndicator :account="row" @show-temp-unsched="handleShowTempUnsched" /><AccountHealthEvidence :account="row" /></div>
             </div>
           </template>
           <template #cell-schedulable="{ row }">
@@ -583,6 +584,8 @@ import AccountTestModal from '@/components/admin/account/AccountTestModal.vue'
 import AccountStatsModal from '@/components/admin/account/AccountStatsModal.vue'
 import ScheduledTestsPanel from '@/components/admin/account/ScheduledTestsPanel.vue'
 import type { SelectOption } from '@/components/common/Select.vue'
+import AccountHealthEvidence from '@/components/account/AccountHealthEvidence.vue'
+import { useAccountLiveUpdates } from '@/composables/useAccountLiveUpdates'
 import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.vue'
 import AccountUsageCell from '@/components/account/AccountUsageCell.vue'
 import AccountTodayStatsCell from '@/components/account/AccountTodayStatsCell.vue'
@@ -1552,10 +1555,11 @@ const mergeAccountsIncrementally = (nextRows: Account[]) => {
   }
 }
 
-const refreshAccountsIncrementally = async () => {
-  if (autoRefreshFetching.value) return
+const refreshAccountsIncrementally = async (strict = false) => {
+  if (autoRefreshFetching.value) return false
   syncAccountListDerivedParams()
   autoRefreshFetching.value = true
+  const queryKey = JSON.stringify([pagination.page, pagination.page_size, toRaw(params)])
   try {
     const result = await adminAPI.accounts.listWithEtag(
       pagination.page,
@@ -1577,6 +1581,7 @@ const refreshAccountsIncrementally = async () => {
       { etag: autoRefreshETag.value }
     )
 
+    if (queryKey !== JSON.stringify([pagination.page, pagination.page_size, toRaw(params)])) return false
     if (result.etag) {
       autoRefreshETag.value = result.etag
     }
@@ -1591,10 +1596,16 @@ const refreshAccountsIncrementally = async () => {
     await refreshTodayStatsBatch()
   } catch (error) {
     console.error('Auto refresh failed:', error)
+    if (strict) throw error
   } finally {
     autoRefreshFetching.value = false
   }
 }
+
+const { connected: liveConnected, lastUpdated: liveUpdated } = useAccountLiveUpdates(async () => {
+  if (loading.value || autoRefreshFetching.value) return false
+  return refreshAccountsIncrementally(true)
+})
 
 const handleManualRefresh = async () => {
   await Promise.all([load(), loadUpstreamBillingProbeGlobalState()])

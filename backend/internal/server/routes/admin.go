@@ -216,6 +216,8 @@ func registerOpsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		ops.GET("/realtime-traffic", h.Admin.Ops.GetRealtimeTrafficSummary)
 
 		// Alerts (rules + events)
+		ops.GET("/adobe-health", h.Admin.Ops.AdobeHealthReport)
+		ops.POST("/adobe-health/email", h.Admin.Ops.SendAdobeHealthReport)
 		ops.GET("/alert-rules", h.Admin.Ops.ListAlertRules)
 		ops.POST("/alert-rules", h.Admin.Ops.CreateAlertRule)
 		ops.PUT("/alert-rules/:id", h.Admin.Ops.UpdateAlertRule)
@@ -378,6 +380,7 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 	accounts := admin.Group("/accounts")
 	{
 		accounts.GET("", h.Admin.Account.List)
+		accounts.GET("/runtime-events", h.Admin.Account.RuntimeEvents)
 		accounts.GET("/okad-inventory", h.Admin.Account.OkadInventory)
 		accounts.POST("/:id/okad-verify", h.Admin.Account.OkadVerifyCredential)
 		accounts.GET("/upstream-billing-rates", h.Admin.Account.GetUpstreamBillingRates)

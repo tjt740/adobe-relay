@@ -109,7 +109,7 @@ func (s *AccountTestService) testAdobeAccountConnection(
 
 	token, err := s.adobeTestAccessToken(ctx, c, account)
 	if err != nil {
-		return s.sendAdobeTestError(c, err)
+		return s.sendAdobeTestError(c, &adobe.OperationError{Stage: "token", Err: err})
 	}
 
 	requestedModel := strings.TrimSpace(modelID)

@@ -1,7 +1,8 @@
 <template>
   <div class="flex items-center gap-2">
     <!-- Authentication failures include Adobe's invalid_credentials response. -->
-    <template v-if="isAuthenticationFailed">
+    <span v-if="adobeHealthPending" class="badge text-xs badge-warning">异常待成功验证</span>
+    <template v-else-if="isAuthenticationFailed">
       <span class="badge text-xs badge-danger">{{ authenticationFailureText }}</span>
       <span
         data-testid="account-auth-status"
@@ -221,6 +222,8 @@ const { t } = useI18n()
 const props = defineProps<{
   account: Account
 }>()
+
+const adobeHealthPending = computed(() => props.account.platform === 'adobe' && Boolean((props.account.extra?.adobe_health as { pending?: boolean } | undefined)?.pending))
 
 const emit = defineEmits<{
   (e: 'show-temp-unsched', account: Account): void
