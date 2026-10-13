@@ -24,9 +24,9 @@ func buildAdobeHealthEmail(rule *OpsAlertRule, event *OpsAlertEvent) string {
 		zone := time.FixedZone("UTC+8", 8*3600)
 		fmt.Fprintf(&b, `<p style="color:#64748b;font-size:12px">数据时间：%s（北京时间）</p><p style="font-size:17px;line-height:1.7"><strong>%d 个账号仍有失败待验证，占全部 %d 个账号的 %.2f%%。</strong><br>这些账号有 401 或 408 记录，尚未取得对应的后续成功证据；不等于所有账号现在都无法使用。</p>`, r.GeneratedAt.In(zone).Format("2006-01-02 15:04:05"), r.Pending, r.Total, r.Ratio)
 		fmt.Fprintf(&b, `<table role="presentation" width="100%%" cellpadding="12" style="background:#f8fafc;text-align:center;border:1px solid #e2e8f0;border-radius:10px"><tr><td><strong style="font-size:25px;color:#b45309">%d</strong><br>仍待成功验证</td><td><strong style="font-size:25px;color:#047857">%d</strong><br>已有恢复证据</td><td><strong style="font-size:25px">%d</strong><br>尚无完整记录</td></tr></table>`, r.Pending, r.Recovered, r.Unknown)
-		fmt.Fprintf(&b, `<p style="font-size:12px;line-height:1.7;color:#64748b">最近 %s–%s，%d 个账号出现过错误，其中 %d 个仍待验证。阈值仍为 %.0f%%，并至少 %d 个账号。分母包含全部未删除 Adobe 账号（含暂停账号）。历史报错数和当前待验证数不相加。</p>`, r.WindowStart.In(zone).Format("15:04"), r.GeneratedAt.In(zone).Format("15:04"), r.Historical, r.RecentPending, r.Threshold, r.Minimum)
+		fmt.Fprintf(&b, `<p style="font-size:12px;line-height:1.7;color:#64748b">最近 %s–%s，%d 个账号出现过错误，其中 %d 个仍待验证。阈值仍为 %.0f%%，并至少 %d 个账号。分母包含全部未删除 Adobe 账号（含暂停账号）。历史报错数和当前待验证数不相加。新告警按最近窗口内仍待验证的账号触发；已触发的告警会继续等待成功证据。</p>`, r.WindowStart.In(zone).Format("15:04"), r.GeneratedAt.In(zone).Format("15:04"), r.Historical, r.RecentPending, r.Threshold, r.Minimum)
 		b.WriteString(`<h2 style="font-size:17px;margin-top:28px">先做什么</h2><table width="100%" cellpadding="10" cellspacing="0" style="border-collapse:collapse;font-size:13px;text-align:left"><tr style="background:#f1f5f9"><th>问题</th><th>账号数</th><th>建议</th></tr>`)
-		for _, reason := range []string{"upstream", "timeout", "auth", "quota", "entitlement", "proxy", "network", "legacy", "unknown"} {
+		for _, reason := range []string{"upstream", "timeout", "auth", "quota", "entitlement", "proxy", "network", "content", "legacy", "unknown"} {
 			ids := map[int64]bool{}
 			for _, a := range r.Accounts {
 				if a.Pending && a.Reason == reason {
@@ -53,6 +53,16 @@ func buildAdobeHealthEmail(rule *OpsAlertRule, event *OpsAlertEvent) string {
 			shown++
 			reason, _ := AdobeHealthReason(a.Reason)
 			source := adobeHealthSourceLabel(a.Source)
+			if label := adobeHealthStageLabel(a.Stage); label != "" {
+				source += " · " + label
+			}
+			codeLabel := ""
+			if a.Code > 0 {
+				codeLabel = fmt.Sprintf("（HTTP %d）", a.Code)
+			}
+			if a.Reason == "timeout" {
+				codeLabel = "（本地超时，按 408 统计）"
+			}
 			failed := "—"
 			success := "尚未确认"
 			if a.FailedAt != nil {
@@ -61,10 +71,10 @@ func buildAdobeHealthEmail(rule *OpsAlertRule, event *OpsAlertEvent) string {
 			if a.SuccessAt != nil {
 				success = a.SuccessAt.In(zone).Format("01-02 15:04:05") + "（不足以确认本次恢复）"
 			}
-			fmt.Fprintf(&b, `<tr><td style="border-bottom:1px solid #e2e8f0">#%d %s<br><span style="color:#64748b">%s</span></td><td style="border-bottom:1px solid #e2e8f0">%s (%d)<br>%s</td><td style="border-bottom:1px solid #e2e8f0">%s<br>%s</td></tr>`, a.ID, htmlEscape(a.Name), htmlEscape(a.Scope), reason, a.Code, source, failed, success)
+			fmt.Fprintf(&b, `<tr><td style="border-bottom:1px solid #e2e8f0">#%d %s<br><span style="color:#64748b">%s</span></td><td style="border-bottom:1px solid #e2e8f0">%s%s<br>%s</td><td style="border-bottom:1px solid #e2e8f0">%s<br>%s</td></tr>`, a.ID, htmlEscape(a.Name), htmlEscape(a.Scope), reason, codeLabel, source, failed, success)
 		}
 		if shown == 0 {
-			b.WriteString(`<tr><td colspan="3">当前没有待验证的 401/408 记录；未检测账号仍不能视为健康。</td></tr>`)
+			b.WriteString(`<tr><td colspan="3">当前没有失败待验证的记录；未检测账号仍不能视为健康。</td></tr>`)
 		}
 		b.WriteString(`</table>`)
 		if totalRows > shown {
@@ -117,4 +127,23 @@ func (s *OpsService) SendAdobeHealthReport(ctx context.Context) error {
 	}
 	s.adobeReportSentAt = time.Now()
 	return nil
+}
+
+func adobeHealthStageLabel(stage string) string {
+	switch stage {
+	case "token":
+		return "登录凭据验证阶段"
+	case "prepare":
+		return "准备请求阶段"
+	case "upload":
+		return "上传参考图阶段"
+	case "submit":
+		return "提交生成任务阶段"
+	case "poll":
+		return "等待生成结果阶段"
+	case "download":
+		return "下载结果阶段"
+	default:
+		return ""
+	}
 }

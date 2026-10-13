@@ -82,6 +82,9 @@ func TestAdobeHealthReasonsNeverPersistUpstreamSecrets(t *testing.T) {
 		{adobe.NewUpstreamTemporaryError(secret, 408, adobe.ErrorTypeStatus), "upstream", 408},
 		{adobe.NewUpstreamTemporaryError(secret, 0, adobe.ErrorTypeProxy), "proxy", 0},
 		{context.DeadlineExceeded, "timeout", 408},
+		{&UpstreamFailoverError{StatusCode: 408}, "upstream", 408},
+		{&OpenAIImagesUpstreamError{StatusCode: 408}, "upstream", 408},
+		{errors.New("HTTP 408"), "upstream", 408},
 		{errors.New(secret), "unknown", 0},
 	}
 	for _, tc := range cases {
@@ -112,4 +115,10 @@ func TestAdobeHealthEmailReadableEscapedAndBounded(t *testing.T) {
 	if path := os.Getenv("ADOBE_HEALTH_EMAIL_PREVIEW"); path != "" {
 		require.NoError(t, os.WriteFile(path, []byte(body), 0600))
 	}
+}
+
+func TestAdobeHealthLegacyIncidentKeepsRecoveredMembers(t *testing.T) {
+	r := &AdobeHealthReport{Accounts: []AdobeHealthAccount{{ID: 2, AlertPending: true}}}
+	e := &OpsAlertEvent{Description: "历史报告\n#1 account | 408=1\n#2 account | 401=1"}
+	require.ElementsMatch(t, []int64{1, 2}, adobeInitialIncidentMembers(r, e))
 }

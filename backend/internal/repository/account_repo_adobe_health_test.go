@@ -47,6 +47,19 @@ func TestAdobeHealthPostgresEvidenceSurvivesQuietWindowsAndStaleResults(t *testi
 	record(true, "model-a", base.Add(6*time.Minute), base.Add(7*time.Minute), 200)
 	require.Equal(t, 1, report().Pending, "old Cookie success cannot clear current health")
 	a.Credentials["cookie"] = "new"
+	_, err = db.Exec(`INSERT INTO proxies(id) VALUES(12); UPDATE accounts SET proxy_id=12 WHERE id=1`)
+	require.NoError(t, err)
+	record(true, "model-a", base.Add(6*time.Minute), base.Add(7*time.Minute), 200)
+	require.Equal(t, 1, report().Pending, "old proxy result cannot recover current route")
+	proxyID := int64(12)
+	a.ProxyID = &proxyID
+	a.Proxy = &service.Proxy{ID: proxyID}
+	require.NoError(t, db.QueryRow(`SELECT updated_at FROM proxies WHERE id=12`).Scan(&a.Proxy.UpdatedAt))
+	_, err = db.Exec(`UPDATE proxies SET updated_at=updated_at+INTERVAL '1 second' WHERE id=12`)
+	require.NoError(t, err)
+	record(true, "model-a", base.Add(6*time.Minute), base.Add(7*time.Minute), 200)
+	require.Equal(t, 1, report().Pending, "edited proxy invalidates an older success")
+	require.NoError(t, db.QueryRow(`SELECT updated_at FROM proxies WHERE id=12`).Scan(&a.Proxy.UpdatedAt))
 	record(true, "model-a", base.Add(8*time.Minute), base.Add(9*time.Minute), 200)
 	require.Zero(t, report().Pending)
 	require.Equal(t, 1, report().Recovered)

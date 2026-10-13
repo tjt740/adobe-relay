@@ -39,7 +39,8 @@ with urllib.request.urlopen(req, timeout=10) as response:
     assert b'"change"' in response.readline()
 out = {'at': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'sha': sha, 'health': 'ok', 'sse': 'ok', 'report': {k: v for k, v in report.items() if k != 'accounts'}}
 assert int(sql("SELECT count(*) FROM accounts WHERE deleted_at IS NULL AND extra->>'mock_dataset'='account-filter-mocks-20261013'")) == 0
-out['telemetry_errors'] = subprocess.run(['docker', 'logs', '--since', '5m', 'adobe-relay-app-1'], text=True, capture_output=True).stderr.count('adobe_health_save_failed')
+logs = subprocess.run(['docker', 'logs', '--since', '5m', 'adobe-relay-app-1'], text=True, capture_output=True)
+out['telemetry_errors'] = (logs.stdout + logs.stderr).count('adobe_health_save_failed')
 assert out['telemetry_errors'] == 0, 'New health evidence failed to persist'
 (root / 'verification.json').write_text(json.dumps(out, ensure_ascii=False, indent=2))
 if phase == 'send-report':

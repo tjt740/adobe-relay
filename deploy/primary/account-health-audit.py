@@ -41,7 +41,7 @@ out['accounts'] = json.loads(sql("SELECT json_build_object('count',count(*),'ado
 out['automatic_tests'] = json.loads(sql("SELECT COALESCE(json_object_agg(state,n),'{}') FROM (SELECT extra->'okad_connection_test'->>'state' state,count(*) n FROM accounts WHERE deleted_at IS NULL AND extra ? 'okad_connection_test' GROUP BY 1) q"))
 assert out['accounts']['mock'] == 0, 'Unexpected production mock dataset'
 if phase == 'before':
-    assert out['containers']['adobe-relay-app-1']['image'] == 'adobe-relay:035bcef4311d606fee461321cb4a0c2eeaa3b5a2', 'Production has a different Sub2 release'
+    assert out['containers']['adobe-relay-app-1']['image'] == 'adobe-relay:f28f14480dc2a90fdd0e98ff7d85569a5b6649fd', 'Production has a different Sub2 release'
     subprocess.run(['docker','tag',out['containers']['adobe-relay-app-1']['image_id'],'adobe-relay:before-account-health-20261013'],check=True)
 else:
     before = json.loads((ROOT/'before.json').read_text())

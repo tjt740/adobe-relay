@@ -304,7 +304,7 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 				activeEvent.Dimensions = map[string]any{}
 			}
 			if _, exists := activeEvent.Dimensions["adobe_incident_accounts"]; !exists {
-				activeEvent.Dimensions["adobe_incident_accounts"] = adobeIncidentMembers(healthReport)
+				activeEvent.Dimensions["adobe_incident_accounts"] = adobeInitialIncidentMembers(healthReport, activeEvent)
 			}
 			activeEvent.Dimensions["adobe_health"] = healthReport
 			activeEvent.Description = detail

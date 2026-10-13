@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strconv"
 	"time"
 )
 
@@ -43,15 +45,6 @@ type AdobeHealthReportRepository interface {
 
 func (r *AdobeHealthReport) Summary() string {
 	return fmt.Sprintf("%d 个账号仍有 401/408 失败待验证，占全部 %d 个账号的 %.2f%%。最近窗口内 %d 个账号报过错；已有 %d 个账号取得后续成功记录。没有新请求不代表恢复。", r.Pending, r.Total, r.Ratio, r.Historical, r.Recovered)
-}
-
-func (r *AdobeHealthReport) HasRecoverySince(at time.Time) bool {
-	for _, a := range r.Accounts {
-		if !a.Pending && a.FailedAt != nil && a.SuccessAt != nil && a.SuccessAt.After(at) {
-			return true
-		}
-	}
-	return false
 }
 
 func adobeReportFromEvent(e *OpsAlertEvent) *AdobeHealthReport {
@@ -132,4 +125,24 @@ func adobeIncidentRecovered(r *AdobeHealthReport, e *OpsAlertEvent) bool {
 		}
 	}
 	return false
+}
+
+// Existing incidents contain the original member IDs in their human report.
+// Preserve them even if an account succeeds before the first new evaluation.
+var adobeLegacyMemberPattern = regexp.MustCompile(`(?m)^#([0-9]+)\s`)
+
+func adobeInitialIncidentMembers(r *AdobeHealthReport, e *OpsAlertEvent) []int64 {
+	ids := adobeIncidentMembers(r)
+	seen := map[int64]bool{}
+	for _, id := range ids {
+		seen[id] = true
+	}
+	for _, match := range adobeLegacyMemberPattern.FindAllStringSubmatch(e.Description, -1) {
+		id, err := strconv.ParseInt(match[1], 10, 64)
+		if err == nil && id > 0 && !seen[id] {
+			ids = append(ids, id)
+			seen[id] = true
+		}
+	}
+	return ids
 }

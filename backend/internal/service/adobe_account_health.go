@@ -70,6 +70,7 @@ func adobeHealthObservation(start time.Time, source, model string, err error) Ad
 		o.Reason = "content"
 	case errors.Is(err, context.DeadlineExceeded):
 		o.Reason = "timeout"
+		o.Code = 408
 	case errors.As(err, &network):
 		if network.Timeout() {
 			o.Reason = "timeout"
@@ -93,7 +94,10 @@ func adobeHealthObservation(start time.Time, source, model string, err error) Ad
 		}
 	default:
 		if o.Code == 408 {
-			o.Reason = "timeout"
+			o.Reason = "upstream"
+			if failover == nil && relay == nil && !connectionTestHTTPCode.MatchString(err.Error()) {
+				o.Reason = "timeout"
+			}
 		}
 	}
 	return o

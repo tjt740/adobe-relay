@@ -24,3 +24,10 @@ WITH cutoff AS (
 INSERT INTO adobe_account_health(account_id,scope,failed_at,alert_failed_at,status_code,reason,source)
 SELECT account_id,'',created_at,created_at,status_code,'legacy','legacy' FROM latest
 ON CONFLICT(account_id,scope) DO NOTHING;
+
+-- Surface the carried-over uncertainty on the account page as well.
+UPDATE accounts a SET extra=COALESCE(a.extra,'{}'::jsonb)||jsonb_build_object('adobe_health',
+ jsonb_build_object('pending',true,'latest',jsonb_build_object('success',false,'code',h.status_code,
+ 'reason','legacy','stage','','source','legacy','scope','','started_at',h.failed_at,'checked_at',h.failed_at))),updated_at=NOW()
+FROM adobe_account_health h WHERE h.account_id=a.id AND h.scope='' AND h.reason='legacy'
+ AND h.success_at IS NULL AND NOT COALESCE(a.extra,'{}'::jsonb) ? 'adobe_health';

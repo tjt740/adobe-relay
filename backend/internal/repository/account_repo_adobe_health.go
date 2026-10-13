@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
@@ -22,10 +23,16 @@ func (r *accountRepository) RecordAdobeHealth(ctx context.Context, a *service.Ac
 	}
 	defer tx.Rollback()
 	var id int64
+	var proxyUpdatedAt *time.Time
+	if a.Proxy != nil {
+		proxyUpdatedAt = &a.Proxy.UpdatedAt
+	}
 	// Serialize observations with credential writes. A result from an old Cookie
 	// cannot bless its replacement or erase its failures.
 	err = tx.QueryRowContext(ctx, `SELECT id FROM accounts WHERE id=$1 AND platform='adobe' AND deleted_at IS NULL
- AND COALESCE(credentials->>'cookie','')=$2 AND COALESCE(credentials->>'api_key','')=$3 FOR UPDATE`, a.ID, a.GetCredential("cookie"), a.GetCredential("api_key")).Scan(&id)
+ AND COALESCE(credentials->>'cookie','')=$2 AND COALESCE(credentials->>'api_key','')=$3
+ AND proxy_id IS NOT DISTINCT FROM $4
+ AND ($5::timestamptz IS NULL OR EXISTS(SELECT 1 FROM proxies WHERE id=accounts.proxy_id AND updated_at=$5)) FOR UPDATE`, a.ID, a.GetCredential("cookie"), a.GetCredential("api_key"), a.ProxyID, proxyUpdatedAt).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
