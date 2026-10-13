@@ -9,6 +9,18 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
+// Authentication state and permission to schedule are independent. In particular,
+// an operator pause must not keep an obsolete 401 after a new Cookie is verified.
+func okadOwnsAuthenticationError(message string) bool {
+	msg := strings.ToLower(message)
+	for _, marker := range []string{"taste_exhausted", "quota exhausted", "credits exhausted", "model_not_entitled", "user_not_entitled", "not entitled", "invalid_client", "invalid_scope"} {
+		if strings.Contains(msg, marker) {
+			return false
+		}
+	}
+	return strings.HasPrefix(msg, "authentication failed (401):") || strings.HasPrefix(msg, "oauth 401 (no refresh_token):") || strings.HasPrefix(msg, "token refresh failed (non-retryable): adobe cookie is no longer valid")
+}
+
 // The allocator binds credential-paused accounts without enabling them. Wait
 // for that binding before probing, rather than accidentally using DIRECT.
 func (r *accountRepository) OkadVerificationProxyReady(ctx context.Context, a *service.Account) (bool, error) {
@@ -32,9 +44,9 @@ func (r *accountRepository) OkadVerificationProxyReady(ctx context.Context, a *s
 
 func (r *accountRepository) ApplyOkadCredential(ctx context.Context, a *service.Account, p service.OkadCredentialUpdate) (bool, error) {
 	old, _ := a.Extra["okad"].(map[string]any)
-	msg := strings.ToLower(a.ErrorMessage)
-	auth := strings.HasPrefix(msg, "authentication failed (401):") || strings.HasPrefix(msg, "oauth 401 (no refresh_token):") || (strings.HasPrefix(msg, "token refresh failed (non-retryable): adobe cookie is no longer valid") && !strings.Contains(msg, "invalid_client") && !strings.Contains(msg, "invalid_scope"))
-	resume := (a.Status == service.StatusActive && a.Schedulable) || (a.Status == service.StatusError && (auth || (a.ErrorMessage == service.OkadVerificationPending && old["resume"] == true)))
+	auth := okadOwnsAuthenticationError(a.ErrorMessage)
+	waiting := a.ErrorMessage == service.OkadVerificationPending || a.ErrorMessage == service.OkadConnectionTestPending
+	resume := (a.Status == service.StatusActive && a.Schedulable) || (a.Status == service.StatusError && (auth || (waiting && old["resume"] == true)))
 	if a.Extra["okad_manual_pause"] == true || (a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now())) {
 		resume = false
 	}
@@ -53,14 +65,14 @@ func (r *accountRepository) ApplyOkadCredential(ctx context.Context, a *service.
  UPDATE accounts a SET credentials=(COALESCE(credentials,'{}'::jsonb)-'access_token'-'expires_at'-'_token_version') || jsonb_build_object('cookie',$2::text),
  extra=(COALESCE(extra,'{}'::jsonb)-'okad_recovery'-'last_check_at'-'last_check_success'-'last_check_status_code')||jsonb_build_object('okad',$3::jsonb,'okad_connection_test',$12::jsonb),
  status=CASE WHEN $4 THEN 'error' ELSE status END,
- error_message=CASE WHEN $4 THEN $5 ELSE error_message END,
+ error_message=CASE WHEN $4 OR $13 THEN $5 ELSE error_message END,
  schedulable=CASE WHEN $4 THEN FALSE ELSE schedulable END,updated_at=NOW()
  WHERE id=$1 AND deleted_at IS NULL AND platform='adobe' AND type='oauth'
  AND updated_at=$6 AND COALESCE(credentials->>'cookie','')=$7
  AND (COALESCE(extra->'okad'->>'issuer','')='' OR (extra->'okad'->>'issuer'=$8 AND extra->'okad'->>'source_key'=$9))
  AND (CASE WHEN COALESCE(extra->'okad'->>'version','') ~ '^[0-9]{1,16}$' THEN (extra->'okad'->>'version')::bigint ELSE 0 END)<$10
  RETURNING id)
- INSERT INTO scheduler_outbox(event_type,account_id,group_id,payload) SELECT $11,id,NULL,NULL FROM updated`, a.ID, p.Cookie, string(raw), resume, service.OkadVerificationPending, a.UpdatedAt, a.GetCredential("cookie"), p.Issuer, p.SourceKey, p.Version, service.SchedulerOutboxEventAccountChanged, string(checkRaw))
+ INSERT INTO scheduler_outbox(event_type,account_id,group_id,payload) SELECT $11,id,NULL,NULL FROM updated`, a.ID, p.Cookie, string(raw), resume, service.OkadVerificationPending, a.UpdatedAt, a.GetCredential("cookie"), p.Issuer, p.SourceKey, p.Version, service.SchedulerOutboxEventAccountChanged, string(checkRaw), a.Status == service.StatusError && auth)
 	if err != nil {
 		return false, err
 	}
@@ -101,12 +113,15 @@ func (r *accountRepository) CompleteOkadVerification(ctx context.Context, a *ser
 	}
 	// A transient probe may replace verification=auth_failed with retry while
 	// the original auth quarantine still belongs to this integration.
-	ownsPause := prior["resume"] == true && a.Status == service.StatusError && !a.Schedulable && (a.ErrorMessage == service.OkadVerificationPending || strings.HasPrefix(a.ErrorMessage, "Authentication failed (401):"))
+	ownsAuthentication := a.Status == service.StatusError && (a.ErrorMessage == service.OkadVerificationPending || a.ErrorMessage == service.OkadConnectionTestPending || okadOwnsAuthenticationError(a.ErrorMessage))
+	ownsPause := prior["resume"] == true && ownsAuthentication && !a.Schedulable
 	resume := ownsPause && a.Extra["okad_manual_pause"] != true && code == "verified" && (a.ExpiresAt == nil || a.ExpiresAt.After(time.Now()))
+	awaitingImage := false
 	if check, ok := a.Extra["okad_connection_test"].(map[string]any); ok && check["gated"] == true && check["state"] != "success" {
 		resume = false // The image check, not a credential-only probe, owns release.
+		awaitingImage = code == "verified" && ownsAuthentication
 	}
-	failAuth := (ownsPause || quarantine) && code == "auth_failed"
+	failAuth := (ownsAuthentication || quarantine) && code == "auth_failed"
 	var proxyUpdatedAt *time.Time
 	if a.Proxy != nil {
 		proxyUpdatedAt = &a.Proxy.UpdatedAt
@@ -116,12 +131,12 @@ func (r *accountRepository) CompleteOkadVerification(ctx context.Context, a *ser
  credentials=(CASE WHEN $13 THEN COALESCE(credentials,'{}'::jsonb)-'access_token'-'expires_at'-'_token_version' ELSE COALESCE(credentials,'{}'::jsonb) END)||$3::jsonb,
  status=CASE WHEN $4 THEN 'active' WHEN $11 THEN 'error' ELSE status END,
  schedulable=CASE WHEN $4 THEN TRUE WHEN $11 THEN FALSE ELSE schedulable END,
- error_message=CASE WHEN $4 THEN '' WHEN $5 THEN $6 WHEN $11 THEN $12 ELSE error_message END,updated_at=NOW()
+ error_message=CASE WHEN $4 THEN '' WHEN $5 THEN $6 WHEN $11 THEN $12 WHEN $15 THEN $16 ELSE error_message END,updated_at=NOW()
  WHERE id=$1 AND deleted_at IS NULL AND updated_at=$7 AND credentials->>'cookie'=$8
  AND proxy_id IS NOT DISTINCT FROM $9
  AND ($14::timestamptz IS NULL OR EXISTS(SELECT 1 FROM proxies p WHERE p.id=accounts.proxy_id AND p.updated_at=$14))
  RETURNING id)
- INSERT INTO scheduler_outbox(event_type,account_id,group_id,payload) SELECT $10,id,NULL,NULL FROM updated`, a.ID, string(raw), string(tokens), resume, failAuth, message, a.UpdatedAt, a.GetCredential("cookie"), a.ProxyID, service.SchedulerOutboxEventAccountChanged, quarantine, service.OkadVerificationPending, code == "auth_failed" || code == "identity_mismatch", proxyUpdatedAt)
+ INSERT INTO scheduler_outbox(event_type,account_id,group_id,payload) SELECT $10,id,NULL,NULL FROM updated`, a.ID, string(raw), string(tokens), resume, failAuth, message, a.UpdatedAt, a.GetCredential("cookie"), a.ProxyID, service.SchedulerOutboxEventAccountChanged, quarantine, service.OkadVerificationPending, code == "auth_failed" || code == "identity_mismatch", proxyUpdatedAt, awaitingImage, service.OkadConnectionTestPending)
 	if err != nil {
 		return false, err
 	}

@@ -320,7 +320,8 @@
           </template>
           <template #cell-status="{ row }">
             <div class="flex items-center gap-1.5">
-              <div><AccountStatusIndicator :account="row" :show-okad-details="showOkadDetails" @show-temp-unsched="handleShowTempUnsched" /><AccountHealthEvidence :account="row" /></div>
+              <AccountStatusIndicator :account="row" :show-okad-details="showOkadDetails" details-in-dialog @show-temp-unsched="handleShowTempUnsched" />
+              <button type="button" class="shrink-0 rounded px-1 py-1 text-xs text-primary-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 dark:text-primary-400" :aria-label="`查看 ${row.name} 的状态详情`" @click.stop="openStatusDetails(row)">详情</button>
             </div>
           </template>
           <template #cell-schedulable="{ row }">
@@ -522,6 +523,7 @@
       @updated="handleBulkUpdated"
     />
     <TempUnschedStatusModal :show="showTempUnsched" :account="tempUnschedAcc" @close="showTempUnsched = false" @reset="handleTempUnschedReset" />
+    <AccountStatusDetailsModal :show="statusDetailsAccount !== null" :account="statusDetailsAccount" @close="statusDetailsAccount = null" />
     <ConfirmDialog :show="showDeleteDialog" :title="t('admin.accounts.deleteAccount')" :message="t('admin.accounts.deleteConfirm', { name: deletingAcc?.name })" :confirm-text="t('common.delete')" :cancel-text="t('common.cancel')" :danger="true" @confirm="confirmDelete" @cancel="showDeleteDialog = false" />
     <ConfirmDialog :show="showCreateShadowDialog" :title="t('admin.accounts.createSparkShadow')" :message="t('admin.accounts.createSparkShadowConfirm', { name: creatingShadowAcc?.name })" @confirm="confirmCreateSparkShadow" @cancel="showCreateShadowDialog = false" />
     <ConfirmDialog :show="showExportDataDialog" :title="t('admin.accounts.dataExport')" :message="t('admin.accounts.dataExportConfirmMessage')" :confirm-text="t('admin.accounts.dataExportConfirm')" :cancel-text="t('common.cancel')" @confirm="handleExportData" @cancel="showExportDataDialog = false">
@@ -596,7 +598,7 @@ import AccountTestModal from '@/components/admin/account/AccountTestModal.vue'
 import AccountStatsModal from '@/components/admin/account/AccountStatsModal.vue'
 import ScheduledTestsPanel from '@/components/admin/account/ScheduledTestsPanel.vue'
 import type { SelectOption } from '@/components/common/Select.vue'
-import AccountHealthEvidence from '@/components/account/AccountHealthEvidence.vue'
+import AccountStatusDetailsModal from '@/components/account/AccountStatusDetailsModal.vue'
 import { useAccountLiveUpdates } from '@/composables/useAccountLiveUpdates'
 import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.vue'
 import AccountUsageCell from '@/components/account/AccountUsageCell.vue'
@@ -687,6 +689,11 @@ const showBulkResetConfirm = ref(false)
 const showBulkRefreshTokenConfirm = ref(false)
 const bulkEditTarget = ref<AccountBulkEditTarget | null>(null)
 const showTempUnsched = ref(false)
+const statusDetailsAccount = ref<Account | null>(null)
+const openStatusDetails = (account: Account) => {
+  // Keep a stable record snapshot while the list's background refresh continues.
+  statusDetailsAccount.value = structuredClone(toRaw(account))
+}
 const showDeleteDialog = ref(false)
 const showCreateShadowDialog = ref(false)
 const showReAuth = ref(false)
@@ -1492,6 +1499,7 @@ const isAnyModalOpen = computed(() => {
     showExportDataDialog.value ||
     showBulkEdit.value ||
     showTempUnsched.value ||
+    statusDetailsAccount.value !== null ||
     showDeleteDialog.value ||
     showReAuth.value ||
     showTest.value ||

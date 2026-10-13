@@ -19,13 +19,13 @@
     <!-- Rate Limit Display (429) - Two-line layout -->
     <div v-else-if="isRateLimited" class="flex flex-col items-center gap-1">
       <span class="badge text-xs badge-warning">{{ t('admin.accounts.status.rateLimited') }}</span>
-      <span class="text-[11px] text-gray-400 dark:text-gray-500">{{ rateLimitResumeText }}</span>
+      <span v-if="!detailsInDialog" class="text-[11px] text-gray-400 dark:text-gray-500">{{ rateLimitResumeText }}</span>
     </div>
 
     <!-- Overload Display (529) - Two-line layout -->
     <div v-else-if="isOverloaded" class="flex flex-col items-center gap-1">
       <span class="badge text-xs badge-danger">{{ t('admin.accounts.status.overloaded') }}</span>
-      <span class="text-[11px] text-gray-400 dark:text-gray-500">{{ overloadCountdown }}</span>
+      <span v-if="!detailsInDialog" class="text-[11px] text-gray-400 dark:text-gray-500">{{ overloadCountdown }}</span>
     </div>
 
     <!-- Request timeout display (408) -->
@@ -35,7 +35,7 @@
 
     <div v-else-if="kiroQuotaBadgeLabel" class="flex flex-col items-center gap-1">
       <span :class="['badge text-xs', kiroQuotaBadgeClass]">{{ kiroQuotaBadgeLabel }}</span>
-      <span v-if="kiroQuotaHint" class="text-[11px] text-gray-400 dark:text-gray-500">{{ kiroQuotaHint }}</span>
+      <span v-if="kiroQuotaHint && !detailsInDialog" class="text-[11px] text-gray-400 dark:text-gray-500">{{ kiroQuotaHint }}</span>
     </div>
 
     <!-- Main Status Badge (shown when not rate limited/overloaded) -->
@@ -49,7 +49,7 @@
         >
           {{ statusText }}
         </button>
-        <span class="max-w-[180px] text-center text-[11px] leading-4 text-gray-500 dark:text-gray-400">
+        <span v-if="!detailsInDialog" class="max-w-[180px] text-center text-[11px] leading-4 text-gray-500 dark:text-gray-400">
           {{ tempUnschedRecoveryText }}
         </span>
       </div>
@@ -72,7 +72,7 @@
 
     <!-- Error Info Indicator -->
     <HelpTooltip
-      v-if="errorDetails"
+      v-if="errorDetails && !detailsInDialog"
       data-testid="account-error-details"
       width-class="w-80 max-w-[calc(100vw-2rem)]"
     >
@@ -105,6 +105,7 @@
       </span>
       <!-- Tooltip -->
       <div
+        v-if="!detailsInDialog"
         class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 whitespace-normal rounded bg-gray-900 px-3 py-2 text-center text-xs leading-relaxed text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-700"
       >
         {{ t('admin.accounts.status.rateLimitedUntil', { time: formatDateTime(activeKiroRuntimeResetAt || account.rate_limit_reset_at) }) }}
@@ -155,6 +156,7 @@
         </span>
         <!-- Tooltip -->
         <div
+          v-if="!detailsInDialog"
           class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[320px] -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-3 py-2 text-center text-xs leading-relaxed text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-700"
         >
           {{
@@ -181,6 +183,7 @@
       </span>
       <!-- Tooltip -->
       <div
+        v-if="!detailsInDialog"
         class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 whitespace-normal rounded bg-gray-900 px-3 py-2 text-center text-xs leading-relaxed text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-700"
       >
         {{ t('admin.accounts.status.overloadedUntil', { time: formatTime(account.overload_until) }) }}
@@ -199,6 +202,7 @@
         408
       </span>
       <div
+        v-if="!detailsInDialog"
         class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 whitespace-normal rounded bg-gray-900 px-3 py-2 text-center text-xs leading-relaxed text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-700"
       >
         {{ t('admin.accounts.status.requestTimeoutHint') }}
@@ -225,8 +229,10 @@ const { t } = useI18n()
 const props = withDefaults(defineProps<{
   account: Account
   showOkadDetails?: boolean
+  detailsInDialog?: boolean
 }>(), {
-  showOkadDetails: false
+  showOkadDetails: false,
+  detailsInDialog: false
 })
 
 const adobeHealthPending = computed(() => props.account.platform === 'adobe' && Boolean((props.account.extra?.adobe_health as { pending?: boolean } | undefined)?.pending))

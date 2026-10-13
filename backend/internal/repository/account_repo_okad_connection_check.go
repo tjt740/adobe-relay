@@ -68,11 +68,11 @@ func (r *accountRepository) ClaimOkadConnectionTest(ctx context.Context) (*servi
 
 func (r *accountRepository) FinishOkadConnectionTest(ctx context.Context, job service.OkadConnectionTestJob, state string) error {
 	result, err := r.sql.ExecContext(ctx, `WITH eligible AS (
- SELECT id,($3='success' AND extra->'okad_connection_test'->>'gated'='true'
- AND extra->'okad_connection_test'->>'resume'='true' AND COALESCE(extra->>'okad_manual_pause','false')<>'true'
+ SELECT id,($3='success'
  AND (extra->'okad_connection_test'->>'require_verification'='false' OR extra->'okad'->>'verification'='verified')
  AND status='error' AND (error_message IN ($6,$7) OR LOWER(error_message) LIKE 'authentication failed (401):%' OR LOWER(error_message) LIKE 'token refresh failed (non-retryable): adobe cookie is no longer valid%')
- AND (expires_at IS NULL OR expires_at>NOW())) AS resume
+ AND LOWER(COALESCE(error_message,'')) NOT LIKE ALL(ARRAY['%taste_exhausted%','%quota exhausted%','%credits exhausted%','%model_not_entitled%','%user_not_entitled%','%not entitled%','%invalid_client%','%invalid_scope%'])
+ AND (expires_at IS NULL OR expires_at>NOW())) AS verified
  FROM accounts WHERE id=$1 AND deleted_at IS NULL
  AND extra->'okad_connection_test'->>'key'=$2
  AND encode(sha256(convert_to(COALESCE(credentials->>'cookie',''),'UTF8')),'hex')=$2
@@ -82,9 +82,10 @@ func (r *accountRepository) FinishOkadConnectionTest(ctx context.Context, job se
  FOR UPDATE), updated AS (
  UPDATE accounts a SET extra=jsonb_set(a.extra,'{okad_connection_test}',
  a.extra->'okad_connection_test'||jsonb_build_object('state',$3::text,'finished_at',NOW(),'next_check_at',CASE WHEN $3='proxy_pending' THEN NOW()+INTERVAL '30 seconds' ELSE NULL END)),
- status=CASE WHEN e.resume THEN 'active' ELSE a.status END,
- schedulable=CASE WHEN e.resume THEN true ELSE a.schedulable END,
- error_message=CASE WHEN e.resume THEN NULL ELSE a.error_message END,updated_at=NOW()
+ status=CASE WHEN e.verified THEN 'active' ELSE a.status END,
+ schedulable=CASE WHEN e.verified AND a.extra->'okad_connection_test'->>'gated'='true'
+ AND a.extra->'okad_connection_test'->>'resume'='true' AND COALESCE(a.extra->>'okad_manual_pause','false')<>'true' THEN true ELSE a.schedulable END,
+ error_message=CASE WHEN e.verified THEN NULL ELSE a.error_message END,updated_at=NOW()
  FROM eligible e WHERE a.id=e.id RETURNING a.id)
  INSERT INTO scheduler_outbox(event_type,account_id,group_id,payload) SELECT $8,id,NULL,NULL FROM updated`, job.AccountID, job.Key, state, job.ProxyID, job.ProxyUpdatedAt, service.OkadConnectionTestPending, service.OkadVerificationPending, service.SchedulerOutboxEventAccountChanged, job.Manual)
 	if err == nil {
