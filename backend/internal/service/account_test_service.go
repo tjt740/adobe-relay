@@ -163,6 +163,7 @@ type AccountTestService struct {
 	grokWSDialer openAIWSClientDialer
 	// adobeTokenProvider 为 nil 时 Adobe 测试路径按需构造本地 provider。
 	adobeTokenProvider *AdobeTokenProvider
+	okadTests          okadConnectionTestWorker
 }
 
 func (s *AccountTestService) SetSettingService(settingService *SettingService) {
@@ -380,6 +381,11 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	account, err := s.accountRepo.GetByID(ctx, accountID)
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Account not found")
+	}
+	if job, ok := ctx.Value(okadConnectionTestContextKey{}).(OkadConnectionTestJob); ok {
+		if account.Platform != PlatformAdobe || account.Type != AccountTypeOAuth || OkadConnectionTestKey(account) != job.Key {
+			return s.sendErrorAndEnd(c, "Cookie changed before the automatic test started")
+		}
 	}
 	defer func() { s.recordConnectionTestResult(ctx, account, testErr) }()
 

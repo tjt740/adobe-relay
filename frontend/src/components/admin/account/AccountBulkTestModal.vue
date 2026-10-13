@@ -90,6 +90,7 @@ const emit = defineEmits<{
   (e: 'open'): void
   (e: 'close'): void
   (e: 'completed'): void
+  (e: 'account-tested', accountID: number): void
   (e: 'running-change', running: boolean): void
 }>()
 const { t } = useI18n()
@@ -136,6 +137,7 @@ const start = async () => {
         row.state = result.success ? 'success' : 'failed'
         row.statusCode = result.statusCode
         row.error = result.error || (result.success ? undefined : t('admin.accounts.bulkTest.failedHint'))
+        emit('account-tested', row.id)
       } catch (error) {
         if (run !== generation) return
         if (batch.signal.aborted) { row.state = 'cancelled'; return }

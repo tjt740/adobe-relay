@@ -117,6 +117,16 @@ export default {
       notesHint: 'Notes are optional',
       allPlatforms: 'All Platforms',
       allTypes: 'All Types',
+      notTested: 'Not tested',
+      capacityFilter: {
+        label: 'Capacity status', all: 'All capacity', idle: 'Idle', inUse: 'In use (not full)', full: 'Full',
+        limitRange: 'Concurrency limit', min: 'Min', max: 'Max',
+        title: 'Filter capacity',
+        clear: 'Clear filter',
+        rangeHint: 'Leave blank for no limit. Both bounds are inclusive.',
+        positiveInteger: 'Enter a positive whole number.',
+        invalidRange: 'Minimum must not exceed maximum.'
+      },
       allStatus: 'All Status',
       allGroups: 'All Groups',
       ungroupedGroup: 'Ungrouped',

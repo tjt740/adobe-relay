@@ -66,6 +66,23 @@ function makeAccount(overrides: Partial<Account>): Account {
 }
 
 describe('AccountStatusIndicator', () => {
+  it('replaces a previous timeout with each new completed test result', async () => {
+    const account = makeAccount({
+      platform: 'adobe',
+      temp_unschedulable_until: '2020-01-01T00:00:00Z',
+      temp_unschedulable_reason: '{"status_code":408}',
+      extra: { last_check_success: false, last_check_status_code: 408, adobe_last_status_code: 408 }
+    })
+    const wrapper = mount(AccountStatusIndicator, { props: { account }, global: { stubs: { Icon: true } } })
+    expect(wrapper.text()).toContain('requestTimeout')
+    await wrapper.setProps({ account: { ...account, extra: { ...account.extra, last_check_success: true, last_check_status_code: 200 } } })
+    expect(wrapper.text()).not.toContain('408')
+    expect(wrapper.get('[data-testid="account-last-check"]').text()).toContain('bulkTest.passed')
+    await wrapper.setProps({ account: { ...account, extra: { ...account.extra, last_check_success: false, last_check_status_code: 401 } } })
+    expect(wrapper.text()).not.toContain('408')
+    expect(wrapper.get('[data-testid="account-last-check"]').text()).toContain('401')
+    wrapper.unmount()
+  })
   it('shows persisted test results independently of scheduling status', async () => {
     const wrapper = mount(AccountStatusIndicator, {
       props: { account: makeAccount({ extra: { last_check_success: false, last_check_status_code: 401, last_check_at: '2026-10-11T03:00:00Z' } }) },

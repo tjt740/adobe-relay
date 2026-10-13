@@ -10,7 +10,17 @@
             @update:filters="(newFilters) => Object.assign(params, newFilters)"
             @change="debouncedReload"
             @update:searchQuery="debouncedReload"
-          />
+          >
+            <template #capacity>
+              <div :class="isColumnVisible('capacity') ? 'md:hidden' : ''">
+                <AccountCapacityFilter
+                  id="account-capacity-filter-mobile"
+                  :filters="params"
+                  @apply="applyCapacityFilters"
+                />
+              </div>
+            </template>
+          </AccountTableFilters>
           <AccountTableActions
             :loading="loading"
             @refresh="handleManualRefresh"
@@ -289,6 +299,9 @@
               </div>
             </div>
           </template>
+          <template #header-capacity>
+            <AccountCapacityFilter id="account-capacity-filter" :filters="params" @apply="applyCapacityFilters" />
+          </template>
           <template #cell-capacity="{ row }">
             <AccountCapacityCell :account="row" />
           </template>
@@ -475,6 +488,7 @@
       @open="showBulkTest = true"
       @close="showBulkTest = false"
       @running-change="bulkTestRunning = $event"
+      @account-tested="handleBulkAccountTested"
       @completed="reload"
     />
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" @status-code="handleAccountTestStatusCode" />
@@ -538,6 +552,7 @@
 </template>
 
 <script setup lang="ts">
+import { matchesAccountRuntimeStatus, runtimeAccountStatuses } from '@/utils/accountStatus'
 import { ref, reactive, computed, onMounted, onUnmounted, toRaw, watch } from 'vue'
 import { useIntervalFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
@@ -558,6 +573,7 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { CreateAccountModal, EditAccountModal, BulkEditAccountModal, SyncFromCrsModal, TempUnschedStatusModal } from '@/components/account'
 import AccountTableActions from '@/components/admin/account/AccountTableActions.vue'
 import AccountTableFilters from '@/components/admin/account/AccountTableFilters.vue'
+import AccountCapacityFilter from '@/components/admin/account/AccountCapacityFilter.vue'
 import AccountBulkActionsBar from '@/components/admin/account/AccountBulkActionsBar.vue'
 import AccountActionMenu from '@/components/admin/account/AccountActionMenu.vue'
 import ImportDataModal from '@/components/admin/account/ImportDataModal.vue'
@@ -618,6 +634,9 @@ type AccountBulkEditTarget =
         group?: string
         search?: string
         privacy_mode?: string
+        capacity?: string
+        concurrency_min?: string
+        concurrency_max?: string
         sort_by?: string
         sort_order?: AccountSortOrder
       }
@@ -719,6 +738,7 @@ type AccountSortState = {
 const ACCOUNT_SORTABLE_KEYS = new Set([
   'id',
   'name',
+  'capacity',
   'status',
   'schedulable',
   'priority',
@@ -1145,6 +1165,9 @@ const {
     platform: '',
     type: '',
     status: '',
+    capacity: '',
+    concurrency_min: '',
+    concurrency_max: '',
     privacy_mode: '',
     group: '',
     search: '',
@@ -1242,6 +1265,9 @@ const buildUpstreamBillingRateFilters = () => {
     platform: typeof rawParams.platform === 'string' ? rawParams.platform : '',
     type: typeof rawParams.type === 'string' ? rawParams.type : '',
     status: typeof rawParams.status === 'string' ? rawParams.status : '',
+    capacity: String(rawParams.capacity || ''),
+    concurrency_min: String(rawParams.concurrency_min || ''),
+    concurrency_max: String(rawParams.concurrency_max || ''),
     group: typeof rawParams.group === 'string' ? rawParams.group : '',
     search: typeof rawParams.search === 'string' ? rawParams.search : '',
     privacy_mode: typeof rawParams.privacy_mode === 'string' ? rawParams.privacy_mode : '',
@@ -1357,6 +1383,11 @@ const debouncedReload = () => {
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = true
   baseDebouncedReload()
+}
+
+const applyCapacityFilters = (filters: { capacity: string; concurrency_min: string; concurrency_max: string }) => {
+  Object.assign(params, filters)
+  debouncedReload()
 }
 
 const handlePageChange = (page: number) => {
@@ -1534,6 +1565,9 @@ const refreshAccountsIncrementally = async () => {
         type?: string
         status?: string
         privacy_mode?: string
+        capacity?: string
+        concurrency_min?: string
+        concurrency_max?: string
         group?: string
         search?: string
         sort_by?: string
@@ -1870,7 +1904,7 @@ const allColumns = computed(() => {
     { key: 'name', label: t('admin.accounts.columns.name'), sortable: true },
     { key: 'id', label: t('admin.accounts.columns.id'), sortable: true },
     { key: 'platform_type', label: t('admin.accounts.columns.platformType'), sortable: false },
-    { key: 'capacity', label: t('admin.accounts.columns.capacity'), sortable: false },
+    { key: 'capacity', label: t('admin.accounts.columns.capacity'), sortable: true },
     { key: 'status', label: t('admin.accounts.columns.status'), sortable: true },
     { key: 'schedulable', label: t('admin.accounts.columns.schedulable'), sortable: true },
     { key: 'today_stats', label: t('admin.accounts.columns.todayStats'), sortable: false }
@@ -2161,6 +2195,9 @@ const buildBulkEditFilterSnapshot = () => {
     platform: typeof rawParams.platform === 'string' ? rawParams.platform : '',
     type: typeof rawParams.type === 'string' ? rawParams.type : '',
     status: typeof rawParams.status === 'string' ? rawParams.status : '',
+    capacity: String(rawParams.capacity || ''),
+    concurrency_min: String(rawParams.concurrency_min || ''),
+    concurrency_max: String(rawParams.concurrency_max || ''),
     group: typeof rawParams.group === 'string' ? rawParams.group : '',
     search: typeof rawParams.search === 'string' ? rawParams.search : '',
     privacy_mode: typeof rawParams.privacy_mode === 'string' ? rawParams.privacy_mode : '',
@@ -2238,6 +2275,9 @@ const buildAccountQueryFilters = () => ({
   platform: params.platform || '',
   type: params.type || '',
   status: params.status || '',
+  capacity: params.capacity || '',
+  concurrency_min: params.concurrency_min || '',
+  concurrency_max: params.concurrency_max || '',
   group: params.group || '',
   privacy_mode: params.privacy_mode || '',
   search: params.search || '',
@@ -2262,17 +2302,25 @@ const accountMatchesCurrentFilters = (account: Account) => {
     const isTempUnschedulable = Number.isFinite(tempUnschedUntil) && tempUnschedUntil > now
 
     if (filters.status === 'active') {
-      if (account.status !== 'active' || isRateLimited || isTempUnschedulable || !account.schedulable) return false
+      if (!matchesAccountRuntimeStatus(account, 'active') || account.status !== 'active' || isRateLimited || isTempUnschedulable || !account.schedulable) return false
     } else if (filters.status === 'rate_limited') {
       if (account.status !== 'active' || !isRateLimited || isTempUnschedulable) return false
     } else if (filters.status === 'temp_unschedulable') {
       if (account.status !== 'active' || !isTempUnschedulable) return false
     } else if (filters.status === 'unschedulable') {
       if (account.status !== 'active' || account.schedulable || isRateLimited || isTempUnschedulable) return false
+    } else if (runtimeAccountStatuses.includes(filters.status)) {
+      if (!matchesAccountRuntimeStatus(account, filters.status)) return false
     } else if (account.status !== filters.status) {
       return false
     }
   }
+  const current = account.current_concurrency || 0
+  if (filters.capacity === 'idle' && current !== 0) return false
+  if (filters.capacity === 'in_use' && (current <= 0 || current >= account.concurrency)) return false
+  if (filters.capacity === 'full' && current < account.concurrency) return false
+  if (filters.concurrency_min && account.concurrency < Number(filters.concurrency_min)) return false
+  if (filters.concurrency_max && account.concurrency > Number(filters.concurrency_max)) return false
   if (filters.group) {
     const groupIds = account.group_ids ?? account.groups?.map((group) => group.id) ?? []
     if (filters.group === ACCOUNT_UNGROUPED_GROUP_QUERY_VALUE) {
@@ -2332,6 +2380,23 @@ const patchAccountInList = (updatedAccount: Account) => {
   nextAccounts[index] = mergedAccount
   accounts.value = nextAccounts
   syncAccountRefs(mergedAccount)
+}
+// A finished SSE request has already persisted its result. Refresh only that
+// visible row, including runtime cooldowns, without reloading selection/pages.
+const handleBulkAccountTested = async (accountID: number) => {
+  if (!accounts.value.some(account => account.id === accountID)) return
+  try {
+    const updated = await adminAPI.accounts.getById(accountID)
+    const index = accounts.value.findIndex(account => account.id === accountID)
+    if (index < 0) return
+    const current = accounts.value[index]
+    if (Date.parse(current.updated_at) > Date.parse(updated.updated_at)) return
+    accounts.value[index] = mergeRuntimeFields(current, updated)
+    syncAccountRefs(accounts.value[index])
+    resetAutoRefreshCache()
+  } catch (error) {
+    console.error('Failed to refresh tested account:', error)
+  }
 }
 const patchUpstreamBillingSnapshot = (accountID: number, snapshot: UpstreamBillingProbeSnapshot) => {
   const account = accounts.value.find(item => item.id === accountID)

@@ -207,6 +207,7 @@
 </template>
 
 <script setup lang="ts">
+import { getAccountStatusCode, getAccountAuthenticationError, isAdobeAccountCookieError } from '@/utils/accountStatus'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
@@ -349,73 +350,13 @@ const isOverloaded = computed(() => {
   return new Date(props.account.overload_until) > new Date()
 })
 
-const parseStatusCode = (value: unknown): number | null => {
-  if (typeof value === 'number' && Number.isInteger(value)) return value
-  if (typeof value !== 'string') return null
-  const match = value.match(/\b408\b/)
-  return match ? 408 : null
-}
-
-const accountStatusCode = computed(() => {
-  const extra = props.account.extra as Record<string, unknown> | undefined
-  const extraKeys = [
-    'last_check_status_code',
-    'last_status_code',
-    'status_code',
-    'upstream_status_code',
-    'adobe_last_status_code'
-  ]
-  for (const key of extraKeys) {
-    const statusCode = parseStatusCode(extra?.[key])
-    if (statusCode === 408) return statusCode
-  }
-
-  if (props.account.temp_unschedulable_reason) {
-    try {
-      const reason = JSON.parse(props.account.temp_unschedulable_reason) as Record<string, unknown>
-      if (parseStatusCode(reason.status_code) === 408) return 408
-    } catch {
-      // Older records may contain plain text instead of JSON.
-      if (parseStatusCode(props.account.temp_unschedulable_reason) === 408) return 408
-    }
-  }
-
-  return parseStatusCode(props.account.error_message)
-})
-
-const isAdobeCookieError = (message: string): boolean =>
-  props.account.platform === 'adobe' &&
-  /adobe cookie is no longer valid|\binvalid_credentials\b/i.test(message)
-
-const isAuthenticationError = (message: string): boolean => {
-  if (isAdobeCookieError(message)) return true
-  try {
-    const reason = JSON.parse(message) as Record<string, unknown> | null
-    if (reason && typeof reason === 'object' && Number(reason.status_code) === 401) return true
-  } catch {
-    // Error messages usually contain plain text, not JSON.
-  }
-  return /(?:^\s*|\(|\b(?:http|oauth|status(?:\s+code)?|returned|rejected|upstream|failed)\s*[:=]?\s*\(?)401\b/i.test(message)
-}
-
 const tempUnschedulableError = computed(() => {
   if (!isTempUnschedulable.value) return ''
   return props.account.temp_unschedulable_reason || ''
 })
-
-const authenticationError = computed(() => {
-  // Current errors take precedence over earlier connection checks.
-  const currentError = props.account.error_message || tempUnschedulableError.value
-  if (currentError) return isAuthenticationError(currentError) ? currentError : ''
-
-  const extra = props.account.extra
-  // A persisted connection check is historical and has its own badge; it must
-  // not turn a recovered account's current status back into an auth failure.
-  for (const key of ['last_status_code', 'status_code', 'upstream_status_code', 'adobe_last_status_code']) {
-    if (Number(extra?.[key]) === 401) return t('admin.accounts.status.authenticationFailedHint')
-  }
-  return ''
-})
+const accountStatusCode = computed(() => getAccountStatusCode(props.account))
+const authenticationError = computed(() => getAccountAuthenticationError(props.account, t('admin.accounts.status.authenticationFailedHint')))
+const isAdobeCookieError = (message: string) => isAdobeAccountCookieError(props.account, message)
 
 const isAuthenticationFailed = computed(() => Boolean(authenticationError.value))
 const authenticationFailureText = computed(() => t(

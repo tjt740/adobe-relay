@@ -61,9 +61,14 @@ func (h *AccountHandler) GetUpstreamBillingRates(c *gin.Context) {
 		}
 	}
 
-	accounts, total, err := h.adminService.ListAccounts(
+	runtimeFilters, err := runtimeFiltersFromQuery(c)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	accounts, total, _, err := h.listAccountsWithRuntimeFilters(
 		c.Request.Context(), page, pageSize, platform, accountType, status,
-		search, groupID, privacyMode, sortBy, sortOrder,
+		search, groupID, privacyMode, sortBy, sortOrder, runtimeFilters,
 	)
 	if err != nil {
 		response.ErrorFrom(c, err)

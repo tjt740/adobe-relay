@@ -66,6 +66,10 @@ func (h *AccountHandler) OkadApplyCredential(c *gin.Context) {
 	if h.tokenCacheInvalidator != nil {
 		_ = h.tokenCacheInvalidator.InvalidateToken(c.Request.Context(), a)
 	}
+	if err := h.accountTestService.QueueOkadConnectionTest(c.Request.Context(), a, true); err != nil {
+		response.Error(c, 503, "Cookie 已写入，接口检测暂未排队，请重试推送")
+		return
+	}
 	response.Success(c, gin.H{"id": a.ID, "status": a.Status, "schedulable": a.Schedulable, "integration": a.Extra["okad"]})
 }
 func (h *AccountHandler) OkadVerifyCredential(c *gin.Context) {

@@ -6,6 +6,7 @@ import AccountsView from '../AccountsView.vue'
 
 const {
   listAccounts,
+  getById,
   listWithEtag,
   batchRefresh,
   exportData,
@@ -16,6 +17,7 @@ const {
   showError
 } = vi.hoisted(() => ({
   listAccounts: vi.fn(),
+  getById: vi.fn(),
   listWithEtag: vi.fn(),
   batchRefresh: vi.fn(),
   exportData: vi.fn(),
@@ -30,6 +32,7 @@ vi.mock('@/api/admin', () => ({
   adminAPI: {
     accounts: {
       list: listAccounts,
+      getById,
       listWithEtag,
       getBatchTodayStats,
       getUpstreamBillingProbeSettings,
@@ -102,7 +105,8 @@ const AccountBulkActionsBarStub = {
 }
 
 const AccountTableFiltersStub = {
-  emits: ['change'],
+  name: 'AccountTableFilters',
+  emits: ['change', 'update:filters'],
   template: '<button data-test="change-filter" @click="$emit(\'change\')">change filter</button>'
 }
 
@@ -121,8 +125,10 @@ const mountView = () => mount(AccountsView, {
         template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
       },
       DataTable: {
-        props: ['data'],
-        template: '<div data-test="data-table"><div v-for="row in data" :key="row.id"><slot name="cell-select" :row="row" /></div></div>'
+        name: 'DataTable',
+        props: ['data', 'columns'],
+        emits: ['sort'],
+        template: '<div data-test="data-table"><slot name="header-capacity" /><div v-for="row in data" :key="row.id"><slot name="cell-select" :row="row" /></div></div>'
       },
       Pagination: true,
       ConfirmDialog: ConfirmDialogStub,
@@ -134,7 +140,7 @@ const mountView = () => mount(AccountsView, {
       ReAuthAccountModal: true,
       AccountTestModal: true,
       AccountBulkTestModal: {
-        name: 'AccountBulkTestModal', props: ['show', 'targets', 'runId'], emits: ['completed', 'open', 'close', 'running-change'],
+        name: 'AccountBulkTestModal', props: ['show', 'targets', 'runId'], emits: ['completed', 'open', 'close', 'running-change', 'account-tested'],
         template: '<button v-if="show" data-test="bulk-test-complete" @click="$emit(\'completed\')">complete</button>'
       },
       AccountStatsModal: true,
@@ -160,6 +166,7 @@ const mountView = () => mount(AccountsView, {
 
 describe('admin AccountsView select all filtered results', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     localStorage.clear()
     listAccounts.mockReset()
     listWithEtag.mockReset()
@@ -168,6 +175,7 @@ describe('admin AccountsView select all filtered results', () => {
     getBatchTodayStats.mockReset()
     getUpstreamBillingProbeSettings.mockReset()
     getAllProxies.mockReset()
+    getById.mockReset()
     getAllGroups.mockReset()
     showError.mockReset()
 
@@ -183,8 +191,52 @@ describe('admin AccountsView select all filtered results', () => {
   })
 
   afterEach(() => {
+    vi.clearAllTimers()
+    vi.useRealTimers()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+  })
+
+  it('requests capacity sorting in both directions while preserving filters', async () => {
+    listAccounts.mockResolvedValue({ items: makeAccounts(3), total: 3, page: 1, page_size: 20, pages: 1 })
+    const wrapper = mountView()
+    await flushPromises()
+    const table = wrapper.findComponent({ name: 'DataTable' })
+    expect(table.props('columns')).toContainEqual(expect.objectContaining({ key: 'capacity', sortable: true }))
+    wrapper.findComponent({ name: 'AccountCapacityFilter' }).vm.$emit('apply', { capacity: 'in_use', concurrency_min: '2', concurrency_max: '8' })
+    for (const order of ['asc', 'desc']) {
+      table.vm.$emit('sort', 'capacity', order)
+      await flushPromises()
+      expect(listAccounts).toHaveBeenLastCalledWith(1, 300, expect.objectContaining({
+        sort_by: 'capacity', sort_order: order, capacity: 'in_use', concurrency_min: '2', concurrency_max: '8'
+      }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    }
+    wrapper.unmount()
+  })
+
+  it('restores capacity sorting for the initial request', async () => {
+    localStorage.setItem('account-table-sort', JSON.stringify({ key: 'capacity', order: 'desc' }))
+    listAccounts.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 20, pages: 0 })
+    const wrapper = mountView()
+    await flushPromises()
+    expect(listAccounts).toHaveBeenLastCalledWith(1, 300, expect.objectContaining({ sort_by: 'capacity', sort_order: 'desc' }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    wrapper.unmount()
+  })
+
+  it('keeps status and capacity filters when selecting all results', async () => {
+    listAccounts.mockResolvedValue({ items: makeAccounts(3), total: 3, page: 1, page_size: 20, pages: 1 })
+    const wrapper = mountView()
+    await flushPromises()
+    const filters = { platform: 'adobe', status: 'request_timeout', capacity: 'full', concurrency_min: '2', concurrency_max: '8' }
+    wrapper.findComponent({ name: 'AccountTableFilters' }).vm.$emit('update:filters', { platform: filters.platform, status: filters.status })
+    wrapper.findComponent({ name: 'AccountCapacityFilter' }).vm.$emit('apply', { capacity: filters.capacity, concurrency_min: filters.concurrency_min, concurrency_max: filters.concurrency_max })
+    await wrapper.get('[data-test="change-filter"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="select-page"]').trigger('click')
+    await wrapper.get('[data-test="select-all-results"]').trigger('click')
+    await flushPromises()
+    expect(listAccounts).toHaveBeenLastCalledWith(1, 1000, expect.objectContaining(filters))
+    wrapper.unmount()
   })
 
   it('passes every selected ID to bulk testing and refreshes the list on completion', async () => {
@@ -218,6 +270,29 @@ describe('admin AccountsView select all filtered results', () => {
     await wrapper.get('[data-test="bulk-test-complete"]').trigger('click')
     await flushPromises()
     expect(listAccounts.mock.calls.length).toBe(before + 1)
+    wrapper.unmount()
+  })
+
+  it('refreshes each tested row while the batch is running in the background, preserving selection', async () => {
+    const rows = makeAccounts(3).map(row => ({ ...row, extra: { last_check_success: false, last_check_status_code: 408 } }))
+    listAccounts.mockResolvedValue({ items: rows, total: 3, page: 1, page_size: 20, pages: 1 })
+    getById.mockResolvedValue({ ...rows[0], extra: { last_check_success: true, last_check_status_code: 200 }, updated_at: '2026-10-13T01:00:00Z' })
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-test="select-page"]').trigger('click')
+    await wrapper.get('[data-test="bulk-test"]').trigger('click')
+    const modal = wrapper.findComponent({ name: 'AccountBulkTestModal' })
+    modal.vm.$emit('running-change', true)
+    modal.vm.$emit('close')
+    const before = listAccounts.mock.calls.length
+    modal.vm.$emit('account-tested', 1)
+    await flushPromises()
+    const rendered = wrapper.findComponent('[data-test="data-table"]').props('data')
+    expect(rendered[0].extra.last_check_status_code).toBe(200)
+    expect(rendered[1].extra.last_check_status_code).toBe(408)
+    expect(wrapper.get('[data-test="selected-count"]').text()).toBe('3')
+    expect(listAccounts.mock.calls.length).toBe(before)
+    expect(modal.props('show')).toBe(false)
     wrapper.unmount()
   })
 
