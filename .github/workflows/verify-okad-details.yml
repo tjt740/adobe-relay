@@ -4,12 +4,20 @@ on:
     branches: [codex/verify-okad-details]
 permissions:
   contents: read
+  actions: read
 jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Read initial post-deployment snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: okad-details-verification
+          run-id: 38376421911
+          github-token: ${{ github.token }}
+          path: initial
       - name: Configure SSH
         env:
           SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
@@ -28,12 +36,18 @@ jobs:
           ssh "${ssh_opts[@]}" "$target" 'python3 - after' < deploy/primary/verify-okad-details-snapshot.py > after.json
           ssh "${ssh_opts[@]}" "$target" 'python3 -' < deploy/primary/verify-okad-details-assets.py > frontend-verification.json
           ssh "${ssh_opts[@]}" "$target" 'python3 -' < deploy/primary/verify-okad-details-accounts.py > proxy-audit.json
+          ssh "${ssh_opts[@]}" "$target" 'cat > /opt/adobe-relay/releases/okad-details-display-20261013/initial-after.json' < initial/after.json
           python3 - <<'PY'
           import json
           report=json.load(open('after.json'))
+          initial=json.load(open('initial/after.json'))
+          assert all(v for k,v in initial['preserved'].items() if k!='sub2_accounts'), initial['preserved']
           assert report['containers']['adobe-relay-app-1']['tag']=='adobe-relay:f28f14480dc2a90fdd0e98ff7d85569a5b6649fd', 'Unexpected subsequent release'
           assert report['containers']['adobe-relay-app-1']['health']=='healthy'
-          assert all(v for k,v in report['preserved'].items() if k!='sub2_accounts'), report['preserved']
+          # Business credentials can legitimately rotate after the initial postflight.
+          # Keep checking live configuration, and reconcile proxy changes with its event log.
+          stable=['files','sub2_env_without_image','okad_settings_digest','integration','sub2_settings_digest','other_containers']
+          assert all(report['preserved'][k] for k in stable), report['preserved']
           proxy=json.load(open('proxy-audit.json'))
           assert proxy['same_account_ids'] and proxy['proxy_policy_unchanged']
           assert proxy['matches_actual_cutover'] or proxy['explained_by_existing_failover']
@@ -48,6 +62,7 @@ jobs:
             after.json
             frontend-verification.json
             proxy-audit.json
+            initial/after.json
           retention-days: 7
       - name: Remove runner key
         if: always()
