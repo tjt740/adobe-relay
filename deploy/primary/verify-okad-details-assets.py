@@ -19,7 +19,7 @@ status_chunks=re.findall(r'(?:assets/)?AccountStatusIndicator-[a-zA-Z0-9_-]+\.js
 if status_chunks:status_body=get(base+'/assets/'+status_chunks[0].removeprefix('assets/'))
 else:status_body=body
 assert 'showOkadDetails' in status_body,'Status display gate missing'
-assert re.search(r'showOkadDetails:\{type:Boolean,required:!1,default:!1\}',status_body),'Default-hidden prop not found'
+assert re.search(r'showOkadDetails:\{type:Boolean,(?:required:!1,)?default:!1\}',status_body),'Default-hidden prop not found'
 for url in ['https://creative.cheap/health','https://creative.cheap/okad/api/health']:
     json.loads(get(url))
 report={'frontend_chunk':chunk,'display_preference_present':True,'details_hidden_by_default':True,'public_health':True}
