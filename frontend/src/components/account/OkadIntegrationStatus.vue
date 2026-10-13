@@ -1,5 +1,5 @@
 <template>
-  <div v-if="state || recovery" class="flex max-w-[230px] flex-col gap-1 text-[11px]" data-testid="okad-integration-status">
+  <div v-if="state || recovery || check" class="flex max-w-[230px] flex-col gap-1 text-[11px]" data-testid="okad-integration-status">
     <span class="rounded bg-blue-50 px-2 py-1 text-blue-700 dark:bg-blue-950 dark:text-blue-200" :title="detail">{{ label }}</span>
     <span v-if="state?.version" class="text-gray-500">Cookie v{{ state.version }} · {{ state.source_key }}</span>
     <span v-if="recovery?.next_check_at" class="text-gray-500">下次检查 {{ new Date(String(recovery.next_check_at)).toLocaleTimeString() }}</span>
@@ -15,6 +15,7 @@ const props = defineProps<{ account: Account }>()
 const busy = ref(false)
 const message = ref('')
 const state = computed(() => props.account.extra?.okad as Record<string, unknown> | undefined)
+const check = computed(() => props.account.extra?.okad_connection_test as Record<string, unknown> | undefined)
 const recovery = computed(() => props.account.extra?.okad_recovery as Record<string, unknown> | undefined)
 const reasons: Record<string, string> = {
   pending: 'Cookie 已同步，等待验证', verified: '上次凭据验证通过', verification_retry: '等待重新验证',
@@ -26,10 +27,20 @@ const reasons: Record<string, string> = {
   login_failed: '自动登录未完成', rate_limited: '登录服务限流', protocol: '联动版本不兼容'
 }
 const label = computed(() => {
+  const phase = String(check.value?.state || '')
+  if (phase === 'pending') return 'Cookie 已同步，等待接口检测'
+  if (phase === 'running') return check.value?.resume === false ? '正在检测，保留原暂停状态' : '正在检测，验证通过后恢复调度'
+  if (phase === 'proxy_pending') return '等待代理就绪后检测'
+  if (phase === 'interrupted') return '检测中断，请重新检测'
+  if (phase === 'failed') return props.account.status === 'active' && props.account.schedulable ? '最新接口检测失败，账号仍在调度' : '接口检测失败，未恢复调度'
+  if (phase === 'success') {
+    if (props.account.extra?.last_check_success === false) return '上次 Cookie 验证通过，最新接口检测失败'
+    return props.account.status === 'active' && props.account.schedulable ? '接口检测通过，已恢复调度' : '上次检测通过，当前账号仍暂停或异常'
+  }
   const code = String(recovery.value?.code || state.value?.verification || '')
   return reasons[code] || '查看联动详情'
 })
-const detail = computed(() => String(state.value?.message || label.value))
+const detail = computed(() => String(check.value ? label.value : state.value?.message || label.value))
 async function verify() {
   busy.value = true
   try {

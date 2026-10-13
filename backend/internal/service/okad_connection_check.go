@@ -13,8 +13,35 @@ import (
 // Claiming is atomic across processes. A claimed test is never automatically
 // replayed after a crash: an upstream generation may already have been submitted.
 type OkadConnectionTestJob struct {
-	AccountID int64
-	Key       string
+	AccountID      int64
+	Key            string
+	ProxyID        *int64
+	ProxyUpdatedAt *time.Time
+	Manual         bool
+}
+
+const OkadConnectionTestPending = "Okad credentials pending connection test"
+
+func okadTestProxyMatches(a *Account, job OkadConnectionTestJob) bool {
+	if (a.ProxyID == nil) != (job.ProxyID == nil) || (a.ProxyID != nil && *a.ProxyID != *job.ProxyID) {
+		return false
+	}
+	return job.ProxyUpdatedAt == nil || (a.Proxy != nil && a.Proxy.UpdatedAt.Equal(*job.ProxyUpdatedAt))
+}
+
+// Resume only pauses owned by authentication recovery, never operator/proxy/quota pauses.
+func OkadConnectionTestMayResume(a *Account) bool {
+	if a == nil || a.Extra["okad_manual_pause"] == true || (a.ExpiresAt != nil && !a.ExpiresAt.After(time.Now())) {
+		return false
+	}
+	prior, _ := a.Extra["okad_connection_test"].(map[string]any)
+	return (a.Status == StatusActive && a.Schedulable) || isAdobeCookieRecoveryCandidate(a) || (a.Status == StatusError && a.ErrorMessage == AdobeCookieRecoveryExhausted) ||
+		(a.Status == StatusError && a.ErrorMessage == OkadConnectionTestPending && prior["resume"] == true)
+}
+
+func NewOkadConnectionTestState(a *Account, requireVerification, resume bool) map[string]any {
+	return map[string]any{"key": OkadConnectionTestKey(a), "state": "pending", "gated": true,
+		"resume": resume, "require_verification": requireVerification, "queued_at": time.Now().UTC().Format(time.RFC3339Nano)}
 }
 
 type OkadConnectionTestRepository interface {
@@ -28,7 +55,7 @@ func OkadConnectionTestKey(a *Account) string {
 }
 
 func newOkadConnectionTestState(a *Account, requireVerification bool) map[string]any {
-	return map[string]any{"key": OkadConnectionTestKey(a), "state": "pending", "require_verification": requireVerification, "queued_at": time.Now().UTC().Format(time.RFC3339Nano)}
+	return NewOkadConnectionTestState(a, requireVerification, OkadConnectionTestMayResume(a))
 }
 
 // QueueOkadConnectionTest is called only by successful Okad credential writes.
@@ -105,6 +132,21 @@ func (s *AccountTestService) runOkadConnectionTest(ctx context.Context, repo Oka
 	// The normal test already has an upstream timeout. This outer bound also
 	// covers token exchange. Do not reconnect/login or retry failed tests here.
 	testCtx, cancel := context.WithTimeout(context.WithValue(ctx, okadConnectionTestContextKey{}, job), 3*time.Minute)
+	defer cancel()
+	if verifier, ok := s.accountRepo.(interface {
+		OkadVerificationProxyReady(context.Context, *Account) (bool, error)
+	}); ok {
+		a, err := s.accountRepo.GetByID(testCtx, job.AccountID)
+		if err != nil {
+			_ = repo.FinishOkadConnectionTest(ctx, job, "interrupted")
+			return
+		}
+		ready, err := verifier.OkadVerificationProxyReady(testCtx, a)
+		if err != nil || !ready {
+			_ = repo.FinishOkadConnectionTest(ctx, job, "proxy_pending")
+			return
+		}
+	}
 	result, err := s.RunTestBackground(testCtx, job.AccountID, "")
 	state := "failed"
 	if err == nil && result != nil && result.Status == "success" {

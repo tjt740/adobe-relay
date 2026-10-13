@@ -286,3 +286,37 @@ func TestResolveAdobeTestPrompt(t *testing.T) {
 	require.Equal(t, defaultOpenAIImageTestPrompt, resolveAdobeTestPrompt("   "))
 	require.Equal(t, "custom", resolveAdobeTestPrompt("  custom  "))
 }
+
+func TestAdobeQuarantinedAccountCanBeTestedWithoutResumingScheduling(t *testing.T) {
+	for _, status := range []string{StatusError, "disabled"} {
+		t.Run(status, func(t *testing.T) {
+			a := adobeTestConnAccount(map[string]any{"cookie": "ims_sid=new"})
+			a.Status = status
+			a.Schedulable = false
+			a.ErrorMessage = OkadConnectionTestPending
+			repo := newAdobeGatewayCredsRepo(a)
+			api := &adobeFakeTransport{}
+			client := adobeSubmitPollDownload(t, api, []byte("PNG"))
+			imageHandler := api.handler
+			exchanges := 0
+			api.handler = func(req *adobe.Request, n int) (*adobe.Response, error) {
+				if strings.Contains(req.URL, "ims/check/v6/token") {
+					exchanges++
+					return adobeJSONResponse(t, 200, map[string]any{"access_token": adobeTestJWT(t, time.Now().Add(time.Hour))}, nil), nil
+				}
+				return imageHandler(req, n)
+			}
+			withStubbedAdobeTestClient(t, client)
+			_, err := runAdobeTestConnWithRepo(t, repo, a, "gpt-image-2", "")
+			if status == StatusError {
+				require.NoError(t, err)
+				require.Equal(t, 1, exchanges)
+			} else {
+				require.Error(t, err)
+				require.Zero(t, exchanges)
+			}
+			require.Equal(t, status, repo.account.Status)
+			require.False(t, repo.account.Schedulable)
+		})
+	}
+}

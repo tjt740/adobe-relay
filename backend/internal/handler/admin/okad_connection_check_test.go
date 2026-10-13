@@ -25,6 +25,12 @@ type okadCheckAdmin struct {
 func (s *okadCheckAdmin) ApplyOkadCredential(context.Context, int64, service.OkadCredentialUpdate) (*service.Account, error) {
 	return s.a, s.err
 }
+func (s *okadCheckAdmin) ApplyLegacyOkadCookie(_ context.Context, _ int64, cookie, email string) (*service.Account, error) {
+	s.a.Credentials["cookie"] = cookie
+	s.a.Status, s.a.Schedulable, s.a.ErrorMessage = service.StatusError, false, service.OkadConnectionTestPending
+	s.a.Extra["okad_connection_test"] = service.NewOkadConnectionTestState(s.a, false, true)
+	return s.a, s.err
+}
 func (s *okadCheckAdmin) ListOkadInventory(context.Context, int64, int, *time.Time) ([]service.OkadInventoryItem, error) {
 	return nil, nil
 }
@@ -69,7 +75,7 @@ func TestOkadCredentialPushQueuesInterfaceTest(t *testing.T) {
 		{"reliable push", "/credentials", `{"version":1,"cookie":"cookie","email":"one@example.test","issuer":"okad","source_key":"external:1"}`, true, false, false, 200, 1},
 		{"rejected push", "/credentials", `{"version":1}`, true, true, false, 409, 0},
 		{"queue unavailable", "/credentials", `{"version":1}`, true, false, true, 503, 1},
-		{"legacy push", "/oauth", `{"type":"oauth","credentials":{"cookie":"fresh"},"extra":{"adobeteam_external_email":"one@example.test"}}`, false, false, false, 200, 1},
+		{"legacy push", "/oauth", `{"type":"oauth","credentials":{"cookie":"fresh"},"extra":{"adobeteam_external_email":"one@example.test"}}`, false, false, false, 200, 0},
 		{"manual reauthorization", "/oauth", `{"type":"oauth","credentials":{"cookie":"fresh"}}`, false, false, false, 200, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

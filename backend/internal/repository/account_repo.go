@@ -2065,6 +2065,7 @@ func (r *accountRepository) ClearError(ctx context.Context, id int64) error {
 	    -- has queued the account. Keep that queue intact until the allocator
 	    -- resumes it; clearing it would strand an active, unschedulable account.
 	    AND NOT (proxy_auto_paused IS TRUE AND status = 'error' AND COALESCE(error_message, '') = $3)
+	    AND NOT (COALESCE(extra->'okad_connection_test'->>'gated','false')='true' AND COALESCE(extra->'okad_connection_test'->>'state','')<>'success')
 	  RETURNING id
 	 )
 	 INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)

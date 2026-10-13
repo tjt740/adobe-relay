@@ -21,8 +21,14 @@ func (r *accountRepository) RecordConnectionTestResultIfCurrent(ctx context.Cont
 	if err != nil {
 		return false, err
 	}
+	var proxyUpdatedAt *time.Time
+	if a.Proxy != nil {
+		proxyUpdatedAt = &a.Proxy.UpdatedAt
+	}
 	result, err := r.sql.ExecContext(ctx, `UPDATE accounts SET extra=COALESCE(extra,'{}'::jsonb)||$2::jsonb,updated_at=NOW()
- WHERE id=$1 AND deleted_at IS NULL AND COALESCE(credentials->>'cookie','')=$3`, a.ID, string(payload), a.GetCredential("cookie"))
+ WHERE id=$1 AND deleted_at IS NULL AND COALESCE(credentials->>'cookie','')=$3
+ AND proxy_id IS NOT DISTINCT FROM $4
+ AND ($5::timestamptz IS NULL OR EXISTS(SELECT 1 FROM proxies WHERE id=accounts.proxy_id AND updated_at=$5))`, a.ID, string(payload), a.GetCredential("cookie"), a.ProxyID, proxyUpdatedAt)
 	if err != nil {
 		return false, err
 	}
