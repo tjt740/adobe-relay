@@ -6,7 +6,7 @@ on:
     inputs:
       phase:
         type: choice
-        options: [before, after]
+        options: [before, after, verify]
         default: after
         required: true
       application_sha:
@@ -43,12 +43,15 @@ jobs:
           opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15)
           target=root@173.234.15.150
           ssh "${opts[@]}" "$target" 'mkdir -p /opt/adobe-relay/releases/adobe-report-notifications-20261014'
-          scp "${opts[@]}" deploy/primary/adobe-report-{audit,policy,rollback}.py "$target:/opt/adobe-relay/releases/adobe-report-notifications-20261014/"
+          scp "${opts[@]}" deploy/primary/adobe-report-{audit,policy,rollback,runtime-verify}.py "$target:/opt/adobe-relay/releases/adobe-report-notifications-20261014/"
           if [ "$PHASE" = before ]; then
             ssh "${opts[@]}" "$target" "python3 /opt/adobe-relay/releases/adobe-report-notifications-20261014/adobe-report-audit.py before"
+          elif [ "$PHASE" = verify ]; then
+            ssh "${opts[@]}" "$target" "python3 /opt/adobe-relay/releases/adobe-report-notifications-20261014/adobe-report-runtime-verify.py '$EXPECTED_SHA'"
           else
             ssh "${opts[@]}" "$target" "python3 /opt/adobe-relay/releases/adobe-report-notifications-20261014/adobe-report-policy.py '$EXPECTED_SHA'"
             ssh "${opts[@]}" "$target" "python3 /opt/adobe-relay/releases/adobe-report-notifications-20261014/adobe-report-audit.py after '$EXPECTED_SHA'"
+            ssh "${opts[@]}" "$target" "python3 /opt/adobe-relay/releases/adobe-report-notifications-20261014/adobe-report-runtime-verify.py '$EXPECTED_SHA'"
           fi
       - name: Remove SSH key
         if: always()
