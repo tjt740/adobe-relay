@@ -13,7 +13,10 @@ assert app['State']['Health']['Status']=='healthy'
 for name,identity in before['other_containers'].items():assert inspect(name)['Id']==identity, 'Other service changed: '+name
 for path,h in before['config_hashes'].items():assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==h, 'Config changed: '+path
 assert sql("SELECT md5(COALESCE(string_agg(key||':'||value,',' ORDER BY key),'')) FROM settings WHERE key<>'ops_adobe_alert_mail_private'")==before['other_settings_hash'],'Other settings changed'
+env_without_image='\n'.join(line for line in Path('/opt/adobe-relay/shared/.env').read_text().splitlines() if not line.startswith('SUB2API_IMAGE='))
+assert hashlib.sha256(env_without_image.encode()).hexdigest()==before['env_without_image_hash'],'Environment changed'
 mail=json.loads(sql("SELECT value FROM settings WHERE key='ops_adobe_alert_mail_private'"))
+assert digest(mail)==before['configured_mail_hash'],'Private mail configuration changed'
 assert digest({k:v for k,v in mail.items() if k!='additional'})==before['primary_transport_hash']
 second=[a for a in mail.get('additional',[]) if a.get('recipient')=='lhaiming65@gmail.com'];assert len(second)==1 and digest(second[0])==before['additional_transport_hash']
 rule9=json.loads(sql('SELECT row_to_json(r) FROM ops_alert_rules r WHERE id=9'))
