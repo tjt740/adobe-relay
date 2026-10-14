@@ -70,4 +70,4 @@ go test -race -tags unit ./internal/service ./internal/handler ./internal/server
 go test -race -tags unit ./internal/pkg/adobe
 ```
 
-本次代码在独立分支 `codex/adobe-image-url-usage` 完成，未合并或部署。上线时仍只使用主服务器正式发布流程，先核对并行任务、现有应用版本与配置；不覆盖其他任务的 Okad 更新。
+本次代码在独立分支 `codex/adobe-image-url-usage` 完成，用户已授权合并 main、推送并部署主服务器。发布状态、实际应用版本和回滚方式见 [发布记录](../deploy/primary/adobe-image-url-usage-20261014.md)。上线仅使用主服务器正式发布流程，先核对并行任务、现有应用版本与配置；不覆盖其他任务的 Okad 更新。
