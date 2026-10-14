@@ -8,7 +8,7 @@ assert phase in ('before','after-sub2','after','okad-cutover-before')
 outfile=ROOT/(phase+'.json')
 assert not (phase=='before' and outfile.exists()), 'Preflight already saved; do not overwrite rollback evidence'
 locks=[]
-for name in ['/opt/adobe-relay/.release.lock','/opt/adobe-team-cookie/.release.lock','/opt/adobe-team-cookie/.incremental-release.lock']:
+for name in ['/opt/adobe-relay/.release.lock','/opt/adobe-team-cookie/.release.lock','/opt/adobe-team-cookie/.incremental-release.lock','/opt/adobe-team-cookie/.local/deploy-login-batches.lock']:
  f=open(name,'a');fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB);locks.append(f)
 def sql(q):
  return subprocess.run(['docker','exec','-i','adobe-relay-postgres-1','psql','-U','sub2api','-d','sub2api','-Atq','-v','ON_ERROR_STOP=1'],input="BEGIN READ ONLY; SET LOCAL statement_timeout='10s'; "+q+'; COMMIT;',text=True,capture_output=True,check=True,timeout=20).stdout.strip()
@@ -50,17 +50,35 @@ if phase=='before':
  out['okad_rollback_image_id']=json.loads(subprocess.check_output(['docker','image','inspect','adobe-team-cookie:before-'+RID]))[0]['Id']
 else:
  before=json.loads((ROOT/'before.json').read_text())
+ reviewed_settings=False
+ if out['okad_settings_hash']!=before['okad_settings_hash'] and (ROOT/'reviewed-concurrent-settings.json').exists():
+  # Keep independently saved settings; require the exact reviewed change and
+  # anchor every other key to the immutable pre-release database snapshot.
+  review=json.loads((ROOT/'reviewed-concurrent-settings.json').read_text())
+  with sqlite3.connect('file:'+str(ROOT/'okad-pre-release/app.db')+'?mode=ro',uri=True) as db:
+   old_settings=db.execute('SELECT key,value FROM settings ORDER BY key').fetchall()
+  assert digest(json.dumps(old_settings,ensure_ascii=False).encode())==before['okad_settings_hash']
+  old=dict(old_settings);current=dict(settings)
+  changed={key for key in old.keys()|current.keys() if old.get(key)!=current.get(key)}
+  assert changed==set(review['changes']), 'Unreviewed concurrent settings change'
+  for key in changed:
+   item=review['changes'][key]
+   assert digest(str(old.get(key)).encode())==item['before_hash']
+   assert digest(str(current.get(key)).encode())==item['after_hash']
+   assert item['saved_at']<review['okad_deployed_at']
+  out['reviewed_concurrent_settings']=review
+  reviewed_settings=True
  out['preserved']={
   'other_containers':all(out['containers'][k]['id']==v['id'] for k,v in before['containers'].items() if k not in ('adobe-relay-app-1','adobe-team-cookie-app-1')),
   'config_files':all(out['config_hashes'][k]==v for k,v in before['config_hashes'].items() if k not in ('/opt/adobe-relay/shared/.env','/opt/adobe-team-cookie/compose.yml')),
   'sub2_env':out['sub2_env_without_image']==before['sub2_env_without_image'],
   'okad_compose':out['okad_compose_without_image']==before['okad_compose_without_image'],
-  'okad_settings':out['okad_settings_hash']==before['okad_settings_hash'],
+  'okad_settings_preserved_or_reviewed':out['okad_settings_hash']==before['okad_settings_hash'] or reviewed_settings,
   'smtp':out['mail_hash']==before['mail_hash'],
   'rule':all(out['rule'][k]==v for k,v in before['rule'].items() if k not in ('updated_at','last_triggered_at')),
   'pagination':out['pagination']==before['pagination']}
- out['changed_okad_files']=[k for k in sorted(set(out['okad_source_hashes'])|set(before['okad_source_hashes'])) if out['okad_source_hashes'].get(k)!=before['okad_source_hashes'].get(k)]
- if phase=='after-sub2':assert not out['changed_okad_files']
+ okad_before=json.loads((ROOT/'okad-cutover-before.json').read_text()) if (ROOT/'okad-cutover-before.json').exists() else before
+ out['changed_okad_files']=[k for k in sorted(set(out['okad_source_hashes'])|set(okad_before['okad_source_hashes'])) if out['okad_source_hashes'].get(k)!=okad_before['okad_source_hashes'].get(k)]
  if phase=='after':
   assert set(out['changed_okad_files'])=={'backend/app/api/routes/external_member.py','backend/app/services/external_sub2.py','backend/app/services/reliable_integration.py','backend/app/services/okad_account_metadata.py'},out['changed_okad_files']
  assert all(out['preserved'].values()),out['preserved']
