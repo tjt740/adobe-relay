@@ -124,7 +124,11 @@ gpt-image 家族支持 OpenAI 的 `background`：`transparent` / `opaque` / `aut
 
 ### 返回格式与耗时诊断
 
-Adobe Cookie 直连显式指定 `response_format=b64_json` 时直接返回 Base64，跳过对象存储。指定 `url` 或省略时，启用对象存储则返回本站存储 URL；未启用或转存失败则保留 Base64 回退。不会直接暴露 Adobe 临时链接。转存直接使用图片字节，每个请求最多并行上传两张，返回顺序保持不变。
+Adobe Cookie 直连显式指定 `response_format=b64_json` 时直接返回 Base64，跳过对象存储。省略时保持原行为：启用对象存储则返回本站存储 URL，未启用或转存失败则回退 Base64。显式指定 `response_format=url` 时仍优先使用本站存储；存储不可用且交付图片与上游原图字节一致时，可返回 Adobe 临时签名 URL。转码或 JPEG 重压缩改变了图片、链接缺失或无效时，继续回退 Base64，避免链接指向错误格式。临时链接会过期，应及时下载；转存每个请求最多并行上传两张，返回顺序保持不变。
+
+响应增加 `model`、`usage`，以及从实际图片读取的 `size`、`output_format`；无法识别图片元信息或同批图片尺寸/格式不一致时，省略对应字段。GPT Image 还返回提交的 `background` 模式（默认 `auto`）和 `moderation: "auto"`，表示继续使用现有审核机制，不表示客户端的 `moderation=low` 已生效。
+
+`usage` **只使用上游明确返回的真实 token 计数**；不根据提示词、图片像素或 Firefly Credits 估算，不用零冒充未知。2026-10-14 两次 `gpt-image-2` 成功实测及出图后约一分钟的结果查询均未出现 token 用量，所以当前这条 Firefly 直连返回 `"usage": null`。这不同于 OpenAI/API Key 中转上游本身提供的用量。上游若提供合法的标准 `usage`，会随图片一起返回 `input_tokens`、`output_tokens`、`total_tokens` 及已知的文本/图片明细；多图只有每张均有完整总量才汇总，缺少的明细不补零。用量仅用于响应展示，原按张/分辨率计费不变。实测范围与响应证据见 [Adobe 图片响应适配核验](docs/ADOBE_IMAGE_RESPONSE_USAGE.md)。
 
 图片正常轮询间隔为 1 秒；临时故障退避为 3/6/12 秒，并遵守上游 `Retry-After`。视频正常轮询仍为 3 秒。`adobe_images.pipeline_completed` 日志包含提交、等待上游、下载、转码、转存、响应编码及写出耗时，以及请求质量和每张图的请求次数；多张图片并行阶段的耗时不能直接相加。此日志表示生成和处理已完成，交付失败另见 `adobe_images.delivery_failed` / `adobe_images.client_disconnected_after_generation`。
 

@@ -1,0 +1,15 @@
+{
+  "contentType": "<redacted string>",
+  "generationSessionId": "<redacted string>",
+  "modelId": "<redacted string>",
+  "modelVersion": "<redacted string>",
+  "outputs": [{
+    "image": {
+      "creativeCloudFileId": "<redacted string>",
+      "id": "<redacted string>",
+      "presignedUrl": "<redacted string>"
+    },
+    "seed": 979641
+  }],
+  "size": {"height": 1024, "width": 1024}
+}

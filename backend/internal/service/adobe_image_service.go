@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -183,7 +184,7 @@ func (s *AdobeImageService) GenerateCall(
 	upstreamCtx, cancelUpstream := context.WithTimeout(context.WithoutCancel(ctx), adobeImageDetachedTimeout)
 	defer cancelUpstream()
 	stageStarted = time.Now()
-	images, imageTimings, err := generateAdobeImages(upstreamCtx, client, token, account.GetCredential("arp_session_id"), adobe.ImagePayloadOptions{
+	generated, err := generateAdobeImages(upstreamCtx, client, token, account.GetCredential("arp_session_id"), adobe.ImagePayloadOptions{
 		Prompt:               req.Prompt,
 		AspectRatio:          conf.AspectRatio,
 		OutputResolution:     conf.OutputResolution,
@@ -197,16 +198,27 @@ func (s *AdobeImageService) GenerateCall(
 		Background:           req.Background,
 	}, n)
 	timings.GenerationMS = time.Since(stageStarted).Milliseconds()
-	timings.Images = imageTimings
 	if err != nil {
 		return nil, err
+	}
+	usage := aggregateAdobeImageUsage(generated)
+	images := make([][]byte, len(generated))
+	upstreamURLs := make([]string, len(generated))
+	timings.Images = make([]adobe.GenerationTimings, len(generated))
+	for i, result := range generated {
+		images[i], upstreamURLs[i], timings.Images[i] = result.Bytes, result.URL, result.Timings
+		result.Bytes, result.Raw = nil, nil // Release originals promptly after transcoding.
 	}
 	stageStarted = time.Now()
 	var conversions errgroup.Group
 	conversions.SetLimit(adobeFanOutConcurrency)
 	for i := range images {
 		conversions.Go(func() error {
-			images[i] = applyAdobeOutputFormat(images[i], outputFormat, req.OutputCompression)
+			converted := applyAdobeOutputFormat(images[i], outputFormat, req.OutputCompression)
+			if !bytes.Equal(converted, images[i]) {
+				upstreamURLs[i] = "" // The upstream URL would deliver the wrong bytes.
+			}
+			images[i] = converted
 			return nil
 		})
 	}
@@ -214,7 +226,10 @@ func (s *AdobeImageService) GenerateCall(
 	timings.TranscodeMS = time.Since(stageStarted).Milliseconds()
 
 	requestID := uuid.NewString()
-	body, err := s.buildResponseBody(upstreamCtx, requestID, images, adobeImageResponseQuality(conf, req.Quality), req.ResponseFormat, &timings)
+	body, err := s.buildResponseBody(upstreamCtx, requestID, images, adobeImageResponseQuality(conf, req.Quality), req.ResponseFormat, &timings, adobeImageResponseMetadata{
+		Request: req, GPTImage: conf.IsGPTImage(), UpstreamURLs: upstreamURLs,
+		Usage: usage,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -246,9 +261,8 @@ func generateAdobeImages(
 	arpSessionID string,
 	opts adobe.ImagePayloadOptions,
 	n int,
-) ([][]byte, []adobe.GenerationTimings, error) {
-	images := make([][]byte, n)
-	timings := make([]adobe.GenerationTimings, n)
+) ([]*adobe.GenerateResult, error) {
+	results := make([]*adobe.GenerateResult, n)
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(adobeFanOutConcurrency)
 	baseSeed := adobe.SeedNow()
@@ -269,15 +283,14 @@ func generateAdobeImages(
 				// 上游声称完成却没给出图片：按临时故障处理，交给 failover 换号，而不是写空响应。
 				return adobe.NewUpstreamTemporaryError("adobe returned an empty image", 0, adobe.ErrorTypeStatus)
 			}
-			images[i] = generated.Bytes
-			timings[i] = generated.Timings
+			results[i] = generated
 			return nil
 		})
 	}
 	if err := group.Wait(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return images, timings, nil
+	return results, nil
 }
 
 // uploadSourceImages 把图生图的源图上传到 Adobe，返回可放进 payload 的 image id。
@@ -325,7 +338,7 @@ func (s *AdobeImageService) uploadSourceImages(
 //
 // URL delivery uploads existing bytes directly. Base64 is encoded only if needed
 // by the client or as a fallback when storage is disabled/unavailable.
-func (s *AdobeImageService) buildResponseBody(ctx context.Context, requestID string, images [][]byte, quality, responseFormat string, timings *AdobeImageTimings) ([]byte, error) {
+func (s *AdobeImageService) buildResponseBody(ctx context.Context, requestID string, images [][]byte, quality, responseFormat string, timings *AdobeImageTimings, meta adobeImageResponseMetadata) ([]byte, error) {
 	if len(images) == 0 {
 		return nil, adobe.NewRequestError("adobe returned an empty image")
 	}
@@ -352,8 +365,14 @@ func (s *AdobeImageService) buildResponseBody(ctx context.Context, requestID str
 	defer func() { timings.EncodeMS = time.Since(started).Milliseconds() }()
 	data := make([]any, len(images))
 	timings.Delivery = "b64_json"
+	if len(urls) != len(images) && strings.EqualFold(strings.TrimSpace(responseFormat), "url") && validAdobeImageURLs(meta.UpstreamURLs, len(images)) {
+		urls = meta.UpstreamURLs
+		timings.Delivery = "upstream_url"
+	}
 	if len(urls) == len(images) {
-		timings.Delivery = "storage_url"
+		if timings.Delivery != "upstream_url" {
+			timings.Delivery = "storage_url"
+		}
 		for i, url := range urls {
 			data[i] = map[string]any{"url": url}
 		}
@@ -369,6 +388,7 @@ func (s *AdobeImageService) buildResponseBody(ctx context.Context, requestID str
 	if quality != "" {
 		payload["quality"] = quality
 	}
+	meta.addTo(payload, images)
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, adobe.NewRequestError(fmt.Sprintf("encode images response: %v", err))
