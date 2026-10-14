@@ -23,6 +23,12 @@ type OpsAdobeAlertMail struct {
 }
 
 func (s *EmailService) getAdobeAlertMail(ctx context.Context) (*OpsAdobeAlertMail, error) {
+	return s.getAdobeAlertMailForRecipient(ctx, "")
+}
+
+// Additional transports remain inside the same private setting. Each rule must
+// explicitly name its recipient; adding a mailbox never fans out an old rule.
+func (s *EmailService) getAdobeAlertMailForRecipient(ctx context.Context, recipient string) (*OpsAdobeAlertMail, error) {
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyOpsAdobeAlertMail)
 	if errors.Is(err, ErrSettingNotFound) || (err == nil && strings.TrimSpace(value) == "") {
 		return nil, nil
@@ -30,14 +36,33 @@ func (s *EmailService) getAdobeAlertMail(ctx context.Context) (*OpsAdobeAlertMai
 	if err != nil {
 		return nil, fmt.Errorf("Adobe alert mail settings unavailable")
 	}
-	var config OpsAdobeAlertMail
+	var config struct {
+		OpsAdobeAlertMail
+		Additional []OpsAdobeAlertMail `json:"additional"`
+	}
 	if json.Unmarshal([]byte(value), &config) != nil {
 		return nil, fmt.Errorf("invalid Adobe alert mail settings")
 	}
-	if _, err := OpsAlertEmailRecipient(map[string]any{"email_recipient": config.Recipient}); err != nil || config.Recipient == "" || config.SMTP.Host == "" || config.SMTP.Port < 1 || config.SMTP.Port > 65535 {
+	selected := &config.OpsAdobeAlertMail
+	if recipient = strings.TrimSpace(recipient); recipient != "" {
+		selected = nil
+		candidates := append([]OpsAdobeAlertMail{config.OpsAdobeAlertMail}, config.Additional...)
+		for i := range candidates {
+			if strings.EqualFold(strings.TrimSpace(candidates[i].Recipient), recipient) {
+				if selected != nil {
+					return nil, fmt.Errorf("ambiguous Adobe alert mail recipient")
+				}
+				selected = &candidates[i]
+			}
+		}
+		if selected == nil {
+			return nil, fmt.Errorf("Adobe alert mail recipient is not configured")
+		}
+	}
+	if _, err := OpsAlertEmailRecipient(map[string]any{"email_recipient": selected.Recipient}); err != nil || selected.Recipient == "" || selected.SMTP.Host == "" || selected.SMTP.Port < 1 || selected.SMTP.Port > 65535 {
 		return nil, fmt.Errorf("invalid Adobe alert mail settings")
 	}
-	return &config, nil
+	return selected, nil
 }
 
 // This port reads saved business/test telemetry only. It must never probe Adobe,

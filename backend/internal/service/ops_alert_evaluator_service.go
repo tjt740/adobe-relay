@@ -814,10 +814,11 @@ func (s *OpsAlertEvaluatorService) maybeSendAlertEmail(ctx context.Context, runt
 	}
 
 	recipients := emailCfg.Alert.Recipients
-	if recipient, err := OpsAlertEmailRecipient(rule.Filters); err != nil {
+	ruleRecipient, err := OpsAlertEmailRecipient(rule.Filters)
+	if err != nil {
 		return false
-	} else if recipient != "" {
-		recipients = []string{recipient}
+	} else if ruleRecipient != "" {
+		recipients = []string{ruleRecipient}
 	}
 	if len(recipients) == 0 {
 		return false
@@ -842,7 +843,7 @@ func (s *OpsAlertEvaluatorService) maybeSendAlertEmail(ctx context.Context, runt
 	}
 	var adobeMail *OpsAdobeAlertMail
 	if rule.MetricType == OpsMetricAdobeErrorAccounts {
-		adobeMail, err = s.emailService.getAdobeAlertMail(ctx)
+		adobeMail, err = s.emailService.getAdobeAlertMailForRecipient(ctx, ruleRecipient)
 		if err != nil {
 			return false
 		}
