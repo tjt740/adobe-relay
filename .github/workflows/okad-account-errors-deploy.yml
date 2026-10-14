@@ -1,0 +1,37 @@
+name: Finish approved Okad account errors release
+on:
+  push:
+    branches: [codex/okad-account-errors-deploy]
+permissions:
+  contents: read
+concurrency:
+  group: adobe-relay-production
+  cancel-in-progress: false
+jobs:
+  finish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure primary SSH
+        env:
+          SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+      - name: Preserve runtime overlays, deploy in a safe window and verify
+        run: |
+          set -euo pipefail
+          opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15)
+          target=root@173.234.15.150
+          root=/opt/adobe-relay/releases/okad-account-errors-20261014
+          scp "${opts[@]}" deploy/primary/account-errors-{finish,release,okad-release,business-verify,verify}.py deploy/primary/image-response-release.py "$target:$root/"
+          scp "${opts[@]}" deploy/primary/account-errors-stage.tar.gz "$target:$root/"
+          ssh "${opts[@]}" "$target" "tar -xzf '$root/account-errors-stage.tar.gz' -C '$root' && python3 '$root/account-errors-finish.py'"
+      - name: Remove runner SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
