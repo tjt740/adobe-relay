@@ -36,6 +36,8 @@ func newOkadRecoveryPostgres(t *testing.T) *sql.DB {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 	_, err = db.Exec(`CREATE TABLE accounts(id bigint PRIMARY KEY,platform text,type text,status text,error_message text,schedulable bool,credentials jsonb,extra jsonb,proxy_id bigint,expires_at timestamptz,deleted_at timestamptz,updated_at timestamptz);
+ ALTER TABLE accounts ADD COLUMN rate_limit_reset_at timestamptz, ADD COLUMN overload_until timestamptz,
+ ADD COLUMN temp_unschedulable_until timestamptz, ADD COLUMN temp_unschedulable_reason text;
  CREATE TABLE account_groups(account_id bigint,group_id bigint);
  CREATE TABLE proxies(id bigint PRIMARY KEY,updated_at timestamptz DEFAULT NOW());
  CREATE TABLE scheduler_outbox(event_type text,account_id bigint,group_id bigint,payload jsonb,dedup_key text);
@@ -47,6 +49,11 @@ func newOkadRecoveryPostgres(t *testing.T) *sql.DB {
 		_, err = db.Exec(string(migration))
 		require.NoError(t, err, name)
 	}
+	// Inventory reads the passive health table added after the original link.
+	migration, err := os.ReadFile("../../migrations/248_adobe_account_health.sql")
+	require.NoError(t, err)
+	_, err = db.Exec(string(migration))
+	require.NoError(t, err)
 	return db
 }
 

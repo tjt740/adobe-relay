@@ -153,7 +153,11 @@ func (r *accountRepository) ListOkadInventory(ctx context.Context, after int64, 
 	}
 	rows, err := r.sql.QueryContext(ctx, `SELECT a.id,COALESCE(a.credentials->>'email',a.extra->>'adobeteam_external_email',''),a.status,a.schedulable,a.proxy_id,COALESCE(a.extra->'okad','{}'::jsonb),COALESCE(r.attempts,0),r.next_attempt_at,a.updated_at,
  COALESCE(a.extra->'okad_connection_test','{}'::jsonb)||jsonb_build_object('last_check_success',a.extra->'last_check_success','last_check_status_code',a.extra->'last_check_status_code','last_check_at',a.extra->'last_check_at'),
- COALESCE(a.extra->>'adobeteam_external_email',''),COALESCE(a.extra->'okad_account','{}'::jsonb)
+ COALESCE(a.extra->>'adobeteam_external_email',''),COALESCE(a.extra->'okad_account','{}'::jsonb),
+ jsonb_build_object('errors',COALESCE((SELECT jsonb_agg(jsonb_build_object('code',h.status_code,'reason',h.reason,'source',h.source,'stage',h.stage,'failed_at',h.failed_at) ORDER BY h.failed_at DESC,h.scope)
+ FROM adobe_account_health h WHERE h.account_id=a.id AND h.failed_at IS NOT NULL AND (h.success_started_at IS NULL OR h.success_started_at<=h.failed_at)),'[]'::jsonb),
+ 'last_success_at',(SELECT MAX(h.success_at) FROM adobe_account_health h WHERE h.account_id=a.id)),
+ COALESCE(NULLIF(a.error_message,''),CASE WHEN a.temp_unschedulable_until>NOW() THEN a.temp_unschedulable_reason END,''),a.rate_limit_reset_at,a.overload_until
  FROM accounts a LEFT JOIN adobe_cookie_recovery_attempts r ON r.account_id=a.id
  WHERE a.deleted_at IS NULL AND a.platform='adobe' AND a.type='oauth' AND a.id>$1 AND ($3::timestamptz IS NULL OR a.updated_at>=$3)
  ORDER BY a.id LIMIT $2`, after, limit, since)
@@ -165,8 +169,10 @@ func (r *accountRepository) ListOkadInventory(ctx context.Context, after int64, 
 	for rows.Next() {
 		var item service.OkadInventoryItem
 		var raw []byte
-		var checkRaw, metadataRaw []byte
-		if err := rows.Scan(&item.ID, &item.Email, &item.Status, &item.Schedulable, &item.ProxyID, &raw, &item.Attempts, &item.NextAttemptAt, &item.UpdatedAt, &checkRaw, &item.ImportedEmail, &metadataRaw); err != nil {
+		var checkRaw, metadataRaw, healthRaw []byte
+		var message string
+		var rateLimit, overload *time.Time
+		if err := rows.Scan(&item.ID, &item.Email, &item.Status, &item.Schedulable, &item.ProxyID, &raw, &item.Attempts, &item.NextAttemptAt, &item.UpdatedAt, &checkRaw, &item.ImportedEmail, &metadataRaw, &healthRaw, &message, &rateLimit, &overload); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(raw, &item.State); err != nil {
@@ -178,6 +184,10 @@ func (r *accountRepository) ListOkadInventory(ctx context.Context, after int64, 
 		if err := json.Unmarshal(metadataRaw, &item.AccountMetadata); err != nil {
 			return nil, err
 		}
+		if err := json.Unmarshal(healthRaw, &item.AccountHealth); err != nil {
+			return nil, err
+		}
+		item.AccountHealth = service.ProjectOkadAccountHealth(item.AccountHealth, message, item.ConnectionTest, rateLimit, overload, time.Now())
 		out = append(out, item)
 	}
 	return out, rows.Err()
