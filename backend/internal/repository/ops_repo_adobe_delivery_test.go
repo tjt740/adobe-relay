@@ -62,3 +62,25 @@ func TestAdobeDeliveryPostgresConcurrentClaimsCooldownAndRestart(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 }
+
+func TestAdobeDeliveryPostgresRulesHaveIndependentReceipts(t *testing.T) {
+	db := newOkadRecoveryPostgres(t)
+	_, err := db.Exec(`CREATE TABLE ops_alert_events(id bigint PRIMARY KEY,rule_id bigint,status text,email_sent boolean,fired_at timestamptz,dimensions jsonb);
+ INSERT INTO ops_alert_events VALUES (1,9,'firing',false,NOW(),'{}'),(2,10,'firing',false,NOW(),'{}'),(3,10,'firing',false,NOW(),'{}');`)
+	require.NoError(t, err)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	repo := &opsRepository{db: db}
+	for _, item := range []struct{ event, rule int64 }{{1, 9}, {2, 10}} {
+		allowed, err := repo.ClaimAdobeAlertEmail(ctx, item.event, item.rule, now, time.Hour)
+		require.NoError(t, err)
+		require.True(t, allowed)
+		require.NoError(t, repo.FinishAdobeAlertEmail(ctx, item.event, true))
+	}
+	allowed, err := repo.ClaimAdobeAlertEmail(ctx, 3, 10, now.Add(59*time.Minute), time.Hour)
+	require.NoError(t, err)
+	require.False(t, allowed)
+	allowed, err = repo.ClaimAdobeAlertEmail(ctx, 3, 10, now.Add(time.Hour), time.Hour)
+	require.NoError(t, err)
+	require.True(t, allowed)
+}
