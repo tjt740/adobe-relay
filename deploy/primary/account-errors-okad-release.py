@@ -53,13 +53,19 @@ def config_hashes():
     return {name: digest(APP / name) for name in ('.env', 'compose.yml', 'compose.override.yml')}
 
 
+def delivery_is_busy(state, lease, due, now):
+    # Future durable retries survive restart and are not active HTTP work.
+    # Drain current leases, due retries, and imminent first deliveries.
+    return lease > now or (state == 'pending' and due <= now + 60) or (state == 'retry' and due <= now)
+
+
 def require_idle():
     with sqlite3.connect('file:' + str(APP / 'data/app.db') + '?mode=ro', uri=True) as db:
         active = db.execute("SELECT id FROM job_records WHERE deleted=0 AND status IN ('running','pausing','paused','cancelling')").fetchall()
         active += db.execute("SELECT id FROM integration_recovery_jobs WHERE state IN ('queued','running')").fetchall()
         now = time.time()
         deliveries = db.execute('SELECT source_key,target,state,lease_until,next_at FROM integration_deliveries').fetchall()
-        busy = [(source,state) for source,target,state,lease,due in deliveries if lease>now or (state in ('pending','retry') and due<=now+60)]
+        busy = [(source,state) for source,target,state,lease,due in deliveries if delivery_is_busy(state,lease,due,now)]
         pending = []
         for mid,raw in db.execute('SELECT id,sub2_links FROM external_members'):
             for target,link in json.loads(raw or '{}').items():
@@ -88,7 +94,8 @@ def switch(image):
     compose = ['docker', 'compose', '--project-directory', str(APP)]
     for path in record['compose_files']:
         compose += ['-f', path]
-    run(compose + ['up', '-d', '--no-build', '--no-deps', '--wait', '--wait-timeout', '180', 'app'])
+    # Graceful shutdown stops the outbox loop and lets any just-started work drain.
+    run(compose + ['up', '-d', '--no-build', '--no-deps', '--timeout', '300', '--wait', '--wait-timeout', '180', 'app'])
     assert inspect('adobe-team-cookie-app-1')['Config']['Image'] == image
     with urllib.request.urlopen('http://127.0.0.1:9500/api/health', timeout=15) as response:
         assert json.load(response)['status'] == 'ok'

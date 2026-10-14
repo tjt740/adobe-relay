@@ -1,4 +1,4 @@
-name: Inspect approved account errors release
+name: Check durable retry safety for approved release
 on:
   push:
     branches: [codex/okad-account-errors-inspect]
@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@v4
       - name: Read release progress without changing state
         env:
           SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
@@ -35,6 +36,28 @@ jobs:
               data=json.loads((root/name).read_text())
               if name=='okad-prepared.json':data={k:data[k] for k in ('image','rollback','prepared_at')}
               print(name,json.dumps(data))
+          PY
+      - name: Apply reviewed release guard without changing application or business data
+        run: |
+          set -euo pipefail
+          opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20)
+          root=/opt/adobe-relay/releases/okad-account-errors-20261014
+          scp "${opts[@]}" deploy/primary/account-errors-okad-release.py "root@173.234.15.150:$root/account-errors-okad-release.py.next"
+          ssh "${opts[@]}" root@173.234.15.150 python3 - <<'PY'
+          import fcntl,hashlib,json,pathlib
+          root=pathlib.Path('/opt/adobe-relay/releases/okad-account-errors-20261014')
+          locks=[]
+          for path in ['/opt/adobe-relay/.release.lock','/opt/adobe-team-cookie/.release.lock','/opt/adobe-team-cookie/.incremental-release.lock','/opt/adobe-team-cookie/.local/deploy-login-batches.lock']:
+              f=open(path,'a');fcntl.flock(f,fcntl.LOCK_EX);locks.append(f)
+          if (root/'okad-deployed.json').exists():
+              print('Already deployed; no guard changed')
+              raise SystemExit(0)
+          path=root/'account-errors-okad-release.py'
+          assert hashlib.sha256(path.read_bytes()).hexdigest()=='20c420a20dbc14ded6055c4f4162fb9898ca81a9fccb3cfb0ce7e308d3b484f5'
+          assert json.loads((root/'okad-prepared.json').read_text())['image']=='adobe-team-cookie:c6e00d968d521d2b157eb0d3470a78faabd0e64d'
+          (root/'account-errors-okad-release.py.original').write_bytes(path.read_bytes())
+          (root/'account-errors-okad-release.py.next').replace(path)
+          print('Reviewed guard installed atomically; application, configuration and database unchanged')
           PY
       - name: Remove SSH key
         if: always()
