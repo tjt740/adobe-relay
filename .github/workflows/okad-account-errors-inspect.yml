@@ -1,0 +1,41 @@
+name: Inspect approved account errors release
+on:
+  push:
+    branches: [codex/okad-account-errors-inspect]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read release progress without changing state
+        env:
+          SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          ssh -i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 root@173.234.15.150 python3 - <<'PY'
+          import pathlib,json,sqlite3,time,subprocess
+          root=pathlib.Path('/opt/adobe-relay/releases/okad-account-errors-20261014')
+          out={'audit_files': sorted(p.name for p in root.glob('*.json'))}
+          out['containers']=[{'name':d['Name'],'image':d['Config']['Image'],'health':d['State'].get('Health',{}).get('Status')} for d in json.loads(subprocess.check_output(['docker','inspect','adobe-relay-app-1','adobe-team-cookie-app-1']))]
+          with sqlite3.connect('file:/opt/adobe-team-cookie/data/app.db?mode=ro',uri=True) as db:
+              out['jobs']=db.execute("SELECT id,type,status,target,success,fail FROM job_records WHERE deleted=0 AND status IN ('running','pausing','paused','cancelling')").fetchall()
+              out['recoveries']=db.execute("SELECT state,count(*) FROM integration_recovery_jobs WHERE state IN ('queued','running') GROUP BY state").fetchall()
+              out['deliveries']=db.execute("SELECT state,count(*),min(next_at),max(next_at),max(lease_until) FROM integration_deliveries WHERE lease_until>? OR (state IN ('pending','retry') AND next_at<=?) GROUP BY state",(time.time(),time.time()+60)).fetchall()
+          out['now']=time.time()
+          print(json.dumps(out))
+          for name in ('okad-prepared.json','okad-deployed.json','health-filter-verification.json','business-verification.json','okad-data-verification.json'):
+              if not (root/name).exists():continue
+              data=json.loads((root/name).read_text())
+              if name=='okad-prepared.json':data={k:data[k] for k in ('image','rollback','prepared_at')}
+              print(name,json.dumps(data))
+          PY
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
