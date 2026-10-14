@@ -18,12 +18,18 @@ import (
 // Runtime filters must run before pagination: current concurrency lives in Redis,
 // while connection-test results and current errors live on the account.
 type accountRuntimeFilters struct {
-	Capacity       string `json:"capacity"`
-	ConcurrencyMin *int   `json:"concurrency_min"`
-	ConcurrencyMax *int   `json:"concurrency_max"`
+	OkadAccountType string `json:"okad_account_type"`
+	Capacity        string `json:"capacity"`
+	ConcurrencyMin  *int   `json:"concurrency_min"`
+	ConcurrencyMax  *int   `json:"concurrency_max"`
 }
 
 func (f accountRuntimeFilters) validate() error {
+	switch f.OkadAccountType {
+	case "", "company", "non_company", "unknown":
+	default:
+		return infraerrors.BadRequest("INVALID_OKAD_ACCOUNT_TYPE", "invalid Okad account type")
+	}
 	switch f.Capacity {
 	case "", "idle", "in_use", "full":
 	default:
@@ -38,7 +44,7 @@ func (f accountRuntimeFilters) validate() error {
 }
 
 func runtimeFiltersFromQuery(c *gin.Context) (accountRuntimeFilters, error) {
-	f := accountRuntimeFilters{Capacity: strings.TrimSpace(c.Query("capacity"))}
+	f := accountRuntimeFilters{Capacity: strings.TrimSpace(c.Query("capacity")), OkadAccountType: strings.TrimSpace(c.Query("okad_account_type"))}
 	for key, target := range map[string]**int{"concurrency_min": &f.ConcurrencyMin, "concurrency_max": &f.ConcurrencyMax} {
 		if raw := strings.TrimSpace(c.Query(key)); raw != "" {
 			value, err := strconv.Atoi(raw)
@@ -60,7 +66,7 @@ func isRuntimeAccountStatus(status string) bool {
 }
 
 func (f accountRuntimeFilters) needed(status string) bool {
-	return isRuntimeAccountStatus(status) || f.Capacity != "" || f.ConcurrencyMin != nil || f.ConcurrencyMax != nil
+	return f.OkadAccountType != "" || isRuntimeAccountStatus(status) || f.Capacity != "" || f.ConcurrencyMin != nil || f.ConcurrencyMax != nil
 }
 
 var timeoutStatusPattern = regexp.MustCompile(`\b408\b`)
@@ -168,6 +174,12 @@ func (h *AccountHandler) listAccountsWithRuntimeFilters(ctx context.Context, pag
 	if err := f.validate(); err != nil {
 		return nil, 0, nil, err
 	}
+	if f.OkadAccountType != "" {
+		if (platform != "" && platform != service.PlatformAdobe) || (accountType != "" && accountType != service.AccountTypeOAuth) {
+			return []service.Account{}, 0, nil, nil
+		}
+		platform, accountType = service.PlatformAdobe, service.AccountTypeOAuth
+	}
 	sortCapacity := strings.EqualFold(strings.TrimSpace(sortBy), "capacity")
 	if !sortCapacity && !f.needed(status) && page > 0 {
 		accounts, total, err := h.adminService.ListAccounts(ctx, page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
@@ -189,7 +201,7 @@ func (h *AccountHandler) listAccountsWithRuntimeFilters(ctx context.Context, pag
 	now := time.Now()
 	matched := make([]service.Account, 0, len(accounts))
 	for _, a := range accounts {
-		if matchesRuntimeAccountStatus(a, status, now) && (accountRuntimeFilters{ConcurrencyMin: f.ConcurrencyMin, ConcurrencyMax: f.ConcurrencyMax}).matchesCapacity(a, 0) {
+		if (f.OkadAccountType == "" || service.OkadAccountKind(&a) == f.OkadAccountType) && matchesRuntimeAccountStatus(a, status, now) && (accountRuntimeFilters{ConcurrencyMin: f.ConcurrencyMin, ConcurrencyMax: f.ConcurrencyMax}).matchesCapacity(a, 0) {
 			matched = append(matched, a)
 		}
 	}

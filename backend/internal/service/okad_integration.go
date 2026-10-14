@@ -22,16 +22,18 @@ type OkadCredentialUpdate struct {
 }
 
 type OkadInventoryItem struct {
-	ID             int64          `json:"id"`
-	Email          string         `json:"email"`
-	Status         string         `json:"status"`
-	Schedulable    bool           `json:"schedulable"`
-	ProxyID        *int64         `json:"proxy_id"`
-	State          map[string]any `json:"integration"`
-	ConnectionTest map[string]any `json:"connection_test,omitempty"`
-	Attempts       int            `json:"attempts"`
-	NextAttemptAt  *time.Time     `json:"next_attempt_at,omitempty"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	ImportedEmail   string         `json:"imported_email,omitempty"`
+	AccountMetadata map[string]any `json:"account_metadata,omitempty"`
+	ID              int64          `json:"id"`
+	Email           string         `json:"email"`
+	Status          string         `json:"status"`
+	Schedulable     bool           `json:"schedulable"`
+	ProxyID         *int64         `json:"proxy_id"`
+	State           map[string]any `json:"integration"`
+	ConnectionTest  map[string]any `json:"connection_test,omitempty"`
+	Attempts        int            `json:"attempts"`
+	NextAttemptAt   *time.Time     `json:"next_attempt_at,omitempty"`
+	UpdatedAt       time.Time      `json:"updated_at"`
 }
 
 type OkadIntegrationRepository interface {

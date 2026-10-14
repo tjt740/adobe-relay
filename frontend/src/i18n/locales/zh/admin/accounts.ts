@@ -272,6 +272,13 @@ export default {
         batchCompleted: '已完成 {count} 个账号的倍率探测',
         batchPartial: '倍率探测部分完成：成功 {success} 个，失败 {failed} 个'
       },
+      allOkadTypes: '全部账号归属',
+      okadCompany: 'Okad · 公司',
+      okadNonCompany: 'Okad · 非公司',
+      okadUnknown: 'Okad · 待识别',
+      okadCompanyTag: '公司',
+      okadCompanyHint: '与 Okad 的公司标记一致：验证码通过公司取信服务获取',
+      okadTypeHint: '按 Okad 同步的标记筛选；缺少或不匹配的来源记录显示为待识别',
       allPrivacyModes: '全部Privacy状态',
       privacyUnset: '未设置',
       privacyTrainingOff: '已关闭训练数据共享',

@@ -435,6 +435,13 @@ export default {
         batchCompleted: 'Probed {count} account(s)',
         batchPartial: 'Probe partially completed: {success} succeeded, {failed} failed'
       },
+      allOkadTypes: 'All account sources',
+      okadCompany: 'Okad · Company',
+      okadNonCompany: 'Okad · Non-company',
+      okadUnknown: 'Okad · Unclassified',
+      okadCompanyTag: 'Company',
+      okadCompanyHint: 'Matches the Okad company tag: verification codes use the company mail service',
+      okadTypeHint: 'Filter by synced Okad classification; missing or mismatched records remain unclassified',
       allPrivacyModes: 'All Privacy States',
       privacyUnset: 'Unset',
       privacyTrainingOff: 'Training data sharing disabled',
