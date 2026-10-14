@@ -1,4 +1,5 @@
 import copy
+import ast
 import importlib.util
 from pathlib import Path
 import unittest
@@ -9,6 +10,21 @@ spec.loader.exec_module(release)
 
 
 class AccountErrorsRollbackTest(unittest.TestCase):
+    def test_only_future_durable_retries_can_survive_switch(self):
+        tree = ast.parse(Path(__file__).with_name('account-errors-okad-release.py').read_text())
+        function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'delivery_is_busy')
+        scope = {}
+        exec(compile(ast.Module(body=[function], type_ignores=[]), '<idle guard>', 'exec'), scope)
+        busy = scope['delivery_is_busy']
+        for state, lease, due, expected in [
+            ('retry', 0, 101, False), ('retry', 0, 100, True),
+            ('retry', 150, 900, True), ('ready', 150, 0, True),
+            ('pending', 0, 150, True), ('pending', 0, 161, False),
+            ('ready', 0, 0, False),
+        ]:
+            with self.subTest(state=state, lease=lease, due=due):
+                self.assertEqual(busy(state, lease, due, 100), expected)
+
     def setUp(self):
         self.sha = 'a' * 40
         self.before = {'containers': {release.base.APP: {'image': release.OLD_IMAGE, 'id': 'old', 'image_id': 'old'},
