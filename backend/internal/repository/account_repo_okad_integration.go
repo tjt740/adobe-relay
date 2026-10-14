@@ -152,7 +152,8 @@ func (r *accountRepository) ListOkadInventory(ctx context.Context, after int64, 
 		limit = 200
 	}
 	rows, err := r.sql.QueryContext(ctx, `SELECT a.id,COALESCE(a.credentials->>'email',a.extra->>'adobeteam_external_email',''),a.status,a.schedulable,a.proxy_id,COALESCE(a.extra->'okad','{}'::jsonb),COALESCE(r.attempts,0),r.next_attempt_at,a.updated_at,
- COALESCE(a.extra->'okad_connection_test','{}'::jsonb)||jsonb_build_object('last_check_success',a.extra->'last_check_success','last_check_status_code',a.extra->'last_check_status_code','last_check_at',a.extra->'last_check_at')
+ COALESCE(a.extra->'okad_connection_test','{}'::jsonb)||jsonb_build_object('last_check_success',a.extra->'last_check_success','last_check_status_code',a.extra->'last_check_status_code','last_check_at',a.extra->'last_check_at'),
+ COALESCE(a.extra->>'adobeteam_external_email',''),COALESCE(a.extra->'okad_account','{}'::jsonb)
  FROM accounts a LEFT JOIN adobe_cookie_recovery_attempts r ON r.account_id=a.id
  WHERE a.deleted_at IS NULL AND a.platform='adobe' AND a.type='oauth' AND a.id>$1 AND ($3::timestamptz IS NULL OR a.updated_at>=$3)
  ORDER BY a.id LIMIT $2`, after, limit, since)
@@ -164,14 +165,17 @@ func (r *accountRepository) ListOkadInventory(ctx context.Context, after int64, 
 	for rows.Next() {
 		var item service.OkadInventoryItem
 		var raw []byte
-		var checkRaw []byte
-		if err := rows.Scan(&item.ID, &item.Email, &item.Status, &item.Schedulable, &item.ProxyID, &raw, &item.Attempts, &item.NextAttemptAt, &item.UpdatedAt, &checkRaw); err != nil {
+		var checkRaw, metadataRaw []byte
+		if err := rows.Scan(&item.ID, &item.Email, &item.Status, &item.Schedulable, &item.ProxyID, &raw, &item.Attempts, &item.NextAttemptAt, &item.UpdatedAt, &checkRaw, &item.ImportedEmail, &metadataRaw); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(raw, &item.State); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(checkRaw, &item.ConnectionTest); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(metadataRaw, &item.AccountMetadata); err != nil {
 			return nil, err
 		}
 		out = append(out, item)

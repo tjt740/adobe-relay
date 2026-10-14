@@ -51,6 +51,7 @@ export async function list(
     group?: string
     search?: string
     privacy_mode?: string
+    okad_account_type?: string
     capacity?: string
     concurrency_min?: string
     concurrency_max?: string
@@ -96,6 +97,7 @@ export async function getUpstreamBillingRatesWithEtag(
     group?: string
     search?: string
     privacy_mode?: string
+    okad_account_type?: string
     capacity?: string
     concurrency_min?: string
     concurrency_max?: string
@@ -132,6 +134,7 @@ export async function listWithEtag(
     group?: string
     search?: string
     privacy_mode?: string
+    okad_account_type?: string
     capacity?: string
     concurrency_min?: string
     concurrency_max?: string
@@ -745,6 +748,7 @@ export async function exportData(options?: {
     status?: string
     group?: string
     privacy_mode?: string
+    okad_account_type?: string
     capacity?: string
     concurrency_min?: string
     concurrency_max?: string
@@ -758,12 +762,13 @@ export async function exportData(options?: {
   if (options?.ids && options.ids.length > 0) {
     params.ids = options.ids.join(',')
   } else if (options?.filters) {
-    const { platform, type, status, group, privacy_mode, capacity, concurrency_min, concurrency_max, search, sort_by, sort_order } = options.filters
+    const { platform, type, status, group, privacy_mode, okad_account_type, capacity, concurrency_min, concurrency_max, search, sort_by, sort_order } = options.filters
     if (platform) params.platform = platform
     if (type) params.type = type
     if (status) params.status = status
     if (group) params.group = group
     if (privacy_mode) params.privacy_mode = privacy_mode
+    if (okad_account_type) params.okad_account_type = okad_account_type
     if (capacity) params.capacity = capacity
     if (concurrency_min) params.concurrency_min = concurrency_min
     if (concurrency_max) params.concurrency_max = concurrency_max

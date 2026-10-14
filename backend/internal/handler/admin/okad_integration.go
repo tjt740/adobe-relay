@@ -97,3 +97,30 @@ func (h *AccountHandler) OkadVerifyCredential(c *gin.Context) {
 	}
 	response.Success(c, gin.H{"id": a.ID, "status": a.Status, "schedulable": a.Schedulable, "integration": a.Extra["okad"]})
 }
+
+// OkadSyncAccountMetadata never acquires credentials, queues tests or changes scheduling.
+func (h *AccountHandler) OkadSyncAccountMetadata(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 200000)
+	var body struct {
+		Items []service.OkadAccountMetadataUpdate `json:"items"`
+	}
+	if c.ShouldBindJSON(&body) != nil {
+		response.BadRequest(c, "invalid account metadata")
+		return
+	}
+	admin, ok := h.adminService.(service.OkadAccountMetadataAdmin)
+	if !ok {
+		response.Error(c, 503, "账号标记同步暂不可用")
+		return
+	}
+	updated, err := admin.SyncOkadAccountMetadata(c.Request.Context(), body.Items)
+	if err != nil {
+		if errors.Is(err, service.ErrOkadConflict) {
+			response.BadRequest(c, "invalid account metadata")
+		} else {
+			response.Error(c, 503, "账号标记同步失败，请稍后重试")
+		}
+		return
+	}
+	response.Success(c, gin.H{"updated": updated})
+}

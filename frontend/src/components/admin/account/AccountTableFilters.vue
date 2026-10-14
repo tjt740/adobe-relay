@@ -10,6 +10,7 @@
     <Select :model-value="filters.platform" class="w-40" :options="pOpts" @update:model-value="updatePlatform" @change="$emit('change')" />
     <Select :model-value="filters.type" class="w-40" :options="tOpts" @update:model-value="updateType" @change="$emit('change')" />
     <Select :model-value="filters.status" class="w-40" :options="sOpts" @update:model-value="updateStatus" @change="$emit('change')" />
+    <Select :model-value="filters.okad_account_type || ''" class="w-44" :options="okadOpts" :title="t('admin.accounts.okadTypeHint')" @update:model-value="updateOkadType" @change="$emit('change')" />
     <slot name="capacity" />
     <Select :model-value="filters.privacy_mode" class="w-40" :options="privacyOpts" @update:model-value="updatePrivacyMode" @change="$emit('change')" />
     <Select :model-value="filters.group" class="w-40" :options="gOpts" @update:model-value="updateGroup" @change="$emit('change')" />
@@ -25,6 +26,13 @@ const emit = defineEmits(['update:searchQuery', 'update:filters', 'change']); co
 const updatePlatform = (value: string | number | boolean | null) => { emit('update:filters', { ...props.filters, platform: value }) }
 const updateType = (value: string | number | boolean | null) => { emit('update:filters', { ...props.filters, type: value }) }
 const updateStatus = (value: string | number | boolean | null) => { emit('update:filters', { ...props.filters, status: value }) }
+const updateOkadType = (value: string | number | boolean | null) => { emit('update:filters', { ...props.filters, okad_account_type: value }) }
+const okadOpts = computed(() => [
+  { value: '', label: t('admin.accounts.allOkadTypes') },
+  { value: 'company', label: t('admin.accounts.okadCompany') },
+  { value: 'non_company', label: t('admin.accounts.okadNonCompany') },
+  { value: 'unknown', label: t('admin.accounts.okadUnknown') }
+])
 const updatePrivacyMode = (value: string | number | boolean | null) => { emit('update:filters', { ...props.filters, privacy_mode: value }) }
 const updateGroup = (value: string | number | boolean | null) => { emit('update:filters', { ...props.filters, group: value }) }
 const pOpts = computed(() => [{ value: '', label: t('admin.accounts.allPlatforms') }, ...CONCRETE_PLATFORM_OPTIONS])

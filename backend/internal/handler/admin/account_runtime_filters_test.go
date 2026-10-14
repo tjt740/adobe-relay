@@ -196,3 +196,63 @@ func TestAccountRuntimeBulkAndExportPreserveFilters(t *testing.T) {
 	require.Len(t, rows, 1)
 	require.EqualValues(t, 2, rows[0].ID)
 }
+
+func TestOkadCompanyFilterBeforePaginationExportAndBulk(t *testing.T) {
+	svc := newStubAdminService()
+	svc.accounts = nil
+	for i := 1; i <= 1205; i++ {
+		extra := map[string]any{"adobeteam_external_email": "company@outlook.com"}
+		if i > 1200 {
+			extra["okad_account"] = map[string]any{"issuer": "site", "source_key": "external:1", "email": "company@outlook.com", "is_company": true}
+		}
+		svc.accounts = append(svc.accounts, service.Account{ID: int64(i), Platform: "adobe", Type: "oauth", Credentials: map[string]any{"email": "company@outlook.com"}, Extra: extra})
+	}
+	h := &AccountHandler{adminService: svc}
+	f := accountRuntimeFilters{OkadAccountType: "company"}
+	rows, total, _, err := h.listAccountsWithRuntimeFilters(context.Background(), 2, 2, "adobe", "oauth", "", "", 0, "", "id", "asc", f)
+	require.NoError(t, err)
+	require.EqualValues(t, 5, total)
+	require.Len(t, rows, 2)
+	require.EqualValues(t, 1203, rows[0].ID)
+	all, total, _, err := h.listAccountsWithRuntimeFilters(context.Background(), 0, 0, "adobe", "oauth", "", "", 0, "", "id", "asc", f)
+	require.NoError(t, err)
+	require.Len(t, all, 5)
+	require.EqualValues(t, 5, total)
+	f.OkadAccountType = "unknown"
+	_, total, _, err = h.listAccountsWithRuntimeFilters(context.Background(), 1, 10, "adobe", "oauth", "", "", 0, "", "id", "asc", f)
+	require.NoError(t, err)
+	require.EqualValues(t, 1200, total)
+	f.OkadAccountType = "non_company"
+	_, total, _, err = h.listAccountsWithRuntimeFilters(context.Background(), 1, 10, "adobe", "oauth", "", "", 0, "", "id", "asc", f)
+	require.NoError(t, err)
+	require.Zero(t, total, "unclassified imports must not become non-company")
+	f.OkadAccountType = "bad-value"
+	require.Error(t, f.validate())
+}
+
+func TestOkadCompanyBulkUpdateAndExportResolveSameIDs(t *testing.T) {
+	svc := newStubAdminService()
+	svc.accounts = nil
+	for i := 1; i <= 3; i++ {
+		extra := map[string]any{"adobeteam_external_email": "a@outlook.com"}
+		if i < 3 {
+			extra["okad_account"] = map[string]any{"issuer": "site", "source_key": "external:1", "email": "a@outlook.com", "is_company": i == 2}
+		}
+		svc.accounts = append(svc.accounts, service.Account{ID: int64(i), Platform: "adobe", Type: "oauth", Extra: extra})
+	}
+	h := &AccountHandler{adminService: svc}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest("POST", "/", strings.NewReader(`{"filters":{"okad_account_type":"company"},"priority":7}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	h.BulkUpdate(c)
+	require.Equal(t, 200, rec.Code, rec.Body.String())
+	require.Equal(t, []int64{2}, svc.lastBulkUpdateAccountInput.AccountIDs)
+	require.Nil(t, svc.lastBulkUpdateAccountInput.Filters)
+	c, _ = gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("GET", "/?okad_account_type=company", nil)
+	rows, err := h.resolveExportAccounts(context.Background(), nil, c)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.EqualValues(t, 2, rows[0].ID)
+}

@@ -249,24 +249,27 @@
           </template>
           <template #cell-name="{ row, value }">
             <div class="flex flex-col">
-              <HelpTooltip
-                v-if="accountHomepageUrl(row)"
-                :content="accountHomepageUrl(row)"
-                width-class="w-max max-w-sm break-all"
-                class="-ml-1 self-start"
-              >
-                <template #trigger>
-                  <a
-                    :href="accountHomepageUrl(row)"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="border-b border-dotted border-gray-300 font-medium text-gray-900 dark:border-dark-600 dark:text-white"
-                  >
-                    {{ value }}
-                  </a>
-                </template>
-              </HelpTooltip>
-              <span v-else class="font-medium text-gray-900 dark:text-white">{{ value }}</span>
+              <div class="flex items-center gap-1.5">
+                <HelpTooltip
+                  v-if="accountHomepageUrl(row)"
+                  :content="accountHomepageUrl(row)"
+                  width-class="w-max max-w-sm break-all"
+                  class="-ml-1 self-start"
+                >
+                  <template #trigger>
+                    <a
+                      :href="accountHomepageUrl(row)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="border-b border-dotted border-gray-300 font-medium text-gray-900 dark:border-dark-600 dark:text-white"
+                    >
+                      {{ value }}
+                    </a>
+                  </template>
+                </HelpTooltip>
+                <span v-else class="min-w-0 break-all font-medium text-gray-900 dark:text-white">{{ value }}</span>
+                <AccountCompanyBadge :account="row" />
+              </div>
               <span
                 v-if="accountDisplayEmail(row)"
                 class="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]"
@@ -587,6 +590,8 @@ import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { CreateAccountModal, EditAccountModal, BulkEditAccountModal, SyncFromCrsModal, TempUnschedStatusModal } from '@/components/account'
 import AccountTableActions from '@/components/admin/account/AccountTableActions.vue'
+import AccountCompanyBadge from '@/components/admin/account/AccountCompanyBadge.vue'
+import { okadAccountType } from '@/utils/okadAccountType'
 import AccountTableFilters from '@/components/admin/account/AccountTableFilters.vue'
 import AccountCapacityFilter from '@/components/admin/account/AccountCapacityFilter.vue'
 import AccountBulkActionsBar from '@/components/admin/account/AccountBulkActionsBar.vue'
@@ -651,6 +656,7 @@ type AccountBulkEditTarget =
         group?: string
         search?: string
         privacy_mode?: string
+        okad_account_type?: string
         capacity?: string
         concurrency_min?: string
         concurrency_max?: string
@@ -1211,6 +1217,7 @@ const {
     concurrency_min: '',
     concurrency_max: '',
     privacy_mode: '',
+    okad_account_type: '',
     group: '',
     search: '',
     lite: '1',
@@ -1313,6 +1320,7 @@ const buildUpstreamBillingRateFilters = () => {
     group: typeof rawParams.group === 'string' ? rawParams.group : '',
     search: typeof rawParams.search === 'string' ? rawParams.search : '',
     privacy_mode: typeof rawParams.privacy_mode === 'string' ? rawParams.privacy_mode : '',
+    okad_account_type: typeof rawParams.okad_account_type === 'string' ? rawParams.okad_account_type : '',
     sort_by: sortState.sort_by,
     sort_order: sortState.sort_order
   }
@@ -1609,6 +1617,7 @@ const refreshAccountsIncrementally = async (strict = false) => {
         type?: string
         status?: string
         privacy_mode?: string
+        okad_account_type?: string
         capacity?: string
         concurrency_min?: string
         concurrency_max?: string
@@ -2252,6 +2261,7 @@ const buildBulkEditFilterSnapshot = () => {
     group: typeof rawParams.group === 'string' ? rawParams.group : '',
     search: typeof rawParams.search === 'string' ? rawParams.search : '',
     privacy_mode: typeof rawParams.privacy_mode === 'string' ? rawParams.privacy_mode : '',
+    okad_account_type: typeof rawParams.okad_account_type === 'string' ? rawParams.okad_account_type : '',
     sort_by: typeof rawParams.sort_by === 'string' ? rawParams.sort_by : '',
     sort_order: sortOrder
   }
@@ -2331,12 +2341,14 @@ const buildAccountQueryFilters = () => ({
   concurrency_max: params.concurrency_max || '',
   group: params.group || '',
   privacy_mode: params.privacy_mode || '',
+  okad_account_type: params.okad_account_type || '',
   search: params.search || '',
   sort_by: sortState.sort_by,
   sort_order: sortState.sort_order
 })
 const accountMatchesCurrentFilters = (account: Account) => {
   const filters = buildAccountQueryFilters()
+  if (filters.okad_account_type && okadAccountType(account) !== filters.okad_account_type) return false
   if (filters.platform && account.platform !== filters.platform) return false
   if (filters.type && account.type !== filters.type) return false
   if (filters.status) {

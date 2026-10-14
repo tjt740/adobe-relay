@@ -10,6 +10,11 @@ describe('account table filters', () => {
     const options = wrapper.findAll('option').map(option => option.attributes('value'))
     expect(options).toEqual(expect.arrayContaining(['authentication_failed', 'request_timeout', 'test_passed', 'test_failed', 'untested']))
     expect(wrapper.find('input[type=number]').exists()).toBe(false)
+    expect(options).toEqual(expect.arrayContaining(['company', 'non_company', 'unknown']))
+    const companySelect = wrapper.findAll('select').find(select => select.find('option[value=company]').exists())!
+    await companySelect.setValue('company')
+    expect(wrapper.emitted('update:filters')?.at(-1)).toEqual([{ ...filters, okad_account_type: 'company' }])
+    expect(wrapper.emitted('change')).toHaveLength(1)
     wrapper.unmount()
   })
 })
