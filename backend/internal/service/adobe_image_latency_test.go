@@ -135,7 +135,7 @@ func TestAdobeImageStorageFailureRetainsCompleteBatch(t *testing.T) {
 			svc := NewAdobeImageService(func() (*ImageResultUploader, bool) { return NewImageResultUploader(storage, "", 0, nil), true })
 			images := [][]byte{pngBytes, []byte("second image")}
 			timings := AdobeImageTimings{}
-			body, err := svc.buildResponseBody(context.Background(), "job", images, "max", "url", &timings)
+			body, err := svc.buildResponseBody(context.Background(), "job", images, "max", "url", &timings, adobeImageResponseMetadata{})
 			require.NoError(t, err)
 			require.True(t, timings.StorageFallback)
 			require.Equal(t, "b64_json", timings.Delivery)
@@ -198,7 +198,7 @@ func BenchmarkAdobeImageResponseStorage(b *testing.B) {
 							_, err = uploader.Rewrite(context.Background(), "job", body)
 						}
 					} else {
-						_, err = svc.buildResponseBody(context.Background(), "job", images, "max", "url", &AdobeImageTimings{})
+						_, err = svc.buildResponseBody(context.Background(), "job", images, "max", "url", &AdobeImageTimings{}, adobeImageResponseMetadata{})
 					}
 					if err != nil {
 						b.Fatal(err)

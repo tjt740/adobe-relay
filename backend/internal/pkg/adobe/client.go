@@ -231,6 +231,9 @@ type GenerateImageInput struct {
 type GenerateResult struct {
 	// Bytes 是下载好的图片/视频字节。
 	Bytes []byte
+	// URL is the upstream signed URL for exactly Bytes, before any transcoding.
+	// Treat it as a temporary capability: never include it in logs.
+	URL string
 	// Raw 是最后一次轮询返回的原始 JSON，供上层记录用量等信息。
 	Raw     map[string]any
 	Timings GenerationTimings
@@ -478,7 +481,7 @@ func (c *Client) poll(ctx context.Context, params pollParams) (result *GenerateR
 			if err != nil {
 				return nil, err
 			}
-			return &GenerateResult{Bytes: bytes, Raw: latest, Timings: timings}, nil
+			return &GenerateResult{Bytes: bytes, URL: mediaURL, Raw: latest, Timings: timings}, nil
 		}
 
 		if isTerminalJobStatus(jobStatus(latest, resp)) {
