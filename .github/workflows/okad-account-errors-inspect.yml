@@ -59,6 +59,13 @@ jobs:
           (root/'account-errors-okad-release.py.next').replace(path)
           print('Reviewed guard installed atomically; application, configuration and database unchanged')
           PY
+      - name: Verify concurrent business updates from existing records
+        run: |
+          set -euo pipefail
+          opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20)
+          root=/opt/adobe-relay/releases/okad-account-errors-20261014
+          scp "${opts[@]}" deploy/primary/account-errors-state-verify.py "root@173.234.15.150:$root/"
+          ssh "${opts[@]}" root@173.234.15.150 "python3 '$root/account-errors-state-verify.py'"
       - name: Remove SSH key
         if: always()
         run: rm -f ~/.ssh/deploy_key
