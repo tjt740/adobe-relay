@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -182,9 +183,49 @@ func TestSubmit451WithoutUnsafeStaysTemporary(t *testing.T) {
 	require.False(t, errors.As(err, &rejected))
 }
 
+func TestPromptUnsafeIsContentRejectedAcrossHTTPStatuses(t *testing.T) {
+	c := &Client{}
+	for _, status := range []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusUnavailableForLegalReasons} {
+		resp := &Response{
+			StatusCode: status,
+			Body:       []byte(fmt.Sprintf(`{"error_code":"prompt_unsafe","message":%q}`, strings.Repeat("private upstream details", 100))),
+		}
+		for _, err := range []error{c.errorForSubmit(resp, "submit"), c.errorForStatus(resp, "image poll")} {
+			var rejected *ContentRejectedError
+			require.ErrorAs(t, err, &rejected)
+			require.Equal(t, status, rejected.StatusCode)
+			require.NotContains(t, rejected.User(), "private upstream details")
+			var auth *AuthError
+			require.False(t, errors.As(err, &auth), "明确的提示词违规不能触发凭据恢复")
+			var temporary *UpstreamTemporaryError
+			require.False(t, errors.As(err, &temporary))
+		}
+	}
+}
+
+func TestPollPromptUnsafeStopsWithoutRetryOrDownload(t *testing.T) {
+	for _, status := range []int{http.StatusOK, http.StatusBadRequest, http.StatusForbidden, http.StatusUnavailableForLegalReasons} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			client, api, download := pollClient(t, "https://firefly-3p.ff.adobe.io/jobs/x", func(int) (*Response, error) {
+				return jsonResponse(t, status, map[string]any{
+					"status": "FAILED", "error_code": "prompt_unsafe",
+					"message": strings.Repeat("private upstream details", 100),
+				}, nil), nil
+			})
+			_, err := generateTestImage(client, t)
+			var rejected *ContentRejectedError
+			require.ErrorAs(t, err, &rejected)
+			require.Len(t, api.calls, 2, "提交一次后，明确的内容拒绝立即结束该任务轮询")
+			require.Empty(t, download.calls)
+		})
+	}
+}
+
 func TestErrorCodeAndContentRejectedHelpers(t *testing.T) {
 	require.Equal(t, ErrorCodeImageUnsafe, ErrorCode(`{"error_code":"image_unsafe"}`))
 	require.True(t, IsContentRejectedBody(`{"error_code":"image_unsafe"}`))
+	require.True(t, IsContentRejectedBody(`{"error_code":"prompt_unsafe"}`))
+	require.True(t, IsContentRejectedCode(" PROMPT_UNSAFE "))
 	require.False(t, IsContentRejectedBody(`{"error_code":"timeout_error"}`))
 	require.False(t, IsContentRejectedBody("not json"))
 	require.False(t, IsContentRejectedCode(""))

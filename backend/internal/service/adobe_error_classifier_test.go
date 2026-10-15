@@ -62,9 +62,10 @@ func TestClassifyAdobeErrorContentRejected(t *testing.T) {
 		`image poll failed: 451 {"error_code":"image_unsafe"}`, http.StatusUnavailableForLegalReasons, ""))
 	require.Equal(t, NextAccountRetry, failure.Failover.NextAccountAction)
 	require.Equal(t, adobeFailureContentRejected, failure.Failover.Reason)
-	require.Equal(t, http.StatusBadRequest, failure.Failover.ClientStatusCode)
+	require.Equal(t, http.StatusUnavailableForLegalReasons, failure.Failover.ClientStatusCode)
 	require.Equal(t, GatewayFailureScopeRequest, failure.Failover.Scope)
 	require.Zero(t, failure.Cooldown, "内容拒绝不是账号故障，不能冷却 Cookie 号")
+	require.False(t, failure.InvalidateToken)
 	require.True(t, IsAdobeContentRejected(failure.Failover))
 }
 
