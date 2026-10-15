@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"errors"
 	"log/slog"
 	"math"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/semaphore"
@@ -22,14 +24,15 @@ const imageRequestBaseMemory = int64(32 << 20)
 // and cannot protect memory occupied by requests waiting for those slots.
 //
 // Keep the configured Go/container limits and business concurrency unchanged.
-// One third of an existing finite Go memory limit budgets image request work;
-// leave the rest for downloads, responses, GC headroom and other application work.
+// Two thirds of the finite Go limit budgets image work. The remaining third
+// and the container headroom cover GC and non-image work. Reservations shrink
+// after preparation; they remain held through detached generation and delivery.
 func ImageRequestMemoryBudget(maxBodyBytes int64) gin.HandlerFunc {
 	limit := debug.SetMemoryLimit(-1) // Read only: a negative value does not set it.
 	if limit == math.MaxInt64 || limit <= 0 {
 		return func(c *gin.Context) { c.Next() }
 	}
-	guard := newImageMemoryGuard(limit/3, maxBodyBytes)
+	guard := newImageMemoryGuard(limit/3*2, maxBodyBytes)
 	guard.runtimeLimit = limit - limit/10
 	return guard.handler
 }
@@ -40,6 +43,8 @@ type imageMemoryGuard struct {
 	bytes        *semaphore.Weighted
 	lastLog      atomic.Int64
 	runtimeLimit int64
+	used         atomic.Int64
+	active       atomic.Int64
 }
 
 func newImageMemoryGuard(capacity, maxBody int64) *imageMemoryGuard {
@@ -55,24 +60,67 @@ func imageRuntimeMemory() uint64 {
 	return samples[0].Value.Uint64() - samples[1].Value.Uint64()
 }
 
+var errImageMemoryBusy = errors.New("image memory capacity exhausted")
+
+const imageMemoryLeaseKey = "image_request_memory_lease"
+
+// During reading/parsing, allow for raw chunks, decoding and audit copies.
+// Unknown sizes grow before allocation rather than reserving the entire pool.
 func (g *imageMemoryGuard) weight(r *http.Request) int64 {
 	size := r.ContentLength
-	// Chunked/encoded input cannot be estimated from its wire length. Reserve
-	// the full budget, permitting one existing-size-limit request to progress.
 	if size < 0 || (r.Header.Get("Content-Encoding") != "" && !strings.EqualFold(r.Header.Get("Content-Encoding"), "identity")) {
-		return g.capacity
+		size = 0
 	}
-	// Six times the wire body covers its retained raw copy, multipart or data
-	// URL representation, decoded uploads and temporary audit/encoding copies.
-	// Saturate rather than overflow or reject a previously valid large request.
-	if size > (math.MaxInt64-imageRequestBaseMemory)/6 {
-		return g.capacity
+	return imageMemoryWeight(size, 6, 1)
+}
+
+func imageMemoryWeight(size, multiplier, images int64) int64 {
+	if size < 0 || size > (math.MaxInt64-imageRequestBaseMemory*images)/multiplier {
+		return math.MaxInt64
 	}
-	weight := imageRequestBaseMemory + size*6
-	if weight > g.capacity {
-		return g.capacity
+	return imageRequestBaseMemory*images + size*multiplier
+}
+
+type imageMemoryLease struct {
+	guard  *imageMemoryGuard
+	weight int64 // Owned by the synchronous request/middleware chain.
+}
+
+func (l *imageMemoryLease) resize(weight int64) bool {
+	delta := weight - l.weight
+	if delta > 0 {
+		if l.guard.runtimeLimit > 0 && imageRuntimeMemory()+uint64(delta) >= uint64(l.guard.runtimeLimit) {
+			return false
+		}
+		if !l.guard.bytes.TryAcquire(delta) {
+			return false
+		}
+	} else if delta < 0 {
+		l.guard.bytes.Release(-delta)
 	}
-	return weight
+	l.guard.used.Add(delta)
+	l.weight = weight
+	return true
+}
+
+// FinishImageMemoryPreparation releases temporary parse/audit headroom after
+// those stages. Retain three input copies plus 32 MiB per output image, including
+// while the client is gone. A multi-image increase must fit before any submit.
+// bodyBytes includes separately retained Gemini relay JSON when present.
+func FinishImageMemoryPreparation(c *gin.Context, bodyBytes int64, images int) bool {
+	raw, ok := c.Get(imageMemoryLeaseKey)
+	if !ok {
+		return true
+	}
+	lease := raw.(*imageMemoryLease)
+	if images < 1 || images > 10 {
+		images = 1
+	} // Invalid values use the existing parameter validator.
+	if !lease.resize(imageMemoryWeight(bodyBytes, 3, int64(images))) {
+		lease.guard.reject(c, "preparation", imageMemoryWeight(bodyBytes, 3, int64(images)))
+		return false
+	}
+	return true
 }
 
 func isAdobeImageMemoryRequest(c *gin.Context) bool {
@@ -111,22 +159,60 @@ func (g *imageMemoryGuard) handler(c *gin.Context) {
 		c.Abort()
 		return
 	}
+	lease := &imageMemoryLease{guard: g}
 	weight := g.weight(c.Request)
-	// Never queue here: reject before reading/decoding the upload. Check current
-	// runtime memory too, since response encoding and other endpoints share it.
-	if (g.runtimeLimit > 0 && imageRuntimeMemory() >= uint64(g.runtimeLimit)) || !g.bytes.TryAcquire(weight) {
-		g.reject(c)
+	if !lease.resize(weight) {
+		g.reject(c, "admission", weight)
 		return
 	}
-	defer g.bytes.Release(weight)
+	g.active.Add(1)
+	defer func() { lease.resize(0); g.active.Add(-1) }()
 	if c.Request.Context().Err() != nil {
 		c.Abort()
 		return
 	}
+	attemptedWeight := lease.weight
+	body, err := pkghttputil.ReadRequestBodyWithBudget(c.Request, func(wire, decoded int64) error {
+		if err := c.Request.Context().Err(); err != nil {
+			return err
+		}
+		required := imageMemoryWeight(wire+decoded, 6, 1)
+		attemptedWeight = required
+		if required > lease.weight && !lease.resize(required) {
+			return errImageMemoryBusy
+		}
+		return nil
+	})
+	if err != nil {
+		if c.Request.Context().Err() != nil {
+			c.Abort()
+			return
+		}
+		if errors.Is(err, errImageMemoryBusy) {
+			g.reject(c, "body_read", attemptedWeight)
+			return
+		}
+		status, message := http.StatusBadRequest, "Failed to read request body"
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			status, message = http.StatusRequestEntityTooLarge, "Request body is too large"
+		}
+		groupModelAllowlistErrorWriter(c)(c, status, message)
+		c.Abort()
+		return
+	}
+	// Drop compressed/wire and overdeclared length headroom after the exact
+	// decoded body is available. Later readers reuse this immutable slice.
+	if !lease.resize(imageMemoryWeight(int64(len(body)), 6, 1)) {
+		g.reject(c, "body_complete", lease.weight)
+		return
+	}
+	c.Request.Body = pkghttputil.NewPrereadBody(body)
+	c.Set(imageMemoryLeaseKey, lease)
 	c.Next()
 }
 
-func (g *imageMemoryGuard) reject(c *gin.Context) {
+func (g *imageMemoryGuard) reject(c *gin.Context, phase string, requested int64) {
 	if c.Request.Context().Err() == nil {
 		c.Header("Retry-After", "1")
 		service.MarkOpsClientBusinessLimited(c, "image_memory_capacity")
@@ -141,6 +227,6 @@ func (g *imageMemoryGuard) reject(c *gin.Context) {
 	now := time.Now().Unix()
 	last := g.lastLog.Load()
 	if now-last >= 5 && g.lastLog.CompareAndSwap(last, now) {
-		slog.Info("image_memory.capacity_rejected", "budget_bytes", g.capacity, "queue_enabled", false)
+		slog.Info("image_memory.capacity_rejected", "budget_bytes", g.capacity, "reserved_bytes", g.used.Load(), "requested_bytes", requested, "active_requests", g.active.Load(), "runtime_bytes", imageRuntimeMemory(), "phase", phase, "queue_enabled", false)
 	}
 }

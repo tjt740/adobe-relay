@@ -94,6 +94,10 @@ func (h *GatewayHandler) AdobeImages(c *gin.Context) {
 		return
 	}
 
+	if !middleware2.FinishImageMemoryPreparation(c, int64(len(body)), parsed.N) {
+		return
+	}
+
 	releaseAdmission, admitted := h.admitAdobeImagesRequest(c, reqLog, apiKey, subject)
 	if !admitted {
 		return
@@ -242,6 +246,10 @@ func (h *GatewayHandler) AdobeGeminiImages(c *gin.Context, apiKey *service.APIKe
 		zap.String("aspect_ratio", call.AspectRatio),
 		zap.String("image_size", call.ImageSize),
 	)
+
+	if !middleware2.FinishImageMemoryPreparation(c, int64(len(body))+int64(len(relayBody)), parsed.N) {
+		return
+	}
 
 	releaseAdmission, admitted := h.admitAdobeImagesRequest(c, reqLog, apiKey, subject)
 	if !admitted {

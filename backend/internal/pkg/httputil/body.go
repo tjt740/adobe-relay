@@ -64,6 +64,14 @@ func (p *PrereadBody) Bytes() []byte {
 // 已由 PrereadBody 回填的请求体直接返回其完整切片（零拷贝），不检查内部
 // reader 是否已被消费——见 PrereadBody 的文档说明。
 func ReadRequestBodyWithPrealloc(req *http.Request) ([]byte, error) {
+	return ReadRequestBodyWithBudget(req, nil)
+}
+
+// ReadRequestBodyWithBudget reserves capacity before allocating each bounded
+// input chunk. The callback receives wire and decoded high-water sizes, not
+// Content-Length, so chunked/compressed bodies cannot bypass memory admission.
+// A callback failure stops reading before downstream work starts.
+func ReadRequestBodyWithBudget(req *http.Request, reserve func(wire, decoded int64) error) ([]byte, error) {
 	if req == nil || req.Body == nil {
 		return nil, nil
 	}
@@ -83,7 +91,11 @@ func ReadRequestBodyWithPrealloc(req *http.Request) ([]byte, error) {
 		}
 	}
 
-	raw, err := readRequestBodyChunks(req.Body, capHint, req.ContentLength)
+	var wireBudget func(int64) error
+	if reserve != nil {
+		wireBudget = func(size int64) error { return reserve(size, 0) }
+	}
+	raw, err := readRequestBodyChunksBudget(req.Body, capHint, req.ContentLength, wireBudget)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +105,11 @@ func ReadRequestBodyWithPrealloc(req *http.Request) ([]byte, error) {
 		return raw, nil
 	}
 
-	decoded, err := decompressRequestBody(enc, raw)
+	var decodedBudget func(int64) error
+	if reserve != nil {
+		decodedBudget = func(size int64) error { return reserve(int64(len(raw)), size) }
+	}
+	decoded, err := decompressRequestBodyBudget(enc, raw, decodedBudget)
 	if err != nil {
 		return nil, fmt.Errorf("decode Content-Encoding %q: %w", enc, err)
 	}
@@ -109,6 +125,10 @@ func ReadRequestBodyWithPrealloc(req *http.Request) ([]byte, error) {
 // This avoids doubling large buffers or eagerly allocating an untrusted
 // Content-Length before the corresponding bytes have arrived.
 func readRequestBodyChunks(reader io.Reader, initialCapacity int, contentLength int64) ([]byte, error) {
+	return readRequestBodyChunksBudget(reader, initialCapacity, contentLength, nil)
+}
+
+func readRequestBodyChunksBudget(reader io.Reader, initialCapacity int, contentLength int64, reserve func(int64) error) ([]byte, error) {
 	capacity := initialCapacity
 	var chunks [][]byte
 	total := 0
@@ -116,6 +136,11 @@ func readRequestBodyChunks(reader io.Reader, initialCapacity int, contentLength 
 		chunkCapacity := capacity
 		if remaining := contentLength - int64(total); remaining >= 0 && remaining < int64(chunkCapacity) {
 			chunkCapacity = int(remaining) + 1
+		}
+		if reserve != nil {
+			if err := reserve(int64(total) + int64(chunkCapacity)); err != nil {
+				return nil, err
+			}
 		}
 		chunk := make([]byte, chunkCapacity)
 		n := 0
@@ -166,28 +191,45 @@ func ReadLenientJSONRequestBodyWithPrealloc(req *http.Request, maxNormalizedByte
 }
 
 func decompressRequestBody(encoding string, raw []byte) ([]byte, error) {
+	return decompressRequestBodyBudget(encoding, raw, nil)
+}
+
+func decompressRequestBodyBudget(encoding string, raw []byte, reserve func(int64) error) ([]byte, error) {
+	read := func(reader io.Reader) ([]byte, error) {
+		return readRequestBodyChunksBudget(io.LimitReader(reader, maxDecompressedBodySize), requestBodyReadInitCap, -1, reserve)
+	}
 	switch encoding {
 	case "zstd":
-		dec, err := zstd.NewReader(bytes.NewReader(raw))
+		var options []zstd.DOption
+		if reserve != nil {
+			// A frame's history window is allocated inside the decoder, before
+			// decoded chunks reach our callback. Bound and reserve it too.
+			// Unbudgeted callers retain their existing decoder configuration.
+			if err := reserve(maxDecompressedBodySize); err != nil {
+				return nil, err
+			}
+			options = append(options, zstd.WithDecoderConcurrency(1), zstd.WithDecoderMaxMemory(maxDecompressedBodySize))
+		}
+		dec, err := zstd.NewReader(bytes.NewReader(raw), options...)
 		if err != nil {
 			return nil, err
 		}
 		defer dec.Close()
-		return io.ReadAll(io.LimitReader(dec, maxDecompressedBodySize))
+		return read(dec)
 	case "gzip", "x-gzip":
 		gr, err := gzip.NewReader(bytes.NewReader(raw))
 		if err != nil {
 			return nil, err
 		}
 		defer func() { _ = gr.Close() }()
-		return io.ReadAll(io.LimitReader(gr, maxDecompressedBodySize))
+		return read(gr)
 	case "deflate":
 		zr, err := zlib.NewReader(bytes.NewReader(raw))
 		if err != nil {
 			return nil, err
 		}
 		defer func() { _ = zr.Close() }()
-		return io.ReadAll(io.LimitReader(zr, maxDecompressedBodySize))
+		return read(zr)
 	default:
 		return nil, errors.New("unsupported Content-Encoding")
 	}
