@@ -1,0 +1,24 @@
+# Adobe 图片未知用量的随机模拟回填
+
+标识：`adobe-simulated-usage-20261015`。用户在真实线上 4K 出图仍未取得 token 用量后，明确要求随机补齐，并选择整份响应 `total_tokens` 在 1800～3000、输入和输出拆分总量，模拟数字标记 `simulated`。
+
+## 行为
+
+- 只改 Adobe 原生图片成功响应的返回层：存在合法真实 usage 时原样保留，包括 0 和部分明细，标记 `usage_source: upstream`；没有完整有效 usage 时生成随机模拟数据，标记 `usage_source: simulated`。
+- 总量为 1800～3000（含边界），输入与输出随机拆分；明细相加一致。有参考图时拆分输入图片/文本；无参考图则输入图片为 0。输出图片等于输出总量，输出文本为 0。范围按整份响应计算，不因 n 倍增；每次独立随机，允许重复。
+- 随机值不是实测，也不是官方公式估算，不进入真实 token 或计费字段；原图片张数/分辨率计费、URL/Base64/存储/转码、metadata、451、安全审核、鉴权与调度保持。已有真实明细缺失时不混补随机值。中转及其他协议保持原语义。
+- 同步更新客户 curl、Python、URL/Base64 返回示例、来源区分及历史调查说明；客户须读取 usage_source，不能把模拟值用于真实 token 账单。
+
+## 验证与发布
+
+回归覆盖 1800/3000 两端、16 路并发随机范围及明细一致性、文生图/URL 与上传参考图、多图范围、真实 0/部分明细优先、返回层不修改实测对象及原 token 计费字段保持；连同现有 Adobe/图片/451 回归和客户示例语法检查。
+
+仅发布主服务器 173.234.15.150，原实际应用为 `9ff382000550d0c9010df5c2d5b90c18c950310b`。保留原配置、数据、SMTP、告警、Okad 及其他服务；无迁移，无配置项修改。本轮测试不增加 Adobe 付费出图、登录或邮件。发布后的实际应用 SHA、工作流及审计结果另行补充。
+
+审计目录 `/opt/adobe-relay/releases/adobe-simulated-usage-20261015/`，回退镜像 `adobe-relay:before-adobe-simulated-usage-20261015`。只读检查：
+
+```sh
+python3 /opt/adobe-relay/releases/adobe-simulated-usage-20261015/adobe-simulated-usage-release.py check-rollback
+```
+
+末尾改为 `rollback` 才执行应用代码回退，恢复本次之前真实 usage 或 null 的规则，保留当前业务数据和计费。脚本依赖同目录 `image-response-release.py`，会检查后续应用、配置、设置、其他容器及回退镜像；不得跳过检查或恢复旧数据库。

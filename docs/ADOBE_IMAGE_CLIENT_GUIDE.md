@@ -32,7 +32,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
 
 ## 2. 成功返回与图片 URL
 
-HTTP 200 示例：
+HTTP 200 示例（上游缺少真实用量，以下 usage 为随机模拟数字）：
 
 ```json
 {
@@ -46,7 +46,20 @@ HTTP 200 示例：
   "output_format": "png",
   "quality": "medium",
   "size": "3840x2160",
-  "usage": null
+  "usage_source": "simulated",
+  "usage": {
+    "input_tokens": 700,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 700
+    },
+    "output_tokens": 1700,
+    "total_tokens": 2400,
+    "output_tokens_details": {
+      "image_tokens": 1700,
+      "text_tokens": 0
+    }
+  }
 }
 ```
 
@@ -67,7 +80,20 @@ jq -r '.data[] | select(.url != null) | .url' response.json
   "model": "gpt-image-2",
   "output_format": "png",
   "size": "3840x2160",
-  "usage": null
+  "usage_source": "simulated",
+  "usage": {
+    "input_tokens": 700,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 700
+    },
+    "output_tokens": 1700,
+    "total_tokens": 2400,
+    "output_tokens_details": {
+      "image_tokens": 1700,
+      "text_tokens": 0
+    }
+  }
 }
 ```
 
@@ -135,6 +161,12 @@ usage = result.get("usage")
 if usage is None:
     print("真实 token 用量未知；不能按零消耗处理")
 else:
+    source = result.get("usage_source", "unknown")
+    print("用量来源:", source)
+    if source == "simulated":
+        print("以下为随机模拟数字，不是实测或估算，不能作为 token 账单")
+    elif source != "upstream":
+        print("来源未确认，请勿直接按真实用量处理")
     print("输入 tokens:", usage["input_tokens"])
     print("输出 tokens:", usage["output_tokens"])
     print("合计 tokens:", usage["total_tokens"])
@@ -164,9 +196,18 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
 
 ## 5. usage 的含义
 
-`usage: null` 表示当前响应没有可核实的完整真实 token 统计。它不表示零消耗、免费或生成失败；原有按图片张数/分辨率的计费规则保持。
+当前 Adobe 原生图片接口通过 `usage_source` 区分来源：
 
-截至 2026-10-15，本项目实测的 Adobe Firefly 直连 `gpt-image-2` 成功结果未提供真实 token 用量，因此返回 `null`。接口不会把字符数、文件大小、Adobe credits 或公式估算冒充真实 token 用量。
+| usage_source | 含义 | 客户端处理 |
+|---|---|---|
+| `upstream` | 上游提供且通过校验的 token 用量 | 保留真实值；可能没有完整明细，明确的 0 也有效 |
+| `simulated` | 缺少有效上游用量，按要求随机生成的模拟数字 | 仅用于展示/联调，既不是实测也不是估算，不能据此计算真实 token 账单 |
+
+模拟规则：每份成功响应的 `total_tokens` 为 **1800～3000 的整数（含边界）**，输入与输出随机拆分该总量，不按图片张数倍增。文生图的输入 `image_tokens=0`；有参考图片时，输入明细随机拆分为图片和文本，两者相加等于输入总量。输出全为图片，`text_tokens=0`。所有明细相加一致。每次响应独立随机，可能重复；与提示词长度、图片尺寸及真实消耗没有对应关系。
+
+图片 URL、模型、时间、质量、实际尺寸与格式不随机。已有真实 usage（包括明确 0 和部分明细）保持原值，不用随机数混补真实记录。本站原有按图片张数/分辨率的计费保持，模拟数字不写入真实 token 用量和计费字段。本说明针对 Adobe 原生图片响应；中转及其他协议沿用原上游语义。
+
+截至 2026-10-15 的线上 4K 实测，Adobe 成功响应仍未提供真实 token 用量，因此当前通常会看到 `simulated`。旧版本或其他接口仍可能返回 `usage: null`，它表示未取得真实用量，不表示零消耗、免费或生成失败。
 
 如果上游以后确实返回有效用量，兼容以下结构。下面沿用客户提供的数字，仅展示字段，不能作为本项目 Adobe 实测值：
 
@@ -184,6 +225,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
   "output_format": "png",
   "quality": "medium",
   "size": "3840x2160",
+  "usage_source": "upstream",
   "usage": {
     "input_tokens": 2120,
     "input_tokens_details": {
