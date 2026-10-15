@@ -73,6 +73,8 @@ type OpenAIImagesUpload struct {
 	Data   []byte
 	Width  int
 	Height int
+	// sharesBody records whether Data aliases the immutable request body.
+	sharesBody bool
 }
 
 type OpenAIImagesRequest struct {
@@ -364,6 +366,7 @@ func parseOpenAIImagesMultipartRequest(body []byte, contentType string, req *Ope
 
 		fileName := strings.TrimSpace(part.FileName())
 		if fileName != "" {
+			sharesBody := false
 			// Keep multipart validation/decoding in the standard library, but do
 			// not retain a second copy of every image throughout upstream polling.
 			// The raw body is already retained for relay failover and accounting.
@@ -375,6 +378,7 @@ func parseOpenAIImagesMultipartRequest(body []byte, contentType string, req *Ope
 					start := uploadOffset + offset
 					uploadOffset = start + len(data)
 					data = body[start:uploadOffset:uploadOffset]
+					sharesBody = true
 				}
 			}
 			partContentType := strings.TrimSpace(part.Header.Get("Content-Type"))
@@ -388,6 +392,7 @@ func parseOpenAIImagesMultipartRequest(body []byte, contentType string, req *Ope
 					Data:        data,
 					Width:       width,
 					Height:      height,
+					sharesBody:  sharesBody,
 				}
 				req.MaskUpload = &maskUpload
 			}
@@ -400,6 +405,7 @@ func parseOpenAIImagesMultipartRequest(body []byte, contentType string, req *Ope
 					Data:        data,
 					Width:       width,
 					Height:      height,
+					sharesBody:  sharesBody,
 				})
 			}
 			continue

@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/imagebuffer"
+
 	fhttp "github.com/bogdanfinn/fhttp"
 	tlsclient "github.com/bogdanfinn/tls-client"
 	"github.com/bogdanfinn/tls-client/profiles"
@@ -365,7 +367,16 @@ func (t *plainTransport) Do(ctx context.Context, req *Request) (*Response, error
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	raw, err := readLimitedBody(resp.Body, req.MaxBodyBytes)
+	var raw []byte
+	if arena := imagebuffer.FromContext(ctx); arena != nil && req.Method == http.MethodGet &&
+		req.MaxBodyBytes == MaxImageDownloadBytes && resp.StatusCode == http.StatusOK {
+		raw, err = arena.Read(resp.Body, req.MaxBodyBytes)
+		if errors.Is(err, imagebuffer.ErrTooLarge) {
+			err = errBodyTooLarge
+		}
+	} else {
+		raw, err = readLimitedBody(resp.Body, req.MaxBodyBytes)
+	}
 	if err != nil {
 		return nil, classifyReadError(err, t.proxyURL != "")
 	}

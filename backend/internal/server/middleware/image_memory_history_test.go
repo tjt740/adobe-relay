@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -18,6 +17,7 @@ import (
 	"time"
 
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/imagebuffer"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -66,13 +66,22 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 		outputMB = n
 	}
 	paced := os.Getenv("ADOBE_HISTORY_PACED") == "1"
+	timeScale := 0.05
+	if scale, err := strconv.ParseFloat(os.Getenv("ADOBE_HISTORY_TIME_SCALE"), 64); err == nil && scale > 0 {
+		timeScale = scale
+	}
+	compact := os.Getenv("ADOBE_HISTORY_COMPACT_RESERVATION") == "1"
+	mixed := os.Getenv("ADOBE_HISTORY_MIXED") == "1"
 	totals := []int{100, 200, 300, 400}
+	if count, e := strconv.Atoi(os.Getenv("ADOBE_HISTORY_TOTAL")); e == nil && count > 0 {
+		totals = []int{count}
+	}
 	if paced {
 		totals = []int{len(trace.Requests)}
 	}
 	for _, total := range totals {
 		t.Run(strconv.Itoa(total), func(t *testing.T) {
-			g := newImageMemoryGuard(debug.SetMemoryLimit(-1)/3*2, 256<<20)
+			g := newImageMemoryGuard(imageMemoryCapacity(debug.SetMemoryLimit(-1)), 256<<20)
 			g.runtimeLimit = debug.SetMemoryLimit(-1) * 9 / 10
 			var arrived, accepted, rejected, active, peak atomic.Int64
 			var inputTotal atomic.Int64
@@ -101,9 +110,40 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 					}
 					runtime.KeepAlive(audit)
 				}()
-				if !FinishImageMemoryPreparation(c, int64(len(raw)), parsed.N) {
+				if !FinishImageRequestParsing(c, service.AdobeImageRetainedBytes(parsed), parsed.N) {
 					return
 				}
+				legacy := c.GetHeader("X-Replay-Legacy") == "1"
+				bufferCtx := c.Request.Context()
+				cleanup := func() {}
+				buffered := false
+				if legacy {
+					if !FinishImageMemoryPreparation(c, int64(len(raw)), parsed.N) {
+						return
+					}
+				} else if compact {
+					// CI reserves the known synthetic output bound, keeping
+					// identical mapped IO while avoiding 160 MiB of unused
+					// physical disk per tiny fake image on limited runners.
+					a, err := imagebuffer.New(int64(parsed.N) * int64((outputMB*3+1)<<20))
+					buffered = err == nil
+					cleanup = func() {
+						if a != nil {
+							_ = a.Close()
+						}
+					}
+					bufferCtx = imagebuffer.WithArena(c.Request.Context(), a)
+				} else {
+					bufferCtx, cleanup, buffered = service.PrepareAdobeImageBuffer(c.Request.Context(), parsed)
+				}
+				defer cleanup()
+				if !legacy && !buffered {
+					t.Error("isolated replay needs disk buffering")
+					c.Status(500)
+					arrived.Add(1)
+					return
+				}
+				arena := imagebuffer.FromContext(bufferCtx)
 				n := active.Add(1)
 				defer active.Add(-1)
 				for p := peak.Load(); n > p; p = peak.Load() {
@@ -116,20 +156,40 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 				arrived.Add(1)
 				if paced {
 					d, _ := strconv.ParseInt(c.GetHeader("X-Replay-Duration-Ms"), 10, 64)
-					time.Sleep(time.Duration(float64(d)*0.05) * time.Millisecond)
+					time.Sleep(time.Duration(float64(d)*timeScale) * time.Millisecond)
 				} else {
 					<-release
 				}
 				images := make([][]byte, parsed.N)
-				data := make([]map[string]string, parsed.N)
 				for i := range images {
-					images[i] = bytes.Repeat([]byte{0x71}, outputMB<<20)
-					data[i] = map[string]string{"b64_json": base64.StdEncoding.EncodeToString(images[i])}
+					readLimit := int64(64 << 20)
+					if compact {
+						readLimit = int64(outputMB << 20)
+					}
+					if legacy {
+						images[i], e = io.ReadAll(&historyFill{int64(outputMB << 20)})
+					} else {
+						images[i], e = arena.Read(&historyFill{int64(outputMB << 20)}, readLimit)
+					}
+					if e != nil {
+						t.Error(e)
+						break
+					}
 				}
-				body, e := json.Marshal(map[string]any{"created": 1, "data": data})
+				var body []byte
+				if legacy {
+					items := make([]map[string]string, len(images))
+					for i, img := range images {
+						items[i] = map[string]string{"b64_json": base64.StdEncoding.EncodeToString(img)}
+					}
+					body, e = json.Marshal(map[string]any{"created": 1, "data": items})
+				} else {
+					body, e = imagebuffer.OpenAIResponse(arena, map[string]any{"created": 1}, images)
+				}
 				if e != nil {
 					t.Error(e)
 				}
+
 				outputs <- struct{}{}
 				if !paced {
 					<-finish
@@ -137,7 +197,6 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 				runtime.KeepAlive(raw)
 				runtime.KeepAlive(parsed)
 				runtime.KeepAlive(images)
-				runtime.KeepAlive(data)
 				runtime.KeepAlive(body)
 				c.Status(200)
 			})
@@ -147,7 +206,7 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 				// Deterministic evenly spaced samples retain the measured long tail.
 				sample := trace.Requests[i*len(trace.Requests)/total]
 				if paced {
-					time.Sleep(time.Until(replayStart.Add(time.Duration(float64(sample.OffsetMS)*0.05) * time.Millisecond)))
+					time.Sleep(time.Until(replayStart.Add(time.Duration(float64(sample.OffsetMS)*timeScale) * time.Millisecond)))
 				}
 				size := sample.AuditBytes // conservative: normalized audit size as raw upload size
 				if size < 1024 {
@@ -163,6 +222,9 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 				req := httptest.NewRequest("POST", "/v1/images/edits", reader)
 				req.Header.Set("X-Replay-Duration-Ms", strconv.FormatInt(sample.DurationMS, 10))
 				req.Header.Set("Content-Type", "multipart/form-data; boundary=hist")
+				if mixed && i%40 < 7 { // observed 17.5% requested explicit transcoding
+					req.Header.Set("X-Replay-Legacy", "1")
+				}
 				req.ContentLength = int64(len(prefix)+len(suffix)) + size
 				if i%10 == 0 {
 					req.ContentLength = -1

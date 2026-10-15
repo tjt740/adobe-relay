@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/imagebuffer"
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 )
@@ -52,6 +53,7 @@ type AdobeImageResult struct {
 // Wall-clock stage durations. Per-image timings overlap when n > 1 and must not
 // be added together to estimate request latency.
 type AdobeImageTimings struct {
+	DiskBuffer      bool                      `json:"disk_buffer"`
 	SourceUploadMS  int64                     `json:"source_upload_ms"`
 	GenerationMS    int64                     `json:"generation_ms"`
 	TranscodeMS     int64                     `json:"transcode_ms"`
@@ -169,7 +171,7 @@ func (s *AdobeImageService) GenerateCall(
 	}
 
 	client := s.clients.clientForAccount(account)
-	var timings AdobeImageTimings
+	timings := AdobeImageTimings{DiskBuffer: imagebuffer.FromContext(ctx) != nil}
 	stageStarted := time.Now()
 	sourceImageIDs, err := s.uploadSourceImages(ctx, client, token, call)
 	timings.SourceUploadMS = time.Since(stageStarted).Milliseconds()
@@ -376,7 +378,7 @@ func (s *AdobeImageService) buildResponseBody(ctx context.Context, requestID str
 		for i, url := range urls {
 			data[i] = map[string]any{"url": url}
 		}
-	} else {
+	} else if imagebuffer.FromContext(ctx) == nil {
 		for i, image := range images {
 			data[i] = map[string]any{"b64_json": base64.StdEncoding.EncodeToString(image)}
 		}
@@ -389,6 +391,10 @@ func (s *AdobeImageService) buildResponseBody(ctx context.Context, requestID str
 		payload["quality"] = quality
 	}
 	meta.addTo(payload, images)
+	if a := imagebuffer.FromContext(ctx); a != nil && len(urls) != len(images) {
+		delete(payload, "data")
+		return imagebuffer.OpenAIResponse(a, payload, images)
+	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, adobe.NewRequestError(fmt.Sprintf("encode images response: %v", err))

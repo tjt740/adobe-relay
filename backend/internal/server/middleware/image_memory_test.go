@@ -188,7 +188,7 @@ func TestImageMemoryConcurrentLargeMultipartRemainsBounded(t *testing.T) {
 	require.NoError(t, w.Close())
 	payload := body.Bytes()
 	contentType := w.FormDataContentType()
-	g := newImageMemoryGuard(128<<20, 128<<20)
+	g := newImageMemoryGuard(64<<20, 128<<20)
 	entered := make(chan struct{}, 40)
 	release := make(chan struct{})
 	var active, peak atomic.Int64
@@ -249,4 +249,25 @@ func TestImageMemoryConcurrentLargeMultipartRemainsBounded(t *testing.T) {
 	wg.Wait()
 	require.True(t, g.bytes.TryAcquire(g.capacity))
 	g.bytes.Release(g.capacity)
+}
+
+func TestImageMemoryParsingReleasesHeadroomAndLegacyOutputMustReacquire(t *testing.T) {
+	g := newImageMemoryGuard(40<<20, 128<<20)
+	lease := &imageMemoryLease{guard: g}
+	require.True(t, lease.resize(30<<20))
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("POST", "/v1/images/edits", nil)
+	c.Set(imageMemoryLeaseKey, lease)
+	require.True(t, FinishImageRequestParsing(c, 2<<20, 1))
+	require.EqualValues(t, 6<<20, g.used.Load())
+	// Other requests can immediately use released parse/output headroom.
+	require.True(t, g.bytes.TryAcquire(10<<20))
+	// An unbuffered failover cannot submit until its original output budget fits.
+	require.False(t, FinishImageMemoryPreparation(c, 2<<20, 1))
+	require.EqualValues(t, 6<<20, lease.weight)
+	g.bytes.Release(10 << 20)
+	require.True(t, FinishImageMemoryPreparation(c, 2<<20, 1))
+	require.EqualValues(t, 38<<20, lease.weight)
+	require.True(t, lease.resize(0))
+	require.Zero(t, g.used.Load())
 }
