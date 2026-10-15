@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/imagebuffer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -165,6 +166,14 @@ func TestImageDownloadFallbackDefaultAndDirectGuards(t *testing.T) {
 }
 
 func TestImageDownloadFallbackRecoversRealTLSFailure(t *testing.T) {
+	for _, buffered := range []bool{false, true} {
+		t.Run(fmt.Sprint(buffered), func(t *testing.T) {
+			testImageDownloadFallbackRecoversRealTLSFailure(t, buffered)
+		})
+	}
+}
+
+func testImageDownloadFallbackRecoversRealTLSFailure(t *testing.T, buffered bool) {
 	var proxyCalls, originCalls atomic.Int32
 	origin := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		originCalls.Add(1)
@@ -204,7 +213,17 @@ func TestImageDownloadFallbackRecoversRealTLSFailure(t *testing.T) {
 	transport.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
 		return (&net.Dialer{}).DialContext(ctx, network, u.Host)
 	}
-	result, err := generateTestImage(client, t)
+	ctx := context.Background()
+	if buffered {
+		arena, err := imagebuffer.New(160 << 20)
+		require.NoError(t, err)
+		defer arena.Close()
+		ctx = imagebuffer.WithArena(ctx, arena)
+	}
+	result, err := client.GenerateImage(ctx, GenerateImageInput{
+		Token: fakeToken(t), Options: ImagePayloadOptions{Prompt: "x", AspectRatio: "1:1", UpstreamModelID: "gpt-image"},
+		PollInterval: time.Millisecond,
+	})
 	require.NoError(t, err)
 	require.Equal(t, []byte("original image bytes"), result.Bytes)
 	require.True(t, result.Timings.DownloadFallback)

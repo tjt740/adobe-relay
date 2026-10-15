@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -70,6 +71,7 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 		timeScale = scale
 	}
 	compact := os.Getenv("ADOBE_HISTORY_COMPACT_RESERVATION") == "1"
+	mixed := os.Getenv("ADOBE_HISTORY_MIXED") == "1"
 	totals := []int{100, 200, 300, 400}
 	if count, e := strconv.Atoi(os.Getenv("ADOBE_HISTORY_TOTAL")); e == nil && count > 0 {
 		totals = []int{count}
@@ -111,10 +113,15 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 				if !FinishImageRequestParsing(c, service.AdobeImageRetainedBytes(parsed), parsed.N) {
 					return
 				}
+				legacy := c.GetHeader("X-Replay-Legacy") == "1"
 				bufferCtx := c.Request.Context()
 				cleanup := func() {}
 				buffered := false
-				if compact {
+				if legacy {
+					if !FinishImageMemoryPreparation(c, int64(len(raw)), parsed.N) {
+						return
+					}
+				} else if compact {
 					// CI reserves the known synthetic output bound, keeping
 					// identical mapped IO while avoiding 160 MiB of unused
 					// physical disk per tiny fake image on limited runners.
@@ -130,7 +137,7 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 					bufferCtx, cleanup, buffered = service.PrepareAdobeImageBuffer(c.Request.Context(), parsed)
 				}
 				defer cleanup()
-				if !buffered {
+				if !legacy && !buffered {
 					t.Error("isolated replay needs disk buffering")
 					c.Status(500)
 					arrived.Add(1)
@@ -159,13 +166,26 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 					if compact {
 						readLimit = int64(outputMB << 20)
 					}
-					images[i], e = arena.Read(&historyFill{int64(outputMB << 20)}, readLimit)
+					if legacy {
+						images[i], e = io.ReadAll(&historyFill{int64(outputMB << 20)})
+					} else {
+						images[i], e = arena.Read(&historyFill{int64(outputMB << 20)}, readLimit)
+					}
 					if e != nil {
 						t.Error(e)
 						break
 					}
 				}
-				body, e := imagebuffer.OpenAIResponse(arena, map[string]any{"created": 1}, images)
+				var body []byte
+				if legacy {
+					items := make([]map[string]string, len(images))
+					for i, img := range images {
+						items[i] = map[string]string{"b64_json": base64.StdEncoding.EncodeToString(img)}
+					}
+					body, e = json.Marshal(map[string]any{"created": 1, "data": items})
+				} else {
+					body, e = imagebuffer.OpenAIResponse(arena, map[string]any{"created": 1}, images)
+				}
 				if e != nil {
 					t.Error(e)
 				}
@@ -202,6 +222,9 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 				req := httptest.NewRequest("POST", "/v1/images/edits", reader)
 				req.Header.Set("X-Replay-Duration-Ms", strconv.FormatInt(sample.DurationMS, 10))
 				req.Header.Set("Content-Type", "multipart/form-data; boundary=hist")
+				if mixed && i%40 < 7 { // observed 17.5% requested explicit transcoding
+					req.Header.Set("X-Replay-Legacy", "1")
+				}
 				req.ContentLength = int64(len(prefix)+len(suffix)) + size
 				if i%10 == 0 {
 					req.ContentLength = -1
