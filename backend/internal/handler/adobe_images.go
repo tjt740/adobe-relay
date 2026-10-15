@@ -94,7 +94,7 @@ func (h *GatewayHandler) AdobeImages(c *gin.Context) {
 		return
 	}
 
-	if !middleware2.FinishImageMemoryPreparation(c, int64(len(body)), parsed.N) {
+	if !middleware2.FinishImageRequestParsing(c, service.AdobeImageRetainedBytes(parsed), parsed.N) {
 		return
 	}
 
@@ -247,7 +247,7 @@ func (h *GatewayHandler) AdobeGeminiImages(c *gin.Context, apiKey *service.APIKe
 		zap.String("image_size", call.ImageSize),
 	)
 
-	if !middleware2.FinishImageMemoryPreparation(c, int64(len(body))+int64(len(relayBody)), parsed.N) {
+	if !middleware2.FinishImageRequestParsing(c, 3*(int64(len(body))+int64(len(relayBody))), parsed.N) {
 		return
 	}
 
@@ -477,6 +477,12 @@ func (h *GatewayHandler) runAdobeImagesFailover(
 
 		attempts++
 		if service.IsAdobeRelayAccount(account) {
+			// A previous native attempt may have used disk-backed output. A
+			// relay must reserve its original heap budget before any submission.
+			if !middleware2.FinishImageMemoryPreparation(c, int64(len(req.body))+int64(len(req.relayBody)), parsed.N) {
+				releaseAccount()
+				return
+			}
 			_, done := h.tryAdobeImagesRelay(
 				c, reqLog, apiKey, subject, subscription, account, req, failedAccountIDs, &lastFailover, attempts)
 			releaseAccount()
@@ -507,7 +513,24 @@ func (h *GatewayHandler) runAdobeImagesFailover(
 		}
 
 		// 提交之后的阶段在 service 内脱离客户端连接：拿到产物就一定记账，即便客户端已断开。
-		result, err := h.adobeImageService.GenerateCall(requestCtx, account, token, req.call)
+		generationCtx := requestCtx
+		cleanup := func() {}
+		buffered := false
+		if !req.writesGemini() {
+			generationCtx, cleanup, buffered = service.PrepareAdobeImageBuffer(requestCtx, parsed)
+			defer cleanup() // Panic/early-return protection; Close is idempotent.
+		}
+		if buffered {
+			if !middleware2.FinishImageRequestParsing(c, service.AdobeImageRetainedBytes(parsed), parsed.N) {
+				cleanup()
+				releaseAccount()
+				return
+			}
+		} else if !middleware2.FinishImageMemoryPreparation(c, int64(len(req.body))+int64(len(req.relayBody)), parsed.N) {
+			releaseAccount()
+			return
+		}
+		result, err := h.adobeImageService.GenerateCall(generationCtx, account, token, req.call)
 		h.gatewayService.RecordAdobeHealth(requestCtx, account, healthStarted, adobeHealthModel(account, req), err)
 		releaseAccount()
 		if err == nil {
@@ -515,6 +538,7 @@ func (h *GatewayHandler) runAdobeImagesFailover(
 			h.finishAdobeImagesSuccess(c, reqLog, apiKey, subject, subscription, account, result, req)
 			return
 		}
+		cleanup()
 		failureLog := reqLog.With(service.RecordAdobeImageFailure(c, account, parsed.Model, err)...)
 		failureLog.Warn("adobe_images.upstream_failed", zap.Int64("account_id", account.ID))
 

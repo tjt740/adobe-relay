@@ -17,7 +17,8 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-const imageRequestBaseMemory = int64(32 << 20)
+const imageRequestBaseMemory = int64(4 << 20)
+const imageUnbufferedOutputMemory = int64(32 << 20)
 
 // ImageRequestMemoryBudget runs after authentication but BEFORE any middleware
 // reads the body. Business concurrency admission happens after parsing/auditing
@@ -116,8 +117,33 @@ func FinishImageMemoryPreparation(c *gin.Context, bodyBytes int64, images int) b
 	if images < 1 || images > 10 {
 		images = 1
 	} // Invalid values use the existing parameter validator.
-	if !lease.resize(imageMemoryWeight(bodyBytes, 3, int64(images))) {
-		lease.guard.reject(c, "preparation", imageMemoryWeight(bodyBytes, 3, int64(images)))
+	output := imageUnbufferedOutputMemory * int64(images)
+	weight := int64(math.MaxInt64)
+	if bodyBytes >= 0 && bodyBytes <= (math.MaxInt64-output)/3 {
+		weight = bodyBytes*3 + output
+	}
+	if !lease.resize(weight) {
+		lease.guard.reject(c, "preparation", weight)
+		return false
+	}
+	return true
+}
+
+// FinishImageRequestParsing retains inputs and small working buffers. Output
+// memory must be reserved separately before an unbuffered upstream attempt.
+// Buffered native attempts use this same weight after reserving physical disk.
+func FinishImageRequestParsing(c *gin.Context, retainedBytes int64, images int) bool {
+	raw, ok := c.Get(imageMemoryLeaseKey)
+	if !ok {
+		return true
+	}
+	if images < 1 || images > 10 {
+		images = 1
+	}
+	lease := raw.(*imageMemoryLease)
+	weight := imageMemoryWeight(retainedBytes, 1, int64(images))
+	if !lease.resize(weight) {
+		lease.guard.reject(c, "parsed_input", weight)
 		return false
 	}
 	return true

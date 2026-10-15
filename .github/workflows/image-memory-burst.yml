@@ -1,0 +1,57 @@
+name: Offline image memory burst validation
+on:
+  push:
+    branches: [codex/adobe-memory-burst]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: offline-image-memory-burst
+  cancel-in-progress: false
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Unit and compatibility checks
+        working-directory: backend
+        run: |
+          go test -race ./internal/pkg/imagebuffer ./internal/pkg/httputil
+          go test -race ./internal/server/middleware -run 'ImageMemory|GroupModelAllowlist|RequestBody'
+          go test -tags unit -race ./internal/pkg/adobe
+          go test -tags unit -race ./internal/service ./internal/handler -run 'Adobe|Images|Image.*Safety|AsyncImage|BatchImage|PromptGuard|SecurityAudit|ImageTask'
+      - name: Build offline replay binary
+        run: |
+          mkdir -p "$RUNNER_TEMP/image-replay"
+          cd backend
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go test -c -ldflags='-s -w' -o "$RUNNER_TEMP/image-replay/memory.test" ./internal/server/middleware
+      - name: Read only sanitized historical metadata
+        env:
+          SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/replay_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/replay_key ~/.ssh/known_hosts
+          ssh -i ~/.ssh/replay_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 root@173.234.15.150 'cat /opt/adobe-relay/releases/adobe-memory-history-validation-20261015/trace.json' > "$RUNNER_TEMP/image-replay/trace.json"
+          rm -f ~/.ssh/replay_key
+      - name: Replay without network under hard memory limits
+        run: python3 deploy/primary/image-memory-burst-ci.py "$RUNNER_TEMP/image-replay"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: image-memory-burst-results
+          path: |
+            ${{ runner.temp }}/image-replay/*.log
+            ${{ runner.temp }}/image-replay/linux-validation.json
+          retention-days: 14
+      - name: Remove temporary key and metadata
+        if: always()
+        run: rm -f ~/.ssh/replay_key "$RUNNER_TEMP/image-replay/trace.json"

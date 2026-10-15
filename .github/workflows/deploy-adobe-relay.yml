@@ -51,7 +51,7 @@ jobs:
           cd backend
           go test -race ./internal/clash ./internal/proxyfailover
           go test -race ./internal/pkg/runtimediag
-          go test -race ./internal/pkg/httputil
+          go test -race ./internal/pkg/httputil ./internal/pkg/imagebuffer
           go test -race ./internal/server/middleware -run 'ImageMemory|GroupModelAllowlist|RequestBody'
           go test -race ./internal/server/routes -run 'ImageMemory|GroupModelAllowlist|AdobeImages|Composite.*Image'
           go test -tags unit -race ./internal/pkg/adobe
