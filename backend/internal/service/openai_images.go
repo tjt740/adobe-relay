@@ -68,9 +68,11 @@ type OpenAIImagesUpload struct {
 	FieldName   string
 	FileName    string
 	ContentType string
-	Data        []byte
-	Width       int
-	Height      int
+	// Data is immutable and may share the original request body. Callers that
+	// need to modify an upload must copy it first.
+	Data   []byte
+	Width  int
+	Height int
 }
 
 type OpenAIImagesRequest struct {
@@ -339,6 +341,7 @@ func parseOpenAIImagesMultipartRequest(body []byte, contentType string, req *Ope
 	}
 
 	reader := multipart.NewReader(bytes.NewReader(body), boundary)
+	uploadOffset := 0
 	for {
 		part, err := reader.NextPart()
 		if err == io.EOF {
@@ -361,6 +364,19 @@ func parseOpenAIImagesMultipartRequest(body []byte, contentType string, req *Ope
 
 		fileName := strings.TrimSpace(part.FileName())
 		if fileName != "" {
+			// Keep multipart validation/decoding in the standard library, but do
+			// not retain a second copy of every image throughout upstream polling.
+			// The raw body is already retained for relay failover and accounting.
+			// Decoded transfer encodings that differ from the wire retain their
+			// own buffer. A full slice expression prevents append from overwriting
+			// following multipart fields.
+			if len(data) > 0 {
+				if offset := bytes.Index(body[uploadOffset:], data); offset >= 0 {
+					start := uploadOffset + offset
+					uploadOffset = start + len(data)
+					data = body[start:uploadOffset:uploadOffset]
+				}
+			}
 			partContentType := strings.TrimSpace(part.Header.Get("Content-Type"))
 			if name == "mask" && len(data) > 0 {
 				req.HasMask = true
