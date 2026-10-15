@@ -51,9 +51,26 @@ def check_preserved(before, current):
     assert current['config_hashes'][str(RESOURCE)] == release.digest(expanded_resources(original)), 'Unreviewed resource change'
     approved = copy.deepcopy(current)
     approved['config_hashes'][str(RESOURCE)] = before['config_hashes'][str(RESOURCE)]
+    review_path = release.ROOT / 'reviewed-concurrent-setting.json'
+    if review_path.exists():
+        # A separate successful settings PUT at 17:00:46 changed this one UI
+        # preference after cutover. Preserve it; do not normalize any other key
+        # or accept another later value when checking rollback.
+        review = json.loads(review_path.read_text())
+        key = review['key']
+        assert key == 'channel_monitor_hide_user_ranking'
+        assert review['request']['method'] == 'PUT' and review['request']['path'] == '/api/v1/admin/settings' and review['request']['status'] == 200
+        assert review['before_hash'] == '68934a3e9455fa72420237eb05902327'
+        assert review['after_hash'] == 'b326b5062b2f0e69046810717534cb09'
+        assert before['settings_hashes'].get(key) == review['before_hash']
+        assert current['settings_hashes'].get(key) == review['after_hash'], 'Reviewed UI preference changed again'
+        approved['settings_hashes'][key] = review['before_hash']
     checks = _original_check(before, approved)
+    if review_path.exists():
+        checks['reviewed_concurrent_ui_setting_preserved'] = True
     memory = current['app_memory']
     assert memory['memory'] == 8 * 1024**3 and memory['go_memory_limit'] == '6144MiB', 'Approved memory limits not active'
+    assert memory['memory_swap'] == 16 * 1024**3, 'Derived memory/swap limit changed'
     assert memory['other_environment_hash'] == before['app_memory']['other_environment_hash'], 'Other runtime environment changed'
     checks['approved_memory_expansion_only'] = True
     return checks
