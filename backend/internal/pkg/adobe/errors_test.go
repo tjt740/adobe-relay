@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -187,7 +188,7 @@ func TestPromptUnsafeIsContentRejectedAcrossHTTPStatuses(t *testing.T) {
 	for _, status := range []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusUnavailableForLegalReasons} {
 		resp := &Response{
 			StatusCode: status,
-			Body:       []byte(`{"error_code":"prompt_unsafe","message":"private upstream details"}`),
+			Body:       []byte(fmt.Sprintf(`{"error_code":"prompt_unsafe","message":%q}`, strings.Repeat("private upstream details", 100))),
 		}
 		for _, err := range []error{c.errorForSubmit(resp, "submit"), c.errorForStatus(resp, "image poll")} {
 			var rejected *ContentRejectedError
@@ -206,7 +207,10 @@ func TestPollPromptUnsafeStopsWithoutRetryOrDownload(t *testing.T) {
 	for _, status := range []int{http.StatusOK, http.StatusBadRequest, http.StatusForbidden, http.StatusUnavailableForLegalReasons} {
 		t.Run(fmt.Sprint(status), func(t *testing.T) {
 			client, api, download := pollClient(t, "https://firefly-3p.ff.adobe.io/jobs/x", func(int) (*Response, error) {
-				return jsonResponse(t, status, map[string]any{"status": "FAILED", "error_code": "prompt_unsafe"}, nil), nil
+				return jsonResponse(t, status, map[string]any{
+					"status": "FAILED", "error_code": "prompt_unsafe",
+					"message": strings.Repeat("private upstream details", 100),
+				}, nil), nil
 			})
 			_, err := generateTestImage(client, t)
 			var rejected *ContentRejectedError

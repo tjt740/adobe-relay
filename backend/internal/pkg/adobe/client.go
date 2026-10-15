@@ -487,7 +487,7 @@ func (c *Client) poll(ctx context.Context, params pollParams) (result *GenerateR
 		if isTerminalJobStatus(jobStatus(latest, resp)) {
 			body := truncate(string(resp.Body), maxErrorBodyBytes)
 			message := fmt.Sprintf("%s job failed: %s", params.label, body)
-			if IsContentRejectedBody(body) {
+			if IsContentRejectedBody(string(resp.Body)) {
 				return nil, NewContentRejectedError(message, resp.StatusCode,
 					"Image content was rejected by the upstream safety filter")
 			}
@@ -683,7 +683,7 @@ func (c *Client) errorForSubmit(resp *Response, label string) error {
 	}
 	body := resp.BodyPreview()
 	message := fmt.Sprintf("%s failed: %d %s", label, resp.StatusCode, body)
-	return classifyAdobeHTTPError(resp.StatusCode, body, message)
+	return classifyAdobeHTTPError(resp.StatusCode, string(resp.Body), message)
 }
 
 func (c *Client) errorForStatus(resp *Response, label string) error {
@@ -695,7 +695,7 @@ func (c *Client) errorForStatus(resp *Response, label string) error {
 	}
 	body := resp.BodyPreview()
 	message := fmt.Sprintf("%s failed: %d %s", label, resp.StatusCode, body)
-	return classifyAdobeHTTPError(resp.StatusCode, body, message)
+	return classifyAdobeHTTPError(resp.StatusCode, string(resp.Body), message)
 }
 
 // classifyAdobeHTTPError 把非鉴权 HTTP 失败分成：内容安全拒绝、可重试临时故障、终态 4xx。
