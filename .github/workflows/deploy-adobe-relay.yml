@@ -51,6 +51,8 @@ jobs:
           cd backend
           go test -race ./internal/clash ./internal/proxyfailover
           go test -race ./internal/pkg/runtimediag
+          go test -race ./internal/server/middleware -run 'ImageMemory|GroupModelAllowlist|RequestBody'
+          go test -race ./internal/server/routes -run 'ImageMemory|GroupModelAllowlist|AdobeImages|Composite.*Image'
           go test -tags unit -race ./internal/pkg/adobe
           go test -tags unit -race ./internal/pkg/googleapi ./internal/handler ./internal/service -run 'HTTPStatusToGoogleStatus|Adobe|Images|Image.*Safety|AsyncImage|BatchImage|PromptGuard|SecurityAudit|ImageTask'
           go test -tags unit -race ./internal/service ./internal/repository ./internal/handler/admin ./internal/server/routes -run 'Okad|Adobe|Proxy|Schedulable|BulkUpdate|AccountRuntime|AccountConnectionTest|TablePreferences|BuildSMTPMessage|SendEmail|SMTP'
