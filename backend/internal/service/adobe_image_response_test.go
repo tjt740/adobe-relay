@@ -42,6 +42,7 @@ func TestAdobeImageResponseURLUsageAndMetadata(t *testing.T) {
 			require.Equal(t, "2x2", body["size"]) // Actual bytes, not the requested 4K.
 			require.Equal(t, "png", body["output_format"])
 			require.EqualValues(t, 10912, body["usage"].(map[string]any)["total_tokens"])
+			require.Equal(t, "upstream", body["usage_source"])
 			for _, entry := range body["data"].([]any) {
 				item := entry.(map[string]any)
 				if format == "url" {
@@ -69,13 +70,18 @@ func TestAdobeImageResponseTranscodeDoesNotReturnOriginalURL(t *testing.T) {
 			api := &adobeFakeTransport{}
 			svc := newAdobeTestService(t, adobeSubmitPollDownload(t, api, adobeTestPNG(t, false)), nil)
 			result, err := svc.Generate(context.Background(), adobeTestAccount(), "tok", &OpenAIImagesRequest{
-				Model: "gpt-image-2", Prompt: "x", Size: "1024x1024", ResponseFormat: "url", OutputFormat: format,
+				Model: "gpt-image-2", Prompt: "x", Size: "1024x1024", N: 2, ResponseFormat: "url", OutputFormat: format,
 			})
 			require.NoError(t, err)
 			var body map[string]any
 			require.NoError(t, json.Unmarshal(result.Body, &body))
 			require.Contains(t, body, "usage")
-			require.Nil(t, body["usage"])
+			require.Equal(t, "simulated", body["usage_source"])
+			total := body["usage"].(map[string]any)["total_tokens"].(float64)
+			require.GreaterOrEqual(t, total, float64(1800))
+			require.LessOrEqual(t, total, float64(3000))
+			require.Zero(t, result.Forward.Usage.InputTokens)
+			require.Zero(t, result.Forward.Usage.OutputTokens)
 			require.Equal(t, format, body["output_format"])
 			item := body["data"].([]any)[0].(map[string]any)
 			if format == "png" {

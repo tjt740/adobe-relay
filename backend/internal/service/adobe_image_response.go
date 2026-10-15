@@ -29,8 +29,14 @@ func validAdobeImageURLs(urls []string, count int) bool {
 }
 
 func (m adobeImageResponseMetadata) addTo(payload map[string]any, images [][]byte) {
-	// Unknown is not zero. A typed nil is deliberately encoded as JSON null.
-	payload["usage"] = m.Usage
+	// Preserve verified upstream counts, including zero and partial details.
+	// Only the response gets synthetic fallback counts; billing stays separate.
+	usage, source := m.Usage, "upstream"
+	if usage == nil {
+		hasInputImage := m.Request != nil && (len(m.Request.InputImageURLs) > 0 || len(m.Request.Uploads) > 0)
+		usage, source = simulatedAdobeImageUsage(hasInputImage), "simulated"
+	}
+	payload["usage"], payload["usage_source"] = usage, source
 	if m.Request != nil {
 		payload["model"] = m.Request.Model
 		if m.GPTImage {

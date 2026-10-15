@@ -8,8 +8,9 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
 )
 
-// These counts are only populated from an explicit upstream usage object.
-// Firefly credits, image size and prompt length are not token measurements.
+// The parser and aggregator accept only explicit upstream counts. The response
+// layer may also use this shape for explicitly labeled simulated data; it never
+// feeds that data back into the parser, aggregator or billing.
 type adobeImageUsage struct {
 	InputTokens         int64                   `json:"input_tokens"`
 	InputTokensDetails  *adobeImageTokenDetails `json:"input_tokens_details,omitempty"`
