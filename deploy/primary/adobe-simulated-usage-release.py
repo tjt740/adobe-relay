@@ -1,4 +1,4 @@
-"""Guard the labeled simulated Adobe image usage release and code-only rollback."""
+"""Guard the simulated Adobe image usage release and code-only rollback."""
 import importlib.util
 from pathlib import Path
 
