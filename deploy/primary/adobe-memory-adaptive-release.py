@@ -51,7 +51,21 @@ def check_preserved(before, current):
     assert current['config_hashes'][str(RESOURCE)] == release.digest(expanded_resources(original)), 'Unreviewed resource change'
     approved = copy.deepcopy(current)
     approved['config_hashes'][str(RESOURCE)] = before['config_hashes'][str(RESOURCE)]
+    review_path = release.ROOT / 'reviewed-concurrent-okad.json'
+    if review_path.exists():
+        review = json.loads(review_path.read_text())
+        name = 'adobe-team-cookie-app-1'
+        compose = '/opt/adobe-team-cookie/compose.yml'
+        assert before['containers'][name] == review['before_container'], 'Concurrent Okad review baseline changed'
+        assert before['config_hashes'][compose] == review['before_compose_hash']
+        for field in ('id', 'image', 'image_id'):
+            assert current['containers'][name][field] == review['after_container'][field], 'Later Okad release requires review'
+        assert current['config_hashes'][compose] == review['after_compose_hash'], 'Later Okad configuration requires review'
+        approved['containers'][name] = before['containers'][name]
+        approved['config_hashes'][compose] = before['config_hashes'][compose]
     checks = _original_check(before, approved)
+    if review_path.exists():
+        checks['reviewed_concurrent_okad_preserved'] = True
     memory = current['app_memory']
     assert memory['memory'] == 12 * 1024**3 and memory['go_memory_limit'] == '9216MiB', 'Approved memory limits not active'
     assert memory['memory_swap'] == 24 * 1024**3, 'Derived memory/swap limit changed'

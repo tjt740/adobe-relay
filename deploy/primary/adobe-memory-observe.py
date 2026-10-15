@@ -32,7 +32,8 @@ def traffic(start, end):
     counts = collections.Counter()
     for line in text.splitlines():
         m = re.search(r'\[([^\]]+)\] "(\w+) ([^ ]+) [^"]+" (\d{3}) ', line)
-        if not m or ('/images/' not in m[3] and 'generateContent' not in m[3]):
+        if not m or m[2] != 'POST' or not any(path in m[3].lower() for path in
+                ('/images/generations', '/images/edits', 'generatecontent')):
             continue
         at = datetime.datetime.strptime(m[1], '%d/%b/%Y:%H:%M:%S %z')
         if start <= at < end:
