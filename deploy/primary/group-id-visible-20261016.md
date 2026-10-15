@@ -17,3 +17,17 @@ python3 /opt/adobe-relay/releases/group-id-visible-20261016/group-id-visible-rel
 ```
 
 末尾改为 `rollback` 才恢复应用代码；依赖同目录 `image-response-release.py` 和 `expected-sha`。先校验后续版本、配置和其他容器，不绕过保护，不恢复旧数据库。浏览器已升级的列选择保存在各浏览器本地，代码回滚不主动重写它们。
+
+## 实际发布与核验
+
+功能 PR [#72](https://github.com/tjt740/adobe-relay/pull/72) 已合并，实际应用为 `c574dcc0dc6369cd05d94b25f75d4ea66c1e4bb1`。正式工作流 [38768162942](https://github.com/tjt740/adobe-relay/actions/runs/38768162942) 成功，北京时间 2026-10-16 00:37:39 启动新容器。后端检查、29 项发布保护、357 项前端回归、3 项 i18n、TypeScript 和镜像构建通过。前后 backend Git tree 均为 `e59cc6f3f80e38d607f5878e78992cee99c8f973`，没有后端行为改动。
+
+只读核验工作流 [38769850399](https://github.com/tjt740/adobe-relay/actions/runs/38769850399) 成功。两站 HTTPS、实时状态流、报表策略和新进程告警心跳正常；原配置、SMTP、告警规则、Okad 设置和其他容器身份/镜像一致。保留容器 12 GiB、Go 9216MiB、GOMAXPROCS=6 和原内存算法；本次未扩容。Okad 仍是 `b0f8e233eaac40d2c88119eb350b87fc536908fe` 及已上线叠加功能。
+
+实际切换备份 `/opt/adobe-relay/backups/20261015T163729Z-c574dcc0dc6369cd05d94b25f75d4ea66c1e4bb1` 与核验时的 956 个账号 ID 完全一致，人工暂停保持。#198/#328/#254 的代理变化都有原自动切换记录；#719/#720/#721/#1014/#1015/#1018 的 Cookie/Token 更新均对应 00:37–00:38 原 Okad credentials 接口成功请求。#719 状态/调度同时变化；#1018 当时已有检测显示 interrupted。核验不主动出图、检测、登录或发邮件，不恢复旧业务数据。分组 2 的 191 个账号和分组 7 的 18 个账号均继续不可调度。
+
+线上分组页资源从 `GroupsView-B7C8Pnif.js` 更新为 `GroupsView-D1p-GHgW.js`，确认列偏好版本为 3 且含 ID 显示迁移。实际浏览器在旧版先隐藏 ID，加载新版后不点击 ID 开关即自动显示；新版截图已保存。新浏览器默认值由页面回归覆盖。
+
+发布标签 `release/group-id-visible-20261016` 指向实际应用，前主干标签 `rollback/group-id-visible-20261016-before-main` 指向 `b589d78184178d41ea04fc6846068ad9b1b0fd95`。代码回滚保护检查通过，回退镜像保留为原实际 `c138d73dc`。审计目录含 before/after、business/proxy/account-state、credential-update-review、final-verification、expected-sha；本地另保留前后浏览器截图与线上资源摘要。
+
+归档提交使用 `[skip ci]`，不重复部署或重启。辅助核验分支 `codex/verify-group-id-visible` 只用于只读审计，不将其工作流替换合入主干；后续核验仍须填写实际应用 SHA。
