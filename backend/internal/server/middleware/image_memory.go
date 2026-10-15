@@ -18,6 +18,8 @@ import (
 )
 
 const imageRequestBaseMemory = int64(4 << 20)
+const imageParsedWorkMemory = int64(1 << 20)
+const imageInitialReadMemory = int64(1 << 20)
 const imageUnbufferedOutputMemory = int64(32 << 20)
 
 // ImageRequestMemoryBudget runs after authentication but BEFORE any middleware
@@ -46,6 +48,7 @@ type imageMemoryGuard struct {
 	bytes        *semaphore.Weighted
 	lastLog      atomic.Int64
 	runtimeLimit int64
+	runtimeUsage func() imageRuntimeFootprint
 	used         atomic.Int64
 	active       atomic.Int64
 }
@@ -54,34 +57,57 @@ func newImageMemoryGuard(capacity, maxBody int64) *imageMemoryGuard {
 	if capacity < 1 {
 		capacity = 1
 	}
-	return &imageMemoryGuard{capacity: capacity, maxBody: maxBody, bytes: semaphore.NewWeighted(capacity)}
+	return &imageMemoryGuard{capacity: capacity, maxBody: maxBody, bytes: semaphore.NewWeighted(capacity), runtimeUsage: imageRuntimeMemory}
 }
 
-func imageRuntimeMemory() uint64 {
-	samples := [2]metrics.Sample{{Name: "/memory/classes/total:bytes"}, {Name: "/memory/classes/heap/released:bytes"}}
+type imageRuntimeFootprint struct {
+	committed uint64
+	reusable  uint64
+}
+
+func (m imageRuntimeFootprint) pressure() uint64 {
+	// Completely free heap spans can satisfy a new allocation without growing
+	// the process. Keep fragmentation, stacks and all uncollected objects in
+	// the pressure calculation. Inconsistent samples must fail conservatively.
+	if m.reusable > m.committed {
+		return m.committed
+	}
+	return m.committed - m.reusable
+}
+
+func imageRuntimeMemory() imageRuntimeFootprint {
+	samples := [3]metrics.Sample{{Name: "/memory/classes/total:bytes"}, {Name: "/memory/classes/heap/released:bytes"}, {Name: "/memory/classes/heap/free:bytes"}}
 	metrics.Read(samples[:])
-	return samples[0].Value.Uint64() - samples[1].Value.Uint64()
+	return imageRuntimeFootprint{committed: samples[0].Value.Uint64() - samples[1].Value.Uint64(), reusable: samples[2].Value.Uint64()}
 }
 
 var errImageMemoryBusy = errors.New("image memory capacity exhausted")
 
 const imageMemoryLeaseKey = "image_request_memory_lease"
 
-// During reading/parsing, allow for raw chunks, decoding and audit copies.
-// Unknown sizes grow before allocation rather than reserving the entire pool.
+// Reserve only the first bounded read, even when Content-Length is known.
+// Later chunks acquire their full parse/audit allowance before allocation, so
+// a slow or overdeclared upload cannot hold six copies of bytes not yet sent.
 func (g *imageMemoryGuard) weight(r *http.Request) int64 {
 	size := r.ContentLength
 	if size < 0 || (r.Header.Get("Content-Encoding") != "" && !strings.EqualFold(r.Header.Get("Content-Encoding"), "identity")) {
 		size = 0
 	}
+	if size > imageInitialReadMemory {
+		size = imageInitialReadMemory
+	}
 	return imageMemoryWeight(size, 6, 1)
 }
 
 func imageMemoryWeight(size, multiplier, images int64) int64 {
-	if size < 0 || size > (math.MaxInt64-imageRequestBaseMemory*images)/multiplier {
+	return imageMemoryWeightWithBase(size, multiplier, images, imageRequestBaseMemory)
+}
+
+func imageMemoryWeightWithBase(size, multiplier, images, base int64) int64 {
+	if size < 0 || size > (math.MaxInt64-base*images)/multiplier {
 		return math.MaxInt64
 	}
-	return imageRequestBaseMemory*images + size*multiplier
+	return base*images + size*multiplier
 }
 
 type imageMemoryLease struct {
@@ -92,7 +118,7 @@ type imageMemoryLease struct {
 func (l *imageMemoryLease) resize(weight int64) bool {
 	delta := weight - l.weight
 	if delta > 0 {
-		if l.guard.runtimeLimit > 0 && imageRuntimeMemory()+uint64(delta) >= uint64(l.guard.runtimeLimit) {
+		if l.guard.runtimeLimit > 0 && l.guard.runtimeUsage().pressure()+uint64(delta) >= uint64(l.guard.runtimeLimit) {
 			return false
 		}
 		if !l.guard.bytes.TryAcquire(delta) {
@@ -131,9 +157,10 @@ func FinishImageMemoryPreparation(c *gin.Context, bodyBytes int64, images int) b
 	return true
 }
 
-// FinishImageRequestParsing retains inputs and small working buffers. Output
-// memory must be reserved separately before an unbuffered upstream attempt.
-// Buffered native attempts use this same weight after reserving physical disk.
+// FinishImageRequestParsing retains inputs and 1 MiB of working memory per
+// image after the parser/auditor has finished. Buffered output uses bounded
+// 64 KiB IO buffers; unbuffered attempts must reacquire their original output
+// allowance before submission. No output bytes are borrowed from this budget.
 func FinishImageRequestParsing(c *gin.Context, retainedBytes int64, images int) bool {
 	raw, ok := c.Get(imageMemoryLeaseKey)
 	if !ok {
@@ -143,7 +170,7 @@ func FinishImageRequestParsing(c *gin.Context, retainedBytes int64, images int) 
 		images = 1
 	}
 	lease := raw.(*imageMemoryLease)
-	weight := imageMemoryWeight(retainedBytes, 1, int64(images))
+	weight := imageMemoryWeightWithBase(retainedBytes, 1, int64(images), imageParsedWorkMemory)
 	if !lease.resize(weight) {
 		lease.guard.reject(c, "parsed_input", weight)
 		return false
@@ -255,6 +282,7 @@ func (g *imageMemoryGuard) reject(c *gin.Context, phase string, requested int64)
 	now := time.Now().Unix()
 	last := g.lastLog.Load()
 	if now-last >= 5 && g.lastLog.CompareAndSwap(last, now) {
-		slog.Info("image_memory.capacity_rejected", "budget_bytes", g.capacity, "reserved_bytes", g.used.Load(), "requested_bytes", requested, "active_requests", g.active.Load(), "runtime_bytes", imageRuntimeMemory(), "phase", phase, "queue_enabled", false)
+		memory := g.runtimeUsage()
+		slog.Info("image_memory.capacity_rejected", "budget_bytes", g.capacity, "reserved_bytes", g.used.Load(), "requested_bytes", requested, "active_requests", g.active.Load(), "runtime_bytes", memory.committed, "runtime_reusable_bytes", memory.reusable, "runtime_pressure_bytes", memory.pressure(), "phase", phase, "queue_enabled", false)
 	}
 }

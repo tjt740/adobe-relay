@@ -3,6 +3,15 @@ on:
   push:
     branches: [codex/adobe-memory-burst]
   workflow_dispatch:
+    inputs:
+      compare_baseline:
+        description: Compare the staged reservation algorithm with deployed 8db3c34
+        type: boolean
+        default: false
+      reuse_compatibility_from:
+        description: Reuse passed compatibility checks only for unchanged backend 45a38fc
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -11,14 +20,24 @@ concurrency:
 jobs:
   replay:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
+      - name: Verify an unchanged backend before reusing compatibility results
+        if: inputs.reuse_compatibility_from != ''
+        env:
+          CHECKED_SHA: ${{ inputs.reuse_compatibility_from }}
+        run: |
+          test "$CHECKED_SHA" = 45a38fc095c16258b7fdeb97a45dbae2e340df93
+          git fetch --depth=1 origin "$CHECKED_SHA"
+          git diff --exit-code "$CHECKED_SHA" HEAD -- backend
+          echo 'Backend identical to compatibility checks passed in workflow 38739411163.'
       - name: Unit and compatibility checks
+        if: inputs.reuse_compatibility_from == ''
         working-directory: backend
         run: |
           go test -race ./internal/pkg/imagebuffer ./internal/pkg/httputil
@@ -42,8 +61,18 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/replay_key ~/.ssh/known_hosts
           ssh -i ~/.ssh/replay_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 root@173.234.15.150 'cat /opt/adobe-relay/releases/adobe-memory-history-validation-20261015/trace.json' > "$RUNNER_TEMP/image-replay/trace.json"
+          ssh -i ~/.ssh/replay_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 root@173.234.15.150 'python3 -' < deploy/primary/image-memory-runtime-limits.py > "$RUNNER_TEMP/image-replay/production-limits.json"
           rm -f ~/.ssh/replay_key
+      - name: Build deployed baseline for an identical-load comparison
+        if: inputs.compare_baseline
+        run: |
+          git fetch --depth=1 origin 8db3c34e862dfe07d556ef9b882d0d351113de0f
+          git worktree add --detach "$RUNNER_TEMP/image-baseline" 8db3c34e862dfe07d556ef9b882d0d351113de0f
+          cd "$RUNNER_TEMP/image-baseline/backend"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go test -c -ldflags='-s -w' -o "$RUNNER_TEMP/image-replay/memory-baseline.test" ./internal/server/middleware
       - name: Replay without network under hard memory limits
+        env:
+          ADOBE_MEMORY_COMPARE_BASELINE: ${{ inputs.compare_baseline }}
         run: python3 deploy/primary/image-memory-burst-ci.py "$RUNNER_TEMP/image-replay"
       - uses: actions/upload-artifact@v4
         if: always()
@@ -52,6 +81,7 @@ jobs:
           path: |
             ${{ runner.temp }}/image-replay/*.log
             ${{ runner.temp }}/image-replay/linux-validation.json
+            ${{ runner.temp }}/image-replay/production-limits.json
           retention-days: 14
       - name: Remove temporary key and metadata
         if: always()
