@@ -1,5 +1,6 @@
 import copy
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -57,6 +58,30 @@ class AdaptiveMemoryReleaseGuardTests(unittest.TestCase):
     def test_expansion_refuses_other_baselines(self):
         with self.assertRaises(AssertionError):
             module.expanded_resources(self.raw.replace(b'8g', b'4g'))
+
+    def test_reviewed_concurrent_okad_update_is_exactly_preserved(self):
+        name = 'adobe-team-cookie-app-1'
+        compose = '/opt/adobe-team-cookie/compose.yml'
+        old = {'id': 'old-okad', 'image': 'old-tag', 'image_id': 'old-image'}
+        new = {'id': 'new-okad', 'image': 'new-tag', 'image_id': 'new-image'}
+        self.before['containers'][name] = old
+        self.before['config_hashes'][compose] = 'old-compose'
+        self.current['containers'][name] = new
+        self.current['config_hashes'][compose] = 'new-compose'
+        review = {'before_container': old, 'after_container': new,
+                  'before_compose_hash': 'old-compose', 'after_compose_hash': 'new-compose'}
+        with self.assertRaises(AssertionError):
+            module.check_preserved(self.before, self.current)
+        (module.release.ROOT / 'reviewed-concurrent-okad.json').write_text(json.dumps(review))
+        self.assertTrue(module.check_preserved(self.before, self.current)['reviewed_concurrent_okad_preserved'])
+        for field in ('id', 'image', 'image_id'):
+            changed = copy.deepcopy(self.current)
+            changed['containers'][name][field] = 'later-release'
+            with self.assertRaises(AssertionError):
+                module.check_preserved(self.before, changed)
+        self.current['config_hashes'][compose] = 'later-config'
+        with self.assertRaises(AssertionError):
+            module.check_preserved(self.before, self.current)
 
 
 
