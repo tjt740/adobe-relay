@@ -172,11 +172,31 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
 
 ```json
 {
-  "input_tokens": 2120,
-  "input_tokens_details": {"image_tokens": 0, "text_tokens": 2120},
-  "output_tokens": 3336,
-  "total_tokens": 5456,
-  "output_tokens_details": {"image_tokens": 3336, "text_tokens": 0}
+  "background": "auto",
+  "created": 1788430668,
+  "data": [
+    {
+      "url": "https://example.invalid/temporary-image.png?signature=EXAMPLE"
+    }
+  ],
+  "model": "gpt-image-2",
+  "moderation": "auto",
+  "output_format": "png",
+  "quality": "medium",
+  "size": "3840x2160",
+  "usage": {
+    "input_tokens": 2120,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 2120
+    },
+    "output_tokens": 3336,
+    "total_tokens": 5456,
+    "output_tokens_details": {
+      "image_tokens": 3336,
+      "text_tokens": 0
+    }
+  }
 }
 ```
 
@@ -201,4 +221,4 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
 
 本说明默认 `stream: false`，Adobe 直连当前不提供原生流式出图。兼容中转流若已发出图片/心跳并提交 HTTP 200，HTTP 协议无法再改变状态；后续违规在错误事件的 `error.status_code` 中给出 **451**。开启 JSON 心跳的兼容接口也需检查错误对象。完整成功应同时满足无 `error` 且存在图片，不能只看 HTTP 200。
 
-Gemini 兼容入口仍采用 Google 错误信封：违规时 HTTP 451，`error.code: 451`、`error.status: "PERMISSION_DENIED"`。异步任务只在支持该功能的分组启用；提交前拒绝为 451，已接受任务的查询 HTTP 200 表示查询成功，任务失败需读取任务状态及保存的错误状态码，不能当成图片成功。本项目 Adobe 直连请使用上面的同步接口。
+Gemini 兼容入口仍采用 Google 错误信封：违规时 HTTP 451，`error.code: 451`、`error.status: "PERMISSION_DENIED"`。异步任务只在支持该功能的分组启用；提交前拒绝为 451，已接受任务的查询 HTTP 200 表示查询成功，任务失败需读取 `status: "failed"` 及 `http_status: 451`，不能当成图片成功。本项目 Adobe 直连请使用上面的同步接口。
