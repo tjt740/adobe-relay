@@ -16,6 +16,7 @@ type OperationError struct {
 	JobID             string
 	Attempts          int
 	ElapsedMS         int64
+	DownloadFallback  bool
 	Err               error
 }
 

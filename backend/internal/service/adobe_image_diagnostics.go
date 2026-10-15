@@ -30,6 +30,7 @@ func RecordAdobeImageFailure(c *gin.Context, account *Account, model string, err
 	status, attempts := 0, 0
 	var elapsedMS int64
 	requestID, jobID := "", ""
+	downloadFallback := false
 	var reqErr *adobe.RequestError
 	if errors.As(err, &reqErr) {
 		status, errorType = reqErr.StatusCode, reqErr.ErrorType
@@ -46,12 +47,14 @@ func RecordAdobeImageFailure(c *gin.Context, account *Account, model string, err
 	if errors.As(err, &op) {
 		stage, attempts, elapsedMS = op.Stage, op.Attempts, op.ElapsedMS
 		requestID, jobID = op.UpstreamRequestID, op.JobID
+		downloadFallback = op.DownloadFallback
 	}
 	proxyID, proxyName := opsUpstreamProxyAttribution(account)
 	detail, _ := json.Marshal(map[string]any{
 		"stage": stage, "error_type": errorType, "upstream_http_status": status,
 		"stage_attempts": attempts, "stage_elapsed_ms": elapsedMS, "job_id": jobID,
 		"upstream_request_id": requestID, "message": message,
+		"download_fallback": downloadFallback,
 	})
 	setOpsUpstreamError(c, status, message, string(detail))
 	if c != nil {
@@ -82,5 +85,6 @@ func RecordAdobeImageFailure(c *gin.Context, account *Account, model string, err
 		zap.Int("upstream_http_status", status), zap.Int("stage_attempts", attempts),
 		zap.Int64("stage_elapsed_ms", elapsedMS), zap.String("upstream_request_id", requestID),
 		zap.String("job_id", jobID), zap.Any("proxy_id", proxyID),
+		zap.Bool("download_fallback", downloadFallback),
 	}
 }

@@ -50,6 +50,10 @@ type ClientConfig struct {
 	Transport Transport
 	// DownloadTransport 用于下载 presigned 产物；为空时用标准库实现。
 	DownloadTransport Transport
+	// ImageDownloadFallbackTransport retrieves the same image after a retryable
+	// download failure. The default proxied downloader falls back to guarded
+	// direct egress. Custom download transports opt in explicitly; videos do not.
+	ImageDownloadFallbackTransport Transport
 	// ProxyURL 是账号级代理，仅在 Transport / DownloadTransport 未显式给出时生效。
 	ProxyURL string
 }
@@ -59,9 +63,10 @@ type ClientConfig struct {
 // 它不持有账号 token：token 由调用方按请求传入，因为账号池会在同一个 Client 配置下
 // 轮换多个账号。
 type Client struct {
-	identity          Identity
-	transport         Transport
-	downloadTransport Transport
+	identity              Identity
+	transport             Transport
+	downloadTransport     Transport
+	imageDownloadFallback Transport
 }
 
 // NewClient 构造 Firefly 客户端。
@@ -72,10 +77,14 @@ func NewClient(cfg ClientConfig) *Client {
 		transport = NewImpersonateTransport(identity, cfg.ProxyURL)
 	}
 	download := cfg.DownloadTransport
+	fallback := cfg.ImageDownloadFallbackTransport
 	if download == nil {
 		download = NewPlainTransport(cfg.ProxyURL)
+		if fallback == nil && (strings.TrimSpace(cfg.ProxyURL) != "" || environmentProxyConfigured()) {
+			fallback = newDirectDownloadTransport()
+		}
 	}
-	return &Client{identity: identity, transport: transport, downloadTransport: download}
+	return &Client{identity: identity, transport: transport, downloadTransport: download, imageDownloadFallback: fallback}
 }
 
 // Identity 返回客户端使用的身份参数。
@@ -248,6 +257,7 @@ type GenerationTimings struct {
 	SubmitAttempts   int   `json:"submit_attempts"`
 	PollCount        int   `json:"poll_count"`
 	DownloadAttempts int   `json:"download_attempts"`
+	DownloadFallback bool  `json:"download_fallback,omitempty"`
 	// HTTP time includes both network transit and Adobe's handling/long polling.
 	// It is not a measurement of network latency alone.
 	PollHTTPMS         int64             `json:"poll_http_ms"`
@@ -316,14 +326,15 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) (r
 	}
 	submitMS := time.Since(submitStarted).Milliseconds()
 	result, err = c.poll(ctx, pollParams{
-		token:        input.Token,
-		pollURL:      NormalizePollURL(pollURL),
-		label:        "image",
-		outputKey:    "image",
-		timeout:      orDuration(input.Timeout, DefaultImageTimeout),
-		pollInterval: orDuration(input.PollInterval, DefaultImagePollInterval),
-		maxDownload:  MaxImageDownloadBytes,
-		downloadWait: defaultSubmitTimeout,
+		token:            input.Token,
+		pollURL:          NormalizePollURL(pollURL),
+		label:            "image",
+		outputKey:        "image",
+		timeout:          orDuration(input.Timeout, DefaultImageTimeout),
+		pollInterval:     orDuration(input.PollInterval, DefaultImagePollInterval),
+		maxDownload:      MaxImageDownloadBytes,
+		downloadWait:     defaultSubmitTimeout,
+		downloadFallback: c.imageDownloadFallback,
 	})
 	if result != nil {
 		result.Timings.SubmitMS = submitMS
@@ -386,8 +397,9 @@ type pollParams struct {
 	timeout      time.Duration
 	pollInterval time.Duration
 	// maxDownload / downloadWait 是产物下载的大小上限与单次超时。
-	maxDownload  int64
-	downloadWait time.Duration
+	maxDownload      int64
+	downloadWait     time.Duration
+	downloadFallback Transport
 }
 
 func (c *Client) poll(ctx context.Context, params pollParams) (result *GenerateResult, retErr error) {
@@ -481,7 +493,7 @@ func (c *Client) poll(ctx context.Context, params pollParams) (result *GenerateR
 			timings.PollCount = attempts
 			timings.PollHTTPMS = httpTime.Milliseconds()
 			timings.PollWaitMS = waitTime.Milliseconds()
-			bytes, err := c.downloadMeasured(ctx, mediaURL, params.maxDownload, params.downloadWait, &timings)
+			bytes, err := c.downloadMeasured(ctx, mediaURL, params.maxDownload, params.downloadWait, &timings, params.downloadFallback)
 			if err != nil {
 				return nil, err
 			}
@@ -554,18 +566,24 @@ func waitNextPoll(ctx context.Context, deadline time.Time, params pollParams) er
 }
 
 func (c *Client) download(ctx context.Context, mediaURL string, maxBytes int64, timeout time.Duration) (data []byte, retErr error) {
-	return c.downloadMeasured(ctx, mediaURL, maxBytes, timeout, nil)
+	return c.downloadMeasured(ctx, mediaURL, maxBytes, timeout, nil, nil)
 }
 
-func (c *Client) downloadMeasured(ctx context.Context, mediaURL string, maxBytes int64, timeout time.Duration, timings *GenerationTimings) (data []byte, retErr error) {
+func (c *Client) downloadMeasured(ctx context.Context, mediaURL string, maxBytes int64, timeout time.Duration, timings *GenerationTimings, fallback Transport) (data []byte, retErr error) {
 	started := time.Now()
 	var resp *Response
 	attempts := 0
+	usedFallback := false
 	defer func() {
 		retErr = operationError(retErr, "download", started, attempts, resp, "")
+		var op *OperationError
+		if errors.As(retErr, &op) {
+			op.DownloadFallback = usedFallback
+		}
 		if timings != nil {
 			timings.DownloadMS = time.Since(started).Milliseconds()
 			timings.DownloadAttempts = attempts
+			timings.DownloadFallback = usedFallback
 		}
 	}()
 	if err := validateDownloadURL(mediaURL); err != nil {
@@ -576,7 +594,14 @@ func (c *Client) downloadMeasured(ctx context.Context, mediaURL string, maxBytes
 			return nil, err
 		}
 		var err error
-		resp, err = c.downloadTransport.Do(ctx, &Request{
+		transport := c.downloadTransport
+		if attempts > 1 && fallback != nil {
+			transport = fallback
+			usedFallback = true
+		}
+		// Retry only this GET, with its original signed URL and no Adobe credentials.
+		// Switching egress never changes the account or resubmits a generation.
+		resp, err = transport.Do(ctx, &Request{
 			Method: http.MethodGet, URL: mediaURL,
 			Headers: map[string]string{"accept": "*/*"},
 			Timeout: orDuration(timeout, defaultSubmitTimeout), MaxBodyBytes: maxBytes,
