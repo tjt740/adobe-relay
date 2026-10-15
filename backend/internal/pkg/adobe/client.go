@@ -447,6 +447,10 @@ func (c *Client) poll(ctx context.Context, params pollParams) (result *GenerateR
 			}
 			continue
 		}
+		// Explicit safety failures take precedence over progress, output placeholders and HTTP status.
+		if IsContentRejectedBody(string(resp.Body)) {
+			return nil, c.errorForStatus(resp, params.label+" poll")
+		}
 		switch {
 		case resp.StatusCode == http.StatusOK, resp.StatusCode == http.StatusCreated:
 		case resp.StatusCode == http.StatusAccepted:
@@ -675,7 +679,7 @@ func waitRetry(ctx context.Context, wait time.Duration, attempt int) error {
 
 // errorForSubmit 处理提交响应，把 401/403 细分成配额耗尽、权益不足与鉴权失效。
 func (c *Client) errorForSubmit(resp *Response, label string) error {
-	if resp.StatusCode == http.StatusOK {
+	if resp.StatusCode == http.StatusOK && !IsContentRejectedBody(string(resp.Body)) {
 		return nil
 	}
 	if isAuthStatus(resp.StatusCode) && !IsContentRejectedBody(string(resp.Body)) {
@@ -687,7 +691,7 @@ func (c *Client) errorForSubmit(resp *Response, label string) error {
 }
 
 func (c *Client) errorForStatus(resp *Response, label string) error {
-	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
+	if (resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated) && !IsContentRejectedBody(string(resp.Body)) {
 		return nil
 	}
 	if isAuthStatus(resp.StatusCode) && !IsContentRejectedBody(string(resp.Body)) {

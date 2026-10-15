@@ -34,15 +34,15 @@ func TestExtractImagesUpstreamError_IncompleteIsRetryable(t *testing.T) {
 	}
 }
 
-// incomplete 因 content_filter → 400，重试无意义，不应触发 failover。
+// incomplete 因 content_filter → 451，重试无意义，不应触发 failover。
 func TestExtractImagesUpstreamError_IncompleteContentFilterNotRetryable(t *testing.T) {
 	body := "data: {\"type\":\"response.incomplete\",\"response\":{\"id\":\"r\",\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"content_filter\"}}}\n\n"
 	got := extractOpenAIImagesUpstreamError([]byte(body))
 	if got == nil {
 		t.Fatal("content_filter incomplete should produce error")
 	}
-	if got.StatusCode != http.StatusBadRequest {
-		t.Fatalf("content_filter should be 400 (non-retryable), got %d", got.StatusCode)
+	if got.StatusCode != http.StatusUnavailableForLegalReasons {
+		t.Fatalf("content_filter should be 451 (non-retryable), got %d", got.StatusCode)
 	}
 	if IsOpenAIImagesRetryableUpstreamError(got) {
 		t.Fatal("content_filter must NOT be retryable")
@@ -52,8 +52,8 @@ func TestExtractImagesUpstreamError_IncompleteContentFilterNotRetryable(t *testi
 // 旧行为不变：error / response.failed 仍按原逻辑识别。
 func TestExtractImagesUpstreamError_ErrorAndFailedUnchanged(t *testing.T) {
 	errBody := "data: {\"type\":\"error\",\"error\":{\"type\":\"image_generation_user_error\",\"code\":\"moderation_blocked\",\"message\":\"rejected\"}}\n\n"
-	if got := extractOpenAIImagesUpstreamError([]byte(errBody)); got == nil || got.StatusCode != http.StatusBadRequest {
-		t.Fatalf("moderation_blocked should still be 400, got %+v", got)
+	if got := extractOpenAIImagesUpstreamError([]byte(errBody)); got == nil || got.StatusCode != http.StatusUnavailableForLegalReasons {
+		t.Fatalf("moderation_blocked must be 451, got %+v", got)
 	}
 }
 
@@ -125,7 +125,7 @@ func TestImagesOAuthNonStreaming_CompletedNoImageTriggersSameAccountRetry(t *tes
 
 // 内容审核拒绝（模型未出图但输出文字拒绝）应返回 400 content_policy 错误且不重试，
 // 而非可重试的 UpstreamFailoverError。
-func TestImagesOAuthNonStreaming_ContentRefusalReturns400NoRetry(t *testing.T) {
+func TestImagesOAuthNonStreaming_ContentRefusalReturns451NoRetry(t *testing.T) {
 	// 上游：completed 无图，但模型输出了文字拒绝（内容审核场景）。
 	upstreamSSE := "event: response.created\n" +
 		"data: {\"type\":\"response.created\",\"response\":{\"id\":\"r\",\"status\":\"in_progress\",\"model\":\"gpt-5.4-mini\",\"output\":[]}}\n\n" +
@@ -145,7 +145,7 @@ func TestImagesOAuthNonStreaming_ContentRefusalReturns400NoRetry(t *testing.T) {
 	if err == nil {
 		t.Fatal("content refusal should return an error")
 	}
-	// 应是不可重试的内容策略错误（400），而非 UpstreamFailoverError。
+	// 应是不可重试的内容策略错误（451），而非 UpstreamFailoverError。
 	var failoverErr *UpstreamFailoverError
 	if errors.As(err, &failoverErr) {
 		t.Fatalf("content refusal must NOT be a retryable failover error, got %v", failoverErr)
@@ -154,8 +154,8 @@ func TestImagesOAuthNonStreaming_ContentRefusalReturns400NoRetry(t *testing.T) {
 	if !errors.As(err, &imgErr) {
 		t.Fatalf("expected *OpenAIImagesUpstreamError, got %T: %v", err, err)
 	}
-	if imgErr.StatusCode != http.StatusBadRequest {
-		t.Fatalf("content refusal should be 400, got %d", imgErr.StatusCode)
+	if imgErr.StatusCode != http.StatusUnavailableForLegalReasons {
+		t.Fatalf("content refusal should be 451, got %d", imgErr.StatusCode)
 	}
 	if !strings.Contains(imgErr.Message, "安全系统") && !strings.Contains(imgErr.Message, "违规") {
 		t.Fatalf("refusal message should carry model's reason, got %q", imgErr.Message)
@@ -219,7 +219,7 @@ func TestImagesOAuthStreaming_TextFallbackReturnsCapabilityError(t *testing.T) {
 	}
 }
 
-func TestImagesOAuthStreaming_SplitSafetyRefusalReturns400(t *testing.T) {
+func TestImagesOAuthStreaming_SplitSafetyRefusalReturns451(t *testing.T) {
 	upstreamSSE := "event: response.output_text.delta\n" +
 		"data: {\"type\":\"response.output_text.delta\",\"delta\":\"安全系\"}\n\n" +
 		"event: response.output_text.delta\n" +
@@ -239,11 +239,11 @@ func TestImagesOAuthStreaming_SplitSafetyRefusalReturns400(t *testing.T) {
 	if !errors.As(err, &imgErr) {
 		t.Fatalf("expected *OpenAIImagesUpstreamError, got %T: %v", err, err)
 	}
-	if imgErr.StatusCode != http.StatusBadRequest || imgErr.Code != "content_policy_violation" {
-		t.Fatalf("split safety refusal should remain a content-policy 400, got status=%d code=%q", imgErr.StatusCode, imgErr.Code)
+	if imgErr.StatusCode != http.StatusUnavailableForLegalReasons || imgErr.Code != "content_policy_violation" {
+		t.Fatalf("split safety refusal should remain a content-policy 451, got status=%d code=%q", imgErr.StatusCode, imgErr.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "event: error") {
-		t.Fatal("content-policy refusal must reach the streaming client")
+	if rec.Code != http.StatusUnavailableForLegalReasons || !strings.Contains(rec.Body.String(), "content_policy_violation") {
+		t.Fatal("refusal before the first image must return HTTP 451")
 	}
 }
 

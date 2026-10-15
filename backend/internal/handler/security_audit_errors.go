@@ -14,6 +14,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// imageSecurityAuditDecision changes only the client status for a blocked image
+// request. Keep the decision, legacy message and audit state owned by the caller.
+func imageSecurityAuditDecision(decision *securityaudit.Decision) *securityaudit.Decision {
+	if decision == nil || (decision.Kind != securityaudit.DecisionBlock && (decision.Legacy == nil || !decision.Legacy.Blocked)) {
+		return decision
+	}
+	copy := *decision
+	copy.HTTPStatus = http.StatusUnavailableForLegalReasons
+	return &copy
+}
+
 func (h *OpenAIGatewayHandler) openAISecurityAuditError(c *gin.Context, decision *securityaudit.Decision) {
 	if decision == nil {
 		return

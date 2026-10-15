@@ -1046,10 +1046,10 @@ func TestOpenAIGatewayServiceForwardImages_OAuthNonStreamModerationBlockedReturn
 	require.Nil(t, result)
 	var upstreamErr *OpenAIImagesUpstreamError
 	require.ErrorAs(t, err, &upstreamErr)
-	require.Equal(t, http.StatusBadRequest, upstreamErr.StatusCode)
+	require.Equal(t, http.StatusUnavailableForLegalReasons, upstreamErr.StatusCode)
 	require.Equal(t, "moderation_blocked", upstreamErr.Code)
 
-	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Equal(t, http.StatusUnavailableForLegalReasons, rec.Code)
 	require.Equal(t, "image_generation_user_error", gjson.Get(rec.Body.String(), "error.type").String())
 	require.Equal(t, "moderation_blocked", gjson.Get(rec.Body.String(), "error.code").String())
 	require.Contains(t, gjson.Get(rec.Body.String(), "error.message").String(), "safety system")
@@ -1318,7 +1318,7 @@ func TestOpenAIImagesSSEClientErrorsAreNotRetryable(t *testing.T) {
 		{
 			name:       "content policy",
 			payload:    `{"type":"error","error":{"type":"image_generation_user_error","code":"content_policy_violation","message":"blocked"}}`,
-			wantStatus: http.StatusBadRequest,
+			wantStatus: http.StatusUnavailableForLegalReasons,
 		},
 		{
 			name:       "rate limit remains distinct from server error",

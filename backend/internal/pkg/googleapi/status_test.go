@@ -13,6 +13,7 @@ func TestHTTPStatusToGoogleStatus(t *testing.T) {
 		{http.StatusBadRequest, "INVALID_ARGUMENT"},
 		{http.StatusUnauthorized, "UNAUTHENTICATED"},
 		{http.StatusForbidden, "PERMISSION_DENIED"},
+		{http.StatusUnavailableForLegalReasons, "PERMISSION_DENIED"},
 		{http.StatusNotFound, "NOT_FOUND"},
 		{http.StatusTooManyRequests, "RESOURCE_EXHAUSTED"},
 		{499, "CANCELLED"},

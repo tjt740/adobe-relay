@@ -87,13 +87,14 @@ func TestOpenAIImagesJSONKeepalive_LateErrorRemainsJSON(t *testing.T) {
 	waitForOpenAIImagesJSONKeepalive(t, c)
 
 	wrote := writeOpenAIImagesUpstreamErrorResponse(c, &OpenAIImagesUpstreamError{
-		StatusCode: http.StatusBadRequest,
+		StatusCode: http.StatusUnavailableForLegalReasons,
 		ErrorType:  "image_generation_user_error",
 		Code:       "moderation_blocked",
 		Message:    "request rejected",
 	})
 
 	require.True(t, wrote)
+	require.Equal(t, int64(451), gjson.Get(rec.Body.String(), "error.status_code").Int())
 	require.Equal(t, http.StatusOK, rec.Code, "heartbeat already committed the status")
 	require.True(t, json.Valid(rec.Body.Bytes()), rec.Body.String())
 	require.Equal(t, "moderation_blocked", gjson.Get(rec.Body.String(), "error.code").String())

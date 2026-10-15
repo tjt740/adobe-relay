@@ -715,6 +715,11 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 		respBody := s.readUpstreamErrorBody(resp)
 		_ = resp.Body.Close()
 		respBody = s.redactAgentIdentitySensitiveBody(upstreamCtx, account, respBody)
+		if rejected := imagesContentRejectedHTTPError(resp.StatusCode, resp.Header, respBody); rejected != nil {
+			setOpsUpstreamError(c, resp.StatusCode, rejected.Message, "")
+			writeOpenAIImagesUpstreamErrorResponse(c, rejected)
+			return nil, rejected
+		}
 		resp.Body = io.NopCloser(bytes.NewReader(respBody))
 		upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
 		upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
@@ -989,6 +994,10 @@ func (s *OpenAIGatewayService) handleOpenAIImagesNonStreamingResponse(
 	if err != nil {
 		return OpenAIUsage{}, 0, nil, err
 	}
+	if rejected := imagesContentRejectedHTTPError(resp.StatusCode, resp.Header, body); rejected != nil {
+		writeOpenAIImagesUpstreamErrorResponse(c, rejected)
+		return OpenAIUsage{}, 0, nil, rejected
+	}
 	body = s.backfillOpenAIImagesB64JSON(ctx, account, parsed, body)
 	contentType := "application/json"
 	if s.cfg != nil && !s.cfg.Security.ResponseHeaders.Enabled {
@@ -1042,11 +1051,11 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 	var sseData openAISSEDataAccumulator
 	var streamErr error
 	finish := func() error {
-		if direct == nil {
-			return nil
-		}
 		if streamErr != nil {
 			return streamErr
+		}
+		if direct == nil {
+			return nil
 		}
 		if !seenSSEData || imageCounter.Count() == 0 {
 			return newOpenAIUpstreamStreamReadError(ErrOpenAIUpstreamStreamTruncated)
@@ -1056,6 +1065,17 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 
 	processSSEData := func(dataBytes []byte) {
 		if streamErr != nil {
+			return
+		}
+		if rejected := openAIImagesUpstreamErrorFromSSEPayload(dataBytes); rejected != nil && rejected.StatusCode == http.StatusUnavailableForLegalReasons {
+			streamErr = rejected
+			if !clientDisconnected {
+				if !writeOpenAIImagesUpstreamErrorResponse(c, rejected) {
+					if err := s.writeOpenAIImagesStreamEvent(c, flusher, "error", buildOpenAIImagesStreamErrorBodyFromUpstream(rejected)); err != nil {
+						clientDisconnected = true
+					}
+				}
+			}
 			return
 		}
 		seenSSEData = true
@@ -1117,31 +1137,58 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 		}
 	}
 
+	var relayFrame bytes.Buffer
+	flushRelayFrame := func() {
+		if relayFrame.Len() == 0 {
+			return
+		}
+		if streamErr == nil && !clientDisconnected {
+			if _, err := c.Writer.Write(relayFrame.Bytes()); err != nil {
+				clientDisconnected = true
+			} else {
+				flusher.Flush()
+				lastDownstreamWriteAt = time.Now()
+			}
+		}
+		relayFrame.Reset()
+	}
 	flushSSEEvent := func() {
 		sseData.Flush(processSSEData)
+		flushRelayFrame()
 	}
 
 	processLine := func(line []byte) {
-		if len(line) == 0 {
+		if len(line) == 0 || streamErr != nil {
 			return
 		}
 		if firstTokenMs == nil {
 			ms := int(time.Since(startTime).Milliseconds())
 			firstTokenMs = &ms
 		}
+		trimmedLine := strings.TrimRight(string(line), "\r\n")
+		_, isData := extractOpenAISSEDataLine(trimmedLine)
+		isBlank := strings.TrimSpace(trimmedLine) == ""
+		isSSE := isData || isBlank || strings.HasPrefix(trimmedLine, "event:") || strings.HasPrefix(trimmedLine, "id:") || strings.HasPrefix(trimmedLine, "retry:") || strings.HasPrefix(trimmedLine, ":")
 		if !clientDisconnected && direct == nil {
-			if _, writeErr := c.Writer.Write(line); writeErr != nil {
+			if isSSE {
+				if int64(relayFrame.Len()+len(line)) > fallbackLimit {
+					streamErr = fmt.Errorf("image stream event exceeds response limit")
+					relayFrame.Reset()
+					return
+				}
+				_, _ = relayFrame.Write(line)
+			} else if _, err := c.Writer.Write(line); err != nil {
 				clientDisconnected = true
-				logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Images stream client disconnected, continue draining upstream for billing")
 			} else {
 				flusher.Flush()
 				lastDownstreamWriteAt = time.Now()
 			}
 		}
-
-		trimmedLine := strings.TrimRight(string(line), "\r\n")
-		if _, ok := extractOpenAISSEDataLine(trimmedLine); ok || strings.TrimSpace(trimmedLine) == "" {
+		if isData || isBlank {
 			sseData.AddLine(trimmedLine, processSSEData)
+			if isBlank {
+				flushRelayFrame()
+			}
 			return
 		}
 		if !seenSSEData && !fallbackTooLarge {
