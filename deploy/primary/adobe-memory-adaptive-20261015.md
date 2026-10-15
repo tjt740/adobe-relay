@@ -58,3 +58,5 @@
 `final-verification.json`、`postflight-result.json`、`traffic-after.json` 保存最终结果。发布前 17:49–17:59 窗口已存在上游 429、选号失败及其他业务错误，不能把这些全部归因于内存保护。独立的 3075 条下午流量回放及 8 MiB 输出本地补测见 `adobe-memory-history-validation-20261015.md`：压力下无 OOM，接入量较旧规则模拟明显提升，但历史高峰仍会触发容量拒绝。
 
 剩余 503 的只读补查保存为 `residual-routing-errors.json`：涉及分组 2/7 的 `gpt-image-2.5-sunburst` / `gpt-image-2.5-flare`，调度器均报告 `total=0 eligible=0`，在选号阶段结束，并非内存预算拒绝。补查时多收到一次同类请求，因此补查累计为 8 条，10 分钟观察窗口内仍为 7 条。本次未修改账号状态或调度配置来掩盖这些失败。
+
+`routing-pool-summary.json` 进一步确认：补查时分组 2 的 191 个账号、分组 7 的 18 个账号全部 `schedulable=false`，解释了空候选集合；没有据此自动启用账号。最初预检至实际切换前的后台状态变化与实际切换备份后的保留校验分开看，不能恢复旧状态覆盖正常业务更新。
