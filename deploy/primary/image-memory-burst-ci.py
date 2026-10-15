@@ -51,6 +51,8 @@ for label,limit,total,output,paced in cases:
   row={'case':label,'hard_limit':limit,'compact_synthetic_disk_reservation':not label.startswith('full-reservation'),'elapsed_seconds':round(time.monotonic()-started,2),'exit_code':d['State']['ExitCode'],'oom_killed':d['State']['OOMKilled'],'memory_peak':peak,'memory_events':events,'sample_count':len(samples),'temporary_files_left':len(list(temp.iterdir()))}
   match=re.search(r'historical_burst requested=(\d+) accepted=(\d+) rejected=(\d+) peak=(\d+)',log)
   if match:row.update(zip(['requested','accepted','rejected','peak_inflight'],map(int,match.groups())))
+  budget=re.search(r'historical_budget go_limit_bytes=(\d+) image_budget_bytes=(\d+) runtime_pressure_bytes=(\d+)',log)
+  if budget:row.update(zip(['go_limit_bytes','image_budget_bytes','runtime_pressure_bytes'],map(int,budget.groups())))
   results.append(row)
   (root/'linux-validation.json').write_text(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'binary_sha256':hashlib.sha256((root/'memory.test').read_bytes()).hexdigest(),'runner_memory':memtotal,'compact_synthetic_disk_reservations':True,'results':results},indent=2))
   print(json.dumps(row),flush=True)
