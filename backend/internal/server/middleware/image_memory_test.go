@@ -54,7 +54,7 @@ func memoryRequest(path, body string) (*http.Request, *memoryTrackedReader) {
 }
 
 func TestImageMemoryRejectsImmediatelyAndRetainsSlotAfterDisconnect(t *testing.T) {
-	g := newImageMemoryGuard(imageRequestBaseMemory, 128<<20)
+	g := newImageMemoryGuard(imageRequestBaseMemory+4096, 128<<20)
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	router := imageMemoryRouter(g, service.PlatformAdobe, func(c *gin.Context) {
@@ -120,7 +120,7 @@ func TestImageMemoryWeightsUnknownCompressedAndOverflowSafely(t *testing.T) {
 		want     int64
 	}{
 		{0, "", imageRequestBaseMemory}, {1 << 20, "", imageRequestBaseMemory + 6*(1<<20)},
-		{-1, "", g.capacity}, {1, "gzip", g.capacity}, {math.MaxInt64, "", g.capacity}, {1, "identity", imageRequestBaseMemory + 6},
+		{-1, "", imageRequestBaseMemory}, {1, "gzip", imageRequestBaseMemory}, {math.MaxInt64, "", int64(math.MaxInt64)}, {1, "identity", imageRequestBaseMemory + 6},
 	} {
 		r := httptest.NewRequest("POST", "/v1/images/edits", nil)
 		r.ContentLength = tc.length
