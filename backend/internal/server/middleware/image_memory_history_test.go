@@ -83,6 +83,7 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 		t.Run(strconv.Itoa(total), func(t *testing.T) {
 			g := newImageMemoryGuard(imageMemoryCapacity(debug.SetMemoryLimit(-1)), 256<<20)
 			g.runtimeLimit = debug.SetMemoryLimit(-1) * 9 / 10
+			t.Logf("historical_budget go_limit_bytes=%d image_budget_bytes=%d runtime_pressure_bytes=%d gomaxprocs=%d", debug.SetMemoryLimit(-1), g.capacity, g.runtimeLimit, runtime.GOMAXPROCS(0))
 			var arrived, accepted, rejected, active, peak atomic.Int64
 			var inputTotal atomic.Int64
 			release := make(chan struct{})

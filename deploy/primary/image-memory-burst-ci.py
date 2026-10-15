@@ -21,7 +21,7 @@ for label,limit,total,output,paced in cases:
  temp=root/('tmp-'+label);temp.mkdir()
  args=['docker','run','-d','--name',name,'--network=none','--read-only','--cpus=4','--memory='+limit,'--memory-swap='+limit,
        '--pids-limit=512','--mount',f'type=bind,src={root},dst=/input,readonly',
-       '--mount',f'type=bind,src={temp},dst=/tmp','-e','GOMEMLIMIT=9216MiB',
+       '--mount',f'type=bind,src={temp},dst=/tmp','-e','GOMEMLIMIT=9216MiB','-e','GOMAXPROCS=6',
        '-e','ADOBE_HISTORY_TRACE=/input/trace.json',
        '-e','ADOBE_HISTORY_TIME_SCALE=0.2','-e','ADOBE_HISTORY_OUTPUT_MIB='+str(output)]
  if not label.startswith('full-reservation'):args+=['-e','ADOBE_HISTORY_COMPACT_RESERVATION=1']
@@ -51,6 +51,9 @@ for label,limit,total,output,paced in cases:
   row={'case':label,'hard_limit':limit,'compact_synthetic_disk_reservation':not label.startswith('full-reservation'),'elapsed_seconds':round(time.monotonic()-started,2),'exit_code':d['State']['ExitCode'],'oom_killed':d['State']['OOMKilled'],'memory_peak':peak,'memory_events':events,'sample_count':len(samples),'temporary_files_left':len(list(temp.iterdir()))}
   match=re.search(r'historical_burst requested=(\d+) accepted=(\d+) rejected=(\d+) peak=(\d+)',log)
   if match:row.update(zip(['requested','accepted','rejected','peak_inflight'],map(int,match.groups())))
+  budget=re.search(r'historical_budget go_limit_bytes=(\d+) image_budget_bytes=(\d+) runtime_pressure_bytes=(\d+) gomaxprocs=(\d+)',log)
+  if budget:row.update(zip(['go_limit_bytes','image_budget_bytes','runtime_pressure_bytes','gomaxprocs'],map(int,budget.groups())))
+  assert row.get('gomaxprocs')==6, 'Replay must match production Go parallelism'
   results.append(row)
   (root/'linux-validation.json').write_text(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'binary_sha256':hashlib.sha256((root/'memory.test').read_bytes()).hexdigest(),'runner_memory':memtotal,'compact_synthetic_disk_reservations':True,'results':results},indent=2))
   print(json.dumps(row),flush=True)
