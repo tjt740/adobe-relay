@@ -16,7 +16,9 @@
 
 仅发布 Sub2 到主服务器 173.234.15.150。预检时应用为 `ecb3e918ec143046b1cdf65181a9e926e322030d`，950 个未删除账号；已核对其他任务及三把发布锁。保留现有配置、数据、SMTP、告警、凭据、代理、Okad 实际容器及已启用联动。无数据库迁移，本轮不发起真实 Adobe 出图、登录或邮件。
 
-发布前主干为 `acd5a2f9bfaebd1f6b19e973fedd14e0090ce214`；应用 SHA、工作流及发布核验在发布完成后归档。审计目录 `/opt/adobe-relay/releases/adobe-safety-complete-20261015/`。
+发布前主干为 `acd5a2f9bfaebd1f6b19e973fedd14e0090ce214`。功能 [PR #52](https://github.com/tjt740/adobe-relay/pull/52) 合并后的实际应用为 `9ff382000550d0c9010df5c2d5b90c18c950310b`；[正式工作流 38675033074](https://github.com/tjt740/adobe-relay/actions/runs/38675033074) 的后端、前端、构建及发布全部成功。主服务器于北京时间 2026-10-15 11:22:44 启动新 Sub2 容器。
+
+发布标签 `release/adobe-safety-complete-20261015` 指向实际应用；`rollback/adobe-safety-complete-20261015-before-main` 指向上述发布前主干。审计目录 `/opt/adobe-relay/releases/adobe-safety-complete-20261015/`。切换备份 `/opt/adobe-relay/backups/20261015T032241Z-9ff382000550d0c9010df5c2d5b90c18c950310b`。
 
 保留前版本镜像 `adobe-relay:before-adobe-safety-complete-20261015`。仅检查：
 
@@ -31,3 +33,13 @@ python3 /opt/adobe-relay/releases/adobe-safety-complete-20261015/adobe-safety-co
 带 race 的客户端、服务、图片 handler、Google 信封相关回归通过；新增构造响应覆盖 200/201/202/400/401/403/451/500、outputs 占位/链接、参考图拒绝、无凭据恢复/重复调用、OpenAI/Gemini 错误信封、流开始前/后、多行 SSE、普通错误及审核故障保留。客户 JSON/Python/bash 示例通过语法检查，回滚保护测试通过。
 
 Adobe 客户端全包在清除当前终端 HTTP(S)/ALL_PROXY 环境变量后通过。之前三项本机下载测试失败来自测试进程继承环境代理后启用公网 DNS 防护；此次未修改下载安全策略或测试夹具。
+
+## 上线核验与业务变化归因
+
+- 两站 HTTPS、实时状态事件、报表策略及新容器启动后的告警心跳正常。配置、环境文件（除镜像引用）、Sub2 设置（含 SMTP）、告警规则、Okad 设置及其他容器身份与重启次数均保持。没有 Nginx 错误拦截规则覆盖应用的 451。
+- 与实际切换备份比较，950 个账号 ID 全部保留；没有新增或删除。9 个代理变化全部有原代理分配/故障切换事件链，未恢复旧绑定。
+- #853、#1115 在备份中均为等待分配代理且 `proxy_auto_paused=true`；原代理分配任务于 11:23:15 分配后恢复调度。对应原代码 `backend/internal/proxyfailover/allocation.go` 本次未变，不能将此变动解释为部署覆盖或新 Cookie 成功证据。
+- #9、#14 只更新原 Token 刷新字段 `_token_version`、`access_token`、`expires_at`；11:22:48 原刷新任务日志与之对应。Cookie 未变，人工暂停及不参与调度状态保持；原 `token_refresh_service.go` 本次未变。
+- 11:23 核验报表有 463 个待验证账号；部署健康不代表全部 Adobe 账号恢复。核验未发邮件、未主动生成图片、未触发登录。
+- 证据包括 `before.json`、`after.json`、`runtime-verification.json`、`business-verification.json`、`proxy-audit.json`、`account-state-audit.json`、`business-change-review.json`。回滚检查已通过；回退镜像对应发布前实际 `ecb3e918`，保留当前业务数据。
+- 后续客户示例及发布归档提交仅更新文档，使用 `[skip ci]`，不重复构建或重启；线上应用版本应以上述实际 SHA 为准。
