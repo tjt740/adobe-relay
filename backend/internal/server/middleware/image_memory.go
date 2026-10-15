@@ -18,6 +18,8 @@ import (
 )
 
 const imageRequestBaseMemory = int64(4 << 20)
+const imageParsedWorkMemory = int64(1 << 20)
+const imageInitialReadMemory = int64(1 << 20)
 const imageUnbufferedOutputMemory = int64(32 << 20)
 
 // ImageRequestMemoryBudget runs after authentication but BEFORE any middleware
@@ -67,21 +69,29 @@ var errImageMemoryBusy = errors.New("image memory capacity exhausted")
 
 const imageMemoryLeaseKey = "image_request_memory_lease"
 
-// During reading/parsing, allow for raw chunks, decoding and audit copies.
-// Unknown sizes grow before allocation rather than reserving the entire pool.
+// Reserve only the first bounded read, even when Content-Length is known.
+// Later chunks acquire their full parse/audit allowance before allocation, so
+// a slow or overdeclared upload cannot hold six copies of bytes not yet sent.
 func (g *imageMemoryGuard) weight(r *http.Request) int64 {
 	size := r.ContentLength
 	if size < 0 || (r.Header.Get("Content-Encoding") != "" && !strings.EqualFold(r.Header.Get("Content-Encoding"), "identity")) {
 		size = 0
 	}
+	if size > imageInitialReadMemory {
+		size = imageInitialReadMemory
+	}
 	return imageMemoryWeight(size, 6, 1)
 }
 
 func imageMemoryWeight(size, multiplier, images int64) int64 {
-	if size < 0 || size > (math.MaxInt64-imageRequestBaseMemory*images)/multiplier {
+	return imageMemoryWeightWithBase(size, multiplier, images, imageRequestBaseMemory)
+}
+
+func imageMemoryWeightWithBase(size, multiplier, images, base int64) int64 {
+	if size < 0 || size > (math.MaxInt64-base*images)/multiplier {
 		return math.MaxInt64
 	}
-	return imageRequestBaseMemory*images + size*multiplier
+	return base*images + size*multiplier
 }
 
 type imageMemoryLease struct {
@@ -131,9 +141,10 @@ func FinishImageMemoryPreparation(c *gin.Context, bodyBytes int64, images int) b
 	return true
 }
 
-// FinishImageRequestParsing retains inputs and small working buffers. Output
-// memory must be reserved separately before an unbuffered upstream attempt.
-// Buffered native attempts use this same weight after reserving physical disk.
+// FinishImageRequestParsing retains inputs and 1 MiB of working memory per
+// image after the parser/auditor has finished. Buffered output uses bounded
+// 64 KiB IO buffers; unbuffered attempts must reacquire their original output
+// allowance before submission. No output bytes are borrowed from this budget.
 func FinishImageRequestParsing(c *gin.Context, retainedBytes int64, images int) bool {
 	raw, ok := c.Get(imageMemoryLeaseKey)
 	if !ok {
@@ -143,7 +154,7 @@ func FinishImageRequestParsing(c *gin.Context, retainedBytes int64, images int) 
 		images = 1
 	}
 	lease := raw.(*imageMemoryLease)
-	weight := imageMemoryWeight(retainedBytes, 1, int64(images))
+	weight := imageMemoryWeightWithBase(retainedBytes, 1, int64(images), imageParsedWorkMemory)
 	if !lease.resize(weight) {
 		lease.guard.reject(c, "parsed_input", weight)
 		return false

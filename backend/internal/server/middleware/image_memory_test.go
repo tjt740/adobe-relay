@@ -120,13 +120,15 @@ func TestImageMemoryWeightsUnknownCompressedAndOverflowSafely(t *testing.T) {
 		want     int64
 	}{
 		{0, "", imageRequestBaseMemory}, {1 << 20, "", imageRequestBaseMemory + 6*(1<<20)},
-		{-1, "", imageRequestBaseMemory}, {1, "gzip", imageRequestBaseMemory}, {math.MaxInt64, "", int64(math.MaxInt64)}, {1, "identity", imageRequestBaseMemory + 6},
+		{-1, "", imageRequestBaseMemory}, {1, "gzip", imageRequestBaseMemory}, {math.MaxInt64, "", imageRequestBaseMemory + 6*imageInitialReadMemory}, {1, "identity", imageRequestBaseMemory + 6},
 	} {
 		r := httptest.NewRequest("POST", "/v1/images/edits", nil)
 		r.ContentLength = tc.length
 		r.Header.Set("Content-Encoding", tc.encoding)
 		require.Equal(t, tc.want, g.weight(r))
 	}
+	require.EqualValues(t, math.MaxInt64, imageMemoryWeight(math.MaxInt64, 6, 1))
+	require.EqualValues(t, math.MaxInt64, imageMemoryWeightWithBase(math.MaxInt64, 1, 10, imageParsedWorkMemory))
 }
 
 func TestImageMemoryScopeAndExistingBodyLimit(t *testing.T) {
@@ -192,7 +194,7 @@ func TestImageMemoryProductionBudgetAcceptsSevenGiBAndRejectsExcess(t *testing.T
 }
 
 // Reproduce the real failure path: large uploads overlap slow upstream work.
-// Rejected requests must never read the body; accepted requests still receive
+// Saturated requests must never read the body; accepted requests still receive
 // byte-identical uploads and audit input, and no new queue retains callers.
 func TestImageMemoryConcurrentLargeMultipartRemainsBounded(t *testing.T) {
 	var body bytes.Buffer
@@ -253,9 +255,16 @@ func TestImageMemoryConcurrentLargeMultipartRemainsBounded(t *testing.T) {
 				require.Equal(t, 200, result.Code)
 			}
 		}()
+		if i < 2 {
+			select {
+			case <-entered:
+			case <-time.After(3 * time.Second):
+				close(release)
+				wg.Wait()
+				t.Fatal("initial requests did not enter")
+			}
+		}
 	}
-	<-entered
-	<-entered
 	require.Eventually(t, func() bool { return len(rejected) == 30 }, 3*time.Second, time.Millisecond)
 	read := 0
 	for _, r := range readers {
@@ -279,12 +288,12 @@ func TestImageMemoryParsingReleasesHeadroomAndLegacyOutputMustReacquire(t *testi
 	c.Request = httptest.NewRequest("POST", "/v1/images/edits", nil)
 	c.Set(imageMemoryLeaseKey, lease)
 	require.True(t, FinishImageRequestParsing(c, 2<<20, 1))
-	require.EqualValues(t, 6<<20, g.used.Load())
+	require.EqualValues(t, 3<<20, g.used.Load())
 	// Other requests can immediately use released parse/output headroom.
 	require.True(t, g.bytes.TryAcquire(10<<20))
 	// An unbuffered failover cannot submit until its original output budget fits.
 	require.False(t, FinishImageMemoryPreparation(c, 2<<20, 1))
-	require.EqualValues(t, 6<<20, lease.weight)
+	require.EqualValues(t, 3<<20, lease.weight)
 	g.bytes.Release(10 << 20)
 	require.True(t, FinishImageMemoryPreparation(c, 2<<20, 1))
 	require.EqualValues(t, 38<<20, lease.weight)
