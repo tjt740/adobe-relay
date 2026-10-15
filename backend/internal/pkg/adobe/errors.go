@@ -194,7 +194,9 @@ func ErrorCode(body string) string {
 // IsContentRejectedCode 判定 error_code 是否属于内容安全拒绝。
 func IsContentRejectedCode(code string) bool {
 	switch strings.ToLower(strings.TrimSpace(code)) {
-	case ErrorCodeImageUnsafe, ErrorCodePromptUnsafe:
+	case ErrorCodeImageUnsafe, ErrorCodePromptUnsafe,
+		"reference_image_unsafe_error", "input_media_unsafe", "prompt_entity_denied", "blocked_artists", "denied_words",
+		"reference_image_privacy_error":
 		return true
 	default:
 		return false

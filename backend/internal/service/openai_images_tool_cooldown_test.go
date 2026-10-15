@@ -156,7 +156,7 @@ func TestOpenAIImagesTextFallback_MarksSynthesizedVerdicts(t *testing.T) {
 		err := openAIImagesTextFallbackErrorForText("Blocked by our content policy.")
 		require.NotNil(t, err)
 		require.Equal(t, "content_policy_violation", err.Code)
-		require.Equal(t, http.StatusBadRequest, err.StatusCode)
+		require.Equal(t, http.StatusUnavailableForLegalReasons, err.StatusCode)
 		// 该分支本来就不走冷却（Code 不匹配），标记与否都不改变行为；
 		// 断言它没有被顺手打标，避免语义漂移。
 		require.False(t, err.SynthesizedFromModelText)

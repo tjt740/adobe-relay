@@ -13,6 +13,8 @@
 
 结论限定于本次模型、参数、账号和 Firefly 直连路径：当前不能取得可核实的真实 token 用量，不能证明其他提供方示例里的数字来自同一路径，也不把其他模型或未来上游行为一概判定为不支持。响应头诊断仅保留字段名，没有保存任意响应头值。
 
+完整可转发示例见 [客户调用说明](ADOBE_IMAGE_CLIENT_GUIDE.md)，包含 curl、Python 下载、图生图、usage 和 451 处理。客户数字来源见 [usage 来源分析](ADOBE_IMAGE_USAGE_PROVENANCE.md)。
+
 ## 客户端调用
 
 ```json

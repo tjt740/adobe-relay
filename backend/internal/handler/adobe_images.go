@@ -90,7 +90,7 @@ func (h *GatewayHandler) AdobeImages(c *gin.Context) {
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject,
 		service.ContentModerationProtocolOpenAIImages, parsed.Model, parsed.ModerationBody()); decision != nil &&
 		!decision.AllowNextStage {
-		h.openAISecurityAuditError(c, decision)
+		h.openAISecurityAuditError(c, imageSecurityAuditDecision(decision))
 		return
 	}
 
@@ -194,7 +194,7 @@ func (h *GatewayHandler) AdobeGeminiImages(c *gin.Context, apiKey *service.APIKe
 	if decision := h.checkSecurityAudit(c, reqLog, apiKey, subject,
 		service.ContentModerationProtocolGemini, modelName, body); decision != nil &&
 		!decision.AllowNextStage {
-		googleSecurityAuditError(c, decision)
+		googleSecurityAuditError(c, imageSecurityAuditDecision(decision))
 		return
 	}
 

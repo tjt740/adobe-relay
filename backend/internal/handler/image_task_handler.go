@@ -155,7 +155,7 @@ func (h *AsyncImageHandler) checkSecurityAuditBeforeSubmit(c *gin.Context, apiKe
 		zap.Int64("user_id", subject.UserID), zap.Int64("api_key_id", apiKey.ID), zap.String("model", model))
 	decision := h.openAI.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIImages, model, moderationBody)
 	if decision != nil && !decision.AllowNextStage {
-		h.openAI.openAISecurityAuditError(c, decision)
+		h.openAI.openAISecurityAuditError(c, imageSecurityAuditDecision(decision))
 		return false
 	}
 	return true

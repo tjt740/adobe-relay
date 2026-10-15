@@ -240,3 +240,36 @@ func TestNotEntitledHelpers(t *testing.T) {
 	require.False(t, IsNotEntitledCode(""))
 	require.False(t, IsNotEntitledCode("taste_exhausted"))
 }
+
+func TestContentRejectedPrecedesOutputParsing(t *testing.T) {
+	for _, code := range []string{"prompt_unsafe", "image_unsafe", "reference_image_unsafe_error", "input_media_unsafe", "prompt_entity_denied", "reference_image_privacy_error", "blocked_artists", "denied_words"} {
+		for _, status := range []int{200, 201, 202, 400, 401, 403, 451, 500} {
+			t.Run(fmt.Sprintf("%s/%d", code, status), func(t *testing.T) {
+				client, api, download := pollClient(t, "https://firefly-3p.ff.adobe.io/jobs/x", func(int) (*Response, error) {
+					return jsonResponse(t, status, map[string]any{"status": "FAILED", "error_code": code, "outputs": []any{map[string]any{"image": map[string]any{"presignedUrl": "https://cdn.example.com/blocked.png"}}}}, nil), nil
+				})
+				_, err := generateTestImage(client, t)
+				var rejected *ContentRejectedError
+				require.ErrorAs(t, err, &rejected)
+				require.Len(t, api.calls, 2)
+				require.Empty(t, download.calls, "even a URL alongside a safety rejection must never be downloaded")
+			})
+		}
+	}
+	client, _, _ := pollClient(t, "https://firefly-3p.ff.adobe.io/jobs/x", func(int) (*Response, error) {
+		return jsonResponse(t, 200, map[string]any{"status": "FAILED", "error_code": "prompt_unsafe", "outputs": []any{map[string]any{}}}, nil), nil
+	})
+	_, err := generateTestImage(client, t)
+	var rejected *ContentRejectedError
+	require.ErrorAs(t, err, &rejected, "output placeholders must not mask the rejection")
+}
+
+func TestContentRejectedSubmit200AndUnrelatedCodes(t *testing.T) {
+	err := (&Client{}).errorForSubmit(&Response{StatusCode: 200, Body: []byte(`{"error_code":"prompt_unsafe"}`)}, "image submit")
+	var rejected *ContentRejectedError
+	require.ErrorAs(t, err, &rejected)
+	for _, code := range []string{"region_blocked", "user_blocked_violation", "invalid_value", "model_not_entitled", "taste_exhausted", "timeout_error"} {
+		require.False(t, IsContentRejectedCode(code), code)
+	}
+	require.False(t, IsContentRejectedBody(`{"message":"prompt_unsafe"}`), "message text is not an error code")
+}

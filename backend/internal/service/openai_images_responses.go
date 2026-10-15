@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
@@ -107,11 +108,32 @@ func IsOpenAIImagesRetryableUpstreamError(err *OpenAIImagesUpstreamError) bool {
 	return err != nil && err.StatusCode >= http.StatusInternalServerError
 }
 
+// Only explicit content-policy codes are normalized; authentication, quota,
+// region restrictions and generic permission errors keep their original policy.
+func isImagesContentRejectedCode(code string) bool {
+	switch strings.ToLower(strings.TrimSpace(code)) {
+	case "content_policy_violation", "moderation_blocked", "content_filter", "safety_violation":
+		return true
+	default:
+		return adobe.IsContentRejectedCode(code)
+	}
+}
+
+func imagesContentRejectedHTTPError(status int, header http.Header, body []byte) *OpenAIImagesUpstreamError {
+	err := openAIImagesUpstreamErrorFromHTTP(status, header, body)
+	if !isImagesContentRejectedCode(err.Code) && !isImagesContentRejectedCode(err.ErrorType) {
+		return nil
+	}
+	return err
+}
+
 func openAIImagesSSEErrorStatus(errType, code string) int {
 	errType = strings.ToLower(strings.TrimSpace(errType))
 	code = strings.ToLower(strings.TrimSpace(code))
 
 	switch {
+	case isImagesContentRejectedCode(code), isImagesContentRejectedCode(errType):
+		return http.StatusUnavailableForLegalReasons
 	case strings.Contains(errType, "rate_limit"), strings.Contains(code, "rate_limit"):
 		return http.StatusTooManyRequests
 	case strings.Contains(errType, "authentication"), strings.Contains(code, "invalid_api_key"), code == "unauthorized":
@@ -138,6 +160,9 @@ func openAIImagesUpstreamErrorResponseBody(err *OpenAIImagesUpstreamError) []byt
 	}
 	body := []byte(`{"error":{"type":"","message":""}}`)
 	body, _ = sjson.SetBytes(body, "error.type", err.clientErrorType())
+	if err.clientStatusCode() == http.StatusUnavailableForLegalReasons {
+		body, _ = sjson.SetBytes(body, "error.status_code", err.clientStatusCode())
+	}
 	body, _ = sjson.SetBytes(body, "error.message", err.clientMessage())
 	if code := strings.TrimSpace(err.Code); code != "" {
 		body, _ = sjson.SetBytes(body, "error.code", code)
@@ -728,7 +753,7 @@ func openAIImagesTextFallbackErrorForText(text string) *OpenAIImagesUpstreamErro
 	}
 	if isOpenAIImagesContentPolicyRefusal(text) {
 		return &OpenAIImagesUpstreamError{
-			StatusCode: http.StatusBadRequest,
+			StatusCode: http.StatusUnavailableForLegalReasons,
 			ErrorType:  "image_generation_user_error",
 			Code:       "content_policy_violation",
 			Message:    sanitizeUpstreamErrorMessage(text),
@@ -792,7 +817,7 @@ func summarizeOpenAIImagesNoOutputBody(body []byte) string {
 
 // openAIImagesIncompleteUpstreamError 从 response.incomplete 事件构建可重试的上游错误。
 // incomplete_details.reason 常见取值：max_output_tokens / content_filter 等。
-// content_filter 视为客户端错误（400，重试无意义）；其余（生成超时/截断）视为
+// content_filter 视为客户端错误（451，重试无意义）；其余（生成超时/截断）视为
 // 可重试的 502，触发 failover 换账号重试。
 func openAIImagesIncompleteUpstreamError(response gjson.Result) *OpenAIImagesUpstreamError {
 	if !response.Exists() {
@@ -803,7 +828,7 @@ func openAIImagesIncompleteUpstreamError(response gjson.Result) *OpenAIImagesUps
 	errType := "incomplete_error"
 	if strings.Contains(strings.ToLower(reason), "content_filter") ||
 		strings.Contains(strings.ToLower(reason), "moderation") {
-		statusCode = http.StatusBadRequest // 内容过滤，重试无意义
+		statusCode = http.StatusUnavailableForLegalReasons // 内容过滤，重试无意义
 		errType = "image_generation_user_error"
 	}
 	message := "Upstream did not complete image generation"
@@ -869,6 +894,13 @@ func openAIImagesErrorTypeForStatus(status int) string {
 func openAIImagesUpstreamErrorFromHTTP(statusCode int, header http.Header, body []byte) *OpenAIImagesUpstreamError {
 	errType := strings.TrimSpace(gjson.GetBytes(body, "error.type").String())
 	code := strings.TrimSpace(extractUpstreamErrorCode(body))
+	if code == "" {
+		code = adobe.ErrorCode(string(body))
+	}
+	if isImagesContentRejectedCode(code) || isImagesContentRejectedCode(errType) {
+		statusCode = http.StatusUnavailableForLegalReasons
+	}
+
 	param := strings.TrimSpace(gjson.GetBytes(body, "error.param").String())
 	message := sanitizeUpstreamErrorMessage(strings.TrimSpace(extractUpstreamErrorMessage(body)))
 	if message == "" {
@@ -910,6 +942,12 @@ func (s *OpenAIGatewayService) handleOpenAIImagesErrorResponse(
 	requestedModel ...string,
 ) (*OpenAIForwardResult, error) {
 	body := s.readUpstreamErrorBody(resp)
+
+	if rejected := imagesContentRejectedHTTPError(resp.StatusCode, resp.Header, body); rejected != nil {
+		setOpsUpstreamError(c, resp.StatusCode, rejected.Message, "")
+		writeOpenAIImagesUpstreamErrorResponse(c, rejected)
+		return nil, rejected
+	}
 
 	upstreamMsg := sanitizeUpstreamErrorMessage(strings.TrimSpace(extractUpstreamErrorMessage(body)))
 	upstreamDetail := ""
@@ -1099,6 +1137,9 @@ func buildOpenAIImagesStreamErrorBodyFromUpstream(err *OpenAIImagesUpstreamError
 	}
 	body := buildOpenAIImagesStreamErrorBody(err.clientMessage())
 	body, _ = sjson.SetBytes(body, "error.type", err.clientErrorType())
+	if err.clientStatusCode() == http.StatusUnavailableForLegalReasons {
+		body, _ = sjson.SetBytes(body, "error.status_code", err.clientStatusCode())
+	}
 	if code := strings.TrimSpace(err.Code); code != "" {
 		body, _ = sjson.SetBytes(body, "error.code", code)
 	}
@@ -1131,9 +1172,13 @@ func writeOpenAIImagesUpstreamErrorResponse(c *gin.Context, err *OpenAIImagesUps
 	if code := strings.TrimSpace(err.Code); code != "" {
 		errorObj["code"] = code
 	}
+	if err.clientStatusCode() == http.StatusUnavailableForLegalReasons {
+		errorObj["status_code"] = err.clientStatusCode()
+	}
 	if param := strings.TrimSpace(err.Param); param != "" {
 		errorObj["param"] = param
 	}
+	c.Header("Content-Type", "application/json; charset=utf-8")
 	c.JSON(err.clientStatusCode(), gin.H{
 		"error": errorObj,
 	})
@@ -1554,7 +1599,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthStreamingResponse(
 					retryable := IsOpenAIImagesRetryableUpstreamError(textFallbackErr)
 					setOpsUpstreamError(c, textFallbackErr.clientStatusCode(), textFallbackErr.clientMessage(), summarizeOpenAIImagesNoOutputBody(dataBytes))
 					if !retryable && !clientDisconnected {
-						s.tryWriteOpenAIImagesStreamEvent(c, flusher, &clientDisconnected, &lastDownstreamWriteAt, "error", buildOpenAIImagesStreamErrorBodyFromUpstream(textFallbackErr))
+						if textFallbackErr.StatusCode != http.StatusUnavailableForLegalReasons || !writeOpenAIImagesUpstreamErrorResponse(c, textFallbackErr) {
+							s.tryWriteOpenAIImagesStreamEvent(c, flusher, &clientDisconnected, &lastDownstreamWriteAt, "error", buildOpenAIImagesStreamErrorBodyFromUpstream(textFallbackErr))
+						}
 					}
 					processDataErr = textFallbackErr
 					processDataDone = true
@@ -1584,7 +1631,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthStreamingResponse(
 			if upstreamErr := openAIImagesUpstreamErrorFromSSEPayload(dataBytes); upstreamErr != nil {
 				retryable := IsOpenAIImagesRetryableUpstreamError(upstreamErr)
 				if !clientDisconnected && (!retryable || c.Writer.Size() != writerSizeBeforeResponse) {
-					s.tryWriteOpenAIImagesStreamEvent(c, flusher, &clientDisconnected, &lastDownstreamWriteAt, "error", buildOpenAIImagesStreamErrorBodyFromUpstream(upstreamErr))
+					if upstreamErr.StatusCode != http.StatusUnavailableForLegalReasons || !writeOpenAIImagesUpstreamErrorResponse(c, upstreamErr) {
+						s.tryWriteOpenAIImagesStreamEvent(c, flusher, &clientDisconnected, &lastDownstreamWriteAt, "error", buildOpenAIImagesStreamErrorBodyFromUpstream(upstreamErr))
+					}
 				}
 				setOpsUpstreamError(c, upstreamErr.clientStatusCode(), upstreamErr.clientMessage(), "")
 				processDataErr = upstreamErr
@@ -1898,6 +1947,11 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 		respBody := s.readUpstreamErrorBody(resp)
 		_ = resp.Body.Close()
 		respBody = s.redactAgentIdentitySensitiveBody(upstreamCtx, account, respBody)
+		if rejected := imagesContentRejectedHTTPError(resp.StatusCode, resp.Header, respBody); rejected != nil {
+			setOpsUpstreamError(c, resp.StatusCode, rejected.Message, "")
+			writeOpenAIImagesUpstreamErrorResponse(c, rejected)
+			return nil, rejected
+		}
 		if direct && (resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusMethodNotAllowed) {
 			return s.forwardOpenAIImagesOAuth(withOpenAIImagesForceResponses(ctx), c, account, parsed, channelMappedModel)
 		}

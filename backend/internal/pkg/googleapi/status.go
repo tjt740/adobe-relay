@@ -10,7 +10,7 @@ func HTTPStatusToGoogleStatus(status int) string {
 		return "INVALID_ARGUMENT"
 	case http.StatusUnauthorized:
 		return "UNAUTHENTICATED"
-	case http.StatusForbidden:
+	case http.StatusForbidden, http.StatusUnavailableForLegalReasons:
 		return "PERMISSION_DENIED"
 	case http.StatusNotFound:
 		return "NOT_FOUND"

@@ -85,7 +85,7 @@ func (h *BatchImageHandler) checkSecurityAuditBeforeSubmit(c *gin.Context, req *
 		zap.Int64("user_id", subject.UserID), zap.Int64("api_key_id", apiKey.ID), zap.String("model", req.Model))
 	decision := h.openAI.checkSecurityAudit(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIImages, req.Model, body)
 	if decision != nil && !decision.AllowNextStage {
-		h.openAI.openAISecurityAuditError(c, decision)
+		h.openAI.openAISecurityAuditError(c, imageSecurityAuditDecision(decision))
 		return false
 	}
 	return true
