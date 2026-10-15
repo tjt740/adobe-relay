@@ -23,6 +23,7 @@ jobs:
         run: |
           go test -race ./internal/pkg/imagebuffer ./internal/pkg/httputil
           go test -race ./internal/server/middleware -run 'ImageMemory|GroupModelAllowlist|RequestBody'
+          go test -race ./internal/server/routes -run 'ImageMemory|GroupModelAllowlist|AdobeImages|Composite.*Image'
           go test -tags unit -race ./internal/pkg/adobe
           go test -tags unit -race ./internal/service ./internal/handler -run 'Adobe|Images|Image.*Safety|AsyncImage|BatchImage|PromptGuard|SecurityAudit|ImageTask'
       - name: Build offline replay binary
