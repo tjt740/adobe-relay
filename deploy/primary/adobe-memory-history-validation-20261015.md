@@ -51,3 +51,11 @@ ADOBE_HISTORY_TRACE=/trace.json GOMEMLIMIT=9216MiB ADOBE_HISTORY_PACED=1 \
 在 backend 目录执行。该测试主动制造 GiB 级内存占用，不纳入普通单元测试的默认运行。`ADOBE_HISTORY_OUTPUT_MIB` 控制每张合成输出大小，默认 4。
 
 服务器独立审计目录 `/opt/adobe-relay/releases/adobe-memory-history-validation-20261015/` 保存脱敏轨迹、Linux 测试二进制、两组完整日志和 `linux-validation.json`。测试二进制 SHA256：`e08955ba29443c54a161d54383c439c02b2f9f70463c9556994caf6e3b9981b7`。生产发布、配置保留和回滚审计沿用 `/opt/adobe-relay/releases/adobe-memory-adaptive-20261015/`。
+
+## 独立上线核验
+
+正式工作流 `38716655545` 构建及部署成功，线上实际应用为 `f16489d9a0ed4f9b4ebcd78816e6bb157d582fe8`。北京时间 18:12:10 独立核验容器内存为 12,884,901,888 字节，`GOMEMLIMIT=9216MiB`；两站 HTTPS、账号实时事件、报表策略和告警任务心跳均正常，cgroup 的 OOM 与 OOM kill 计数均为 0。
+
+原配置、其他环境变量、Sub2 设置（包括 SMTP）、告警规则、Okad 设置及其他服务全部通过摘要保留检查。独立任务此前发布的 Okad `b0f8e233eaac40d2c88119eb350b87fc536908fe` 已列入核验基准，保持其新版本。核验未发送邮件、未触发 Adobe 出图。此初始快照不作为长期稳定性或所有 Adobe 账号健康的证明；自然流量的后续观察由本次应用发布记录承接。
+
+独立证据保存为同一历史验证目录下的 `postflight.json`。本提交只归档测试与说明，保留线上应用版本并跳过重复部署。
