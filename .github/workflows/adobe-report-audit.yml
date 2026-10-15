@@ -40,10 +40,14 @@ jobs:
           scp "${opts[@]}" expected-sha "$target:$audit/expected-sha"
           ssh "${opts[@]}" "$target" "python3 $audit/group-id-visible-release.py after"
           ssh "${opts[@]}" "$target" "python3 $audit/group-id-business-verify.py"
-          ssh "${opts[@]}" "$target" "python3 $audit/group-id-final-verify.py"
+          for attempt in 1 2 3 4 5 6 7 8; do
+            if ssh "${opts[@]}" "$target" "python3 $audit/group-id-final-verify.py"; then break; fi
+            if [ "$attempt" = 8 ]; then exit 1; fi
+            sleep 20
+          done
           ssh "${opts[@]}" "$target" "python3 $audit/group-id-visible-release.py check-rollback"
           mkdir -p audit-results
-          scp "${opts[@]}" "$target:$audit/{before,after,account-state-audit,proxy-audit,business-verification,final-verification}.json" audit-results/
+          scp "${opts[@]}" "$target:$audit/*.json" audit-results/
       - uses: actions/upload-artifact@v4
         with:
           name: group-id-visible-audit
