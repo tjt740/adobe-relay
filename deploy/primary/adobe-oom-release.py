@@ -88,7 +88,12 @@ def prepare_memory():
     try:
         resolved_after = json.loads(subprocess.check_output(['adobe-relay', 'config', '--format', 'json']))
         expected = copy.deepcopy(resolved_before)
-        expected['services']['app']['mem_limit'] = 8 * 1024**3
+        # Compose serializes mem_limit as a decimal string on the primary;
+        # retain the existing JSON type instead of weakening full comparison.
+        memory_type = type(expected['services']['app']['mem_limit'])
+        assert memory_type in (str, int)
+        assert int(expected['services']['app']['mem_limit']) == 2 * 1024**3
+        expected['services']['app']['mem_limit'] = memory_type(8 * 1024**3)
         expected['services']['app']['environment']['GOMEMLIMIT'] = '6144MiB'
         assert resolved_after == expected, 'Resolved Compose changed beyond the approved memory fields'
     except BaseException:
