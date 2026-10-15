@@ -68,7 +68,7 @@ func TestAdobeImageSimulatedUsageResponseMetadata(t *testing.T) {
 		body := map[string]any{}
 		meta := adobeImageResponseMetadata{Request: req, GPTImage: true}
 		meta.addTo(body, [][]byte{adobeTestPNG(t, false)})
-		require.Equal(t, "simulated", body["usage_source"])
+		require.NotContains(t, body, "usage_source")
 		require.Nil(t, meta.Usage) // Never mutate the original measured usage.
 		assertSimulatedAdobeUsage(t, body["usage"].(*adobeImageUsage), len(req.InputImageURLs)+len(req.Uploads) > 0)
 		require.Equal(t, "2x2", body["size"])
@@ -86,7 +86,7 @@ func TestAdobeImageSimulatedUsagePreservesMeasuredZeroAndPartialDetails(t *testi
 		require.NoError(t, err)
 		body := map[string]any{}
 		adobeImageResponseMetadata{Usage: usage}.addTo(body, [][]byte{adobeTestPNG(t, false)})
-		require.Equal(t, "upstream", body["usage_source"])
+		require.NotContains(t, body, "usage_source")
 		require.Same(t, usage, body["usage"])
 		after, err := json.Marshal(body["usage"])
 		require.NoError(t, err)

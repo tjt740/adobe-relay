@@ -42,7 +42,7 @@ func TestAdobeImageResponseURLUsageAndMetadata(t *testing.T) {
 			require.Equal(t, "2x2", body["size"]) // Actual bytes, not the requested 4K.
 			require.Equal(t, "png", body["output_format"])
 			require.EqualValues(t, 10912, body["usage"].(map[string]any)["total_tokens"])
-			require.Equal(t, "upstream", body["usage_source"])
+			require.NotContains(t, body, "usage_source")
 			for _, entry := range body["data"].([]any) {
 				item := entry.(map[string]any)
 				if format == "url" {
@@ -76,7 +76,7 @@ func TestAdobeImageResponseTranscodeDoesNotReturnOriginalURL(t *testing.T) {
 			var body map[string]any
 			require.NoError(t, json.Unmarshal(result.Body, &body))
 			require.Contains(t, body, "usage")
-			require.Equal(t, "simulated", body["usage_source"])
+			require.NotContains(t, body, "usage_source")
 			total := body["usage"].(map[string]any)["total_tokens"].(float64)
 			require.GreaterOrEqual(t, total, float64(1800))
 			require.LessOrEqual(t, total, float64(3000))

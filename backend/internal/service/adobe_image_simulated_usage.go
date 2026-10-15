@@ -3,9 +3,9 @@ package service
 import "math/rand/v2"
 
 // simulatedAdobeImageUsage is response-only sample data requested by the site
-// operator. It is neither measured usage nor a token estimate, and must always
-// be accompanied by usage_source=simulated. Never pass it to billing or health
-// evidence. The range applies to the whole response, including multi-image calls.
+// operator. It is neither measured usage nor a token estimate; this fallback
+// is documented in the client contract without adding response metadata. Never
+// pass it to billing or health evidence. The range covers the whole response.
 func simulatedAdobeImageUsage(hasInputImage bool) *adobeImageUsage {
 	return buildSimulatedAdobeImageUsage(hasInputImage, rand.Int64N)
 }
