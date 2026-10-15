@@ -94,3 +94,27 @@ func TestImageMemoryParsedMultipleImagesRetainOnlyWorkingBuffers(t *testing.T) {
 	require.True(t, lease.resize(0))
 	require.Zero(t, g.used.Load())
 }
+
+func TestImageMemoryReusesFreeHeapButStillRejectsLivePressure(t *testing.T) {
+	g := newImageMemoryGuard(128<<20, 128<<20)
+	g.runtimeLimit = 100 << 20
+	memory := imageRuntimeFootprint{committed: 110 << 20, reusable: 64 << 20}
+	g.runtimeUsage = func() imageRuntimeFootprint { return memory }
+	lease := &imageMemoryLease{guard: g}
+	defer lease.resize(0)
+	// A previous burst left committed pages, but these spans are fully free.
+	// Growing within them need not increase the resident footprint.
+	require.True(t, lease.resize(32<<20))
+	require.EqualValues(t, 32<<20, g.used.Load())
+	// As the spans become occupied, the same 90% pressure guard applies.
+	memory.reusable = 32 << 20
+	require.False(t, lease.resize(60<<20))
+	require.EqualValues(t, 32<<20, lease.weight)
+	require.True(t, lease.resize(0))
+	memory.reusable = 0
+	require.False(t, lease.resize(1<<20), "live memory pressure cannot borrow pool headroom")
+	// Never turn inconsistent metrics into an unsigned underflow/free budget.
+	memory.reusable = 120 << 20
+	require.False(t, lease.resize(1<<20))
+	require.Zero(t, g.used.Load())
+}

@@ -48,6 +48,7 @@ type imageMemoryGuard struct {
 	bytes        *semaphore.Weighted
 	lastLog      atomic.Int64
 	runtimeLimit int64
+	runtimeUsage func() imageRuntimeFootprint
 	used         atomic.Int64
 	active       atomic.Int64
 }
@@ -56,13 +57,28 @@ func newImageMemoryGuard(capacity, maxBody int64) *imageMemoryGuard {
 	if capacity < 1 {
 		capacity = 1
 	}
-	return &imageMemoryGuard{capacity: capacity, maxBody: maxBody, bytes: semaphore.NewWeighted(capacity)}
+	return &imageMemoryGuard{capacity: capacity, maxBody: maxBody, bytes: semaphore.NewWeighted(capacity), runtimeUsage: imageRuntimeMemory}
 }
 
-func imageRuntimeMemory() uint64 {
-	samples := [2]metrics.Sample{{Name: "/memory/classes/total:bytes"}, {Name: "/memory/classes/heap/released:bytes"}}
+type imageRuntimeFootprint struct {
+	committed uint64
+	reusable  uint64
+}
+
+func (m imageRuntimeFootprint) pressure() uint64 {
+	// Completely free heap spans can satisfy a new allocation without growing
+	// the process. Keep fragmentation, stacks and all uncollected objects in
+	// the pressure calculation. Inconsistent samples must fail conservatively.
+	if m.reusable > m.committed {
+		return m.committed
+	}
+	return m.committed - m.reusable
+}
+
+func imageRuntimeMemory() imageRuntimeFootprint {
+	samples := [3]metrics.Sample{{Name: "/memory/classes/total:bytes"}, {Name: "/memory/classes/heap/released:bytes"}, {Name: "/memory/classes/heap/free:bytes"}}
 	metrics.Read(samples[:])
-	return samples[0].Value.Uint64() - samples[1].Value.Uint64()
+	return imageRuntimeFootprint{committed: samples[0].Value.Uint64() - samples[1].Value.Uint64(), reusable: samples[2].Value.Uint64()}
 }
 
 var errImageMemoryBusy = errors.New("image memory capacity exhausted")
@@ -102,7 +118,7 @@ type imageMemoryLease struct {
 func (l *imageMemoryLease) resize(weight int64) bool {
 	delta := weight - l.weight
 	if delta > 0 {
-		if l.guard.runtimeLimit > 0 && imageRuntimeMemory()+uint64(delta) >= uint64(l.guard.runtimeLimit) {
+		if l.guard.runtimeLimit > 0 && l.guard.runtimeUsage().pressure()+uint64(delta) >= uint64(l.guard.runtimeLimit) {
 			return false
 		}
 		if !l.guard.bytes.TryAcquire(delta) {
@@ -266,6 +282,7 @@ func (g *imageMemoryGuard) reject(c *gin.Context, phase string, requested int64)
 	now := time.Now().Unix()
 	last := g.lastLog.Load()
 	if now-last >= 5 && g.lastLog.CompareAndSwap(last, now) {
-		slog.Info("image_memory.capacity_rejected", "budget_bytes", g.capacity, "reserved_bytes", g.used.Load(), "requested_bytes", requested, "active_requests", g.active.Load(), "runtime_bytes", imageRuntimeMemory(), "phase", phase, "queue_enabled", false)
+		memory := g.runtimeUsage()
+		slog.Info("image_memory.capacity_rejected", "budget_bytes", g.capacity, "reserved_bytes", g.used.Load(), "requested_bytes", requested, "active_requests", g.active.Load(), "runtime_bytes", memory.committed, "runtime_reusable_bytes", memory.reusable, "runtime_pressure_bytes", memory.pressure(), "phase", phase, "queue_enabled", false)
 	}
 }
