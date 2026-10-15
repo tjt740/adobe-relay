@@ -4614,13 +4614,16 @@ const onboardingStore = useOnboardingStore();
 
 const ALWAYS_VISIBLE_COLUMNS = new Set(["name", "actions"]);
 // Default hidden columns (hidden on first load / after schema bumps).
-const DEFAULT_HIDDEN_COLUMNS = ["id"];
+const DEFAULT_HIDDEN_COLUMNS: string[] = [];
 const HIDDEN_COLUMNS_KEY = "group-hidden-columns";
-// Bump when adding new default-hidden columns so existing admins pick them up once.
+// Bump when changing default visibility so existing admins pick it up once.
 const COLUMN_SETTINGS_VERSION_KEY = "group-column-settings-version";
-const COLUMN_SETTINGS_VERSION = 2;
+const COLUMN_SETTINGS_VERSION = 3;
 const VERSION_NEW_HIDDEN_COLUMNS: Record<number, string[]> = {
   2: ["id"],
+};
+const VERSION_NEW_VISIBLE_COLUMNS: Record<number, string[]> = {
+  3: ["id"],
 };
 
 const allColumns = computed<Column[]>(() => {
@@ -4672,7 +4675,7 @@ const loadSavedColumns = () => {
           .forEach((key) => hiddenColumns.add(key));
       }
 
-      // Existing admins: auto-hide columns newly added as default-hidden.
+      // Apply changed defaults once, preserving other saved column preferences.
       const storedVersion = Number(
         localStorage.getItem(COLUMN_SETTINGS_VERSION_KEY) ?? "1",
       );
@@ -4684,6 +4687,9 @@ const loadSavedColumns = () => {
               hiddenColumns.add(key);
               mutated = true;
             }
+          }
+          for (const key of VERSION_NEW_VISIBLE_COLUMNS[v] ?? []) {
+            if (hiddenColumns.delete(key)) mutated = true;
           }
         }
         if (mutated) {
