@@ -109,6 +109,12 @@ func NewPlainTransport(proxyURL string) Transport {
 	return &plainTransport{proxyURL: strings.TrimSpace(proxyURL)}
 }
 
+// Direct image fallback must not inherit HTTP(S)_PROXY and revisit a failed
+// egress. It retains the same TLS, public-IP, redirect and body-size guards.
+func newDirectDownloadTransport() Transport {
+	return &plainTransport{direct: true}
+}
+
 // ---- TLS 伪装传输 ----
 
 type impersonateTransport struct {
@@ -257,6 +263,7 @@ const maxDownloadRedirects = 3
 
 type plainTransport struct {
 	proxyURL string
+	direct   bool
 
 	once   sync.Once
 	client *http.Client
@@ -274,7 +281,13 @@ func (t *plainTransport) ensureClient() (*http.Client, error) {
 		if base, ok := http.DefaultTransport.(*http.Transport); ok {
 			transport = base.Clone()
 		}
-		if t.proxyURL != "" {
+		if t.direct {
+			transport.Proxy = nil
+			if plainTransportDialControl != nil {
+				dialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Control: plainTransportDialControl}
+				transport.DialContext = dialer.DialContext
+			}
+		} else if t.proxyURL != "" {
 			parsed, err := url.Parse(t.proxyURL)
 			if err != nil {
 				// 不回显原串：代理 URL 里常带 user:pass。

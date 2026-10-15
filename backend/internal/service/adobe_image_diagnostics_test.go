@@ -18,7 +18,7 @@ func TestAdobeDiagnosticsPreserveNetworkFailureWithoutSyntheticStatus(t *testing
 	proxyID := int64(44)
 	account := &Account{ID: 10, Platform: PlatformAdobe, ProxyID: &proxyID,
 		Proxy: &Proxy{ID: 44, Name: "test proxy"}, Credentials: map[string]any{"access_token": "exact-private-token"}}
-	err := &adobe.OperationError{Stage: "download", JobID: "job-123", Attempts: 3, ElapsedMS: 1234,
+	err := &adobe.OperationError{Stage: "download", JobID: "job-123", Attempts: 3, ElapsedMS: 1234, DownloadFallback: true,
 		Err: adobe.NewUpstreamTemporaryError(`Get "https://cdn.example/file?signature=private": EOF exact-private-token`, 0, adobe.ErrorTypeConnection)}
 	fields := RecordAdobeImageFailure(c, account, "gpt-image-2.5-flare", err)
 	require.NotEmpty(t, fields)
@@ -37,6 +37,7 @@ func TestAdobeDiagnosticsPreserveNetworkFailureWithoutSyntheticStatus(t *testing
 	require.Equal(t, "job-123", detail["job_id"])
 	require.Equal(t, float64(3), detail["stage_attempts"])
 	require.Equal(t, float64(1234), detail["stage_elapsed_ms"])
+	require.Equal(t, true, detail["download_fallback"])
 }
 
 func TestAdobeDiagnosticsDoNotResubmitAcceptedJobs(t *testing.T) {
