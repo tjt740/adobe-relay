@@ -103,7 +103,7 @@ func classifyAdobeError(err error) adobeFailure {
 		return adobeFailure{
 			Failover: &UpstreamFailoverError{
 				StatusCode:        statusOrDefault(contentErr.StatusCode, http.StatusUnavailableForLegalReasons),
-				ClientStatusCode:  http.StatusBadRequest,
+				ClientStatusCode:  http.StatusUnavailableForLegalReasons,
 				ClientMessage:     contentErr.User(),
 				Stage:             GatewayFailureStageInference,
 				Scope:             GatewayFailureScopeRequest,

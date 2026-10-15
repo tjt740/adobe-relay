@@ -678,7 +678,7 @@ func (c *Client) errorForSubmit(resp *Response, label string) error {
 	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
-	if isAuthStatus(resp.StatusCode) {
+	if isAuthStatus(resp.StatusCode) && !IsContentRejectedBody(string(resp.Body)) {
 		return authOrQuotaError(resp)
 	}
 	body := resp.BodyPreview()
@@ -690,7 +690,7 @@ func (c *Client) errorForStatus(resp *Response, label string) error {
 	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
 		return nil
 	}
-	if isAuthStatus(resp.StatusCode) {
+	if isAuthStatus(resp.StatusCode) && !IsContentRejectedBody(string(resp.Body)) {
 		return authOrQuotaError(resp)
 	}
 	body := resp.BodyPreview()

@@ -71,8 +71,11 @@ type ContentRejectedError struct{ RequestError }
 
 func (e *ContentRejectedError) Unwrap() error { return &e.RequestError }
 
-// ErrorCodeImageUnsafe 是 Firefly 内容安全拒绝出图时的 error_code。
-const ErrorCodeImageUnsafe = "image_unsafe"
+// Firefly 内容安全拒绝提示词或出图时的 error_code。
+const (
+	ErrorCodeImageUnsafe  = "image_unsafe"
+	ErrorCodePromptUnsafe = "prompt_unsafe"
+)
 
 // Firefly 在账号没有该模型 / 质量档权益时返回的 error_code（也见于 x-access-error）。
 const (
@@ -190,7 +193,12 @@ func ErrorCode(body string) string {
 
 // IsContentRejectedCode 判定 error_code 是否属于内容安全拒绝。
 func IsContentRejectedCode(code string) bool {
-	return strings.EqualFold(strings.TrimSpace(code), ErrorCodeImageUnsafe)
+	switch strings.ToLower(strings.TrimSpace(code)) {
+	case ErrorCodeImageUnsafe, ErrorCodePromptUnsafe:
+		return true
+	default:
+		return false
+	}
 }
 
 // IsContentRejectedBody 判定响应体是否带有内容安全拒绝的 error_code。
