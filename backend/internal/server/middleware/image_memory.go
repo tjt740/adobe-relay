@@ -25,7 +25,7 @@ const imageUnbufferedOutputMemory = int64(32 << 20)
 // and cannot protect memory occupied by requests waiting for those slots.
 //
 // Keep the configured Go/container limits and business concurrency unchanged.
-// Two thirds of the finite Go limit budgets image work. The remaining third
+// Three quarters of the finite Go limit budgets image work. The remaining quarter
 // and the container headroom cover GC and non-image work. Reservations shrink
 // after preparation; they remain held through detached generation and delivery.
 func ImageRequestMemoryBudget(maxBodyBytes int64) gin.HandlerFunc {
@@ -33,10 +33,12 @@ func ImageRequestMemoryBudget(maxBodyBytes int64) gin.HandlerFunc {
 	if limit == math.MaxInt64 || limit <= 0 {
 		return func(c *gin.Context) { c.Next() }
 	}
-	guard := newImageMemoryGuard(limit/3*2, maxBodyBytes)
+	guard := newImageMemoryGuard(imageMemoryCapacity(limit), maxBodyBytes)
 	guard.runtimeLimit = limit - limit/10
 	return guard.handler
 }
+
+func imageMemoryCapacity(limit int64) int64 { return limit - limit/4 }
 
 type imageMemoryGuard struct {
 	capacity     int64

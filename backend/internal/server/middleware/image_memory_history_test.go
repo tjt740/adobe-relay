@@ -81,7 +81,7 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 	}
 	for _, total := range totals {
 		t.Run(strconv.Itoa(total), func(t *testing.T) {
-			g := newImageMemoryGuard(debug.SetMemoryLimit(-1)/3*2, 256<<20)
+			g := newImageMemoryGuard(imageMemoryCapacity(debug.SetMemoryLimit(-1)), 256<<20)
 			g.runtimeLimit = debug.SetMemoryLimit(-1) * 9 / 10
 			var arrived, accepted, rejected, active, peak atomic.Int64
 			var inputTotal atomic.Int64
