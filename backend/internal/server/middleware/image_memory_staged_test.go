@@ -56,7 +56,7 @@ func TestImageMemorySlowDeclaredUploadsReserveOnlyArrivedChunks(t *testing.T) {
 			t.Fatal("slow upload failed to start immediately")
 		}
 	}
-	require.EqualValues(t, 40<<20, g.used.Load())
+	require.EqualValues(t, 16<<20, g.used.Load(), "disk-backed uploads hold only bounded IO working memory before parse admission")
 	// These read leases remain bounded: no queue and no body reads when full.
 	free := g.capacity - g.used.Load()
 	require.True(t, g.bytes.TryAcquire(free))

@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -22,7 +24,7 @@ func TestImageMemoryMappedInputPreservesBytesAndBudgets(t *testing.T) {
 		t.Run(map[bool]string{false: "disk", true: "heap_fallback"}[fallback], func(t *testing.T) {
 			g := newImageMemoryGuard(128<<20, 64<<20)
 			if fallback {
-				g.bufferInput = func([]byte) ([]byte, func(), error) { return nil, nil, errors.New("disk unavailable") }
+				g.newInputBuffer = func(int64) (imageRequestInputBuffer, error) { return nil, errors.New("disk unavailable") }
 			}
 			body := strings.Repeat("x", (2<<20)+37) // Non-page-aligned mappings must preserve the exact size.
 			router := imageMemoryRouter(g, service.PlatformAdobe, func(c *gin.Context) {
@@ -36,7 +38,7 @@ func TestImageMemoryMappedInputPreservesBytesAndBudgets(t *testing.T) {
 				}
 				require.Equal(t, mapped, lease.mappedBodyBytes)
 				require.Equal(t, mapped, g.mappedBytes.Load())
-				require.EqualValues(t, 4<<20+6*len(body), lease.weight, "parse/audit peak remains reserved")
+				require.EqualValues(t, 4<<20+6*len(body)-int(mapped), lease.weight, "only the physically mapped raw copy is credited during parsing")
 				require.True(t, FinishImageRequestParsing(c, 3*int64(len(body)), 2))
 				require.EqualValues(t, 3*len(body)+(2<<20)-int(mapped), lease.weight)
 				require.True(t, FinishImageMemoryPreparation(c, int64(len(body)), 2))
@@ -65,9 +67,9 @@ func TestImageMemoryInputCleanupAfterDisconnectAndPanic(t *testing.T) {
 		t.Run(map[bool]string{false: "disconnect", true: "panic"}[panicHandler], func(t *testing.T) {
 			g := newImageMemoryGuard(64<<20, 64<<20)
 			var closed atomic.Int64
-			g.bufferInput = func(body []byte) ([]byte, func(), error) {
-				mapped, cleanup, err := bufferImageRequestInput(body)
-				return mapped, func() { cleanup(); closed.Add(1) }, err
+			g.newInputBuffer = func(length int64) (imageRequestInputBuffer, error) {
+				buffer, err := newImageRequestInputBuffer(length)
+				return &trackedImageInputBuffer{imageRequestInputBuffer: buffer, closed: &closed}, err
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -104,9 +106,9 @@ func TestImageMemoryInputDoesNotMapAsyncOrSmallRequests(t *testing.T) {
 		size int
 	}{{"/v1/images/edits/async", 2 << 20}, {"/v1/images/edits", 1024}, {"/images/generations", 2 << 20}} {
 		g := newImageMemoryGuard(64<<20, 64<<20)
-		g.bufferInput = func([]byte) ([]byte, func(), error) {
+		g.newInputBuffer = func(int64) (imageRequestInputBuffer, error) {
 			t.Fatal("mapping lifetime must not cover asynchronous or unrelated endpoints")
-			return nil, nil, nil
+			return nil, nil
 		}
 		router := imageMemoryRouter(g, service.PlatformAdobe, func(c *gin.Context) { c.Status(204) })
 		req, _ := memoryRequest(tc.path, strings.Repeat("x", tc.size))
@@ -149,4 +151,52 @@ func TestImageMemoryMappedMultipartStillParsesAuditsAndPreservesUpload(t *testin
 	require.Equal(t, 204, rec.Code)
 	require.Zero(t, g.used.Load())
 	require.Zero(t, g.mappedBytes.Load())
+}
+
+type trackedImageInputBuffer struct {
+	imageRequestInputBuffer
+	closed *atomic.Int64
+}
+
+func TestImageMemorySpoolingCannotBypassParseAdmission(t *testing.T) {
+	g := newImageMemoryGuard(64<<20, 64<<20)
+	entered := make(chan struct{}, 2)
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	done := make(chan struct{}, 2)
+	defer func() {
+		releaseOnce.Do(func() { close(release) })
+		for i := 0; i < 2; i++ {
+			select {
+			case <-done:
+			case <-time.After(3 * time.Second):
+				t.Error("admitted request did not finish cleanup")
+			}
+		}
+		require.Zero(t, g.used.Load())
+		require.Zero(t, g.mappedBytes.Load())
+	}()
+	var calls atomic.Int64
+	router := imageMemoryRouter(g, service.PlatformAdobe, func(c *gin.Context) { calls.Add(1); entered <- struct{}{}; <-release; c.Status(200) })
+	for i := 0; i < 2; i++ {
+		req, _ := memoryRequest("/v1/images/edits", strings.Repeat("x", 4<<20))
+		go func() { router.ServeHTTP(httptest.NewRecorder(), req); done <- struct{}{} }()
+		select {
+		case <-entered:
+		case <-time.After(time.Second):
+			t.Fatal("initial parser admission failed")
+		}
+	}
+	req, reader := memoryRequest("/v1/images/edits", strings.Repeat("x", 4<<20))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	require.Equal(t, 429, rec.Code)
+	require.Positive(t, reader.reads.Load(), "raw input can stream to bounded disk before its parser is admitted")
+	require.EqualValues(t, 2, calls.Load(), "an unreserved parser/generation must never execute")
+	require.LessOrEqual(t, g.used.Load(), g.capacity)
+}
+
+func (b *trackedImageInputBuffer) Close() error {
+	b.closed.Add(1)
+	return b.imageRequestInputBuffer.Close()
 }

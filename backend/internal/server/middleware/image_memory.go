@@ -1,8 +1,8 @@
 package middleware
 
 import (
-	"bytes"
 	"errors"
+	"io"
 	"log/slog"
 	"math"
 	"net/http"
@@ -46,23 +46,28 @@ func ImageRequestMemoryBudget(maxBodyBytes int64) gin.HandlerFunc {
 func imageMemoryCapacity(limit int64) int64 { return limit - limit/5 }
 
 type imageMemoryGuard struct {
-	capacity     int64
-	maxBody      int64
-	bytes        *semaphore.Weighted
-	lastLog      atomic.Int64
-	runtimeLimit int64
-	runtimeUsage func() imageRuntimeFootprint
-	used         atomic.Int64
-	active       atomic.Int64
-	mappedBytes  atomic.Int64
-	bufferInput  func([]byte) ([]byte, func(), error)
+	capacity       int64
+	maxBody        int64
+	bytes          *semaphore.Weighted
+	lastLog        atomic.Int64
+	runtimeLimit   int64
+	runtimeUsage   func() imageRuntimeFootprint
+	used           atomic.Int64
+	active         atomic.Int64
+	mappedBytes    atomic.Int64
+	newInputBuffer func(int64) (imageRequestInputBuffer, error)
+}
+
+type imageRequestInputBuffer interface {
+	Read(io.Reader, int64) ([]byte, error)
+	Close() error
 }
 
 func newImageMemoryGuard(capacity, maxBody int64) *imageMemoryGuard {
 	if capacity < 1 {
 		capacity = 1
 	}
-	return &imageMemoryGuard{capacity: capacity, maxBody: maxBody, bytes: semaphore.NewWeighted(capacity), runtimeUsage: imageRuntimeMemory, bufferInput: bufferImageRequestInput}
+	return &imageMemoryGuard{capacity: capacity, maxBody: maxBody, bytes: semaphore.NewWeighted(capacity), runtimeUsage: imageRuntimeMemory, newInputBuffer: newImageRequestInputBuffer}
 }
 
 type imageRuntimeFootprint struct {
@@ -244,6 +249,12 @@ func (g *imageMemoryGuard) handler(c *gin.Context) {
 	}
 	lease := &imageMemoryLease{guard: g}
 	weight := g.weight(c.Request)
+	key, _ := GetAPIKeyFromContext(c)
+	encoding := c.Request.Header.Get("Content-Encoding")
+	spoolCandidate := g.maxBody > 0 && c.Request.ContentLength >= 1<<20 && strings.HasSuffix(c.Request.URL.Path, "/images/edits") && key != nil && key.Group != nil && key.Group.Platform == service.PlatformAdobe && (encoding == "" || strings.EqualFold(encoding, "identity"))
+	if spoolCandidate {
+		weight = imageRequestBaseMemory
+	}
 	if !lease.resize(weight) {
 		g.reject(c, "admission", weight)
 		return
@@ -255,17 +266,43 @@ func (g *imageMemoryGuard) handler(c *gin.Context) {
 		return
 	}
 	attemptedWeight := lease.weight
-	body, err := pkghttputil.ReadRequestBodyWithBudget(c.Request, func(wire, decoded int64) error {
-		if err := c.Request.Context().Err(); err != nil {
-			return err
+	var body []byte
+	var err error
+	spooled := false
+	if spoolCandidate {
+		buffer, prepareErr := g.newInputBuffer(c.Request.ContentLength)
+		if prepareErr == nil {
+			spooled = true
+			defer func() {
+				c.Request.Body = http.NoBody
+				_ = buffer.Close()
+				g.mappedBytes.Add(-lease.mappedBodyBytes)
+			}()
+			// Bounded 64 KiB IO: uploading never reserves six copies of
+			// bytes merely waiting on disk. Full parsing is admitted below.
+			body, err = buffer.Read(c.Request.Body, c.Request.ContentLength)
+			if err == nil {
+				lease.mappedBodyBytes = int64(len(body))
+				g.mappedBytes.Add(lease.mappedBodyBytes)
+			}
+		} else if !lease.resize(g.weight(c.Request)) {
+			g.reject(c, "admission", g.weight(c.Request))
+			return
 		}
-		required := imageMemoryWeight(wire+decoded, 6, 1)
-		attemptedWeight = required
-		if required > lease.weight && !lease.resize(required) {
-			return errImageMemoryBusy
-		}
-		return nil
-	})
+	}
+	if !spooled {
+		body, err = pkghttputil.ReadRequestBodyWithBudget(c.Request, func(wire, decoded int64) error {
+			if err := c.Request.Context().Err(); err != nil {
+				return err
+			}
+			required := imageMemoryWeight(wire+decoded, 6, 1)
+			attemptedWeight = required
+			if required > lease.weight && !lease.resize(required) {
+				return errImageMemoryBusy
+			}
+			return nil
+		})
+	}
 	if err != nil {
 		if c.Request.Context().Err() != nil {
 			c.Abort()
@@ -286,25 +323,10 @@ func (g *imageMemoryGuard) handler(c *gin.Context) {
 	}
 	// Drop compressed/wire and overdeclared length headroom after the exact
 	// decoded body is available. Later readers reuse this immutable slice.
-	if !lease.resize(imageMemoryWeight(int64(len(body)), 6, 1)) {
+	parseWeight := imageMemoryWeight(int64(len(body)), 6, 1) - lease.mappedInputCredit(int64(len(body)))
+	if !lease.resize(parseWeight) {
 		g.reject(c, "body_complete", lease.weight)
 		return
-	}
-	// This synchronous edit route holds its immutable raw input throughout
-	// polling/failover. Move large bodies off anonymous heap after the protected
-	// read, before parsing. Never opt asynchronous endpoints into this lifetime.
-	key, _ := GetAPIKeyFromContext(c)
-	if len(body) >= 1<<20 && strings.HasSuffix(c.Request.URL.Path, "/images/edits") && key != nil && key.Group != nil && key.Group.Platform == service.PlatformAdobe {
-		if mapped, cleanup, mapErr := g.bufferInput(body); mapErr == nil {
-			body = mapped
-			lease.mappedBodyBytes = int64(len(body))
-			g.mappedBytes.Add(lease.mappedBodyBytes)
-			defer func() {
-				c.Request.Body = http.NoBody // Do not leave a reader pointing at an unmapped slice.
-				cleanup()
-				g.mappedBytes.Add(-lease.mappedBodyBytes)
-			}()
-		}
 	}
 	c.Request.Body = pkghttputil.NewPrereadBody(body)
 	c.Set(imageMemoryLeaseKey, lease)
@@ -331,17 +353,8 @@ func (g *imageMemoryGuard) reject(c *gin.Context, phase string, requested int64)
 	}
 }
 
-func bufferImageRequestInput(body []byte) ([]byte, func(), error) {
+func newImageRequestInputBuffer(length int64) (imageRequestInputBuffer, error) {
 	page := int64(os.Getpagesize())
-	size := (int64(len(body)) + page - 1) / page * page
-	arena, err := imagebuffer.New(size)
-	if err != nil {
-		return nil, nil, err
-	}
-	mapped, err := arena.Read(bytes.NewReader(body), int64(len(body)))
-	if err != nil {
-		_ = arena.Close()
-		return nil, nil, err
-	}
-	return mapped, func() { _ = arena.Close() }, nil
+	size := (length + page - 1) / page * page
+	return imagebuffer.New(size)
 }

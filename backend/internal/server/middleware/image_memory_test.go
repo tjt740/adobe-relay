@@ -3,6 +3,7 @@ package middleware
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"math"
 	"mime/multipart"
@@ -211,6 +212,9 @@ func TestImageMemoryConcurrentLargeMultipartRemainsBounded(t *testing.T) {
 	payload := body.Bytes()
 	contentType := w.FormDataContentType()
 	g := newImageMemoryGuard(64<<20, 128<<20)
+	// Preserve the original heap-fallback guarantee: requests rejected by
+	// its capacity check must not read/allocate their large upload.
+	g.newInputBuffer = func(int64) (imageRequestInputBuffer, error) { return nil, errors.New("disk unavailable") }
 	entered := make(chan struct{}, 40)
 	release := make(chan struct{})
 	var active, peak atomic.Int64

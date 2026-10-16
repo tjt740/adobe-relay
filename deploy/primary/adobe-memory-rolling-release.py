@@ -50,7 +50,6 @@ def prepare(sha):
   run(['docker','tag',old['Image'],r.ROLLBACK_IMAGE])
  own_lease()
  prefixes=slot_prefixes()
- assert prefixes,'No tracked source process; inspect its work before starting a handoff'
  env=dict(v.split('=',1) for v in old['Config']['Env'])
  env['LOG_OUTPUT_TO_FILE']='false';env['LOG_OUTPUT_TO_STDOUT']='true'
  private=ROOT/'canary-environment'
@@ -75,7 +74,10 @@ def prepare(sha):
   assert time.monotonic()<deadline,'Canary health failed; no traffic has switched'
   time.sleep(2)
  assert inspect(APP)['Id']==old['Id'],'Source container changed during preparation'
- state={'at':now(),'candidate_sha':sha,'old_id':old['Id'],'old_prefixes':list(prefixes),'canary_id':inspect(CANARY)['Id'],'nginx_files':{str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in Path('/etc/nginx/conf.d').glob('*.conf')}}
+ startup=run(['docker','logs',CANARY])
+ match=re.search(r'request_slot_process_prefix=(r[a-z0-9]+)',startup)
+ assert match,'Canary did not report request-slot ownership; do not route customer traffic'
+ state={'at':now(),'candidate_sha':sha,'old_id':old['Id'],'old_prefixes':list(prefixes),'canary_prefix':match[1],'canary_id':inspect(CANARY)['Id'],'nginx_files':{str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in Path('/etc/nginx/conf.d').glob('*.conf')}}
  save('rolling-prepared.json',state)
  print(json.dumps({'prepared':True,'served_customer_traffic':False,'candidate_sha':sha,'source_prefix_count':len(prefixes)}))
 def switch(on):
@@ -111,14 +113,15 @@ def pending_uploads(name):
 def drain(which):
  state=load('rolling-prepared.json');own_lease()
  if which=='old':prefixes=state['old_prefixes'];name=APP
- else:prefixes=load('rolling-old-drained.json')['canary_prefixes'];name=CANARY
+ else:prefixes=[state['canary_prefix']];name=CANARY
  expected_id=state['old_id'] if which=='old' else state['canary_id']
  assert inspect(name)['Id']==expected_id,'Draining container changed; inspect the later release first'
- assert prefixes,'Unknown process ownership; do not stop an untracked process'
  zero_since=None;end=time.monotonic()+1500;samples=[]
  while True:
   assert inspect(name)['Id']==expected_id,'Draining container changed during observation'
-  own_lease();current=slot_prefixes();count=sum(current.get(p,0) for p in prefixes);pending=pending_uploads(name)
+  own_lease();current=slot_prefixes()
+  if which=='old':prefixes=list(set(prefixes)|{p for p in current if p!=state['canary_prefix']})
+  count=sum(current.get(p,0) for p in prefixes);pending=pending_uploads(name)
   row={'at':now(),'remaining_tracked_slots':count,'pending_input_sockets':pending,'host_available_bytes':available()}
   samples.append(row);save('rolling-'+which+'-drain-progress.json',{'samples':samples})
   if available()<2*1024**3:
@@ -129,8 +132,7 @@ def drain(which):
    if time.monotonic()-zero_since>=45:
     value={'at':now(),'drained':which,'stable_zero_seconds':45,'samples':samples}
     if which=='old':
-     value['canary_prefixes']=[p for p in current if p not in prefixes]
-     assert value['canary_prefixes'],'Canary has not taken real traffic; do not infer a new owner'
+     value['canary_prefixes']=[state['canary_prefix']]
     save('rolling-'+which+'-drained.json',value)
     print(json.dumps({'drained':which,'stable_zero_seconds':45,'samples':len(samples)}));return
   else:zero_since=None
@@ -150,10 +152,14 @@ def cleanup():
  print(json.dumps(load('rolling-finished.json')))
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('action',choices=['prepare','route-canary','drain-old','route-canonical','drain-canary','cleanup']);p.add_argument('--sha');a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('action',choices=['prepare','route-canary','drain-old','route-canonical','drain-canary','cleanup','heartbeat']);p.add_argument('--sha');a=p.parse_args()
  if a.action=='prepare':prepare(a.sha)
  elif a.action=='route-canary':switch(True)
  elif a.action=='route-canonical':switch(False)
  elif a.action=='drain-old':drain('old')
  elif a.action=='drain-canary':drain('canary')
- else:cleanup()
+ elif a.action=='cleanup':cleanup()
+ else:
+  deadline=time.monotonic()+7200
+  while time.monotonic()<deadline and redis('GET',LEASE)==RID:
+   redis('EXPIRE',LEASE,1800);time.sleep(20)

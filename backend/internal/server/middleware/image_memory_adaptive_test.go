@@ -82,7 +82,7 @@ func TestImageMemoryUnknownAndCompressedShareBudget(t *testing.T) {
 }
 
 func TestImageMemoryReleasesPreparationHeadroomBeforeSlowGeneration(t *testing.T) {
-	g := newImageMemoryGuard(240<<20, 128<<20)
+	g := newImageMemoryGuard(232<<20, 128<<20)
 	payload := bytes.Repeat([]byte("x"), 8<<20)
 	entered := make(chan struct{}, 4)
 	release := make(chan struct{})
