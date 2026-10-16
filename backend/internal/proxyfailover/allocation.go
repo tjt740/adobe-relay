@@ -7,6 +7,8 @@ import (
 	"errors"
 	"sort"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/clash"
 )
 
 const accountsPerProxy = 3
@@ -28,6 +30,8 @@ type AllocationNode struct {
 }
 
 type AllocationView struct {
+	ReclaimableSlots int `json:"reclaimable_slots"`
+	BusinessWaiting  int `json:"business_waiting"`
 	AllocationPolicy
 	AccountsPerProxy    int              `json:"accounts_per_proxy"`
 	Accounts            int              `json:"accounts"`
@@ -50,8 +54,15 @@ func (m *Manager) GetAllocation(ctx context.Context) (AllocationView, error) {
 		return v, err
 	}
 	counts := map[int64]int{}
+	inactiveCounts := map[int64]int{}
 	for _, a := range accounts {
 		counts[a.Current]++
+		if a.BindingOnly {
+			inactiveCounts[a.Current]++
+		}
+		if !a.BindingOnly && (a.Current == 0 || a.Waiting) {
+			v.BusinessWaiting++
+		}
 		if !a.Eligible {
 			continue
 		}
@@ -89,13 +100,14 @@ func (m *Manager) GetAllocation(ctx context.Context) (AllocationView, error) {
 		h := hs[node.ID]
 		if !exists || !p.available(time.Now()) {
 			node.Status = "unavailable"
-		} else if h.fingerprint == p.fingerprint() && time.Since(h.CheckedAt) <= freshness {
+		} else if h.fingerprint == p.fingerprint() && time.Since(h.CheckedAt) <= clash.ProbeFreshness(len(ps)) {
 			node.Status = h.Status
 			node.LatencyMS = h.LatencyMS
 		}
 		if node.Status == "healthy" {
 			v.HealthyNodes++
 			v.AvailableSlots += max(0, accountsPerProxy-node.Accounts)
+			v.ReclaimableSlots += min(accountsPerProxy, inactiveCounts[node.ID])
 		}
 		v.Nodes = append(v.Nodes, node)
 	}
@@ -168,6 +180,7 @@ func (m *Manager) SaveAllocation(ctx context.Context, policy AllocationPolicy) (
 type allocationAccount struct {
 	ID, Current       int64
 	Eligible, Waiting bool
+	LastSwitch        time.Time
 	BindingOnly       bool
 }
 
@@ -179,7 +192,8 @@ func loadAllocationAccounts(ctx context.Context, q queryer) ([]allocationAccount
 	 NOT ((auto_pause_on_expired IS NOT TRUE OR expires_at IS NULL OR expires_at>NOW()) AND
 	 ((status='active' AND schedulable) OR COALESCE(proxy_auto_paused AND status='error' AND NOT schedulable AND error_message=$1,false)
 	 OR COALESCE(status='error' AND schedulable AND NOT proxy_auto_paused AND error_message=$1,false)))
-	 FROM accounts WHERE deleted_at IS NULL ORDER BY id`, allocationWaitingMessage)
+	 ,COALESCE((SELECT created_at FROM proxy_failover_events e WHERE e.account_id=accounts.id ORDER BY e.id DESC LIMIT 1),'epoch'::timestamptz)
+ FROM accounts WHERE deleted_at IS NULL ORDER BY id`, allocationWaitingMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +201,7 @@ func loadAllocationAccounts(ctx context.Context, q queryer) ([]allocationAccount
 	result := []allocationAccount{}
 	for rows.Next() {
 		var a allocationAccount
-		if err = rows.Scan(&a.ID, &a.Current, &a.Eligible, &a.Waiting, &a.BindingOnly); err != nil {
+		if err = rows.Scan(&a.ID, &a.Current, &a.Eligible, &a.Waiting, &a.BindingOnly, &a.LastSwitch); err != nil {
 			return nil, err
 		}
 		result = append(result, a)
@@ -199,9 +213,8 @@ func freshHealthy(p proxy, h health, now time.Time) bool {
 	return p.available(now) && h.Status == "healthy" && h.fingerprint == p.fingerprint() && now.Sub(h.CheckedAt) <= freshness
 }
 
-// Preserve working bindings first, then fill a node to three before using the
-// next. Existing inactive accounts get bindings too, without being resumed.
-// Every schedulable account type shares the same three-account node capacity.
+// Preserve working business routes, place waiting business accounts, then use
+// spare capacity for inactive bindings without changing their scheduling state.
 func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int64]health, now time.Time) map[int64]int64 {
 	used := map[int64]int{}
 	next := map[int64]int64{}
@@ -212,53 +225,83 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 	}
 	ordered := append([]allocationAccount(nil), accounts...)
 	sort.SliceStable(ordered, func(i, j int) bool {
-		if ordered[i].BindingOnly != ordered[j].BindingOnly {
-			return !ordered[i].BindingOnly
-		}
 		if ordered[i].Waiting != ordered[j].Waiting {
 			return !ordered[i].Waiting
 		}
 		return ordered[i].ID < ordered[j].ID
 	})
-	for _, a := range ordered {
-		if !a.Eligible {
-			continue
-		}
-		p, exists := ps[a.Current]
-		h := hs[a.Current]
-		keep := exists && freshHealthy(p, h, now)
-		// One failed probe, a stale measurement or an upstream outage does not
-		// move an established route. Edited/disabled/expired proxies do.
-		if (!a.Waiting || a.BindingOnly) && exists && p.available(now) && h.fingerprint == p.fingerprint() && !(h.Status == "unhealthy" && h.Failures >= 2) {
-			keep = true
-		}
-		if keep && used[a.Current] < accountsPerProxy {
-			next[a.ID] = a.Current
-			used[a.Current]++
-		}
+	fresh := func(id int64) bool {
+		p, ok := ps[id]
+		h := hs[id]
+		return ok && p.available(now) && h.Status == "healthy" && h.fingerprint == p.fingerprint() && now.Sub(h.CheckedAt) <= clash.ProbeFreshness(len(ps))
 	}
-	for _, a := range ordered {
-		if !a.Eligible || next[a.ID] != 0 {
-			continue
-		}
-		var best int64
-		for id, p := range ps {
-			if used[id] >= accountsPerProxy || !freshHealthy(p, hs[id], now) {
+	best := func(except int64) int64 {
+		var chosen int64
+		for id := range ps {
+			if id == except || used[id] >= accountsPerProxy || !fresh(id) {
 				continue
 			}
-			if best == 0 || used[id] > used[best] || (used[id] == used[best] && (hs[id].LatencyMS < hs[best].LatencyMS || (hs[id].LatencyMS == hs[best].LatencyMS && id < best))) {
-				best = id
+			if chosen != 0 && ps[id].sourceTrafficAvailable != ps[chosen].sourceTrafficAvailable {
+				if ps[id].sourceTrafficAvailable {
+					chosen = id
+				}
+				continue
+			}
+			if chosen == 0 || routeScore(hs[id], used[id]) < routeScore(hs[chosen], used[chosen]) || (routeScore(hs[id], used[id]) == routeScore(hs[chosen], used[chosen]) && id < chosen) {
+				chosen = id
 			}
 		}
-		next[a.ID] = best
-		if best != 0 {
-			used[best]++
+		return chosen
+	}
+	// Allocate business accounts before preserving/filling inactive bindings.
+	for _, bindingOnly := range []bool{false, true} {
+		for _, a := range ordered {
+			if !a.Eligible || a.BindingOnly != bindingOnly {
+				continue
+			}
+			p, exists := ps[a.Current]
+			h := hs[a.Current]
+			keep := fresh(a.Current)
+			if (!a.Waiting || a.BindingOnly) && exists && p.available(now) && h.fingerprint == p.fingerprint() && !(h.Status == "unhealthy" && h.Failures >= 2) {
+				keep = true
+			}
+			if keep && used[a.Current] < accountsPerProxy {
+				next[a.ID] = a.Current
+				used[a.Current]++
+			}
+		}
+		for _, a := range ordered {
+			if !a.Eligible || a.BindingOnly != bindingOnly || next[a.ID] != 0 {
+				continue
+			}
+			id := best(0)
+			next[a.ID] = id
+			if id != 0 {
+				used[id]++
+			}
+		}
+		if !bindingOnly {
+			for _, a := range ordered {
+				current := next[a.ID]
+				if a.BindingOnly || current == 0 || current != a.Current || !fresh(current) || now.Sub(a.LastSwitch) < softSwitchCooldown {
+					continue
+				}
+				candidate := best(current)
+				if candidate != 0 && (!ps[current].sourceTrafficAvailable || ps[candidate].sourceTrafficAvailable) && betterLatencyRoute(hs[current], hs[candidate]) {
+					next[a.ID] = candidate
+					used[current]--
+					used[candidate]++
+				}
+			}
 		}
 	}
 	return next
 }
 
 func (m *Manager) checkAllocation(ctx context.Context, tx *sql.Tx, policy AllocationPolicy) error {
+	return m.allocate(ctx, tx, policy, true)
+}
+func (m *Manager) allocate(ctx context.Context, tx *sql.Tx, policy AllocationPolicy, probe bool) error {
 	ps, err := loadProxies(ctx, tx)
 	if err != nil {
 		return err
@@ -273,7 +316,14 @@ func (m *Manager) checkAllocation(ctx context.Context, tx *sql.Tx, policy Alloca
 			needed[id] = true
 		}
 	}
-	if err = m.refreshHealth(ctx, tx, ps, hs, needed, false); err != nil {
+	if probe {
+		if err = m.refreshHealth(ctx, tx, ps, hs, needed, false); err != nil {
+			return err
+		}
+	}
+	// Lock source admission before accounts, matching subscription import order.
+	var sourceDocument []byte
+	if err = tx.QueryRowContext(ctx, `SELECT document FROM clash_subscription WHERE id=1 FOR SHARE`).Scan(&sourceDocument); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, `LOCK TABLE accounts IN SHARE ROW EXCLUSIVE MODE`); err != nil {

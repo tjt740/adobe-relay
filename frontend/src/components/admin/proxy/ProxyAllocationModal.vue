@@ -13,7 +13,7 @@
           <p class="mt-2 text-xs leading-relaxed text-gray-500">{{ t('admin.proxies.allocation.behavior') }}</p>
           <p class="mt-2 text-xs leading-relaxed text-gray-500">{{ t('admin.proxies.allocation.disableHint') }}</p>
         </div>
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <div v-for="stat in stats" :key="stat.label" class="rounded-xl border border-gray-200 p-3 dark:border-dark-600">
             <p class="text-xs text-gray-500">{{ stat.label }}</p>
             <p class="mt-1 text-2xl font-semibold tabular-nums">{{ stat.value }}</p>
@@ -75,7 +75,8 @@ const stats = computed(() => [
   { label: t('admin.proxies.allocation.assigned'), value: view.value?.assigned ?? 0 },
   { label: t('admin.proxies.allocation.waiting'), value: view.value?.waiting ?? 0 },
   { label: t('admin.proxies.allocation.healthyNodes'), value: view.value?.healthy_nodes ?? 0 },
-  { label: t('admin.proxies.allocation.availableSlots'), value: view.value?.available_slots ?? 0 }
+  { label: t('admin.proxies.allocation.availableSlots'), value: view.value?.available_slots ?? 0 },
+  { label: t('admin.proxies.allocation.reclaimableSlots'), value: view.value?.reclaimable_slots ?? 0 }
 ])
 function apply(v: ProxyAllocationView, reset: boolean) {
   view.value = v

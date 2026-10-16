@@ -5,6 +5,8 @@ import channelMonitorV2 from './channelMonitorV2'
 import batchImage from './batchImage'
 import admin from './admin'
 import misc from './misc'
+import proxyHealth from './proxyHealth'
+import changelog from './changelog'
 
 export default {
   ...landing,
@@ -13,5 +15,7 @@ export default {
   ...channelMonitorV2,
   ...batchImage,
   admin,
+  proxyHealth,
+  changelog,
   ...misc,
 }

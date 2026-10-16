@@ -206,6 +206,7 @@ export default {
     proxies: 'Proxies',
     redeemCodes: 'Redeem Codes',
     ops: 'Ops',
+    changelog: 'Changelog',
     promoCodes: 'Promo Codes',
     settings: 'Settings',
     myAccount: 'My Account',

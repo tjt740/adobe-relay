@@ -412,6 +412,7 @@ func (h *GatewayHandler) runAdobeImagesFailover(
 	// busy / 推迟 / 内容拒绝后跳过的账号只加入排除集合，不消耗换号预算；排除集合单调增长，
 	// 选号候选随之减少，round 上限只是防御调度器忽略排除集合时的死循环。
 	attempts := 0
+	snapshotRechecked := false
 	for round := 0; attempts <= h.maxAccountSwitches && round < adobeImagesMaxSelectionRounds; round++ {
 		if failoverClientGone(c) {
 			return
@@ -434,6 +435,13 @@ func (h *GatewayHandler) runAdobeImagesFailover(
 				)
 				account, err = h.gatewayService.SelectAccountForModelWithExclusions(
 					requestCtx, apiKey.GroupID, "", req.routingModel, unavailable)
+			}
+			if (errors.Is(err, service.ErrNoAvailableAccounts) || (err == nil && account == nil)) && attempts == 0 && !snapshotRechecked && requestCtx.Err() == nil {
+				snapshotRechecked = true
+				recheckCtx, cancelRecheck := context.WithTimeout(requestCtx, 1200*time.Millisecond)
+				h.proxyRouteRecovery.Recover(recheckCtx)
+				account, err = h.gatewayService.SelectAccountForModelWithExclusions(service.WithFreshAccountSnapshot(recheckCtx), apiKey.GroupID, "", req.routingModel, unavailable)
+				cancelRecheck()
 			}
 			if err != nil || account == nil {
 				if lastFailover == nil && len(busyAccountIDs) > 0 {
@@ -724,6 +732,11 @@ func (h *GatewayHandler) finishAdobeImagesWithoutAccount(
 	}
 	markOpsRoutingCapacityLimitedIfNoAvailable(c, selectErr)
 	cls := classifyNoAccountErrorFromGin(c, h.openAIGatewayService, apiKey, parsed.Model, parsed.Model, service.PlatformAdobe)
+	if cls.Status == http.StatusServiceUnavailable {
+		failure := h.proxyRouteRecovery.DiagnosePool(c.Request.Context(), apiKey.GroupID)
+		adobeImagesUnavailableError(c, failure.Reason, failure.RetryAfter)
+		return
+	}
 	adobeImagesError(c, cls.Status, cls.ErrType, cls.Message)
 }
 
@@ -956,6 +969,7 @@ func (h *GatewayHandler) recordAdobeImagesUsage(
 func adobeImagesAccountsBusyError(c *gin.Context, reqLog *zap.Logger, busyAccountIDs map[int64]struct{}) {
 	reqLog.Info("adobe_images.accounts_busy", zap.Int("busy_account_count", len(busyAccountIDs)))
 	markOpsRoutingCapacityLimited(c)
+	c.Header("Retry-After", "2")
 	adobeImagesError(c, http.StatusTooManyRequests, "rate_limit_error",
 		"Too many concurrent requests for available accounts, please retry later")
 }

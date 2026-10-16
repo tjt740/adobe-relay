@@ -43,11 +43,12 @@ export default {
     // Proxies
     proxies: {
       allocation: {
-        "bindingOnlyHint": "{count} disabled, expired or error accounts receive proxy bindings only; they will not be automatically enabled.",
+        "reclaimableSlots": "Reclaimable slots",
+        "bindingOnlyHint": "{count} stopped, expired, or error accounts remain disabled. Their binding slots may be reclaimed for enabled business accounts.",
         "title": "Auto-assign proxies",
         "description": "Continuously bind proxies to existing and new Adobe OAuth accounts, with at most 3 accounts per healthy node. No account re-import is needed. Uses the current Clash subscription and manually added proxies.",
         "enable": "Maintain automatically (3 accounts / node)",
-        "behavior": "Checks Adobe connectivity about every 30 seconds; larger pools are checked in batches. Keeps working bindings and switches after 2 consecutive failures to a healthy node with capacity. Existing disabled, expired and credential-error accounts also receive bindings while keeping their scheduling and error states. Only otherwise eligible accounts paused by the allocator itself are resumed after binding. Existing bindings for other platforms also consume capacity.",
+        "behavior": "Checks connectivity about every 30 seconds in bounded batches. Enabled business accounts take priority; inactive binding slots can be reclaimed without enabling accounts. Two connection failures trigger failover. Sustained slow routes switch only to a significantly better alternative, with a 5-minute soft-switch cooldown. Exhausted or expired subscriptions are excluded.",
         "disableHint": "Enabling takes over routing and disables existing per-account failover policies. Disabling keeps current bindings; waiting accounts remain paused until manually configured and resumed.",
         "saved": "Settings saved. Background checks and allocation will follow.",
         "waitingHint": "{count} accounts are waiting for checks or capacity on a healthy node. Otherwise eligible accounts are paused and never use a direct connection; disabled, expired and error accounts retain their states.",

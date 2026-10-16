@@ -119,6 +119,7 @@ type schedulerActiveGroupIDLister interface {
 }
 
 type SchedulerSnapshotService struct {
+	rescueLimit                  *fallbackLimiter
 	cache                        SchedulerCache
 	outboxRepo                   SchedulerOutboxRepository
 	accountRepo                  AccountRepository
@@ -164,6 +165,7 @@ func NewSchedulerSnapshotService(
 		cfg:           cfg,
 		stopCh:        make(chan struct{}),
 		fallbackLimit: newFallbackLimiter(maxQPS),
+		rescueLimit:   newFallbackLimiter(5),
 	}
 }
 
@@ -217,7 +219,7 @@ func (s *SchedulerSnapshotService) ListSchedulableAccounts(ctx context.Context, 
 		return nil, useMixed, err
 	}
 
-	if s.cache != nil {
+	if s.cache != nil && !freshAccountSnapshotRequested(ctx) {
 		cached, hit, err := s.cache.GetSnapshot(ctx, bucket)
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return nil, useMixed, ctxErr
@@ -243,6 +245,9 @@ func (s *SchedulerSnapshotService) ListSchedulableAccounts(ctx context.Context, 
 		}
 	}
 
+	if freshAccountSnapshotRequested(ctx) && s.rescueLimit != nil && !s.rescueLimit.Allow() {
+		return nil, useMixed, ErrSchedulerFallbackLimited
+	}
 	if err := s.guardFallback(ctx); err != nil {
 		return nil, useMixed, err
 	}
@@ -278,7 +283,7 @@ func (s *SchedulerSnapshotService) GetAccount(ctx context.Context, accountID int
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if s.cache != nil {
+	if s.cache != nil && !freshAccountSnapshotRequested(ctx) {
 		account, err := s.cache.GetAccount(ctx, accountID)
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return nil, ctxErr

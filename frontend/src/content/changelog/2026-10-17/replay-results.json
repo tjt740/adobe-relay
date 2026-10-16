@@ -1,0 +1,275 @@
+[
+  {
+    "case": "json-1000-8m",
+    "profile": "current52-go40",
+    "cpu_limit": 8,
+    "gomaxprocs": 14,
+    "hard_limit_GiB": 52,
+    "go_target_GiB": 40,
+    "requested": 1000,
+    "accepted": 1000,
+    "rejected": 0,
+    "elapsed_seconds": 103.97,
+    "temporary_files": 0,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  {
+    "case": "json-1000-8m",
+    "profile": "candidate54-go44",
+    "cpu_limit": 8,
+    "gomaxprocs": 16,
+    "hard_limit_GiB": 54,
+    "go_target_GiB": 44,
+    "requested": 1000,
+    "accepted": 1000,
+    "rejected": 0,
+    "elapsed_seconds": 30.77,
+    "temporary_files": 0,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  {
+    "case": "mixed-1600-8m",
+    "profile": "current52-go40",
+    "cpu_limit": 8,
+    "gomaxprocs": 14,
+    "hard_limit_GiB": 52,
+    "go_target_GiB": 40,
+    "requested": 1600,
+    "accepted": 1599,
+    "rejected": 1,
+    "elapsed_seconds": 63.49,
+    "temporary_files": 0,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  {
+    "case": "mixed-1600-8m",
+    "profile": "candidate54-go44",
+    "cpu_limit": 8,
+    "gomaxprocs": 16,
+    "hard_limit_GiB": 54,
+    "go_target_GiB": 44,
+    "requested": 1600,
+    "accepted": 1600,
+    "rejected": 0,
+    "elapsed_seconds": 47.51,
+    "temporary_files": 0,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  {
+    "case": "json-1600-16m",
+    "profile": "current52-go40",
+    "cpu_limit": 8,
+    "gomaxprocs": 14,
+    "hard_limit_GiB": 52,
+    "go_target_GiB": 40,
+    "requested": 1600,
+    "accepted": 1565,
+    "rejected": 35,
+    "elapsed_seconds": 90.73,
+    "temporary_files": 0,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 17478,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  {
+    "case": "json-1600-16m",
+    "profile": "candidate54-go44",
+    "cpu_limit": 8,
+    "gomaxprocs": 16,
+    "hard_limit_GiB": 54,
+    "go_target_GiB": 44,
+    "requested": 1600,
+    "accepted": 1551,
+    "rejected": 49,
+    "elapsed_seconds": 95.77,
+    "temporary_files": 0,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 18358,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  {
+    "case": "full-256-8m",
+    "profile": "current52-go40",
+    "cpu_limit": 8,
+    "gomaxprocs": 14,
+    "hard_limit_GiB": 52,
+    "go_target_GiB": 40,
+    "requested": 256,
+    "accepted": 256,
+    "rejected": 0,
+    "elapsed_seconds": 5.91,
+    "temporary_files": 0,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  {
+    "case": "full-256-8m",
+    "profile": "candidate54-go44",
+    "cpu_limit": 8,
+    "gomaxprocs": 16,
+    "hard_limit_GiB": 54,
+    "go_target_GiB": 44,
+    "requested": 256,
+    "accepted": 256,
+    "rejected": 0,
+    "elapsed_seconds": 5.89,
+    "temporary_files": 0,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  {
+    "case": "json-1600-16m-cpu16",
+    "profile": "current52-go40",
+    "cpu_limit": 16,
+    "gomaxprocs": 14,
+    "hard_limit_GiB": 52,
+    "go_target_GiB": 40,
+    "requested": 1600,
+    "accepted": 1578,
+    "rejected": 22,
+    "elapsed_seconds": 88.02,
+    "temporary_files": 0,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 16752,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  {
+    "case": "json-1600-16m-cpu16",
+    "profile": "candidate54-go42",
+    "cpu_limit": 16,
+    "gomaxprocs": 16,
+    "hard_limit_GiB": 54,
+    "go_target_GiB": 42,
+    "requested": 1600,
+    "accepted": 1600,
+    "rejected": 0,
+    "elapsed_seconds": 89.07,
+    "temporary_files": 0,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 16740,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  {
+    "case": "json-1600-16m-cpu16",
+    "profile": "candidate54-go44",
+    "cpu_limit": 16,
+    "gomaxprocs": 16,
+    "hard_limit_GiB": 54,
+    "go_target_GiB": 44,
+    "requested": 1600,
+    "accepted": 1600,
+    "rejected": 0,
+    "elapsed_seconds": 90.4,
+    "temporary_files": 0,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 21215,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  {
+    "case": "mixed-1600-8m-cpu16",
+    "profile": "selected54-go42",
+    "cpu_limit": 16,
+    "gomaxprocs": 16,
+    "hard_limit_GiB": 54,
+    "go_target_GiB": 42,
+    "requested": 1600,
+    "accepted": 1600,
+    "rejected": 0,
+    "elapsed_seconds": 42.59,
+    "temporary_files": 0,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  },
+  {
+    "case": "full-256-8m-cpu16",
+    "profile": "selected54-go42",
+    "cpu_limit": 16,
+    "gomaxprocs": 16,
+    "hard_limit_GiB": 54,
+    "go_target_GiB": 42,
+    "requested": 256,
+    "accepted": 256,
+    "rejected": 0,
+    "elapsed_seconds": 5.14,
+    "temporary_files": 0,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    }
+  }
+]

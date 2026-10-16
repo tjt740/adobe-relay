@@ -101,6 +101,7 @@
             </div>
           </div>
         </div>
+        <ProxyHealthPanel @manage="showClashSubscription = true" />
       </template>
 
       <template #table>
@@ -996,6 +997,7 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ImportDataModal from '@/components/admin/proxy/ImportDataModal.vue'
 import ProxyAllocationModal from '@/components/admin/proxy/ProxyAllocationModal.vue'
+import ProxyHealthPanel from '@/components/admin/proxy/ProxyHealthPanel.vue'
 import ClashSubscriptionModal from '@/components/admin/proxy/ClashSubscriptionModal.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'

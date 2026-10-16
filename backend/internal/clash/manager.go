@@ -24,6 +24,7 @@ import (
 )
 
 type State struct {
+	Sources   []Source  `json:"sources,omitempty"`
 	URL       string    `json:"url"`
 	Revision  int64     `json:"revision"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -113,7 +114,7 @@ func (m *Manager) view(s State) View {
 func (m *Manager) nodeView(n Node) NodeView {
 	server, _ := n.Config["server"].(string)
 	port, _ := strconv.Atoi(fmt.Sprint(n.Config["port"]))
-	v := NodeView{Name: n.Name, Type: n.Type, Server: server, ServerPort: port, ProxyID: n.ProxyID, Enabled: n.Enabled}
+	v := NodeView{SourceID: n.SourceID, Name: n.Name, Type: n.Type, Server: server, ServerPort: port, ProxyID: n.ProxyID, Enabled: n.Enabled}
 	if n.ProxyID != 0 {
 		v.ProxyHost, v.ProxyPort = m.host, n.Port
 	}
@@ -230,7 +231,7 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 	if raw == "" {
 		raw = snapshot.URL
 	}
-	fetched, err := fetchSubscription(ctx, m.fetchClient, raw)
+	fetched, sources, err := fetchSubscriptionDetails(ctx, m.fetchClient, raw)
 	if err != nil {
 		return View{}, err
 	}
@@ -266,7 +267,17 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 	if previous.Revision != req.Revision {
 		return View{}, errors.New("订阅已被其他操作更新，请重新预览")
 	}
-	next := State{URL: raw, Revision: previous.Revision + 1, UpdatedAt: time.Now().UTC(), Nodes: make([]Node, 0)}
+	normalizeSources(&previous)
+	previousSources := map[string]Source{}
+	for _, src := range previous.Sources {
+		previousSources[src.ID] = src
+	}
+	for i, src := range sources {
+		if old, ok := previousSources[src.ID]; ok {
+			sources[i] = mergeSourceObservation(old, src)
+		}
+	}
+	next := State{Sources: sources, URL: raw, Revision: previous.Revision + 1, UpdatedAt: time.Now().UTC(), Nodes: make([]Node, 0)}
 	oldByName := map[string]Node{}
 	usedPorts := map[int]bool{}
 	retiredIDs := []int64{}
@@ -399,6 +410,11 @@ func (m *Manager) restorePersisted() {
 }
 
 func marker(s State) string {
+	s.Sources = nil
+	s.Nodes = append([]Node(nil), s.Nodes...)
+	for i := range s.Nodes {
+		s.Nodes[i].SourceID = ""
+	}
 	b, _ := json.Marshal(s)
 	sum := sha256.Sum256(b)
 	return "sub2api-revision-" + hex.EncodeToString(sum[:12])
@@ -502,6 +518,7 @@ func (m *Manager) Run(ctx context.Context) {
 		defer cancel()
 		_ = m.reconcile(attempt)
 	}
+	go m.monitorSources(ctx)
 	reconcile()
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
