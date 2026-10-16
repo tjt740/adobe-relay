@@ -332,6 +332,8 @@ const ChartIcon = {
     )
 }
 
+const ChangelogIcon = { render: () => h(Icon, { name: 'clock', size: 'md' }) }
+
 const GiftIcon = {
   render: () =>
     h(
@@ -792,6 +794,7 @@ const adminNavItems = computed((): NavItem[] => {
   const baseItems: NavItem[] = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
     { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring },
+    { path: '/admin/changelog', label: t('nav.changelog'), icon: ChangelogIcon },
     { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/api-keys', label: t('adminKeys.title'), icon: KeyIcon },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon },

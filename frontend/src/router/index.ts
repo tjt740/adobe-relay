@@ -415,6 +415,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/changelog',
+    name: 'AdminChangelog',
+    component: () => import('@/views/admin/ChangelogView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Changelog',
+      titleKey: 'nav.changelog',
+      descriptionKey: 'changelog.description'
+    }
+  },
+  {
     path: '/admin/ops',
     name: 'AdminOps',
     component: () => import('@/views/admin/ops/OpsDashboard.vue'),
