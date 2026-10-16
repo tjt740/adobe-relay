@@ -90,6 +90,14 @@ var errImageMemoryBusy = errors.New("image memory capacity exhausted")
 
 const imageMemoryLeaseKey = "image_request_memory_lease"
 
+func ImageRequestInputDiskBuffered(c *gin.Context) bool {
+	value, ok := c.Get(imageMemoryLeaseKey)
+	if !ok {
+		return false
+	}
+	return value.(*imageMemoryLease).mappedBodyBytes > 0
+}
+
 // Reserve only the first bounded read, even when Content-Length is known.
 // Later chunks acquire their full parse/audit allowance before allocation, so
 // a slow or overdeclared upload cannot hold six copies of bytes not yet sent.
@@ -125,8 +133,8 @@ type imageMemoryLease struct {
 // remains charged to the container and can be reclaimed by the kernel. Only
 // subtract the one raw copy actually mapped; decoded inputs, audit allocations,
 // relay copies and conservative output allowances keep their existing budget.
-func (l *imageMemoryLease) withoutMappedBody(weight int64) int64 {
-	return max(0, weight-l.mappedBodyBytes)
+func (l *imageMemoryLease) mappedInputCredit(inputBytes int64) int64 {
+	return min(max(0, inputBytes), l.mappedBodyBytes)
 }
 
 func (l *imageMemoryLease) resize(weight int64) bool {
@@ -165,7 +173,7 @@ func FinishImageMemoryPreparation(c *gin.Context, bodyBytes int64, images int) b
 		weight = bodyBytes*3 + output
 	}
 	if weight != math.MaxInt64 {
-		weight = lease.withoutMappedBody(weight)
+		weight -= lease.mappedInputCredit(bodyBytes)
 	}
 	if !lease.resize(weight) {
 		lease.guard.reject(c, "preparation", weight)
@@ -189,7 +197,7 @@ func FinishImageRequestParsing(c *gin.Context, retainedBytes int64, images int) 
 	lease := raw.(*imageMemoryLease)
 	weight := imageMemoryWeightWithBase(retainedBytes, 1, int64(images), imageParsedWorkMemory)
 	if weight != math.MaxInt64 {
-		weight = lease.withoutMappedBody(weight)
+		weight -= lease.mappedInputCredit(retainedBytes)
 	}
 	if !lease.resize(weight) {
 		lease.guard.reject(c, "parsed_input", weight)

@@ -12,7 +12,7 @@ trace=json.loads((root/'trace.json').read_text())
 assert trace['window_start'].startswith('2026-10-16') and len(trace['requests'])>400
 subprocess.run(['docker','pull','alpine:3.21'],check=True)
 results=[]
-cases=[('burst-400-4m','12g',400,4,False,True),('burst-600-8m','12g',600,8,False,True),('paced-incident-4m','12g',None,4,True,True),('full-64-4m','12g',64,4,False,False),('low-limit-32-64m','1536m',32,64,False,False)]
+cases=[('burst-400-4m','12g',400,4,False,True),('burst-600-8m','12g',600,8,False,True),('paced-incident-4m','12g',None,4,True,True),('json-burst-400-4m','12g',400,4,False,True),('json-paced-incident-4m','12g',None,4,True,True),('full-64-4m','12g',64,4,False,False),('low-limit-32-64m','1536m',32,64,False,False)]
 for baseline in [True,False]:
  for case,limit,total,output,paced,compact in cases:
   label=('baseline-' if baseline else 'mapped-')+case
@@ -27,6 +27,7 @@ for baseline in [True,False]:
   if total:args+=['-e','ADOBE_HISTORY_TOTAL='+str(total)]
   if paced:args+=['-e','ADOBE_HISTORY_PACED=1']
   if compact:args+=['-e','ADOBE_HISTORY_MIXED=1','-e','ADOBE_HISTORY_LEGACY_PERCENT=40','-e','ADOBE_HISTORY_OBSERVED_PATHS=1']
+  if case.startswith('json-'):args+=['-e','ADOBE_HISTORY_INPUT_FORMAT=json']
   args+=['alpine:3.21','sh','-c','/input/'+binary+' -test.run=^TestImageMemoryHistoricalBurst$ -test.v -test.timeout=9m; code=$?; sleep 2; exit "$code"']
   subprocess.run(args,check=True,stdout=subprocess.DEVNULL)
   started=time.monotonic(); peak=0;events={}
