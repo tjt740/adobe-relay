@@ -23,10 +23,10 @@ fi
 if [[ -n "$rolling_mode" ]]; then
   # The operator already routed new connections and drained the old instance.
   # A legacy rollback startup could erase slots still owned by the canary.
-  [[ "$(docker inspect adobe-relay-memory-canary --format '{{.State.Health.Status}}')" == healthy ]]
-  [[ "$(docker inspect adobe-relay-memory-canary --format '{{.Config.Image}}')" == "$image" ]]
-  lease_ttl=$(docker exec adobe-relay-redis-1 redis-cli --raw TTL concurrency:rolling_deployment)
-  [[ "$lease_ttl" =~ ^[0-9]+$ && "$lease_ttl" -gt 0 ]]
+  [[ "$(docker inspect adobe-relay-memory-canary --format '{{.State.Health.Status}}')" == healthy ]] || exit 1
+  [[ "$(docker inspect adobe-relay-memory-canary --format '{{.Config.Image}}')" == "$image" ]] || exit 1
+  lease_ttl=$(docker exec adobe-relay-redis-1 redis-cli --raw TTL concurrency:rolling_deployment) || exit 1
+  [[ "$lease_ttl" =~ ^[0-9]+$ && "$lease_ttl" -gt 0 ]] || exit 1
 fi
 backup_dir="$root/backups/$(date -u +%Y%m%dT%H%M%SZ)-${image##*:}"
 mkdir -p "$backup_dir"

@@ -29,7 +29,8 @@ case "$name:$*" in
     [[ "$FAILURE" != canary ]] || exit 1
     echo healthy ;;
   'docker:inspect adobe-relay-memory-canary --format '{{.Config.Image}}) echo adobe-relay:new ;;
-  'docker:exec adobe-relay-redis-1 redis-cli --raw TTL concurrency:rolling_deployment') echo 1800 ;;
+  'docker:exec adobe-relay-redis-1 redis-cli --raw TTL concurrency:rolling_deployment')
+    if [[ "$FAILURE" == lease ]]; then echo -2; else echo 1800; fi ;;
   'docker:exec postgres pg_dump '*)
     [[ "$FAILURE" != backup ]] || exit 1
     echo database ;;
@@ -94,6 +95,13 @@ esac
 
     def test_rolling_requires_healthy_canary_before_backup_or_cutover(self):
         root, result = self.run_release("canary", rolling=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SUB2API_IMAGE=adobe-relay:old", (root / "shared/.env").read_text())
+        self.assertNotIn("adobe-relay up ", (root / "commands").read_text())
+        self.assertFalse((root / "backups").exists())
+
+    def test_rolling_requires_live_lease_before_cutover(self):
+        root, result = self.run_release("lease", rolling=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("SUB2API_IMAGE=adobe-relay:old", (root / "shared/.env").read_text())
         self.assertNotIn("adobe-relay up ", (root / "commands").read_text())
