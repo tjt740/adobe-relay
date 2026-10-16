@@ -9,6 +9,8 @@ export interface ProxyAllocationView {
   waiting: number
   binding_only_accounts: number
   healthy_nodes: number
+  reclaimable_slots?: number
+  business_waiting?: number
   available_slots: number
   checked_at: string | null
   nodes: Array<{ id: number; name: string; accounts: number; status: string; latency_ms: number }>

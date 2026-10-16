@@ -107,3 +107,18 @@ func (h *ProxyHandler) rejectManagedClashProxy(c *gin.Context, id int64) bool {
 	}
 	return false
 }
+
+// ClashHealth reads existing telemetry only; it never probes or fetches feeds.
+func (h *ProxyHandler) ClashHealth(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	if h.clash == nil {
+		response.Success(c, clash.HealthView{Sources: []clash.SourceView{}, Groups: []clash.GroupCapacity{}})
+		return
+	}
+	view, err := h.clash.Health(c.Request.Context())
+	if err != nil {
+		response.InternalError(c, "无法读取订阅健康状态")
+		return
+	}
+	response.Success(c, view)
+}

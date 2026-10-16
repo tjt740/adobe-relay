@@ -11,7 +11,10 @@ import (
 	"slices"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/clash"
 )
 
 const interval = 30 * time.Second
@@ -28,13 +31,16 @@ type Policy struct {
 	CurrentProxyID int64   `json:"current_proxy_id"`
 }
 type health struct {
-	ProxyID     int64     `json:"proxy_id"`
-	Status      string    `json:"status"`
-	Failures    int       `json:"failures"`
-	LatencyMS   int64     `json:"latency_ms"`
-	CheckedAt   time.Time `json:"checked_at"`
-	Message     string    `json:"message"`
-	fingerprint string
+	LatencyEWMA     int64     `json:"latency_ewma_ms"`
+	SlowChecks      int       `json:"slow_checks"`
+	SuccessPermille int       `json:"success_permille"`
+	ProxyID         int64     `json:"proxy_id"`
+	Status          string    `json:"status"`
+	Failures        int       `json:"failures"`
+	LatencyMS       int64     `json:"latency_ms"`
+	CheckedAt       time.Time `json:"checked_at"`
+	Message         string    `json:"message"`
+	fingerprint     string
 }
 type Event struct {
 	FromProxyID int64     `json:"from_proxy_id"`
@@ -49,6 +55,9 @@ type View struct {
 	Events      []Event  `json:"events"`
 }
 type proxy struct {
+	sourceTrafficAvailable                     bool
+	sourceID                                   string
+	sourceBlocked                              bool
 	ID                                         int64
 	Protocol, Host, Username, Password, Status string
 	Port                                       int
@@ -58,7 +67,7 @@ type proxy struct {
 }
 
 func (p proxy) available(now time.Time) bool {
-	return !p.Deleted && p.Status == "active" && (!p.ExpiresAt.Valid || p.ExpiresAt.Time.After(now))
+	return !p.sourceBlocked && !p.Deleted && p.Status == "active" && (!p.ExpiresAt.Valid || p.ExpiresAt.Time.After(now))
 }
 func (p proxy) fingerprint() string {
 	// Persist only a digest, never proxy credentials, in health records.
@@ -67,9 +76,10 @@ func (p proxy) fingerprint() string {
 }
 
 type Manager struct {
-	db    *sql.DB
-	wake  chan struct{}
-	probe func(context.Context, proxy) health
+	demandAt atomic.Int64
+	db       *sql.DB
+	wake     chan struct{}
+	probe    func(context.Context, proxy) health
 }
 
 func NewManager(db *sql.DB) *Manager {
@@ -94,10 +104,26 @@ func loadProxies(ctx context.Context, q queryer) (map[int64]proxy, error) {
 		}
 		result[p.ID] = p
 	}
-	return result, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	sources, err := clash.LoadProxySources(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	for id, source := range sources {
+		if p, ok := result[id]; ok {
+			p.sourceID = source.ID
+			p.sourceBlocked = source.Blocked
+			p.sourceTrafficAvailable = source.TrafficAvailable
+			result[id] = p
+		}
+	}
+	return result, nil
 }
 func loadHealth(ctx context.Context, q queryer) (map[int64]health, error) {
-	rows, err := q.QueryContext(ctx, `SELECT proxy_id,fingerprint,status,failures,latency_ms,checked_at,message FROM proxy_failover_health`)
+	rows, err := q.QueryContext(ctx, `SELECT proxy_id,fingerprint,status,failures,latency_ms,checked_at,message,latency_ewma_ms,slow_checks,success_permille FROM proxy_failover_health`)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +131,7 @@ func loadHealth(ctx context.Context, q queryer) (map[int64]health, error) {
 	result := make(map[int64]health)
 	for rows.Next() {
 		var h health
-		if err := rows.Scan(&h.ProxyID, &h.fingerprint, &h.Status, &h.Failures, &h.LatencyMS, &h.CheckedAt, &h.Message); err != nil {
+		if err := rows.Scan(&h.ProxyID, &h.fingerprint, &h.Status, &h.Failures, &h.LatencyMS, &h.CheckedAt, &h.Message, &h.LatencyEWMA, &h.SlowChecks, &h.SuccessPermille); err != nil {
 			return nil, err
 		}
 		result[h.ProxyID] = h
@@ -443,7 +469,11 @@ func (m *Manager) refreshHealth(ctx context.Context, tx *sql.Tx, ps map[int64]pr
 	results := make(chan health, len(pending))
 	jobs := make(chan proxy)
 	var wg sync.WaitGroup
-	for i := 0; i < 8; i++ {
+	workers := 8
+	if !persist {
+		workers = 24
+	}
+	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -478,10 +508,11 @@ func (m *Manager) refreshHealth(ctx context.Context, tx *sql.Tx, ps map[int64]pr
 		old := hs[h.ProxyID]
 		if h.Status == "unhealthy" {
 			h.Failures = 1
-			if old.Status == "unhealthy" && old.fingerprint == h.fingerprint && h.CheckedAt.Sub(old.CheckedAt) < 3*time.Minute {
+			if old.Status == "unhealthy" && old.fingerprint == h.fingerprint && h.CheckedAt.Sub(old.CheckedAt) < max(3*time.Minute, 2*clash.ProbeFreshness(len(ps))) {
 				h.Failures = min(old.Failures+1, 100)
 			}
 		}
+		h = qualityObservation(old, h)
 		hs[h.ProxyID] = h
 	}
 	if persist {
@@ -496,8 +527,8 @@ func persistHealth(ctx context.Context, tx *sql.Tx, ps map[int64]proxy, hs map[i
 		if !exists || h.fingerprint != p.fingerprint() {
 			continue
 		}
-		_, err := tx.ExecContext(ctx, `INSERT INTO proxy_failover_health(proxy_id,fingerprint,status,failures,latency_ms,checked_at,message) VALUES($1,$2,$3,$4,$5,$6,$7)
-  ON CONFLICT(proxy_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,status=EXCLUDED.status,failures=EXCLUDED.failures,latency_ms=EXCLUDED.latency_ms,checked_at=EXCLUDED.checked_at,message=EXCLUDED.message`, h.ProxyID, h.fingerprint, h.Status, h.Failures, h.LatencyMS, h.CheckedAt, h.Message)
+		_, err := tx.ExecContext(ctx, `INSERT INTO proxy_failover_health(proxy_id,fingerprint,status,failures,latency_ms,checked_at,message,latency_ewma_ms,slow_checks,success_permille) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+  ON CONFLICT(proxy_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,status=EXCLUDED.status,failures=EXCLUDED.failures,latency_ms=EXCLUDED.latency_ms,checked_at=EXCLUDED.checked_at,message=EXCLUDED.message,latency_ewma_ms=EXCLUDED.latency_ewma_ms,slow_checks=EXCLUDED.slow_checks,success_permille=EXCLUDED.success_permille`, h.ProxyID, h.fingerprint, h.Status, h.Failures, h.LatencyMS, h.CheckedAt, h.Message, h.LatencyEWMA, h.SlowChecks, h.SuccessPermille)
 		if err != nil {
 			return err
 		}

@@ -126,6 +126,12 @@ func testDB(t *testing.T) *sql.DB {
 	require.NoError(t, err)
 	_, err = db.Exec(string(migration))
 	require.NoError(t, err)
+	for _, name := range []string{"240_clash_subscription.sql", "250_proxy_quality.sql"} {
+		migration, err = os.ReadFile("../../migrations/" + name)
+		require.NoError(t, err)
+		_, err = db.Exec(string(migration))
+		require.NoError(t, err)
+	}
 	return db
 }
 

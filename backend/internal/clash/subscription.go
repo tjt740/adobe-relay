@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -21,6 +20,7 @@ const maxBody = 8 << 20
 const maxNodes = 512
 
 type Node struct {
+	SourceID string         `json:"source_id,omitempty"`
 	Name     string         `json:"name"`
 	Type     string         `json:"type"`
 	Config   map[string]any `json:"config"`
@@ -31,6 +31,7 @@ type Node struct {
 }
 
 type NodeView struct {
+	SourceID   string `json:"source_id,omitempty"`
 	Name       string `json:"name"`
 	Type       string `json:"type"`
 	Server     string `json:"server"`
@@ -326,54 +327,6 @@ func subscriptionClient() *http.Client {
 }
 
 func fetchSubscription(ctx context.Context, client *http.Client, raw string) ([]Node, error) {
-	urls := strings.Fields(raw)
-	if len(urls) == 0 {
-		return nil, errors.New("请输入至少一个订阅链接")
-	}
-	if len(urls) > 8 {
-		return nil, errors.New("最多支持 8 个订阅链接")
-	}
-	all := make([]Node, 0)
-	for index, subscriptionURL := range urls {
-		if err := validateURL(subscriptionURL); err != nil {
-			return nil, err
-		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, subscriptionURL, nil)
-		if err != nil {
-			return nil, errors.New("订阅链接无效")
-		}
-		req.Header.Set("User-Agent", "clash.meta/sub2api")
-		res, err := client.Do(req)
-		if err != nil {
-			return nil, errors.New("获取订阅失败，请检查链接、网络或稍后重试")
-		}
-		body, readErr := io.ReadAll(io.LimitReader(res.Body, maxBody+1))
-		res.Body.Close()
-		if readErr != nil {
-			return nil, errors.New("读取订阅失败")
-		}
-		if res.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("订阅服务器返回 HTTP %d", res.StatusCode)
-		}
-		nodes, err := parseSubscription(body)
-		if err != nil {
-			return nil, err
-		}
-		if len(urls) > 1 {
-			prefix := fmt.Sprintf("订阅%d · ", index+1)
-			for i := range nodes {
-				name := []rune(prefix + nodes[i].Name)
-				if len(name) > 90 {
-					name = name[:90]
-				}
-				nodes[i].Name = string(name)
-				nodes[i].Config["name"] = nodes[i].Name
-			}
-		}
-		all = append(all, nodes...)
-		if len(all) > maxNodes {
-			return nil, fmt.Errorf("合并后的订阅节点超过 %d 个", maxNodes)
-		}
-	}
-	return all, nil
+	nodes, _, err := fetchSubscriptionDetails(ctx, client, raw)
+	return nodes, err
 }
