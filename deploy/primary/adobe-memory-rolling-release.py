@@ -36,6 +36,9 @@ def locks():
  for name in ['/opt/adobe-relay/.release.lock','/opt/adobe-team-cookie/.release.lock','/opt/adobe-team-cookie/.incremental-release.lock']:
   f=open(name,'r');fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB);result.append(f)
  return result
+def startup_contract(config):
+ return {k:(config.get(k) or ('' if k in ['User','WorkingDir'] else [])) for k in ['User','WorkingDir','Entrypoint','Cmd']}
+
 def preserved_container_options(old):
  args=[]
  for option in old['HostConfig'].get('SecurityOpt') or []:args+=['--security-opt',option]
@@ -52,7 +55,7 @@ def prepare(sha):
  assert old['State']['Health']['Status']=='healthy' and available()>5*1024**3
  assert not rule_present()
  image_config=inspect('adobe-relay:'+sha)['Config']
- assert all(image_config.get(k)==old['Config'].get(k) for k in ['User','WorkingDir','Entrypoint','Cmd']),'Candidate startup contract changed; inspect before routing'
+ assert startup_contract(image_config)==startup_contract(old['Config']),'Candidate startup contract changed; inspect before routing'
  spec=importlib.util.spec_from_file_location('release_guard',ROOT/'adobe-memory-real-load-release.py')
  guard=importlib.util.module_from_spec(spec);spec.loader.exec_module(guard);r=guard.release
  if not (ROOT/'before.json').exists():

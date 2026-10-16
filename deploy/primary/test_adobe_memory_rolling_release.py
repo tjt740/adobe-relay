@@ -6,6 +6,10 @@ spec=importlib.util.spec_from_file_location('rolling',Path(__file__).with_name('
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
 class RollingHandoffTests(TestCase):
+    def test_default_root_user_null_and_empty_are_same_startup_contract(self):
+        self.assertEqual(m.startup_contract({'User':None}),m.startup_contract({'User':''}))
+        self.assertNotEqual(m.startup_contract({'User':'1000'}),m.startup_contract({'User':''}))
+
     def test_canary_preserves_security_and_log_rotation(self):
         opts=m.preserved_container_options({'HostConfig':{'SecurityOpt':['no-new-privileges:true'],'LogConfig':{'Type':'json-file','Config':{'max-file':'3','max-size':'10m'}}}})
         self.assertEqual(opts,['--security-opt','no-new-privileges:true','--log-driver','json-file','--log-opt','max-file=3','--log-opt','max-size=10m'])
