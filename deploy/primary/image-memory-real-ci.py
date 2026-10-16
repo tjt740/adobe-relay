@@ -12,6 +12,7 @@ trace=json.loads((root/'trace.json').read_text())
 assert trace['window_start'].startswith('2026-10-16') and len(trace['requests'])>400
 subprocess.run(['docker','pull','alpine:3.21'],check=True)
 results=[]
+regressions=[]
 cases=[('burst-400-4m','12g',400,4,False,True),('burst-600-8m','12g',600,8,False,True),('paced-incident-4m','12g',None,4,True,True),('json-burst-400-4m','12g',400,4,False,True),('json-paced-incident-4m','12g',None,4,True,True),('full-64-4m','12g',64,4,False,False),('low-limit-32-64m','1536m',32,64,False,False)]
 for baseline in [True,False]:
  for case,limit,total,output,paced,compact in cases:
@@ -56,7 +57,10 @@ for baseline in [True,False]:
    assert row['temporary_files_left']==0,label
    if not baseline:
     previous=next(r for r in results if r['case']==case and r['baseline'])
-    assert row.get('accepted',0)>=previous.get('accepted',0), 'Admission regressed: '+label
+    if row.get('accepted',0)<previous.get('accepted',0):
+     regressions.append({'case':case,'baseline_accepted':previous.get('accepted',0),'candidate_accepted':row.get('accepted',0)})
     if not compact:assert row['accepted']==row['requested'], 'Full physical reservation/low limit must complete all accepted-size requests'
   finally:
    subprocess.run(['docker','rm','-f',name],stdout=subprocess.DEVNULL)
+
+assert not regressions, "Admission regressed: "+json.dumps(regressions)

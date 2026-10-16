@@ -21,6 +21,10 @@ import (
 )
 
 const imageRequestBaseMemory = int64(4 << 20)
+
+// Spooling owns two 64 KiB IO buffers and small request/file metadata.
+// Keep eight times that IO bound; the full parser allowance is acquired later.
+const imageSpoolReadMemory = int64(1 << 20)
 const imageParsedWorkMemory = int64(1 << 20)
 const imageInitialReadMemory = int64(1 << 20)
 const imageUnbufferedOutputMemory = int64(32 << 20)
@@ -253,7 +257,7 @@ func (g *imageMemoryGuard) handler(c *gin.Context) {
 	encoding := c.Request.Header.Get("Content-Encoding")
 	spoolCandidate := g.maxBody > 0 && c.Request.ContentLength >= 1<<20 && strings.HasSuffix(c.Request.URL.Path, "/images/edits") && key != nil && key.Group != nil && key.Group.Platform == service.PlatformAdobe && (encoding == "" || strings.EqualFold(encoding, "identity"))
 	if spoolCandidate {
-		weight = imageRequestBaseMemory
+		weight = imageSpoolReadMemory
 	}
 	if !lease.resize(weight) {
 		g.reject(c, "admission", weight)
@@ -325,7 +329,7 @@ func (g *imageMemoryGuard) handler(c *gin.Context) {
 	// decoded body is available. Later readers reuse this immutable slice.
 	parseWeight := imageMemoryWeight(int64(len(body)), 6, 1) - lease.mappedInputCredit(int64(len(body)))
 	if !lease.resize(parseWeight) {
-		g.reject(c, "body_complete", lease.weight)
+		g.reject(c, "body_complete", parseWeight)
 		return
 	}
 	c.Request.Body = pkghttputil.NewPrereadBody(body)
