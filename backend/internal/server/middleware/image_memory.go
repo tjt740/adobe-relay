@@ -1,10 +1,12 @@
 package middleware
 
 import (
+	"bytes"
 	"errors"
 	"log/slog"
 	"math"
 	"net/http"
+	"os"
 	"runtime/debug"
 	"runtime/metrics"
 	"strings"
@@ -12,6 +14,7 @@ import (
 	"time"
 
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/imagebuffer"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/semaphore"
@@ -51,13 +54,15 @@ type imageMemoryGuard struct {
 	runtimeUsage func() imageRuntimeFootprint
 	used         atomic.Int64
 	active       atomic.Int64
+	mappedBytes  atomic.Int64
+	bufferInput  func([]byte) ([]byte, func(), error)
 }
 
 func newImageMemoryGuard(capacity, maxBody int64) *imageMemoryGuard {
 	if capacity < 1 {
 		capacity = 1
 	}
-	return &imageMemoryGuard{capacity: capacity, maxBody: maxBody, bytes: semaphore.NewWeighted(capacity), runtimeUsage: imageRuntimeMemory}
+	return &imageMemoryGuard{capacity: capacity, maxBody: maxBody, bytes: semaphore.NewWeighted(capacity), runtimeUsage: imageRuntimeMemory, bufferInput: bufferImageRequestInput}
 }
 
 type imageRuntimeFootprint struct {
@@ -111,8 +116,17 @@ func imageMemoryWeightWithBase(size, multiplier, images, base int64) int64 {
 }
 
 type imageMemoryLease struct {
-	guard  *imageMemoryGuard
-	weight int64 // Owned by the synchronous request/middleware chain.
+	guard           *imageMemoryGuard
+	weight          int64 // Owned by the synchronous request/middleware chain.
+	mappedBodyBytes int64 // Immutable raw body held in reclaimable file pages, not Go heap.
+}
+
+// The ledger covers anonymous heap. File-backed raw input, like buffered output,
+// remains charged to the container and can be reclaimed by the kernel. Only
+// subtract the one raw copy actually mapped; decoded inputs, audit allocations,
+// relay copies and conservative output allowances keep their existing budget.
+func (l *imageMemoryLease) withoutMappedBody(weight int64) int64 {
+	return max(0, weight-l.mappedBodyBytes)
 }
 
 func (l *imageMemoryLease) resize(weight int64) bool {
@@ -150,6 +164,9 @@ func FinishImageMemoryPreparation(c *gin.Context, bodyBytes int64, images int) b
 	if bodyBytes >= 0 && bodyBytes <= (math.MaxInt64-output)/3 {
 		weight = bodyBytes*3 + output
 	}
+	if weight != math.MaxInt64 {
+		weight = lease.withoutMappedBody(weight)
+	}
 	if !lease.resize(weight) {
 		lease.guard.reject(c, "preparation", weight)
 		return false
@@ -171,6 +188,9 @@ func FinishImageRequestParsing(c *gin.Context, retainedBytes int64, images int) 
 	}
 	lease := raw.(*imageMemoryLease)
 	weight := imageMemoryWeightWithBase(retainedBytes, 1, int64(images), imageParsedWorkMemory)
+	if weight != math.MaxInt64 {
+		weight = lease.withoutMappedBody(weight)
+	}
 	if !lease.resize(weight) {
 		lease.guard.reject(c, "parsed_input", weight)
 		return false
@@ -262,6 +282,22 @@ func (g *imageMemoryGuard) handler(c *gin.Context) {
 		g.reject(c, "body_complete", lease.weight)
 		return
 	}
+	// This synchronous edit route holds its immutable raw input throughout
+	// polling/failover. Move large bodies off anonymous heap after the protected
+	// read, before parsing. Never opt asynchronous endpoints into this lifetime.
+	key, _ := GetAPIKeyFromContext(c)
+	if len(body) >= 1<<20 && strings.HasSuffix(c.Request.URL.Path, "/images/edits") && key != nil && key.Group != nil && key.Group.Platform == service.PlatformAdobe {
+		if mapped, cleanup, mapErr := g.bufferInput(body); mapErr == nil {
+			body = mapped
+			lease.mappedBodyBytes = int64(len(body))
+			g.mappedBytes.Add(lease.mappedBodyBytes)
+			defer func() {
+				c.Request.Body = http.NoBody // Do not leave a reader pointing at an unmapped slice.
+				cleanup()
+				g.mappedBytes.Add(-lease.mappedBodyBytes)
+			}()
+		}
+	}
 	c.Request.Body = pkghttputil.NewPrereadBody(body)
 	c.Set(imageMemoryLeaseKey, lease)
 	c.Next()
@@ -270,7 +306,7 @@ func (g *imageMemoryGuard) handler(c *gin.Context) {
 func (g *imageMemoryGuard) reject(c *gin.Context, phase string, requested int64) {
 	if c.Request.Context().Err() == nil {
 		c.Header("Retry-After", "1")
-		service.MarkOpsClientBusinessLimited(c, "image_memory_capacity")
+		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonImageMemoryCapacity)
 		message := "Image processing capacity is busy, please retry later"
 		if strings.Contains(c.Request.URL.Path, "/v1beta/") {
 			GoogleErrorWriter(c, http.StatusTooManyRequests, message)
@@ -283,6 +319,21 @@ func (g *imageMemoryGuard) reject(c *gin.Context, phase string, requested int64)
 	last := g.lastLog.Load()
 	if now-last >= 5 && g.lastLog.CompareAndSwap(last, now) {
 		memory := g.runtimeUsage()
-		slog.Info("image_memory.capacity_rejected", "budget_bytes", g.capacity, "reserved_bytes", g.used.Load(), "requested_bytes", requested, "active_requests", g.active.Load(), "runtime_bytes", memory.committed, "runtime_reusable_bytes", memory.reusable, "runtime_pressure_bytes", memory.pressure(), "phase", phase, "queue_enabled", false)
+		slog.Info("image_memory.capacity_rejected", "budget_bytes", g.capacity, "reserved_bytes", g.used.Load(), "requested_bytes", requested, "active_requests", g.active.Load(), "mapped_input_bytes", g.mappedBytes.Load(), "runtime_bytes", memory.committed, "runtime_reusable_bytes", memory.reusable, "runtime_pressure_bytes", memory.pressure(), "phase", phase, "queue_enabled", false)
 	}
+}
+
+func bufferImageRequestInput(body []byte) ([]byte, func(), error) {
+	page := int64(os.Getpagesize())
+	size := (int64(len(body)) + page - 1) / page * page
+	arena, err := imagebuffer.New(size)
+	if err != nil {
+		return nil, nil, err
+	}
+	mapped, err := arena.Read(bytes.NewReader(body), int64(len(body)))
+	if err != nil {
+		_ = arena.Close()
+		return nil, nil, err
+	}
+	return mapped, func() { _ = arena.Close() }, nil
 }

@@ -17,6 +17,11 @@ import (
 // 太短会反复撞同一个空账号，太长会在额度已恢复后仍白白闲置账号。
 const adobeQuotaCooldown = 30 * time.Minute
 
+// After the existing same-account submit retries still receive 429, briefly
+// avoid scheduling new work onto that account. This neither cancels accepted
+// jobs nor changes manual pause, credentials, login policy or retry counts.
+const adobeSubmitRateLimitCooldown = 15 * time.Second
+
 // Adobe 失败原因，进入 UpstreamFailoverError.Reason 供 ops 归因。
 const (
 	adobeFailureQuotaExhausted  = GatewayFailureReason("adobe_quota_exhausted")
@@ -116,8 +121,14 @@ func classifyAdobeError(err error) adobeFailure {
 	var temporaryErr *adobe.UpstreamTemporaryError
 	if errors.As(err, &temporaryErr) {
 		action := NextAccountRetry
+		var cooldown time.Duration
+		var cooldownReason string
 		var op *adobe.OperationError
-		if errors.As(err, &op) && (op.Stage == "poll" || op.Stage == "download") {
+		if errors.As(err, &op) && op.Stage == "submit" && temporaryErr.StatusCode == http.StatusTooManyRequests {
+			cooldown = adobeSubmitRateLimitCooldown
+			cooldownReason = "adobe submit rate limited (429)"
+		}
+		if op != nil && (op.Stage == "poll" || op.Stage == "download") {
 			// The job was already accepted. Its local GET retries are exhausted;
 			// switching accounts would create and charge for a different image.
 			action = NextAccountStop
@@ -130,6 +141,8 @@ func classifyAdobeError(err error) adobeFailure {
 				Reason:            adobeFailureUpstream,
 				NextAccountAction: action,
 			},
+			Cooldown:       cooldown,
+			CooldownReason: cooldownReason,
 		}
 	}
 

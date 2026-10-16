@@ -3,6 +3,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      build_only:
+        description: Run all checks and build an image without replacing the running application
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -10,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || inputs.build_only
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
@@ -98,6 +103,7 @@ jobs:
 
   deploy:
     needs: build
+    if: inputs.build_only != true
     runs-on: ubuntu-latest
     timeout-minutes: 25
     name: Deploy primary

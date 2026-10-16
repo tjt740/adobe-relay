@@ -1,0 +1,61 @@
+"""Identical-load comparison with today's incident sizes; disposable CI only."""
+import datetime, hashlib, json, os, re, subprocess, sys, time
+from pathlib import Path
+
+assert os.environ.get('GITHUB_ACTIONS') == 'true'
+root=Path(sys.argv[1]).resolve()
+production=json.loads((root/'production-limits.json').read_text())
+assert production['memory_bytes']==12*1024**3
+assert production['environment']=={'GOMEMLIMIT':'9216MiB','GOMAXPROCS':'6'}
+assert production['pids_max']=='max' or int(production['pids_max'])>=2048
+trace=json.loads((root/'trace.json').read_text())
+assert trace['window_start'].startswith('2026-10-16') and len(trace['requests'])>400
+subprocess.run(['docker','pull','alpine:3.21'],check=True)
+results=[]
+cases=[('burst-400-4m','12g',400,4,False,True),('burst-600-8m','12g',600,8,False,True),('paced-incident-4m','12g',None,4,True,True),('full-64-4m','12g',64,4,False,False),('low-limit-32-64m','1536m',32,64,False,False)]
+for baseline in [True,False]:
+ for case,limit,total,output,paced,compact in cases:
+  label=('baseline-' if baseline else 'mapped-')+case
+  binary='memory-baseline.test' if baseline else 'memory.test'
+  name='sub2-real-'+label
+  temp=root/('tmp-'+label);temp.mkdir()
+  args=['docker','run','-d','--name',name,'--network=none','--read-only','--cpus=4','--memory='+limit,'--memory-swap='+limit,'--pids-limit=2048',
+        '--mount',f'type=bind,src={root},dst=/input,readonly','--mount',f'type=bind,src={temp},dst=/tmp',
+        '-e','GOMEMLIMIT=9216MiB','-e','GOMAXPROCS=6','-e','ADOBE_HISTORY_TRACE=/input/trace.json',
+        '-e','ADOBE_HISTORY_TIME_SCALE=0.15','-e','ADOBE_HISTORY_OUTPUT_MIB='+str(output)]
+  if compact:args+=['-e','ADOBE_HISTORY_COMPACT_RESERVATION=1']
+  if total:args+=['-e','ADOBE_HISTORY_TOTAL='+str(total)]
+  if paced:args+=['-e','ADOBE_HISTORY_PACED=1']
+  if compact:args+=['-e','ADOBE_HISTORY_MIXED=1','-e','ADOBE_HISTORY_LEGACY_PERCENT=40','-e','ADOBE_HISTORY_OBSERVED_PATHS=1']
+  args+=['alpine:3.21','sh','-c','/input/'+binary+' -test.run=^TestImageMemoryHistoricalBurst$ -test.v -test.timeout=9m; code=$?; sleep 2; exit "$code"']
+  subprocess.run(args,check=True,stdout=subprocess.DEVNULL)
+  started=time.monotonic(); peak=0;events={}
+  try:
+   while True:
+    d=json.loads(subprocess.check_output(['docker','inspect',name]))[0]
+    if not d['State']['Running']:break
+    try:
+     p=Path('/sys/fs/cgroup')/Path(f"/proc/{d['State']['Pid']}/cgroup").read_text().strip().split(':')[-1].lstrip('/')
+     peak=max(peak,int((p/'memory.peak').read_text()))
+     events={k:int(v) for k,v in (line.split() for line in (p/'memory.events').read_text().splitlines())}
+    except FileNotFoundError:pass
+    assert time.monotonic()-started<570
+    time.sleep(1)
+   log=subprocess.check_output(['docker','logs',name],stderr=subprocess.STDOUT,text=True)
+   (root/(label+'.log')).write_text(log)
+   row={'case':case,'baseline':baseline,'binary_sha256':hashlib.sha256((root/binary).read_bytes()).hexdigest(),'hard_limit':limit,'compact_disk_reservation':compact,
+        'elapsed_seconds':round(time.monotonic()-started,2),'exit_code':d['State']['ExitCode'],'oom_killed':d['State']['OOMKilled'],'memory_peak':peak,'memory_events':events,'temporary_files_left':len(list(temp.iterdir()))}
+   match=re.search(r'historical_burst requested=(\d+) accepted=(\d+) rejected=(\d+) peak=(\d+)',log)
+   if match:row.update(zip(['requested','accepted','rejected','peak_inflight'],map(int,match.groups())))
+   results.append(row)
+   (root/'linux-validation.json').write_text(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'trace_requests':len(trace['requests']),'trace_sha256':hashlib.sha256((root/'trace.json').read_bytes()).hexdigest(),'production_limits':production,'results':results},indent=2))
+   print(json.dumps(row),flush=True)
+   if row['exit_code']!=0:print(log[-4000:],flush=True)
+   assert row['exit_code']==0 and not row['oom_killed'] and events.get('oom',0)==0 and events.get('oom_kill',0)==0, label
+   assert row['temporary_files_left']==0,label
+   if not baseline:
+    previous=next(r for r in results if r['case']==case and r['baseline'])
+    assert row.get('accepted',0)>=previous.get('accepted',0), 'Admission regressed: '+label
+    if not compact:assert row['accepted']==row['requested'], 'Full physical reservation/low limit must complete all accepted-size requests'
+  finally:
+   subprocess.run(['docker','rm','-f',name],stdout=subprocess.DEVNULL)

@@ -30,6 +30,7 @@ type historyTrace struct {
 		DurationMS       int64 `json:"duration_ms"`
 		DurationObserved bool  `json:"duration_observed"`
 		ImageCount       int   `json:"image_count"`
+		Legacy           *bool `json:"legacy"`
 	} `json:"requests"`
 }
 type historyFill struct{ remaining int64 }
@@ -72,6 +73,10 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 	}
 	compact := os.Getenv("ADOBE_HISTORY_COMPACT_RESERVATION") == "1"
 	mixed := os.Getenv("ADOBE_HISTORY_MIXED") == "1"
+	legacyPercent := 17
+	if n, err := strconv.Atoi(os.Getenv("ADOBE_HISTORY_LEGACY_PERCENT")); err == nil && n >= 0 && n <= 100 {
+		legacyPercent = n
+	}
 	totals := []int{100, 200, 300, 400}
 	if count, e := strconv.Atoi(os.Getenv("ADOBE_HISTORY_TOTAL")); e == nil && count > 0 {
 		totals = []int{count}
@@ -223,7 +228,11 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 				req := httptest.NewRequest("POST", "/v1/images/edits", reader)
 				req.Header.Set("X-Replay-Duration-Ms", strconv.FormatInt(sample.DurationMS, 10))
 				req.Header.Set("Content-Type", "multipart/form-data; boundary=hist")
-				if mixed && i%40 < 7 { // observed 17.5% requested explicit transcoding
+				legacy := mixed && i%100 < legacyPercent
+				if mixed && os.Getenv("ADOBE_HISTORY_OBSERVED_PATHS") == "1" && sample.Legacy != nil {
+					legacy = *sample.Legacy
+				}
+				if legacy {
 					req.Header.Set("X-Replay-Legacy", "1")
 				}
 				req.ContentLength = int64(len(prefix)+len(suffix)) + size
