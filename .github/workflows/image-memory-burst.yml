@@ -8,12 +8,16 @@ on:
         description: Compare current c574dcc with mapped input using the October 16 incident metadata
         type: boolean
         default: false
+      repeat_bursts:
+        description: Five alternating-order comparisons of each burst; identical verified backend only
+        type: boolean
+        default: false
       compare_baseline:
         description: Compare the staged reservation algorithm with deployed 8db3c34
         type: boolean
         default: false
       reuse_compatibility_from:
-        description: Reuse passed compatibility checks only for unchanged backend 45a38fc
+        description: Reuse checks only for the exact verified 45a38fc or 3e35a47 backend
         type: string
         default: ''
 permissions:
@@ -36,10 +40,14 @@ jobs:
         env:
           CHECKED_SHA: ${{ inputs.reuse_compatibility_from }}
         run: |
-          test "$CHECKED_SHA" = 45a38fc095c16258b7fdeb97a45dbae2e340df93
+          case "$CHECKED_SHA" in
+            45a38fc095c16258b7fdeb97a45dbae2e340df93) echo 'Verified checks: 38739411163.' ;;
+            3e35a47c18bb67291ad9f05bb2e8f499bce04bdd) echo 'Verified full checks/build: 38854531880.' ;;
+            *) exit 1 ;;
+          esac
           git fetch --depth=1 origin "$CHECKED_SHA"
           git diff --exit-code "$CHECKED_SHA" HEAD -- backend
-          echo 'Backend identical to compatibility checks passed in workflow 38739411163.'
+          echo 'Backend identical to the verified application; no application change.'
       - name: Unit and compatibility checks
         if: inputs.reuse_compatibility_from == ''
         working-directory: backend
@@ -91,7 +99,11 @@ jobs:
           ADOBE_MEMORY_COMPARE_BASELINE: ${{ inputs.compare_baseline }}
         run: |
           if [[ '${{ inputs.real_load }}' == 'true' ]]; then
-            python3 deploy/primary/image-memory-real-ci.py "$RUNNER_TEMP/image-replay"
+            if [[ '${{ inputs.repeat_bursts }}' == 'true' ]]; then
+              ADOBE_MEMORY_BURST_REPEATS=5 python3 deploy/primary/image-memory-real-ci.py "$RUNNER_TEMP/image-replay"
+            else
+              python3 deploy/primary/image-memory-real-ci.py "$RUNNER_TEMP/image-replay"
+            fi
           else
             python3 deploy/primary/image-memory-burst-ci.py "$RUNNER_TEMP/image-replay"
           fi
