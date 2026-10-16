@@ -6,6 +6,10 @@ spec=importlib.util.spec_from_file_location('rolling',Path(__file__).with_name('
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
 class RollingHandoffTests(TestCase):
+    def test_canary_preserves_security_and_log_rotation(self):
+        opts=m.preserved_container_options({'HostConfig':{'SecurityOpt':['no-new-privileges:true'],'LogConfig':{'Type':'json-file','Config':{'max-file':'3','max-size':'10m'}}}})
+        self.assertEqual(opts,['--security-opt','no-new-privileges:true','--log-driver','json-file','--log-opt','max-file=3','--log-opt','max-size=10m'])
+
     def test_unhealthy_canary_does_not_change_routing(self):
         with mock.patch.object(m,'locks'), mock.patch.object(m,'own_lease'), mock.patch.object(m,'load',return_value={'old_id':'old'}), mock.patch.object(m,'inspect',return_value={'Id':'old'}), mock.patch.object(m,'health',return_value=False), mock.patch.object(m,'run') as run:
             with self.assertRaises(AssertionError):m.switch(True)
