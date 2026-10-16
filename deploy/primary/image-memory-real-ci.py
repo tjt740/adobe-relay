@@ -17,8 +17,10 @@ cases=[('burst-400-4m','12g',400,4,False,True),('burst-600-8m','12g',600,8,False
 repeats=int(os.environ.get('ADOBE_MEMORY_BURST_REPEATS','1'))
 assert repeats in (1,5)
 if repeats==5:
- cases=[c for c in cases if c[0] in ('burst-400-4m','burst-600-8m','json-burst-400-4m')]
- plan=[(baseline,repeat,case) for repeat in range(5) for case in cases for baseline in ([True,False] if repeat%2==0 else [False,True])]
+ burst_cases=[c for c in cases if c[0] in ('burst-400-4m','burst-600-8m','json-burst-400-4m')]
+ single_cases=[c for c in cases if c not in burst_cases]
+ plan=[(baseline,repeat,case) for repeat in range(5) for case in burst_cases for baseline in ([True,False] if repeat%2==0 else [False,True])]
+ plan += [(baseline,0,case) for baseline in [True,False] for case in single_cases]
 else:
  plan=[(baseline,0,case) for baseline in [True,False] for case in cases]
 for baseline,repeat,case_spec in plan:
@@ -56,13 +58,15 @@ for baseline,repeat,case_spec in plan:
         'elapsed_seconds':round(time.monotonic()-started,2),'exit_code':d['State']['ExitCode'],'oom_killed':d['State']['OOMKilled'],'memory_peak':peak,'memory_events':events,'temporary_files_left':len(list(temp.iterdir()))}
    match=re.search(r'historical_burst requested=(\d+) accepted=(\d+) rejected=(\d+) peak=(\d+)',log)
    if match:row.update(zip(['requested','accepted','rejected','peak_inflight'],map(int,match.groups())))
+   volume=re.search(r'input_mib=([0-9.]+).*held_heap_mib=([0-9.]+).*reserved_mib=([0-9.]+)',log)
+   if volume:row.update(zip(['input_mib','held_heap_mib','reserved_mib'],map(float,volume.groups())))
    results.append(row)
    (root/'linux-validation.json').write_text(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'trace_requests':len(trace['requests']),'trace_sha256':hashlib.sha256((root/'trace.json').read_bytes()).hexdigest(),'production_limits':production,'results':results},indent=2))
    print(json.dumps(row),flush=True)
    if row['exit_code']!=0:print(log[-4000:],flush=True)
    assert row['exit_code']==0 and not row['oom_killed'] and events.get('oom',0)==0 and events.get('oom_kill',0)==0, label
    assert row['temporary_files_left']==0,label
-   if not baseline and repeats==1:
+   if not baseline and (repeats==1 or case_spec not in burst_cases):
     previous=next(r for r in results if r['case']==case and r['baseline'])
     if row.get('accepted',0)<previous.get('accepted',0):
      regressions.append({'case':case,'baseline_accepted':previous.get('accepted',0),'candidate_accepted':row.get('accepted',0)})
@@ -72,7 +76,7 @@ for baseline,repeat,case_spec in plan:
 
 if repeats>1:
  medians={}
- for case in cases:
+ for case in burst_cases:
   name=case[0]
   before=[r['accepted'] for r in results if r['case']==name and r['baseline']]
   after=[r['accepted'] for r in results if r['case']==name and not r['baseline']]

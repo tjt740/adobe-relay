@@ -9,7 +9,7 @@ on:
         type: boolean
         default: false
       repeat_bursts:
-        description: Five alternating-order comparisons of each burst; identical verified backend only
+        description: Five alternating-order burst comparisons plus timed, full and low-limit cases
         type: boolean
         default: false
       compare_baseline:
