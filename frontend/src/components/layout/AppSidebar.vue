@@ -794,7 +794,6 @@ const adminNavItems = computed((): NavItem[] => {
   const baseItems: NavItem[] = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
     { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring },
-    { path: '/admin/changelog', label: t('nav.changelog'), icon: ChangelogIcon },
     { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/api-keys', label: t('adminKeys.title'), icon: KeyIcon },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon },
@@ -828,6 +827,7 @@ const adminNavItems = computed((): NavItem[] => {
       ],
     },
     { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true },
+    { path: '/admin/changelog', label: t('nav.changelog'), icon: ChangelogIcon },
     { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon, hideInSimpleMode: true },
     {
       path: '/admin/affiliates',
