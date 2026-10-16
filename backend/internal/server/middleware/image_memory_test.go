@@ -3,6 +3,7 @@ package middleware
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"math"
 	"mime/multipart"
@@ -173,22 +174,22 @@ func TestImageMemoryKeepsConfiguredGoLimit(t *testing.T) {
 	require.EqualValues(t, 1536<<20, debug.SetMemoryLimit(-1))
 }
 
-func TestImageMemoryProductionBudgetAcceptsSevenGiBAndRejectsExcess(t *testing.T) {
+func TestImageMemoryProductionBudgetAcceptsEightGiBAndRejectsExcess(t *testing.T) {
 	const goLimit = int64(9 << 30)
 	g := newImageMemoryGuard(imageMemoryCapacity(goLimit), 256<<20)
 	first, second := &imageMemoryLease{guard: g}, &imageMemoryLease{guard: g}
 	defer first.resize(0)
 	defer second.resize(0)
-	// Seven GiB fits the new budget, but a further 256 MiB must not borrow
+	// Eight GiB fits the new budget, but a further 128 MiB must not borrow
 	// from the headroom reserved for the rest of the Go process.
-	require.True(t, first.resize(7<<30))
-	require.False(t, second.resize(256<<20))
-	require.EqualValues(t, 7<<30, g.used.Load())
+	require.True(t, first.resize(8<<30))
+	require.False(t, second.resize(128<<20))
+	require.EqualValues(t, 8<<30, g.used.Load())
 	require.True(t, first.resize(0))
-	require.True(t, second.resize(256<<20))
+	require.True(t, second.resize(128<<20))
 	// Runtime pressure must still reject a growth even with free pool space.
 	g.runtimeLimit = 1
-	require.False(t, second.resize(257<<20))
+	require.False(t, second.resize(129<<20))
 	require.True(t, second.resize(0))
 	require.Zero(t, g.used.Load())
 }
@@ -211,6 +212,9 @@ func TestImageMemoryConcurrentLargeMultipartRemainsBounded(t *testing.T) {
 	payload := body.Bytes()
 	contentType := w.FormDataContentType()
 	g := newImageMemoryGuard(64<<20, 128<<20)
+	// Preserve the original heap-fallback guarantee: requests rejected by
+	// its capacity check must not read/allocate their large upload.
+	g.newInputBuffer = func(int64) (imageRequestInputBuffer, error) { return nil, errors.New("disk unavailable") }
 	entered := make(chan struct{}, 40)
 	release := make(chan struct{})
 	var active, peak atomic.Int64

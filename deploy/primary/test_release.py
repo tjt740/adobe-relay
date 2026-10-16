@@ -6,7 +6,7 @@ import unittest
 
 
 class PrimaryReleaseTest(unittest.TestCase):
-    def run_release(self, failure=""):
+    def run_release(self, failure="", rolling=False):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         root = Path(directory.name)
@@ -25,6 +25,12 @@ case "$name:$*" in
   'adobe-relay:ps -q app') echo app ;;
   'adobe-relay:ps -q postgres') echo postgres ;;
   'docker:inspect app --format '{{.Config.Image}}) echo adobe-relay:old ;;
+  'docker:inspect adobe-relay-memory-canary --format '{{.State.Health.Status}})
+    [[ "$FAILURE" != canary ]] || exit 1
+    echo healthy ;;
+  'docker:inspect adobe-relay-memory-canary --format '{{.Config.Image}}) echo adobe-relay:new ;;
+  'docker:exec adobe-relay-redis-1 redis-cli --raw TTL concurrency:rolling_deployment')
+    if [[ "$FAILURE" == lease ]]; then echo -2; else echo 1800; fi ;;
   'docker:exec postgres pg_dump '*)
     [[ "$FAILURE" != backup ]] || exit 1
     echo database ;;
@@ -45,7 +51,10 @@ esac
             "root=/opt/adobe-relay", 'root="$TEST_ROOT"'))
         env = dict(os.environ, TEST_ROOT=str(root), FAILURE=failure,
                    PATH=str(binaries) + os.pathsep + os.environ["PATH"])
-        result = subprocess.run(["bash", str(script), "adobe-relay:new"], env=env,
+        args = ["bash", str(script), "adobe-relay:new"]
+        if rolling:
+            args += ["adobe-relay:old", "--keep-canary-on-failure"]
+        result = subprocess.run(args, env=env,
                                 capture_output=True, text=True)
         return root, result
 
@@ -76,6 +85,27 @@ esac
         self.assertEqual((root / "shared/.env").read_text(),
                          "SUB2API_IMAGE=adobe-relay:old\nPRESERVE=value\n")
         self.assertEqual((root / "commands").read_text().count("adobe-relay up "), 2)
+
+    def test_rolling_failure_keeps_canary_without_restarting_legacy(self):
+        root, result = self.run_release("health", rolling=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SUB2API_IMAGE=adobe-relay:new", (root / "shared/.env").read_text())
+        self.assertEqual((root / "commands").read_text().count("adobe-relay up "), 1)
+        self.assertIn("no legacy process was restarted", result.stderr)
+
+    def test_rolling_requires_healthy_canary_before_backup_or_cutover(self):
+        root, result = self.run_release("canary", rolling=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SUB2API_IMAGE=adobe-relay:old", (root / "shared/.env").read_text())
+        self.assertNotIn("adobe-relay up ", (root / "commands").read_text())
+        self.assertFalse((root / "backups").exists())
+
+    def test_rolling_requires_live_lease_before_cutover(self):
+        root, result = self.run_release("lease", rolling=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SUB2API_IMAGE=adobe-relay:old", (root / "shared/.env").read_text())
+        self.assertNotIn("adobe-relay up ", (root / "commands").read_text())
+        self.assertFalse((root / "backups").exists())
 
 
 if __name__ == "__main__":

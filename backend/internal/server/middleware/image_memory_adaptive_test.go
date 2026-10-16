@@ -82,12 +82,12 @@ func TestImageMemoryUnknownAndCompressedShareBudget(t *testing.T) {
 }
 
 func TestImageMemoryReleasesPreparationHeadroomBeforeSlowGeneration(t *testing.T) {
-	g := newImageMemoryGuard(256<<20, 128<<20)
+	g := newImageMemoryGuard(232<<20, 128<<20)
 	payload := bytes.Repeat([]byte("x"), 8<<20)
 	entered := make(chan struct{}, 4)
 	release := make(chan struct{})
 	var wg sync.WaitGroup
-	// Three requests retain 168 MiB; the fourth can use the freed preparation space.
+	// Each request retains 2 input copies plus 32 MiB output; the raw copy is mapped.
 	router := imageMemoryRouter(g, service.PlatformAdobe, func(c *gin.Context) {
 		body, err := pkghttputil.ReadRequestBodyWithPrealloc(c.Request)
 		require.NoError(t, err)
@@ -113,7 +113,7 @@ func TestImageMemoryReleasesPreparationHeadroomBeforeSlowGeneration(t *testing.T
 			t.Fatal("temporary headroom was retained")
 		}
 	}
-	require.EqualValues(t, 224<<20, g.used.Load())
+	require.EqualValues(t, 192<<20, g.used.Load())
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/v1/images/edits", bytes.NewReader(payload))
 	router.ServeHTTP(w, r)

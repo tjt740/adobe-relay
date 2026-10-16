@@ -48,6 +48,7 @@ func (h *GatewayHandler) AdobeImages(c *gin.Context) {
 		zap.Int64("user_id", subject.UserID),
 		zap.Int64("api_key_id", apiKey.ID),
 		zap.Any("group_id", apiKey.GroupID),
+		zap.Bool("input_disk_buffer", middleware2.ImageRequestInputDiskBuffered(c)),
 	)
 
 	body, err := pkghttputil.ReadRequestBodyWithPrealloc(c.Request)

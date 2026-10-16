@@ -2,9 +2,11 @@ package middleware
 
 import (
 	"errors"
+	"io"
 	"log/slog"
 	"math"
 	"net/http"
+	"os"
 	"runtime/debug"
 	"runtime/metrics"
 	"strings"
@@ -12,12 +14,17 @@ import (
 	"time"
 
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/imagebuffer"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/semaphore"
 )
 
 const imageRequestBaseMemory = int64(4 << 20)
+
+// Spooling owns two 64 KiB IO buffers and small request/file metadata.
+// Keep eight times that IO bound; the full parser allowance is acquired later.
+const imageSpoolReadMemory = int64(1 << 20)
 const imageParsedWorkMemory = int64(1 << 20)
 const imageInitialReadMemory = int64(1 << 20)
 const imageUnbufferedOutputMemory = int64(32 << 20)
@@ -27,9 +34,10 @@ const imageUnbufferedOutputMemory = int64(32 << 20)
 // and cannot protect memory occupied by requests waiting for those slots.
 //
 // Keep the configured Go/container limits and business concurrency unchanged.
-// Four fifths of the finite Go limit budgets image work. The remaining fifth
-// and the container headroom cover GC and non-image work. Reservations shrink
-// after preparation; they remain held through detached generation and delivery.
+// Nine tenths of the finite Go limit budgets image work. The remaining tenth
+// and the container headroom cover GC and non-image work. Growth also checks
+// actual Go pressure against the same ceiling before reserving any bytes.
+// Reservations shrink after preparation; they remain held through detached generation and delivery.
 func ImageRequestMemoryBudget(maxBodyBytes int64) gin.HandlerFunc {
 	limit := debug.SetMemoryLimit(-1) // Read only: a negative value does not set it.
 	if limit == math.MaxInt64 || limit <= 0 {
@@ -40,24 +48,31 @@ func ImageRequestMemoryBudget(maxBodyBytes int64) gin.HandlerFunc {
 	return guard.handler
 }
 
-func imageMemoryCapacity(limit int64) int64 { return limit - limit/5 }
+func imageMemoryCapacity(limit int64) int64 { return limit - limit/10 }
 
 type imageMemoryGuard struct {
-	capacity     int64
-	maxBody      int64
-	bytes        *semaphore.Weighted
-	lastLog      atomic.Int64
-	runtimeLimit int64
-	runtimeUsage func() imageRuntimeFootprint
-	used         atomic.Int64
-	active       atomic.Int64
+	capacity       int64
+	maxBody        int64
+	bytes          *semaphore.Weighted
+	lastLog        atomic.Int64
+	runtimeLimit   int64
+	runtimeUsage   func() imageRuntimeFootprint
+	used           atomic.Int64
+	active         atomic.Int64
+	mappedBytes    atomic.Int64
+	newInputBuffer func(int64) (imageRequestInputBuffer, error)
+}
+
+type imageRequestInputBuffer interface {
+	Read(io.Reader, int64) ([]byte, error)
+	Close() error
 }
 
 func newImageMemoryGuard(capacity, maxBody int64) *imageMemoryGuard {
 	if capacity < 1 {
 		capacity = 1
 	}
-	return &imageMemoryGuard{capacity: capacity, maxBody: maxBody, bytes: semaphore.NewWeighted(capacity), runtimeUsage: imageRuntimeMemory}
+	return &imageMemoryGuard{capacity: capacity, maxBody: maxBody, bytes: semaphore.NewWeighted(capacity), runtimeUsage: imageRuntimeMemory, newInputBuffer: newImageRequestInputBuffer}
 }
 
 type imageRuntimeFootprint struct {
@@ -85,6 +100,14 @@ var errImageMemoryBusy = errors.New("image memory capacity exhausted")
 
 const imageMemoryLeaseKey = "image_request_memory_lease"
 
+func ImageRequestInputDiskBuffered(c *gin.Context) bool {
+	value, ok := c.Get(imageMemoryLeaseKey)
+	if !ok {
+		return false
+	}
+	return value.(*imageMemoryLease).mappedBodyBytes > 0
+}
+
 // Reserve only the first bounded read, even when Content-Length is known.
 // Later chunks acquire their full parse/audit allowance before allocation, so
 // a slow or overdeclared upload cannot hold six copies of bytes not yet sent.
@@ -111,8 +134,17 @@ func imageMemoryWeightWithBase(size, multiplier, images, base int64) int64 {
 }
 
 type imageMemoryLease struct {
-	guard  *imageMemoryGuard
-	weight int64 // Owned by the synchronous request/middleware chain.
+	guard           *imageMemoryGuard
+	weight          int64 // Owned by the synchronous request/middleware chain.
+	mappedBodyBytes int64 // Immutable raw body held in reclaimable file pages, not Go heap.
+}
+
+// The ledger covers anonymous heap. File-backed raw input, like buffered output,
+// remains charged to the container and can be reclaimed by the kernel. Only
+// subtract the one raw copy actually mapped; decoded inputs, audit allocations,
+// relay copies and conservative output allowances keep their existing budget.
+func (l *imageMemoryLease) mappedInputCredit(inputBytes int64) int64 {
+	return min(max(0, inputBytes), l.mappedBodyBytes)
 }
 
 func (l *imageMemoryLease) resize(weight int64) bool {
@@ -150,6 +182,9 @@ func FinishImageMemoryPreparation(c *gin.Context, bodyBytes int64, images int) b
 	if bodyBytes >= 0 && bodyBytes <= (math.MaxInt64-output)/3 {
 		weight = bodyBytes*3 + output
 	}
+	if weight != math.MaxInt64 {
+		weight -= lease.mappedInputCredit(bodyBytes)
+	}
 	if !lease.resize(weight) {
 		lease.guard.reject(c, "preparation", weight)
 		return false
@@ -171,6 +206,9 @@ func FinishImageRequestParsing(c *gin.Context, retainedBytes int64, images int) 
 	}
 	lease := raw.(*imageMemoryLease)
 	weight := imageMemoryWeightWithBase(retainedBytes, 1, int64(images), imageParsedWorkMemory)
+	if weight != math.MaxInt64 {
+		weight -= lease.mappedInputCredit(retainedBytes)
+	}
 	if !lease.resize(weight) {
 		lease.guard.reject(c, "parsed_input", weight)
 		return false
@@ -216,6 +254,12 @@ func (g *imageMemoryGuard) handler(c *gin.Context) {
 	}
 	lease := &imageMemoryLease{guard: g}
 	weight := g.weight(c.Request)
+	key, _ := GetAPIKeyFromContext(c)
+	encoding := c.Request.Header.Get("Content-Encoding")
+	spoolCandidate := g.maxBody > 0 && c.Request.ContentLength >= 1<<20 && strings.HasSuffix(c.Request.URL.Path, "/images/edits") && key != nil && key.Group != nil && key.Group.Platform == service.PlatformAdobe && (encoding == "" || strings.EqualFold(encoding, "identity"))
+	if spoolCandidate {
+		weight = imageSpoolReadMemory
+	}
 	if !lease.resize(weight) {
 		g.reject(c, "admission", weight)
 		return
@@ -227,17 +271,43 @@ func (g *imageMemoryGuard) handler(c *gin.Context) {
 		return
 	}
 	attemptedWeight := lease.weight
-	body, err := pkghttputil.ReadRequestBodyWithBudget(c.Request, func(wire, decoded int64) error {
-		if err := c.Request.Context().Err(); err != nil {
-			return err
+	var body []byte
+	var err error
+	spooled := false
+	if spoolCandidate {
+		buffer, prepareErr := g.newInputBuffer(c.Request.ContentLength)
+		if prepareErr == nil {
+			spooled = true
+			defer func() {
+				c.Request.Body = http.NoBody
+				_ = buffer.Close()
+				g.mappedBytes.Add(-lease.mappedBodyBytes)
+			}()
+			// Bounded 64 KiB IO: uploading never reserves six copies of
+			// bytes merely waiting on disk. Full parsing is admitted below.
+			body, err = buffer.Read(c.Request.Body, c.Request.ContentLength)
+			if err == nil {
+				lease.mappedBodyBytes = int64(len(body))
+				g.mappedBytes.Add(lease.mappedBodyBytes)
+			}
+		} else if !lease.resize(g.weight(c.Request)) {
+			g.reject(c, "admission", g.weight(c.Request))
+			return
 		}
-		required := imageMemoryWeight(wire+decoded, 6, 1)
-		attemptedWeight = required
-		if required > lease.weight && !lease.resize(required) {
-			return errImageMemoryBusy
-		}
-		return nil
-	})
+	}
+	if !spooled {
+		body, err = pkghttputil.ReadRequestBodyWithBudget(c.Request, func(wire, decoded int64) error {
+			if err := c.Request.Context().Err(); err != nil {
+				return err
+			}
+			required := imageMemoryWeight(wire+decoded, 6, 1)
+			attemptedWeight = required
+			if required > lease.weight && !lease.resize(required) {
+				return errImageMemoryBusy
+			}
+			return nil
+		})
+	}
 	if err != nil {
 		if c.Request.Context().Err() != nil {
 			c.Abort()
@@ -258,8 +328,9 @@ func (g *imageMemoryGuard) handler(c *gin.Context) {
 	}
 	// Drop compressed/wire and overdeclared length headroom after the exact
 	// decoded body is available. Later readers reuse this immutable slice.
-	if !lease.resize(imageMemoryWeight(int64(len(body)), 6, 1)) {
-		g.reject(c, "body_complete", lease.weight)
+	parseWeight := imageMemoryWeight(int64(len(body)), 6, 1) - lease.mappedInputCredit(int64(len(body)))
+	if !lease.resize(parseWeight) {
+		g.reject(c, "body_complete", parseWeight)
 		return
 	}
 	c.Request.Body = pkghttputil.NewPrereadBody(body)
@@ -270,7 +341,7 @@ func (g *imageMemoryGuard) handler(c *gin.Context) {
 func (g *imageMemoryGuard) reject(c *gin.Context, phase string, requested int64) {
 	if c.Request.Context().Err() == nil {
 		c.Header("Retry-After", "1")
-		service.MarkOpsClientBusinessLimited(c, "image_memory_capacity")
+		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonImageMemoryCapacity)
 		message := "Image processing capacity is busy, please retry later"
 		if strings.Contains(c.Request.URL.Path, "/v1beta/") {
 			GoogleErrorWriter(c, http.StatusTooManyRequests, message)
@@ -283,6 +354,12 @@ func (g *imageMemoryGuard) reject(c *gin.Context, phase string, requested int64)
 	last := g.lastLog.Load()
 	if now-last >= 5 && g.lastLog.CompareAndSwap(last, now) {
 		memory := g.runtimeUsage()
-		slog.Info("image_memory.capacity_rejected", "budget_bytes", g.capacity, "reserved_bytes", g.used.Load(), "requested_bytes", requested, "active_requests", g.active.Load(), "runtime_bytes", memory.committed, "runtime_reusable_bytes", memory.reusable, "runtime_pressure_bytes", memory.pressure(), "phase", phase, "queue_enabled", false)
+		slog.Info("image_memory.capacity_rejected", "budget_bytes", g.capacity, "reserved_bytes", g.used.Load(), "requested_bytes", requested, "active_requests", g.active.Load(), "mapped_input_bytes", g.mappedBytes.Load(), "runtime_bytes", memory.committed, "runtime_reusable_bytes", memory.reusable, "runtime_pressure_bytes", memory.pressure(), "phase", phase, "queue_enabled", false)
 	}
+}
+
+func newImageRequestInputBuffer(length int64) (imageRequestInputBuffer, error) {
+	page := int64(os.Getpagesize())
+	size := (length + page - 1) / page * page
+	return imagebuffer.New(size)
 }

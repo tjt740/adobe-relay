@@ -871,6 +871,25 @@ func TestClassifyOpsLocalModelConfigurationRejection(t *testing.T) {
 	require.Equal(t, "gateway", errorSource)
 }
 
+func TestClassifyOpsImageMemoryCapacityIsPlatformCapacityNotAuthentication(t *testing.T) {
+	for _, stale := range []bool{false, true} {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonImageMemoryCapacity)
+		if stale {
+			c.Set(service.OpsUpstreamStatusCodeKey, 429)
+		}
+		phase, limited, owner, source := classifyOpsErrorLog(c, "rate_limit_error", "Image processing capacity is busy, please retry later", "", 429)
+		require.Equal(t, "routing", phase)
+		require.True(t, limited)
+		require.Equal(t, "platform", owner)
+		require.Equal(t, "gateway", source)
+		status := 429
+		entry := &service.OpsInsertErrorLogInput{UpstreamStatusCode: &status}
+		suppressOpsUpstreamAttributionForLocalModelConfiguration(c, entry)
+		require.Nil(t, entry.UpstreamStatusCode)
+	}
+}
+
 func TestClassifyOpsLocalModelConfigurationOverridesStaleUpstreamMarkers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())

@@ -30,9 +30,24 @@ type historyTrace struct {
 		DurationMS       int64 `json:"duration_ms"`
 		DurationObserved bool  `json:"duration_observed"`
 		ImageCount       int   `json:"image_count"`
+		Legacy           *bool `json:"legacy"`
 	} `json:"requests"`
 }
 type historyFill struct{ remaining int64 }
+
+type historyBase64Fill struct{ remaining int64 }
+
+func (r *historyBase64Fill) Read(p []byte) (int, error) {
+	if r.remaining <= 0 {
+		return 0, io.EOF
+	}
+	n := min(int64(len(p)), r.remaining)
+	for i := int64(0); i < n; i++ {
+		p[i] = 'A'
+	}
+	r.remaining -= n
+	return int(n), nil
+}
 
 func (r *historyFill) Read(p []byte) (int, error) {
 	if r.remaining <= 0 {
@@ -72,6 +87,10 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 	}
 	compact := os.Getenv("ADOBE_HISTORY_COMPACT_RESERVATION") == "1"
 	mixed := os.Getenv("ADOBE_HISTORY_MIXED") == "1"
+	legacyPercent := 17
+	if n, err := strconv.Atoi(os.Getenv("ADOBE_HISTORY_LEGACY_PERCENT")); err == nil && n >= 0 && n <= 100 {
+		legacyPercent = n
+	}
 	totals := []int{100, 200, 300, 400}
 	if count, e := strconv.Atoi(os.Getenv("ADOBE_HISTORY_TOTAL")); e == nil && count > 0 {
 		totals = []int{count}
@@ -113,6 +132,15 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 				}()
 				if !FinishImageRequestParsing(c, service.AdobeImageRetainedBytes(parsed), parsed.N) {
 					return
+				}
+				var decodedInputs [][]byte
+				for _, rawURL := range parsed.InputImageURLs {
+					_, payload, _ := strings.Cut(rawURL, ",")
+					data, err := base64.StdEncoding.DecodeString(payload)
+					if err != nil {
+						t.Error(err)
+					}
+					decodedInputs = append(decodedInputs, data)
 				}
 				legacy := c.GetHeader("X-Replay-Legacy") == "1"
 				bufferCtx := c.Request.Context()
@@ -199,6 +227,7 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 				runtime.KeepAlive(parsed)
 				runtime.KeepAlive(images)
 				runtime.KeepAlive(body)
+				runtime.KeepAlive(decodedInputs)
 				c.Status(200)
 			})
 			var wg sync.WaitGroup
@@ -220,13 +249,41 @@ func TestImageMemoryHistoricalBurst(t *testing.T) {
 				prefix := fmt.Sprintf("--hist\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\ngpt-image-2.5-sunburst\r\n--hist\r\nContent-Disposition: form-data; name=\"prompt\"\r\n\r\nhistorical size-only replay\r\n--hist\r\nContent-Disposition: form-data; name=\"n\"\r\n\r\n%d\r\n--hist\r\nContent-Disposition: form-data; name=\"image\"; filename=\"reference.png\"\r\nContent-Type: image/png\r\n\r\n", n)
 				suffix := "\r\n--hist--\r\n"
 				reader := io.MultiReader(strings.NewReader(prefix), &historyFill{size}, strings.NewReader(suffix))
+				contentLength := int64(len(prefix)+len(suffix)) + size
+				contentType := "multipart/form-data; boundary=hist"
+				if os.Getenv("ADOBE_HISTORY_INPUT_FORMAT") == "json" {
+					// Stream the synthetic client body too: its large bytes must
+					// be allocated inside the guard, not by the test before admission.
+					header := fmt.Sprintf(`{"model":"gpt-image-2.5-sunburst","prompt":"size-only replay","n":%d,"images":[`, n)
+					parts := []io.Reader{strings.NewReader(header)}
+					contentLength = int64(len(header))
+					remaining := (size + 3) / 4 * 4
+					for index := 0; remaining > 0; index++ {
+						amount := min(remaining, int64(16<<20))
+						item := `{"image_url":"data:image/png;base64,`
+						if index > 0 {
+							item = "," + item
+						}
+						parts = append(parts, strings.NewReader(item), &historyBase64Fill{amount}, strings.NewReader(`"}`))
+						contentLength += int64(len(item)) + amount + 2
+						remaining -= amount
+					}
+					parts = append(parts, strings.NewReader("]}"))
+					contentLength += 2
+					reader = io.MultiReader(parts...)
+					contentType = "application/json"
+				}
 				req := httptest.NewRequest("POST", "/v1/images/edits", reader)
 				req.Header.Set("X-Replay-Duration-Ms", strconv.FormatInt(sample.DurationMS, 10))
-				req.Header.Set("Content-Type", "multipart/form-data; boundary=hist")
-				if mixed && i%40 < 7 { // observed 17.5% requested explicit transcoding
+				req.Header.Set("Content-Type", contentType)
+				legacy := mixed && i%100 < legacyPercent
+				if mixed && os.Getenv("ADOBE_HISTORY_OBSERVED_PATHS") == "1" && sample.Legacy != nil {
+					legacy = *sample.Legacy
+				}
+				if legacy {
 					req.Header.Set("X-Replay-Legacy", "1")
 				}
-				req.ContentLength = int64(len(prefix)+len(suffix)) + size
+				req.ContentLength = contentLength
 				if i%10 == 0 {
 					req.ContentLength = -1
 				}

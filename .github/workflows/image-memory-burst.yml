@@ -4,12 +4,20 @@ on:
     branches: [codex/adobe-memory-burst]
   workflow_dispatch:
     inputs:
+      real_load:
+        description: Compare current c574dcc with mapped input using the October 16 incident metadata
+        type: boolean
+        default: false
+      repeat_bursts:
+        description: Five alternating-order burst comparisons plus timed, full and low-limit cases
+        type: boolean
+        default: false
       compare_baseline:
         description: Compare the staged reservation algorithm with deployed 8db3c34
         type: boolean
         default: false
       reuse_compatibility_from:
-        description: Reuse passed compatibility checks only for unchanged backend 45a38fc
+        description: Reuse checks only for the exact verified 45a38fc or 3e35a47 backend
         type: string
         default: ''
 permissions:
@@ -32,15 +40,20 @@ jobs:
         env:
           CHECKED_SHA: ${{ inputs.reuse_compatibility_from }}
         run: |
-          test "$CHECKED_SHA" = 45a38fc095c16258b7fdeb97a45dbae2e340df93
+          case "$CHECKED_SHA" in
+            45a38fc095c16258b7fdeb97a45dbae2e340df93) echo 'Verified checks: 38739411163.' ;;
+            3e35a47c18bb67291ad9f05bb2e8f499bce04bdd) echo 'Verified full checks/build: 38854531880.' ;;
+            *) exit 1 ;;
+          esac
           git fetch --depth=1 origin "$CHECKED_SHA"
           git diff --exit-code "$CHECKED_SHA" HEAD -- backend
-          echo 'Backend identical to compatibility checks passed in workflow 38739411163.'
+          echo 'Backend identical to the verified application; no application change.'
       - name: Unit and compatibility checks
         if: inputs.reuse_compatibility_from == ''
         working-directory: backend
         run: |
           go test -race ./internal/pkg/imagebuffer ./internal/pkg/httputil
+          go test -race ./internal/repository -run TestConcurrencyRollingDeployment
           go test -race ./internal/server/middleware -run 'ImageMemory|GroupModelAllowlist|RequestBody'
           go test -race ./internal/server/routes -run 'ImageMemory|GroupModelAllowlist|AdobeImages|Composite.*Image'
           go test -tags unit -race ./internal/pkg/adobe
@@ -60,20 +73,40 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/replay_key
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/replay_key ~/.ssh/known_hosts
-          ssh -i ~/.ssh/replay_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 root@173.234.15.150 'cat /opt/adobe-relay/releases/adobe-memory-history-validation-20261015/trace.json' > "$RUNNER_TEMP/image-replay/trace.json"
+          if [[ '${{ inputs.real_load }}' == 'true' ]]; then
+            trace=/opt/adobe-relay/releases/adobe-memory-real-load-20261016/trace.json
+          else
+            trace=/opt/adobe-relay/releases/adobe-memory-history-validation-20261015/trace.json
+          fi
+          ssh -i ~/.ssh/replay_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 root@173.234.15.150 "cat '$trace'" > "$RUNNER_TEMP/image-replay/trace.json"
           ssh -i ~/.ssh/replay_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 root@173.234.15.150 'python3 -' < deploy/primary/image-memory-runtime-limits.py > "$RUNNER_TEMP/image-replay/production-limits.json"
           rm -f ~/.ssh/replay_key
       - name: Build deployed baseline for an identical-load comparison
-        if: inputs.compare_baseline
+        if: inputs.compare_baseline || inputs.real_load
         run: |
-          git fetch --depth=1 origin 8db3c34e862dfe07d556ef9b882d0d351113de0f
-          git worktree add --detach "$RUNNER_TEMP/image-baseline" 8db3c34e862dfe07d556ef9b882d0d351113de0f
+          baseline=8db3c34e862dfe07d556ef9b882d0d351113de0f
+          if [[ '${{ inputs.real_load }}' == 'true' ]]; then
+            baseline=c574dcc0dc6369cd05d94b25f75d4ea66c1e4bb1
+          fi
+          git fetch --depth=1 origin "$baseline"
+          git worktree add --detach "$RUNNER_TEMP/image-baseline" "$baseline"
+          # Both binaries receive the identical incident-aware test harness only.
+          cp backend/internal/server/middleware/image_memory_history_test.go "$RUNNER_TEMP/image-baseline/backend/internal/server/middleware/image_memory_history_test.go"
           cd "$RUNNER_TEMP/image-baseline/backend"
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go test -c -ldflags='-s -w' -o "$RUNNER_TEMP/image-replay/memory-baseline.test" ./internal/server/middleware
       - name: Replay without network under hard memory limits
         env:
           ADOBE_MEMORY_COMPARE_BASELINE: ${{ inputs.compare_baseline }}
-        run: python3 deploy/primary/image-memory-burst-ci.py "$RUNNER_TEMP/image-replay"
+        run: |
+          if [[ '${{ inputs.real_load }}' == 'true' ]]; then
+            if [[ '${{ inputs.repeat_bursts }}' == 'true' ]]; then
+              ADOBE_MEMORY_BURST_REPEATS=5 python3 deploy/primary/image-memory-real-ci.py "$RUNNER_TEMP/image-replay"
+            else
+              python3 deploy/primary/image-memory-real-ci.py "$RUNNER_TEMP/image-replay"
+            fi
+          else
+            python3 deploy/primary/image-memory-burst-ci.py "$RUNNER_TEMP/image-replay"
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

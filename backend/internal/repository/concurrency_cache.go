@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -58,6 +59,7 @@ const (
 	// 一次性迁移 marker：活跃索引机制上线前遗留的等待计数键无法被索引发现，
 	// 且有流量时 TTL 会被不断刷新，必须清扫一次。marker 存在即代表已完成。
 	legacyWaitSweepMarkerKey = "concurrency:startup:legacy_wait_sweep:v1"
+	rollingDeploymentKey     = "concurrency:rolling_deployment"
 )
 
 var (
@@ -1146,6 +1148,20 @@ func (c *concurrencyCache) reconcileExpiredIndexCandidates(ctx context.Context, 
 func (c *concurrencyCache) CleanupStaleProcessSlots(ctx context.Context, activeRequestPrefix string) error {
 	if activeRequestPrefix == "" {
 		return nil
+	}
+	// A bounded operator lease permits a rolling handoff. During that window,
+	// another prefix can still own paid work; startup must not delete its slots.
+	// Normal expiry cleanup continues, and normal startup behavior is unchanged
+	// once the lease is removed/expires. No persistent configuration is added.
+	ttl, err := c.rdb.TTL(ctx, rollingDeploymentKey).Result()
+	if err != nil {
+		return fmt.Errorf("check rolling deployment lease: %w", err)
+	}
+	if ttl >= 0 {
+		return nil
+	}
+	if ttl == -time.Nanosecond {
+		return fmt.Errorf("rolling deployment lease requires an expiry")
 	}
 	if err := c.sweepLegacyWaitKeysOnce(ctx); err != nil {
 		return err

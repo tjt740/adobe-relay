@@ -3,6 +3,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      build_only:
+        description: Run all checks and build an image without replacing the running application
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -10,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || inputs.build_only
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
@@ -52,6 +57,7 @@ jobs:
           go test -race ./internal/clash ./internal/proxyfailover
           go test -race ./internal/pkg/runtimediag
           go test -race ./internal/pkg/httputil ./internal/pkg/imagebuffer
+          go test -race ./internal/repository -run TestConcurrencyRollingDeployment
           go test -race ./internal/server/middleware -run 'ImageMemory|GroupModelAllowlist|RequestBody'
           go test -race ./internal/server/routes -run 'ImageMemory|GroupModelAllowlist|AdobeImages|Composite.*Image'
           go test -tags unit -race ./internal/pkg/adobe
@@ -98,6 +104,7 @@ jobs:
 
   deploy:
     needs: build
+    if: inputs.build_only != true
     runs-on: ubuntu-latest
     timeout-minutes: 25
     name: Deploy primary

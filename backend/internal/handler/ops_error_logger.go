@@ -1745,7 +1745,8 @@ func applyOpsUpstreamErrorEvents(entry *service.OpsInsertErrorLogInput, events [
 }
 
 func suppressOpsUpstreamAttributionForLocalModelConfiguration(c *gin.Context, entry *service.OpsInsertErrorLogInput) {
-	if entry == nil || !service.HasOpsClientBusinessLimited(c) || service.OpsClientBusinessLimitedReason(c) != service.OpsClientBusinessLimitedReasonLocalModelConfiguration {
+	reason := service.OpsClientBusinessLimitedReason(c)
+	if entry == nil || !service.HasOpsClientBusinessLimited(c) || (reason != service.OpsClientBusinessLimitedReasonLocalModelConfiguration && reason != service.OpsClientBusinessLimitedReasonImageMemoryCapacity) {
 		return
 	}
 	entry.AccountID = nil
@@ -2217,6 +2218,7 @@ func classifyOpsErrorLog(c *gin.Context, errType, message, code string, status i
 	routingCapacityLimited := isOpsRoutingCapacityLimited(c)
 	clientBusinessLimited := service.HasOpsClientBusinessLimited(c)
 	localModelConfiguration := clientBusinessLimited && service.OpsClientBusinessLimitedReason(c) == service.OpsClientBusinessLimitedReasonLocalModelConfiguration
+	localImageCapacity := clientBusinessLimited && service.OpsClientBusinessLimitedReason(c) == service.OpsClientBusinessLimitedReasonImageMemoryCapacity
 	// 分组模型白名单的入口拒绝发生在调度之前（本地面请求策略，业务限流原因与
 	// 账号模型映射复用 local_model_configuration）：保持 classifyOpsPhase 的
 	// 自然分类（not_found/invalid_request → request，owner=client），不落到
@@ -2240,8 +2242,11 @@ func classifyOpsErrorLog(c *gin.Context, errType, message, code string, status i
 	if routingCapacityLimited {
 		phase = "routing"
 	}
+	if localImageCapacity {
+		phase = "routing"
+	}
 	msg := strings.ToLower(message)
-	effectiveUpstreamError := upstreamError && !localModelConfiguration
+	effectiveUpstreamError := upstreamError && !localModelConfiguration && !localImageCapacity
 	localClientAuthError := !effectiveUpstreamError && phase == "auth" && isOpsClientAuthError(code, msg)
 	localBusinessLimited := !effectiveUpstreamError && classifyOpsIsBusinessLimited(errType, phase, code, status, message, localClientAuthError)
 	isBusinessLimited = localModelConfiguration || routingCapacityLimited || (clientBusinessLimited && !effectiveUpstreamError) || localBusinessLimited

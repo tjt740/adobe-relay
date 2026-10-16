@@ -57,6 +57,36 @@ func TestClassifyAdobeErrorUpstreamTemporary(t *testing.T) {
 	require.Zero(t, failure.Cooldown)
 }
 
+func TestAdobeSubmit429BriefCooldownDoesNotChangeAcceptedJobsOrCredentials(t *testing.T) {
+	for _, tc := range []struct {
+		stage  string
+		status int
+		cool   bool
+	}{
+		{"submit", 429, true}, {"poll", 429, false}, {"download", 429, false}, {"submit", 408, false}, {"submit", 503, false},
+	} {
+		t.Run(fmt.Sprintf("%s/%d", tc.stage, tc.status), func(t *testing.T) {
+			err := &adobe.OperationError{Stage: tc.stage, Attempts: 3, Err: adobe.NewUpstreamTemporaryError("busy", tc.status, adobe.ErrorTypeStatus)}
+			f := classifyAdobeError(err)
+			require.False(t, f.InvalidateToken)
+			if tc.cool {
+				require.Equal(t, 15*time.Second, f.Cooldown)
+				require.Equal(t, NextAccountRetry, f.Failover.NextAccountAction)
+				r := &adobeCooldownRecorder{}
+				before := time.Now()
+				applyAdobeCooldown(context.Background(), r, 42, f)
+				require.Equal(t, int64(42), r.accountID)
+				require.WithinDuration(t, before.Add(15*time.Second), r.until, time.Second)
+			} else {
+				require.Zero(t, f.Cooldown)
+			}
+			if tc.stage == "poll" || tc.stage == "download" {
+				require.Equal(t, NextAccountStop, f.Failover.NextAccountAction)
+			}
+		})
+	}
+}
+
 func TestClassifyAdobeErrorContentRejected(t *testing.T) {
 	failure := classifyAdobeError(adobe.NewContentRejectedError(
 		`image poll failed: 451 {"error_code":"image_unsafe"}`, http.StatusUnavailableForLegalReasons, ""))

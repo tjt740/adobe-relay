@@ -5,6 +5,8 @@ umask 077
 image="${1:?Usage: release.sh adobe-relay:COMMIT}"
 [[ "$image" =~ ^adobe-relay:[a-zA-Z0-9._-]+$ ]] || exit 2
 expected_current="${2:-}"
+rolling_mode="${3:-}"
+[[ -z "$rolling_mode" || "$rolling_mode" == --keep-canary-on-failure ]] || exit 2
 root=/opt/adobe-relay
 env_file="$root/shared/.env"
 exec 9>"$root/.release.lock"
@@ -17,6 +19,14 @@ old_image=$(docker inspect "$app_id" --format '{{.Config.Image}}')
 if [[ -n "$expected_current" && "$old_image" != "$expected_current" ]]; then
   echo "Production changed since preflight; refusing to replace a later release." >&2
   exit 1
+fi
+if [[ -n "$rolling_mode" ]]; then
+  # The operator already routed new connections and drained the old instance.
+  # A legacy rollback startup could erase slots still owned by the canary.
+  [[ "$(docker inspect adobe-relay-memory-canary --format '{{.State.Health.Status}}')" == healthy ]] || exit 1
+  [[ "$(docker inspect adobe-relay-memory-canary --format '{{.Config.Image}}')" == "$image" ]] || exit 1
+  lease_ttl=$(docker exec adobe-relay-redis-1 redis-cli --raw TTL concurrency:rolling_deployment) || exit 1
+  [[ "$lease_ttl" =~ ^[0-9]+$ && "$lease_ttl" -gt 0 ]] || exit 1
 fi
 backup_dir="$root/backups/$(date -u +%Y%m%dT%H%M%SZ)-${image##*:}"
 mkdir -p "$backup_dir"
@@ -43,6 +53,10 @@ if adobe-relay up -d --no-build --no-deps --wait --wait-timeout 240 app &&
    curl --fail --silent --show-error --max-time 15 http://127.0.0.1:6666/health; then
   echo "Released $image on the primary server."
 else
+  if [[ -n "$rolling_mode" ]]; then
+    echo 'Canonical release failed; keep the canary and its live requests. Inspect before retrying; no legacy process was restarted.' >&2
+    exit 1
+  fi
   echo 'Release failed; restoring the previous application image.' >&2
   set_image "$old_image"
   adobe-relay up -d --no-build --no-deps --wait --wait-timeout 120 app || true
