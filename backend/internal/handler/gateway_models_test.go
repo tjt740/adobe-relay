@@ -1285,6 +1285,55 @@ func TestGatewayModels_CustomModelsListCanReturnEmptyWhenSelectionsUnavailable(t
 	require.Empty(t, modelIDsForTest(got.Data))
 }
 
+func TestGatewayModels_AdobeFallbackAndConfiguredModels(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const groupID int64 = 7
+	for _, tc := range []struct {
+		name      string
+		accounts  []service.Account
+		allowlist service.GroupModelAllowlist
+		want      []string
+	}{
+		{name: "no schedulable accounts", want: adobe.ImageModelIDs()},
+		{
+			name:      "disabled allowlist does not narrow defaults",
+			allowlist: service.GroupModelAllowlist{Models: []string{"gpt-image-2"}},
+			want:      adobe.ImageModelIDs(),
+		},
+		{
+			name:      "enabled allowlist filters defaults",
+			allowlist: service.GroupModelAllowlist{Enabled: true, Models: []string{"gpt-image-2", "claude-opus-4-6"}},
+			want:      []string{"gpt-image-2"},
+		},
+		{
+			name: "account mapping stays authoritative",
+			accounts: []service.Account{{ID: 1, Platform: service.PlatformAdobe, Credentials: map[string]any{
+				"model_mapping": map[string]any{"flux-pro": "firefly-flux-pro"},
+			}}},
+			want: []string{"flux-pro"},
+		},
+	} {
+		for _, path := range []string{"/v1/models", "/models"} {
+			t.Run(tc.name+path, func(t *testing.T) {
+				h := newGatewayModelsHandlerForTest(&gatewayModelsAccountRepoStub{
+					byGroup: map[int64][]service.Account{groupID: tc.accounts},
+				})
+				rec := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(rec)
+				c.Request = httptest.NewRequest(http.MethodGet, path, nil)
+				c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{Group: &service.Group{
+					ID: groupID, Platform: service.PlatformAdobe, ModelAllowlist: tc.allowlist,
+				}})
+				h.Models(c)
+				require.Equal(t, http.StatusOK, rec.Code)
+				var got gatewayModelsResponseForTest
+				require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+				require.Equal(t, tc.want, modelIDsForTest(got.Data))
+			})
+		}
+	}
+}
+
 func TestGatewayModels_CustomModelsListFiltersDefaultFallbackModels(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

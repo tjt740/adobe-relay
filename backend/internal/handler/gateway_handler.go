@@ -1234,6 +1234,11 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 	}
 
 	// Fallback to default models
+	if platform == service.PlatformAdobe {
+		writeModelsList(c, platform, defaultModelIDsForPlatform(platform))
+		return
+	}
+
 	if platform == service.PlatformOpenAI {
 		writeModelsListResponse(c, openai.DefaultModels)
 		return
@@ -1545,7 +1550,7 @@ func defaultModelIDsForPlatform(platform string) []string {
 	case service.PlatformAnthropic:
 		return claude.DefaultModelIDs()
 	case service.PlatformAdobe:
-		// 修 bug：Step 8 之前这里没有 adobe 分支，`/v1/models` 会走 default: 分支返回 claude 模型。
+		// 对外仅列出已接入网关的图片模型名。
 		return adobe.ImageModelIDs()
 	case service.PlatformGrok:
 		return xai.DefaultModelIDs()
