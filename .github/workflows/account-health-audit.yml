@@ -51,7 +51,7 @@ jobs:
           ssh "${opts[@]}" "$target" "test ! -f '$root/progress.json' && (nohup python3 '$root/driver.py' > '$root/driver.log' 2>&1 < /dev/null & )"
           finished=false
           for attempt in $(seq 1 200); do
-            result=$(ssh "${opts[@]}" "$target" "cat '$root/progress.json' 2>/dev/null || printf '{}'")
+            result=$(ssh "${opts[@]}" "$target" "python3 '$root/cloud-status.py'")
             echo "$result"
             state=$(printf '%s' "$result" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("state",""))')
             step=$(printf '%s' "$result" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("step",""))')
