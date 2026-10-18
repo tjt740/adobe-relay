@@ -62,7 +62,7 @@ HTTP 200 示例（上游缺少真实用量，以下 usage 为随机模拟数字�
 }
 ```
 
-第一张图片的 URL 在 `data[0].url`；多图遍历 `data`。`created` 是 Unix 秒，`size` / `output_format` 以实际交付图片为准。`quality` 表示提交档位，`moderation: "auto"` 表示默认审核方式。
+第一张图片的 URL 在 `data[0].url`；多图遍历 `data`。`created` 是 Unix 秒，`size` / `output_format` 以实际交付图片为准。`quality` 表示网关采用的归一化质量标签，`moderation: "auto"` 表示默认审核方式。GPT Image 2.5 请求 `xhigh` 返回 `xhigh`，请求 `max` 返回 `max`，两者提交给 Adobe 的值仍同为 `detailLevel=7`；2 / 1.5 请求这两档仍返回 `high`。该标签不是上游对成图质量的评估。
 
 ```bash
 jq -r '.data[] | select(.url != null) | .url' response.json
