@@ -116,7 +116,7 @@ Cookie 失效后需要重新从浏览器导出。刷新器会把账号标为错�
 
 `quality` 会映射为 Firefly `detailLevel`：`low`（默认）→ 1，`medium` → 3，`high` → 5，`xhigh`/`max` 在 2 / 1.5 上为 5，在 2.5 上为 7。
 
-Adobe Cookie 直连的 GPT Image 生图和编辑响应会在顶层返回 `quality`，表示网关实际提交的归一化生成档位：1 → `low`，3 → `medium`，5 → `high`，7 → `max`。例如 2.5 请求 `max` 或 `xhigh` 都返回 `"quality":"max"`；2 / 1.5 请求这两档返回 `"quality":"high"`。省略、`auto` 或未识别值保持现有默认行为，返回 `low`。该字段在图片 URL、Base64 及转存失败回退时都保留；没有质量控制的其他 Adobe 模型不返回此字段。它反映提交参数，不是上游返回的图片质量评估。
+Adobe Cookie 直连的 GPT Image 生图和编辑响应会在顶层返回 `quality`，表示网关采用的归一化质量标签。2.5 请求 `xhigh` 返回 `"quality":"xhigh"`，请求 `max` 返回 `"quality":"max"`；这两种请求仍沿用同一个上游 `detailLevel=7`，返回名称不同不表示实际提交档位不同。2 / 1.5 请求这两档仍受模型上限限制，返回 `"quality":"high"`。其他映射为 1 → `low`、3 → `medium`、5 → `high`；省略、`auto` 或未识别值保持现有默认行为，返回 `low`。该字段在图片 URL、Base64 及转存失败回退时都保留；没有质量控制的其他 Adobe 模型不返回此字段。它是网关生成的标签，不是上游返回的图片质量评估。
 
 gpt-image 家族支持 OpenAI 的 `background`：`transparent` / `opaque` / `auto`。
 

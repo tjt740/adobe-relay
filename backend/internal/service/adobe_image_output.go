@@ -58,7 +58,8 @@ func normalizeAdobeOutputFormat(raw string) (string, error) {
 	}
 }
 
-// adobeImageResponseQuality 返回实际提交的生成档位，复用 payload 的 detailLevel 映射。
+// adobeImageResponseQuality 返回网关采用的质量标签，复用 payload 映射处理默认值和模型上限。
+// 2.5 的 xhigh / max 仍提交 detailLevel=7，对外分别保留规范化的请求名称。
 // 非 GPT Image 模型没有这个生成控制，不回显请求值，以免声称未生效的参数已生效。
 func adobeImageResponseQuality(conf adobe.ImageModelConf, requested string) string {
 	if !conf.IsGPTImage() {
@@ -66,6 +67,9 @@ func adobeImageResponseQuality(conf adobe.ImageModelConf, requested string) stri
 	}
 	switch adobe.GPTImageDetailLevelFromQualityForVersion(requested, conf.UpstreamModelVersion) {
 	case 7:
+		if strings.EqualFold(strings.TrimSpace(requested), "xhigh") {
+			return "xhigh"
+		}
 		return "max"
 	case 5:
 		return "high"
