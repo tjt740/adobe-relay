@@ -1,30 +1,26 @@
-name: Account health release verification
+name: Subscription UI controlled release
 on:
-  push:
-    branches: [codex/account-health-live]
   workflow_dispatch:
-    inputs:
-      phase:
-        type: choice
-        options: [after, send-report]
-        default: after
-        required: true
-      application_sha:
-        type: string
-        description: 已部署应用提交（仅审计或文档更新时填写）
-        required: false
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: adobe-relay-production
   cancel-in-progress: false
 jobs:
-  audit:
+  publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - name: Configure primary SSH
+      - name: Download checked image
+        uses: actions/download-artifact@v4
+        with:
+          name: release-images
+          run-id: 39135974046
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: tjt740/adobe-relay
+      - name: Configure verified primary SSH
         env:
           SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
@@ -33,23 +29,63 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
-      - name: Audit protected state and verify runtime
-        env:
-          PHASE: ${{ inputs.phase || 'before' }}
-          EXPECTED_SHA: ${{ inputs.application_sha || github.sha }}
+      - name: Verify archive, load image and check protected state
         run: |
           set -euo pipefail
-          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          sha256sum -c release-images.tar.gz.sha256
           opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15)
           target=root@173.234.15.150
-          ssh "${opts[@]}" "$target" 'mkdir -p /opt/adobe-relay/releases/account-health-20261013'
-          scp "${opts[@]}" deploy/primary/account-health-{audit,verify,rollback}.py "$target:/opt/adobe-relay/releases/account-health-20261013/"
-          if [ "$PHASE" = before ]; then
-            ssh "${opts[@]}" "$target" "python3 /opt/adobe-relay/releases/account-health-20261013/account-health-audit.py before"
-          else
-            ssh "${opts[@]}" "$target" "python3 /opt/adobe-relay/releases/account-health-20261013/account-health-audit.py after '$EXPECTED_SHA'"
-            ssh "${opts[@]}" "$target" "python3 /opt/adobe-relay/releases/account-health-20261013/account-health-verify.py '$EXPECTED_SHA' '$PHASE'"
-          fi
-      - name: Remove SSH key
+          root=/opt/adobe-relay/releases/subscription-health-ui-20261018
+          ssh "${opts[@]}" "$target" "install -d -m 700 '$root'"
+          scp "${opts[@]}" deploy/primary/subscription-health-ui-20261018/* "$target:$root/"
+          ssh "${opts[@]}" "$target" "python3 -m unittest discover -s '$root' -p test_rolling.py"
+          gzip -dc release-images.tar.gz | ssh "${opts[@]}" "$target" 'docker load'
+          ssh "${opts[@]}" "$target" "python3 '$root/cloud-metadata.py'"
+          ssh "${opts[@]}" "$target" "python3 '$root/audit.py' before"
+      - name: Run guarded rolling handoff
+        run: |
+          set -euo pipefail
+          opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15)
+          target=root@173.234.15.150
+          root=/opt/adobe-relay/releases/subscription-health-ui-20261018
+          ssh "${opts[@]}" "$target" "test ! -f '$root/progress.json' && (nohup python3 '$root/driver.py' > '$root/driver.log' 2>&1 < /dev/null & )"
+          finished=false
+          for attempt in $(seq 1 200); do
+            result=$(ssh "${opts[@]}" "$target" "cat '$root/progress.json' 2>/dev/null || printf '{}'")
+            echo "$result"
+            state=$(printf '%s' "$result" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("state",""))')
+            step=$(printf '%s' "$result" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("step",""))')
+            if [ "$state" = attention_required ]; then exit 1; fi
+            if [ "$step" = complete ] && [ "$state" = done ]; then finished=true; break; fi
+            sleep 10
+          done
+          test "$finished" = true
+      - name: Verify frontend, business preservation and passive operation
+        run: |
+          set -euo pipefail
+          opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15)
+          target=root@173.234.15.150
+          root=/opt/adobe-relay/releases/subscription-health-ui-20261018
+          ssh "${opts[@]}" "$target" "python3 '$root/business-verify.py'"
+          ssh "${opts[@]}" "$target" "python3 '$root/frontend-verify.py'"
+          ssh "${opts[@]}" "$target" "python3 '$root/observe.py'"
+          ssh "${opts[@]}" "$target" "python3 '$root/final-verification.py'"
+          ssh "${opts[@]}" "$target" "python3 '$root/audit.py' check-rollback"
+      - name: Download sanitized audit results
+        if: always()
+        run: |
+          mkdir -p audit-results
+          opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15)
+          root=/opt/adobe-relay/releases/subscription-health-ui-20261018
+          for name in release-metadata.json progress.json rolling-finished.json runtime-verification.json frontend-verification.json business-verification.json observation.json final-verification.json; do
+            scp "${opts[@]}" "root@173.234.15.150:$root/$name" audit-results/ || true
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: subscription-ui-release-results
+          path: audit-results/
+          retention-days: 7
+      - name: Remove runner SSH key
         if: always()
         run: rm -f ~/.ssh/deploy_key
