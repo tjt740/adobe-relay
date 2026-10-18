@@ -2,6 +2,18 @@
   <AppLayout>
     <div class="changelog mx-auto max-w-6xl space-y-7">
       <header class="release-hero">
+        <p class="text-xs font-medium text-primary-600 dark:text-primary-300">{{ t('changelog.daily.timezone') }}</p>
+        <h2 class="mt-3 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white sm:text-3xl">{{ t('changelog.daily.title') }}</h2>
+        <p class="mt-3 text-sm leading-7 text-gray-600 dark:text-gray-300">{{ t('changelog.daily.intro') }}</p>
+      </header>
+      <DailyChangelog />
+
+      <details class="release-archive space-y-7">
+        <summary class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-5 text-sm font-medium text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 dark:border-dark-700 dark:bg-dark-900 dark:text-gray-200">
+          <span>{{ t('changelog.daily.archiveTitle') }}</span>
+          <Icon name="chevronDown" size="sm" class="archive-chevron shrink-0 transition-transform motion-reduce:transition-none" aria-hidden="true" />
+        </summary>
+      <header class="release-hero">
         <div class="flex items-center gap-2 text-xs font-medium text-primary-600 dark:text-primary-300">
           <Icon name="clock" size="sm" aria-hidden="true" />
           <span>{{ t('changelog.edition') }}</span>
@@ -148,6 +160,7 @@
           <div class="markdown-body release-document" lang="zh" v-html="documentHtml"></div>
         </article>
       </section>
+      </details>
     </div>
   </AppLayout>
 </template>
@@ -159,6 +172,7 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
+import DailyChangelog from '@/components/admin/changelog/DailyChangelog.vue'
 import replayResults from '@/content/changelog/2026-10-17/replay-results.json'
 import overview from '@/content/changelog/2026-10-17/night-overview.md?raw'
 import overviewUrl from '@/content/changelog/2026-10-17/night-overview.md?url'
@@ -228,6 +242,7 @@ async function readDocument(id: string) {
 summary { list-style: none; }
 summary::-webkit-details-marker { display: none; }
 .scenario-card[open] .scenario-chevron { transform: rotate(180deg); }
+.release-archive[open] > summary .archive-chevron { transform: rotate(180deg); }
 .release-document { overflow-wrap: anywhere; }
 .release-document :deep(table) { display: block; overflow-x: auto; }
 .release-document :deep(h1) { @apply mt-0 text-2xl; }

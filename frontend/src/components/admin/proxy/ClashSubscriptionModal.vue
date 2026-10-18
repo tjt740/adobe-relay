@@ -17,13 +17,13 @@
           <label for="clash-subscription-url" class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('admin.proxies.clash.url') }}</label>
           <span v-if="state?.revision" class="text-xs text-gray-500">{{ t('admin.proxies.clash.updated') }} {{ formatDateTime(state.updated_at) }}</span>
         </div>
-        <div class="flex flex-col gap-2 sm:flex-row">
-          <div class="relative min-w-0 flex-1">
-            <Icon name="link" size="sm" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <textarea id="clash-subscription-url" v-model="url" rows="2" autocomplete="off" autocapitalize="off" spellcheck="false"
-              class="input min-h-11 resize-y pl-9 pr-11 font-mono text-sm" :class="{ 'clash-subscription-hidden': !showURL }" :disabled="busy"
+        <div class="flex flex-col items-start gap-3 sm:flex-row">
+          <div class="relative w-full min-w-0 flex-1">
+            <Icon name="link" size="sm" class="pointer-events-none absolute left-3 top-3.5 text-gray-400" />
+            <textarea id="clash-subscription-url" v-model="url" rows="6" autocomplete="off" autocapitalize="off" spellcheck="false"
+              class="input clash-subscription-input resize-y pl-9 pr-11 font-mono text-sm leading-6" :class="{ 'clash-subscription-hidden': !showURL }" :disabled="busy"
               :placeholder="t(state?.url_hint ? 'admin.proxies.clash.keepURL' : 'admin.proxies.clash.urlPlaceholder')" @input="invalidatePreview" />
-            <button type="button" class="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-dark-600 dark:hover:text-gray-200"
+            <button type="button" class="absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-dark-600 dark:hover:text-gray-200"
               :aria-label="t(showURL ? 'admin.proxies.clash.hideURL' : 'admin.proxies.clash.showURL')" :title="t(showURL ? 'admin.proxies.clash.hideURL' : 'admin.proxies.clash.showURL')"
               :aria-pressed="showURL" @click="showURL = !showURL">
               <Icon :name="showURL ? 'eyeOff' : 'eye'" size="md" />
@@ -280,6 +280,10 @@ onMounted(load)
 </script>
 
 <style scoped>
+.clash-subscription-input {
+  min-height: 10rem;
+}
+
 .clash-subscription-hidden {
   -webkit-text-security: disc;
 }

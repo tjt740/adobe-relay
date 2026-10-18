@@ -13,5 +13,6 @@ export default {
   paused: 'No enabled accounts; manual settings are preserved',
   evidenceHint: 'Connectivity does not prove account authorization, credits, or generation success. Group counts use recorded state; model limits and concurrency further filter candidates. Traffic refreshes about every 5–6 minutes with failure backoff, without generation or login.',
   fetchReasons: { invalid_url: 'Invalid URL', connection_failed: 'Connection failed or timed out', read_failed: 'Download failed', invalid_subscription: 'Invalid subscription response', unknown: 'Unconfirmed cause' },
-  states: { checking: 'Awaiting checks', healthy: 'Reachable', degraded: 'Some nodes failed', unavailable: 'All nodes unreachable', fetch_failed: 'Subscription URL refresh failed', stale: 'Stale observations', exhausted: 'Subscription traffic exhausted', expired: 'Subscription expired' }
+  states: { checking: 'Awaiting checks', healthy: 'Reachable', degraded: 'Some nodes failed', unavailable: 'All nodes unreachable', fetch_failed: 'Subscription URL refresh failed', stale: 'Stale observations', exhausted: 'Subscription traffic exhausted', expired: 'Subscription expired' },
+  watermarks: { checking: 'Pending', healthy: 'Healthy', degraded: 'Partial', unavailable: 'Offline', fetch_failed: 'Error', stale: 'Unverified', exhausted: 'Offline', expired: 'Offline' }
 }

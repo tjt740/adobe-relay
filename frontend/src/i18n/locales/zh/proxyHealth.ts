@@ -13,5 +13,6 @@ export default {
   paused: '当前没有启用账号，保留人工状态',
   evidenceHint: '连接可达不代表账号鉴权、额度或出图正常；分组候选按已有状态统计，模型限制和并发仍会进一步筛选。余额约每 5–6 分钟更新，失败退避，不主动出图或登录。',
   fetchReasons: { invalid_url: '链接格式无效', connection_failed: '连接失败或超时', read_failed: '下载失败', invalid_subscription: '返回内容不是有效订阅', unknown: '原因未确认' },
-  states: { checking: '等待检测', healthy: '连接可达', degraded: '部分节点异常', unavailable: '节点全部不可达', fetch_failed: '订阅链接更新失败', stale: '记录已过期', exhausted: '订阅流量耗尽', expired: '订阅已到期' }
+  states: { checking: '等待检测', healthy: '连接可达', degraded: '部分节点异常', unavailable: '节点全部不可达', fetch_failed: '订阅链接更新失败', stale: '记录已过期', exhausted: '订阅流量耗尽', expired: '订阅已到期' },
+  watermarks: { checking: '待检测', healthy: '健康', degraded: '部分可用', unavailable: '不可用', fetch_failed: '更新失败', stale: '待确认', exhausted: '不可用', expired: '不可用' }
 }

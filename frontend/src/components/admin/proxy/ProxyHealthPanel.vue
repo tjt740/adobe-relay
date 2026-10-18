@@ -18,12 +18,13 @@
       </p>
     </div>
     <div v-if="expanded && view?.sources.length" class="mt-3 grid max-h-[42vh] gap-3 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
-      <article v-for="source in view.sources" :key="source.id" class="min-w-0 rounded-lg border p-3" :class="severity(source.status)">
-        <div class="flex items-start justify-between gap-2">
-          <span class="text-sm font-medium">{{ t('proxyHealth.source', { index: source.index }) }}</span>
-          <span class="shrink-0 text-xs font-medium">{{ t(`proxyHealth.states.${source.status}`) }}</span>
+      <article v-for="source in view.sources" :key="source.id" class="subscription-card relative min-w-0 overflow-hidden rounded-xl border bg-white p-4 text-gray-700 dark:bg-dark-800 dark:text-gray-300" :class="`subscription-card--${tone(source.status)}`">
+        <span class="subscription-watermark" aria-hidden="true">{{ t(`proxyHealth.watermarks.${source.status}`) }}</span>
+        <div class="relative pr-32">
+          <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ t('proxyHealth.source', { index: source.index }) }}</h4>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t(`proxyHealth.states.${source.status}`) }}</p>
         </div>
-        <p class="mt-1 break-all font-mono text-xs">{{ source.url_hint }} · {{ source.id.slice(-6) }}</p>
+        <p class="relative mt-4 break-all font-mono text-xs text-gray-500 dark:text-gray-400">{{ source.url_hint }} · {{ source.id.slice(-6) }}</p>
         <p class="mt-2 text-xs">{{ source.traffic_known ? t('proxyHealth.remaining', { remaining: bytes(source.remaining_bytes), total: bytes(source.total_bytes) }) : t('proxyHealth.trafficUnknown') }}</p>
         <p v-if="source.expires_at" class="mt-1 text-xs">{{ t('proxyHealth.expires') }} {{ formatDateTime(source.expires_at) }}</p>
         <p class="mt-1 text-xs">{{ t('proxyHealth.nodes', { healthy: source.healthy, failed: source.failed, unknown: source.unknown, total: source.nodes }) }}</p>
@@ -70,6 +71,12 @@ function severity(status: string) {
   if (['degraded', 'fetch_failed', 'stale'].includes(status)) return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300'
   return 'border-gray-200 text-gray-700 dark:border-dark-600 dark:text-gray-300'
 }
+function tone(status: string) {
+  if (status === 'healthy') return 'healthy'
+  if (['exhausted', 'expired', 'unavailable'].includes(status)) return 'danger'
+  if (['degraded', 'fetch_failed', 'stale'].includes(status)) return 'warning'
+  return 'neutral'
+}
 function fetchReason(reason: string, status?: number) {
   if (reason === 'http_error') return `HTTP ${status || '—'}`
   if (['invalid_url', 'connection_failed', 'read_failed', 'invalid_subscription'].includes(reason)) return t(`proxyHealth.fetchReasons.${reason}`)
@@ -85,3 +92,48 @@ async function refresh() {
 onMounted(() => { void refresh(); timer = setInterval(() => { if (!document.hidden) void refresh() }, 30_000) })
 onUnmounted(() => { alive = false; clearInterval(timer) })
 </script>
+
+<style scoped>
+.subscription-card--healthy {
+  @apply border-emerald-200 dark:border-emerald-900;
+}
+.subscription-card--warning {
+  @apply border-amber-200 dark:border-amber-900;
+}
+.subscription-card--danger {
+  @apply border-red-200 dark:border-red-900;
+}
+.subscription-card--neutral {
+  @apply border-gray-200 dark:border-dark-600;
+}
+.subscription-watermark {
+  position: absolute;
+  top: 1.1rem;
+  right: 1rem;
+  max-width: 8rem;
+  padding: 0.35rem 0.65rem;
+  border: 3px double currentColor;
+  border-radius: 0.4rem;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  letter-spacing: 0.08em;
+  transform: rotate(-10deg);
+  opacity: 0.3;
+  pointer-events: none;
+  user-select: none;
+}
+.subscription-card--healthy .subscription-watermark {
+  @apply text-emerald-600 dark:text-emerald-400;
+}
+.subscription-card--warning .subscription-watermark {
+  @apply text-amber-600 dark:text-amber-400;
+}
+.subscription-card--danger .subscription-watermark {
+  @apply text-red-600 dark:text-red-400;
+}
+.subscription-card--neutral .subscription-watermark {
+  @apply text-gray-500 dark:text-gray-400;
+}
+</style>
