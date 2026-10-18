@@ -18,3 +18,9 @@ curl --fail https://creative.cheap/health
 旧 `deploy/online` 和 `deploy/adobe-relay` 的 IP 与目录说明仅用于历史维护，不作为默认发布目标。
 
 受控滚动切换时，在已验证新镜像的临时实例接走新连接、旧实例排空后，可调用 `release.sh IMAGE EXPECTED_CURRENT --keep-canary-on-failure`。此模式要求同镜像临时实例健康且滚动租约有效；正式实例启动失败时保留临时实例服务，不自动启动旧版，以免旧版启动清理删除在途请求的并发槽。检查后再重试或安排排空回退。普通发布的原自动回退行为保持。
+
+## 每日更新日志
+
+每次应用更新或修复，都应随版本同步维护网站「更新日志」：在 `frontend/src/content/changelog/daily.ts` 添加条目，并维护中英文 `changelog.daily` 文案。按实际发布的北京时间日期（Asia/Shanghai）归入当天，同一天的多次更新合并展示，日期倒序；跨午夜发布要调整日期。简述用户能看到的变化和必要边界，保留历史记录及专题原文，不把未发布或仅测试的功能写成已上线。
+
+内部审计、实际应用 SHA、备份与回退条件仍单独归档在本目录。仅归档发布证据且不改变应用时使用 `[skip ci]`，避免重复部署。
