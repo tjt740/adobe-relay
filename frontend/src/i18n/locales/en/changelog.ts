@@ -1,4 +1,91 @@
 export default {
+  daily: {
+    "title": "Changelog",
+    "timezone": "Daily summaries · Beijing time (UTC+8)",
+    "intro": "Updates and fixes grouped by day, with changes from the same date together and the newest day first.",
+    "latest": "Latest",
+    "count": "{count} updates",
+    "archiveTitle": "Oct 17 detailed archive · Resources, proxies and load replays",
+    "types": {
+      "added": "Added",
+      "improved": "Improved",
+      "fixed": "Fixed"
+    },
+    "updates": {
+      "subscriptionUI": {
+        "title": "Subscription input and status cards",
+        "body": "A six-line, resizable subscription input and green, amber or red status watermarks make links and availability easier to read. Node counts and specific failure reasons remain visible."
+      },
+      "dailyHistory": {
+        "title": "Daily release summaries",
+        "body": "Updates and fixes are grouped by release date in Beijing time, newest first. Releases on the same day share one section; the latest day is expanded, with earlier entries and detailed archives retained."
+      },
+      "adobeModels": {
+        "title": "Correct Adobe model lists",
+        "body": "An Adobe group without schedulable accounts still lists Adobe image models, respecting mappings and allowlists. A listed model does not guarantee that generation is currently available."
+      },
+      "qualityLabel": {
+        "title": "Preserve the xhigh quality label",
+        "body": "GPT Image 2.5 responses preserve xhigh when requested; max stays max. Both retain the same upstream highest-detail setting, with other model limits unchanged."
+      },
+      "proxyRouting": {
+        "title": "Proxy health and account fallback",
+        "body": "Identify exhausted, expired or failing subscriptions, switch away from persistently slow exits and prioritize enabled accounts. An initial empty pool gets a bounded same-group recheck, preserving manual pauses and retry limits."
+      },
+      "capacity": {
+        "title": "Higher request capacity",
+        "body": "Sub2 uses a 54 GiB container limit, 42 GiB Go target, 37.8 GiB image budget and parallelism 16, with higher ingress limits. Successful isolated replays are not a guarantee of upstream throughput."
+      },
+      "groupIDs": {
+        "title": "Group IDs visible by default",
+        "body": "Group IDs appear beside names. Existing browsers receive the new default on their first updated load, preserving other column preferences and later manual changes."
+      },
+      "imageAdmission": {
+        "title": "Reduce premature image rejections",
+        "body": "Staged reservations and disk buffering reduce capacity rejections when memory remains available. OOM protection, the absence of a new capacity queue and same-job download retries are preserved."
+      },
+      "imageSafety": {
+        "title": "Consistent image content refusals",
+        "body": "Explicit prompt or reference-image content refusals use 451. If streaming has already started, the error object carries the status code so clients can distinguish content refusal from parameter errors."
+      },
+      "imageDelivery": {
+        "title": "Image delivery and download retries",
+        "body": "Failed downloads continue the original job and image URL, retrying or changing exits under existing rules. Valid real usage is retained; random simulated values used when usage is missing do not represent actual token consumption."
+      },
+      "imageMemory": {
+        "title": "Lower memory pressure during image bursts",
+        "body": "Uploads reserve memory incrementally and release temporary allowances, while outputs use bounded disk buffering and reusable heap. Capacity guards remain; passing tests does not imply zero rejections for every input."
+      },
+      "quietAlerts": {
+        "title": "Complete reports and quieter alerts",
+        "body": "Reports show full details with red 401 and amber 408 entries and improved mobile layouts. Notifications require sustained confirmation, send once per event, and wait at least 60 minutes between new notifications or failed-send retries."
+      },
+      "imageURL": {
+        "title": "Image URL delivery",
+        "body": "Explicit URL requests prefer object storage, then a validated HTTPS image URL whose downloaded bytes were unchanged. When these conditions are not met, delivery falls back to Base64."
+      },
+      "accountDetails": {
+        "title": "Clearer account and integration errors",
+        "body": "Account details show Cookie verification and model errors, with company filters. Linked external accounts support error-state viewing and filtering; unknown states are not presented as healthy."
+      },
+      "accountEvidence": {
+        "title": "Live account state and success evidence",
+        "body": "Account pages reflect recorded changes and distinguish failures, pending verification and actual success evidence. Reports use existing records without generating images or signing in; quiet windows do not clear old failures."
+      },
+      "reliableLink": {
+        "title": "Reliable primary-site integration",
+        "body": "Okad and Sub2 use two-way authentication and reliable synchronization. Account lists hide integration details by default with an option to reveal them, preserving existing settings and manual scheduling."
+      },
+      "recoveryProtection": {
+        "title": "Safer automatic account recovery",
+        "body": "Authentication, quota and entitlement errors are distinguished, with existing Cookies reused first. Timeouts do not trigger sign-in; automatic sign-ins use persistent account cooldowns and preserve manual pauses."
+      },
+      "adobeAlerts": {
+        "title": "Dedicated Adobe error alerts",
+        "body": "Business and account-check failures are aggregated, deduplicated by account and evaluated by error ratio. Later dated entries describe sustained confirmation, success evidence and notification frequency improvements."
+      }
+    }
+  },
   description: 'Changes, practical scenarios and validation evidence',
   edition: 'Night of Oct 16 – early Oct 17, 2026 · Beijing time',
   headline: 'More capacity, more reliable routing',
