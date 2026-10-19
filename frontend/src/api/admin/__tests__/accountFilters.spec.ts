@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { bulkUpdate, exportData, list, listWithEtag, getUpstreamBillingRatesWithEtag } from '../accounts'
 const { get, post } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
 vi.mock('../../client', () => ({ apiClient: { get, post } }))
-const filters = { okad_account_type: 'company', status: 'request_timeout', capacity: 'full', concurrency_min: '2', concurrency_max: '8' }
+const filters = { okad_account_type: 'company', okad_group: 'site:3', status: 'request_timeout', capacity: 'full', concurrency_min: '2', concurrency_max: '8' }
 beforeEach(() => { get.mockReset(); post.mockReset(); get.mockResolvedValue({ data: {}, headers: {} }); post.mockResolvedValue({ data: {} }) })
 describe('account runtime filter transport', () => {
   it('preserves filters for list, refresh, billing snapshots and export', async () => {

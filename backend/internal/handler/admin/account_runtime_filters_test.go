@@ -256,3 +256,56 @@ func TestOkadCompanyBulkUpdateAndExportResolveSameIDs(t *testing.T) {
 	require.Len(t, rows, 1)
 	require.EqualValues(t, 2, rows[0].ID)
 }
+
+func TestOkadGroupFilterCombinesTypeAcrossPagesAndMutations(t *testing.T) {
+	svc := newStubAdminService()
+	svc.accounts = nil
+	for i := 1; i <= 7; i++ {
+		kind, issuer := "vietnam", "site"
+		if i == 1 {
+			kind = "company"
+		}
+		if i == 7 {
+			issuer = "other"
+		}
+		extra := map[string]any{"adobeteam_external_email": "a@example.com", "okad_account": map[string]any{
+			"issuer": issuer, "source_key": "external:1", "email": "a@example.com", "is_company": i == 1, "account_type": kind, "group_id": 3, "group_name": "同名组",
+		}}
+		if i == 6 {
+			delete(extra, "okad_account")
+		}
+		svc.accounts = append(svc.accounts, service.Account{ID: int64(i), Platform: "adobe", Type: "oauth", Extra: extra})
+	}
+	h := &AccountHandler{adminService: svc}
+	f := accountRuntimeFilters{OkadAccountType: "vietnam", OkadGroup: "site:3"}
+	rows, total, _, err := h.listAccountsWithRuntimeFilters(context.Background(), 2, 2, "adobe", "oauth", "", "", 0, "", "id", "asc", f)
+	require.NoError(t, err)
+	require.EqualValues(t, 4, total)
+	require.EqualValues(t, 4, rows[0].ID)
+	require.EqualValues(t, 5, rows[1].ID)
+	rows, total, _, err = h.listAccountsWithRuntimeFilters(context.Background(), 0, 0, "adobe", "oauth", "", "", 0, "", "id", "asc", f)
+	require.NoError(t, err)
+	require.Len(t, rows, 4)
+	require.EqualValues(t, 4, total)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("GET", "/?okad_group=site%3A3&okad_account_type=vietnam", nil)
+	rows, err = h.resolveExportAccounts(context.Background(), nil, c)
+	require.NoError(t, err)
+	require.Len(t, rows, 4)
+	rec := httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest("POST", "/", strings.NewReader(`{"filters":{"okad_group":"site:3","okad_account_type":"vietnam"},"priority":7}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	h.BulkUpdate(c)
+	require.Equal(t, 200, rec.Code, rec.Body.String())
+	require.Equal(t, []int64{2, 3, 4, 5}, svc.lastBulkUpdateAccountInput.AccountIDs)
+	rec = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest("GET", "/", nil)
+	h.OkadGroups(c)
+	require.Equal(t, 200, rec.Code)
+	require.Contains(t, rec.Body.String(), `"value":"site:3"`)
+	require.Contains(t, rec.Body.String(), `"value":"other:3"`)
+	f.OkadGroup = "site:0"
+	require.Error(t, f.validate())
+}

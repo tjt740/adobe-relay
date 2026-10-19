@@ -2,18 +2,24 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"regexp"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // Company follows Okad's supply-mail tag, not the Adobe profile or email domain.
 // Keep this metadata separate from credential verification and scheduling state.
 type OkadAccountMetadata struct {
-	Issuer    string `json:"issuer"`
-	SourceKey string `json:"source_key"`
-	Email     string `json:"email"`
-	IsCompany *bool  `json:"is_company"`
+	Issuer      string `json:"issuer"`
+	SourceKey   string `json:"source_key"`
+	Email       string `json:"email"`
+	IsCompany   *bool  `json:"is_company"`
+	AccountType string `json:"account_type,omitempty"`
+	GroupID     *int64 `json:"group_id"`
+	GroupName   string `json:"group_name"`
 }
 
 type OkadAccountMetadataUpdate struct {
@@ -28,7 +34,9 @@ type OkadAccountMetadataAdmin interface {
 var okadSourceKeyPattern = regexp.MustCompile(`^(external|pool):[1-9][0-9]*$`)
 
 func (p OkadAccountMetadata) Valid() bool {
-	return p.IsCompany != nil && p.Email != "" && len(p.Email) <= 320 &&
+	kindValid := p.AccountType == "" || p.AccountType == "company" || p.AccountType == "non_company" || p.AccountType == "vietnam"
+	groupValid := (p.GroupID == nil && p.GroupName == "") || (p.GroupID != nil && *p.GroupID > 0 && strings.TrimSpace(p.GroupName) != "" && utf8.RuneCountInString(p.GroupName) <= 64 && strings.HasPrefix(p.SourceKey, "external:"))
+	return kindValid && groupValid && p.IsCompany != nil && (p.AccountType == "" || (p.AccountType == "company") == *p.IsCompany) && (p.AccountType != "vietnam" || strings.HasPrefix(p.SourceKey, "external:")) && p.Email != "" && len(p.Email) <= 320 &&
 		p.Issuer != "" && len(p.Issuer) <= 100 && len(p.SourceKey) <= 100 && okadSourceKeyPattern.MatchString(p.SourceKey) &&
 		(!*p.IsCompany || strings.HasPrefix(p.SourceKey, "external:"))
 }
@@ -48,20 +56,39 @@ func OkadAccountKind(a *Account) string {
 	}
 	metadata, _ := a.Extra["okad_account"].(map[string]any)
 	p := OkadAccountMetadata{}
-	p.Issuer, _ = metadata["issuer"].(string)
-	p.SourceKey, _ = metadata["source_key"].(string)
-	p.Email, _ = metadata["email"].(string)
-	if v, ok := metadata["is_company"].(bool); ok {
-		p.IsCompany = &v
+	raw, err := json.Marshal(metadata)
+	if err != nil || json.Unmarshal(raw, &p) != nil {
+		return "unknown"
 	}
 	if !p.Valid() || !strings.EqualFold(p.Email, adobeRecoveryEmail(a)) ||
 		(issuer != "" && (issuer != p.Issuer || source != p.SourceKey)) {
 		return "unknown"
 	}
+	if p.AccountType != "" {
+		return p.AccountType
+	}
 	if *p.IsCompany {
 		return "company"
 	}
 	return "non_company"
+}
+
+// The instance issuer namespaces IDs so equal names or IDs on different Okad sites never merge.
+func OkadAccountGroup(a *Account) (key, name string) {
+	kind := OkadAccountKind(a)
+	if kind == "" || kind == "unknown" {
+		return "", ""
+	}
+	metadata, _ := a.Extra["okad_account"].(map[string]any)
+	raw, err := json.Marshal(metadata)
+	var p OkadAccountMetadata
+	if err != nil || json.Unmarshal(raw, &p) != nil || !p.Valid() {
+		return "", ""
+	}
+	if p.GroupID == nil {
+		return "ungrouped", ""
+	}
+	return p.Issuer + ":" + strconv.FormatInt(*p.GroupID, 10), p.GroupName
 }
 
 func (s *adminServiceImpl) SyncOkadAccountMetadata(ctx context.Context, items []OkadAccountMetadataUpdate) (int, error) {

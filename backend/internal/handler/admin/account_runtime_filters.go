@@ -19,6 +19,7 @@ import (
 // while connection-test results and current errors live on the account.
 type accountRuntimeFilters struct {
 	OkadAccountType string `json:"okad_account_type"`
+	OkadGroup       string `json:"okad_group"`
 	Capacity        string `json:"capacity"`
 	ConcurrencyMin  *int   `json:"concurrency_min"`
 	ConcurrencyMax  *int   `json:"concurrency_max"`
@@ -26,9 +27,19 @@ type accountRuntimeFilters struct {
 
 func (f accountRuntimeFilters) validate() error {
 	switch f.OkadAccountType {
-	case "", "company", "non_company", "unknown":
+	case "", "company", "vietnam", "non_company", "unknown":
 	default:
 		return infraerrors.BadRequest("INVALID_OKAD_ACCOUNT_TYPE", "invalid Okad account type")
+	}
+	if f.OkadGroup != "" && f.OkadGroup != "ungrouped" {
+		parts := strings.LastIndex(f.OkadGroup, ":")
+		if parts < 1 || parts > 100 || len(f.OkadGroup) > 121 {
+			return infraerrors.BadRequest("INVALID_OKAD_GROUP", "invalid Okad group")
+		}
+		id, err := strconv.ParseInt(f.OkadGroup[parts+1:], 10, 64)
+		if err != nil || id < 1 {
+			return infraerrors.BadRequest("INVALID_OKAD_GROUP", "invalid Okad group")
+		}
 	}
 	switch f.Capacity {
 	case "", "idle", "in_use", "full":
@@ -44,7 +55,7 @@ func (f accountRuntimeFilters) validate() error {
 }
 
 func runtimeFiltersFromQuery(c *gin.Context) (accountRuntimeFilters, error) {
-	f := accountRuntimeFilters{Capacity: strings.TrimSpace(c.Query("capacity")), OkadAccountType: strings.TrimSpace(c.Query("okad_account_type"))}
+	f := accountRuntimeFilters{OkadGroup: strings.TrimSpace(c.Query("okad_group")), Capacity: strings.TrimSpace(c.Query("capacity")), OkadAccountType: strings.TrimSpace(c.Query("okad_account_type"))}
 	for key, target := range map[string]**int{"concurrency_min": &f.ConcurrencyMin, "concurrency_max": &f.ConcurrencyMax} {
 		if raw := strings.TrimSpace(c.Query(key)); raw != "" {
 			value, err := strconv.Atoi(raw)
@@ -66,7 +77,7 @@ func isRuntimeAccountStatus(status string) bool {
 }
 
 func (f accountRuntimeFilters) needed(status string) bool {
-	return f.OkadAccountType != "" || isRuntimeAccountStatus(status) || f.Capacity != "" || f.ConcurrencyMin != nil || f.ConcurrencyMax != nil
+	return f.OkadAccountType != "" || f.OkadGroup != "" || isRuntimeAccountStatus(status) || f.Capacity != "" || f.ConcurrencyMin != nil || f.ConcurrencyMax != nil
 }
 
 var timeoutStatusPattern = regexp.MustCompile(`\b408\b`)
@@ -174,7 +185,7 @@ func (h *AccountHandler) listAccountsWithRuntimeFilters(ctx context.Context, pag
 	if err := f.validate(); err != nil {
 		return nil, 0, nil, err
 	}
-	if f.OkadAccountType != "" {
+	if f.OkadAccountType != "" || f.OkadGroup != "" {
 		if (platform != "" && platform != service.PlatformAdobe) || (accountType != "" && accountType != service.AccountTypeOAuth) {
 			return []service.Account{}, 0, nil, nil
 		}
@@ -201,6 +212,12 @@ func (h *AccountHandler) listAccountsWithRuntimeFilters(ctx context.Context, pag
 	now := time.Now()
 	matched := make([]service.Account, 0, len(accounts))
 	for _, a := range accounts {
+		if f.OkadGroup != "" {
+			key, _ := service.OkadAccountGroup(&a)
+			if key != f.OkadGroup {
+				continue
+			}
+		}
 		if (f.OkadAccountType == "" || service.OkadAccountKind(&a) == f.OkadAccountType) && matchesRuntimeAccountStatus(a, status, now) && (accountRuntimeFilters{ConcurrencyMin: f.ConcurrencyMin, ConcurrencyMax: f.ConcurrencyMax}).matchesCapacity(a, 0) {
 			matched = append(matched, a)
 		}

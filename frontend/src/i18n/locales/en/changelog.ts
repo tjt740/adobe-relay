@@ -12,6 +12,10 @@ export default {
       "fixed": "Fixed"
     },
     "updates": {
+      "okadGroups": {
+        "title": "Okad custom groups and filters across both apps",
+        "body": "Create and choose groups when importing external accounts, or regroup existing accounts in bulk. Combine groups with company, Vietnam and non-company types. Sub2 filters, exports and bulk actions use the same group selection."
+      },
       "subscriptionUI": {
         "title": "Subscription input and status cards",
         "body": "A six-line, resizable subscription input and green, amber or red status watermarks make links and availability easier to read. Node counts and specific failure reasons remain visible."

@@ -41,6 +41,11 @@ import type {
  * @param filters - Optional filters
  * @returns Paginated list of accounts
  */
+export async function getOkadGroups(): Promise<{value: string; name: string}[]> {
+  const { data } = await apiClient.get<{value: string; name: string}[]>('/admin/accounts/okad-groups')
+  return data
+}
+
 export async function list(
   page: number = 1,
   pageSize: number = 20,
@@ -52,6 +57,7 @@ export async function list(
     search?: string
     privacy_mode?: string
     okad_account_type?: string
+    okad_group?: string
     capacity?: string
     concurrency_min?: string
     concurrency_max?: string
@@ -98,6 +104,7 @@ export async function getUpstreamBillingRatesWithEtag(
     search?: string
     privacy_mode?: string
     okad_account_type?: string
+    okad_group?: string
     capacity?: string
     concurrency_min?: string
     concurrency_max?: string
@@ -135,6 +142,7 @@ export async function listWithEtag(
     search?: string
     privacy_mode?: string
     okad_account_type?: string
+    okad_group?: string
     capacity?: string
     concurrency_min?: string
     concurrency_max?: string
@@ -749,6 +757,7 @@ export async function exportData(options?: {
     group?: string
     privacy_mode?: string
     okad_account_type?: string
+    okad_group?: string
     capacity?: string
     concurrency_min?: string
     concurrency_max?: string
@@ -762,13 +771,14 @@ export async function exportData(options?: {
   if (options?.ids && options.ids.length > 0) {
     params.ids = options.ids.join(',')
   } else if (options?.filters) {
-    const { platform, type, status, group, privacy_mode, okad_account_type, capacity, concurrency_min, concurrency_max, search, sort_by, sort_order } = options.filters
+    const { platform, type, status, group, privacy_mode, okad_account_type, okad_group, capacity, concurrency_min, concurrency_max, search, sort_by, sort_order } = options.filters
     if (platform) params.platform = platform
     if (type) params.type = type
     if (status) params.status = status
     if (group) params.group = group
     if (privacy_mode) params.privacy_mode = privacy_mode
     if (okad_account_type) params.okad_account_type = okad_account_type
+    if (okad_group) params.okad_group = okad_group
     if (capacity) params.capacity = capacity
     if (concurrency_min) params.concurrency_min = concurrency_min
     if (concurrency_max) params.concurrency_max = concurrency_max
@@ -1170,6 +1180,7 @@ export async function refreshOpenCodeGoUsage(id: number): Promise<OpenCodeGoUsag
 
 export const accountsAPI = {
   list,
+  getOkadGroups,
   listWithEtag,
   getUpstreamBillingRatesWithEtag,
   getById,

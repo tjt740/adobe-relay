@@ -18,3 +18,14 @@ describe('account table filters', () => {
     wrapper.unmount()
   })
 })
+
+describe('Okad custom group filter', () => {
+  it('combines a created group with Vietnam type and can clear the group', async () => {
+    const filters = {platform: 'adobe', okad_account_type: 'vietnam', okad_group: 'site:3'}
+    const wrapper = mount(AccountTableFilters, {props: {filters, searchQuery: '', okadGroups: [{value: 'site:3', name: '客户 A'}]}, global: {stubs: {Select, SearchInput: true}}})
+    expect(wrapper.get('#okad-group-filter').text()).toContain('客户 A')
+    await wrapper.get('#okad-group-filter').setValue('')
+    expect(wrapper.emitted('update:filters')?.at(-1)).toEqual([{...filters, okad_group: ''}])
+    wrapper.unmount()
+  })
+})

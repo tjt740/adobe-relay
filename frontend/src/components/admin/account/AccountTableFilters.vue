@@ -11,6 +11,8 @@
     <Select :model-value="filters.type" class="w-40" :options="tOpts" @update:model-value="updateType" @change="$emit('change')" />
     <Select :model-value="filters.status" class="w-40" :options="sOpts" @update:model-value="updateStatus" @change="$emit('change')" />
     <Select :model-value="filters.okad_account_type || ''" class="w-44" :options="okadOpts" :title="t('admin.accounts.okadTypeHint')" @update:model-value="updateOkadType" @change="$emit('change')" />
+    <Select id="okad-group-filter" :aria-label="t('admin.accounts.okadGroups')" :model-value="filters.okad_group || ''" class="w-48" :options="okadGroupOpts" @update:model-value="updateOkadGroup" @change="$emit('change')" />
+    <span v-if="okadGroupsError" role="alert" class="text-xs text-red-500">{{ okadGroupsError }}</span>
     <slot name="capacity" />
     <Select :model-value="filters.privacy_mode" class="w-40" :options="privacyOpts" @update:model-value="updatePrivacyMode" @change="$emit('change')" />
     <Select :model-value="filters.group" class="w-40" :options="gOpts" @update:model-value="updateGroup" @change="$emit('change')" />
@@ -21,7 +23,7 @@
 import { computed } from 'vue'; import { useI18n } from 'vue-i18n'; import Select from '@/components/common/Select.vue'; import SearchInput from '@/components/common/SearchInput.vue'
 import type { AdminGroup } from '@/types'
 import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
-const props = defineProps<{ searchQuery: string; filters: Record<string, any>; groups?: AdminGroup[] }>()
+const props = defineProps<{ searchQuery: string; filters: Record<string, any>; groups?: AdminGroup[]; okadGroups?: {value: string; name: string}[]; okadGroupsError?: string }>()
 const emit = defineEmits(['update:searchQuery', 'update:filters', 'change']); const { t } = useI18n()
 const updatePlatform = (value: string | number | boolean | null) => { emit('update:filters', { ...props.filters, platform: value }) }
 const updateType = (value: string | number | boolean | null) => { emit('update:filters', { ...props.filters, type: value }) }
@@ -29,9 +31,16 @@ const updateStatus = (value: string | number | boolean | null) => { emit('update
 const updateOkadType = (value: string | number | boolean | null) => { emit('update:filters', { ...props.filters, okad_account_type: value }) }
 const okadOpts = computed(() => [
   { value: '', label: t('admin.accounts.allOkadTypes') },
+  { value: 'vietnam', label: t('admin.accounts.okadVietnam') },
   { value: 'company', label: t('admin.accounts.okadCompany') },
   { value: 'non_company', label: t('admin.accounts.okadNonCompany') },
   { value: 'unknown', label: t('admin.accounts.okadUnknown') }
+])
+const updateOkadGroup = (value: string | number | boolean | null) => emit('update:filters', { ...props.filters, okad_group: value })
+const okadGroupOpts = computed(() => [
+  {value: '', label: t('admin.accounts.okadGroups')},
+  {value: 'ungrouped', label: t('admin.accounts.okadUngrouped')},
+  ...(props.okadGroups || []).map(g => ({value: g.value, label: g.name}))
 ])
 const updatePrivacyMode = (value: string | number | boolean | null) => { emit('update:filters', { ...props.filters, privacy_mode: value }) }
 const updateGroup = (value: string | number | boolean | null) => { emit('update:filters', { ...props.filters, group: value }) }

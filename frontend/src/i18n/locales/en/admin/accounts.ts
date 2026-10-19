@@ -436,6 +436,10 @@ export default {
         batchPartial: 'Probe partially completed: {success} succeeded, {failed} failed'
       },
       allOkadTypes: 'All account sources',
+      okadVietnam: 'Okad · Vietnam',
+      okadGroups: 'Groups created in Okad: All',
+      okadUngrouped: 'Okad · Ungrouped',
+      okadGroupsError: 'Failed to load Okad groups. Refresh to retry.',
       okadCompany: 'Okad · Company',
       okadNonCompany: 'Okad · Non-company',
       okadUnknown: 'Okad · Unclassified',
