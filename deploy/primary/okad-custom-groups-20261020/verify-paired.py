@@ -23,6 +23,8 @@ checks['configuration_retained_except_image']=all(current['config_hashes'][name]
 old=(root/'okad'/'backup'/'compose.yml').read_text();now=Path(allowed).read_text()
 expected,count=re.subn(r'(?m)^(    image:)\s*adobe-team-cookie:[^\s]+[ \t]*$',lambda m:m[1]+' adobe-team-cookie:'+manifest['commit'],old)
 checks['okad_compose_only_image_changed']=count==1 and now==expected
+sp=importlib.util.spec_from_file_location('okad_release',root/'okad'/'okad-release.py');om=importlib.util.module_from_spec(sp);sp.loader.exec_module(om)
+checks['original_okad_records_exact']=om.database_summary()==okad['database']
 state=json.loads((root/'group-test-fixture.json').read_text());checks['temporary_group_fixtures_cleaned']=state.get('cleaned') is True
 with sqlite3.connect('file:/opt/adobe-team-cookie/data/app.db?mode=ro',uri=True) as db:
  checks['sqlite_integrity']=db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'

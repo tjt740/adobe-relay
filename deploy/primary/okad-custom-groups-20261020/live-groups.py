@@ -15,6 +15,7 @@ STATE = ROOT / 'group-test-fixture.json'
 REPORT = ROOT / 'group-verification.json'
 EMAIL = 'group-release-20261020@verification.invalid'
 PREFIX = '发布验证-20261020-'
+NAME = PREFIX + EMAIL
 spec = importlib.util.spec_from_file_location('audit', ROOT / 'audit.py')
 audit = importlib.util.module_from_spec(spec); spec.loader.exec_module(audit)
 
@@ -77,7 +78,7 @@ def cleanup():
     if state.get('remote_id'):
         rid = int(state['remote_id'])
         row = json.loads(sql(f"SELECT json_build_object('name',name,'email',credentials->>'email','schedulable',schedulable,'status',status,'proxy_id',proxy_id) FROM accounts WHERE id={rid}"))
-        assert row['name'] == PREFIX+'账号' and row['email'] == EMAIL and not row['schedulable'] and row['status'] == 'inactive' and row['proxy_id'] is None
+        assert row['name'] in (PREFIX+'账号', NAME) and row['email'] == EMAIL and not row['schedulable'] and row['status'] == 'inactive' and row['proxy_id'] is None
         # Delete through the API so scheduler caches receive the normal invalidation.
         _, key = credentials()
         request('http://127.0.0.1:6666/api/v1', {'x-api-key':key},f'/admin/accounts/{rid}','DELETE')
@@ -127,7 +128,7 @@ with SessionLocal() as db:
  db.add(row);db.commit();print(json.dumps({'id':row.id}))''')
         state['member_id']=local['id'];save_state(state)
         creds=json.dumps({'email':EMAIL});extra=json.dumps({'adobeteam_external_email':EMAIL,'okad_manual_pause':True})
-        state['remote_id']=int(sql("INSERT INTO accounts(name,platform,type,credentials,extra,status,schedulable,concurrency,priority) VALUES ("+quoted(PREFIX+'账号')+",'adobe','oauth',"+quoted(creds)+"::jsonb,"+quoted(extra)+"::jsonb,'inactive',false,1,99999) RETURNING id" ).splitlines()[0]);save_state(state)
+        state['remote_id']=int(sql("INSERT INTO accounts(name,platform,type,credentials,extra,status,schedulable,concurrency,priority) VALUES ("+quoted(NAME)+",'adobe','oauth',"+quoted(creds)+"::jsonb,"+quoted(extra)+"::jsonb,'inactive',false,1,99999) RETURNING id" ).splitlines()[0]);save_state(state)
         before=sql(f"SELECT md5(credentials::text)||':'||status||':'||schedulable::text||':'||COALESCE(proxy_id::text,'') FROM accounts WHERE id={state['remote_id']}")
         def result(base,headers,params):
             value=request(base,headers,'/members?'+urllib.parse.urlencode(params)) if base==ob else request(base,headers,'/admin/accounts?'+urllib.parse.urlencode(params))['data']
