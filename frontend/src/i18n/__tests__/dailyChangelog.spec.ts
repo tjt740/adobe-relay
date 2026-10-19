@@ -44,7 +44,7 @@ describe('Daily changelog', () => {
     expect(sections).toHaveLength(new Set(dailyUpdates.map(item => item.date)).size)
     expect(sections[0].attributes('open')).toBeDefined()
     expect(sections.slice(1).every(section => section.attributes('open') === undefined)).toBe(true)
-    expect(sections[0].findAll('li')).toHaveLength(4)
+    expect(sections[0].findAll('li')).toHaveLength(groupDailyUpdates(dailyUpdates)[0].items.length)
     expect(wrapper.text()).toContain('订阅输入与状态卡片')
     expect(wrapper.text()).toContain('2026-10-12')
     expect(wrapper.findAll('li')).toHaveLength(dailyUpdates.length)

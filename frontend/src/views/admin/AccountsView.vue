@@ -7,6 +7,8 @@
             v-model:searchQuery="params.search"
             :filters="params"
             :groups="groups"
+            :okad-groups="okadGroups"
+            :okad-groups-error="okadGroupsError"
             @update:filters="(newFilters) => Object.assign(params, newFilters)"
             @change="debouncedReload"
             @update:searchQuery="debouncedReload"
@@ -591,7 +593,7 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { CreateAccountModal, EditAccountModal, BulkEditAccountModal, SyncFromCrsModal, TempUnschedStatusModal } from '@/components/account'
 import AccountTableActions from '@/components/admin/account/AccountTableActions.vue'
 import AccountCompanyBadge from '@/components/admin/account/AccountCompanyBadge.vue'
-import { okadAccountType } from '@/utils/okadAccountType'
+import { okadAccountType, okadAccountGroup } from '@/utils/okadAccountType'
 import AccountTableFilters from '@/components/admin/account/AccountTableFilters.vue'
 import AccountCapacityFilter from '@/components/admin/account/AccountCapacityFilter.vue'
 import AccountBulkActionsBar from '@/components/admin/account/AccountBulkActionsBar.vue'
@@ -657,6 +659,7 @@ type AccountBulkEditTarget =
         search?: string
         privacy_mode?: string
         okad_account_type?: string
+        okad_group?: string
         capacity?: string
         concurrency_min?: string
         concurrency_max?: string
@@ -1218,6 +1221,7 @@ const {
     concurrency_max: '',
     privacy_mode: '',
     okad_account_type: '',
+    okad_group: '',
     group: '',
     search: '',
     lite: '1',
@@ -1295,6 +1299,7 @@ const load = async (options: AccountLoadOptions = {}) => {
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = false
   requestParams.lite = '1'
+  void loadOkadGroups()
   await baseLoad()
   if (options.refreshTodayStats !== false) await refreshTodayStatsBatch()
 }
@@ -1304,6 +1309,7 @@ const reload = async () => {
   hasPendingListSync.value = false
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = false
+  void loadOkadGroups()
   await baseReload()
   await refreshTodayStatsBatch()
 }
@@ -1321,6 +1327,7 @@ const buildUpstreamBillingRateFilters = () => {
     search: typeof rawParams.search === 'string' ? rawParams.search : '',
     privacy_mode: typeof rawParams.privacy_mode === 'string' ? rawParams.privacy_mode : '',
     okad_account_type: typeof rawParams.okad_account_type === 'string' ? rawParams.okad_account_type : '',
+    okad_group: typeof rawParams.okad_group === 'string' ? rawParams.okad_group : '',
     sort_by: sortState.sort_by,
     sort_order: sortState.sort_order
   }
@@ -1618,6 +1625,7 @@ const refreshAccountsIncrementally = async (strict = false) => {
         status?: string
         privacy_mode?: string
         okad_account_type?: string
+        okad_group?: string
         capacity?: string
         concurrency_min?: string
         concurrency_max?: string
@@ -2262,6 +2270,7 @@ const buildBulkEditFilterSnapshot = () => {
     search: typeof rawParams.search === 'string' ? rawParams.search : '',
     privacy_mode: typeof rawParams.privacy_mode === 'string' ? rawParams.privacy_mode : '',
     okad_account_type: typeof rawParams.okad_account_type === 'string' ? rawParams.okad_account_type : '',
+    okad_group: typeof rawParams.okad_group === 'string' ? rawParams.okad_group : '',
     sort_by: typeof rawParams.sort_by === 'string' ? rawParams.sort_by : '',
     sort_order: sortOrder
   }
@@ -2342,12 +2351,14 @@ const buildAccountQueryFilters = () => ({
   group: params.group || '',
   privacy_mode: params.privacy_mode || '',
   okad_account_type: params.okad_account_type || '',
+  okad_group: params.okad_group || '',
   search: params.search || '',
   sort_by: sortState.sort_by,
   sort_order: sortState.sort_order
 })
 const accountMatchesCurrentFilters = (account: Account) => {
   const filters = buildAccountQueryFilters()
+  if (filters.okad_group && okadAccountGroup(account) !== filters.okad_group) return false
   if (filters.okad_account_type && okadAccountType(account) !== filters.okad_account_type) return false
   if (filters.platform && account.platform !== filters.platform) return false
   if (filters.type && account.type !== filters.type) return false
@@ -2831,6 +2842,12 @@ const loadProxies = async () => {
   }
 }
 
+const okadGroups = ref<{value: string; name: string}[]>([])
+const okadGroupsError = ref('')
+async function loadOkadGroups() {
+  try { okadGroups.value = await adminAPI.accounts.getOkadGroups(); okadGroupsError.value = '' }
+  catch { okadGroupsError.value = t('admin.accounts.okadGroupsError') }
+}
 onMounted(async () => {
   if (typeof window !== 'undefined') {
     desktopViewportMediaQuery = window.matchMedia(desktopViewportQuery)

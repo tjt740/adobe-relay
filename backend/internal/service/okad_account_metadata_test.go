@@ -81,3 +81,20 @@ func TestOkadMetadataValidationBeforeAnyWrite(t *testing.T) {
 	require.Equal(t, 1, n)
 	require.Equal(t, 1, repo.calls)
 }
+
+func TestOkadVietnamAndGroupsUseVerifiedOwner(t *testing.T) {
+	var a Account
+	require.NoError(t, json.Unmarshal([]byte(`{"platform":"adobe","type":"oauth","credentials":{"email":"vn@example.com"},"extra":{"adobeteam_external_email":"vn@example.com","okad_account":{"issuer":"site","source_key":"external:7","email":"vn@example.com","is_company":false,"account_type":"vietnam","group_id":3,"group_name":"客户 A"}}}`), &a))
+	require.Equal(t, "vietnam", OkadAccountKind(&a))
+	key, name := OkadAccountGroup(&a)
+	require.Equal(t, "site:3", key)
+	require.Equal(t, "客户 A", name)
+	a.Extra["okad_account"].(map[string]any)["group_id"] = nil
+	a.Extra["okad_account"].(map[string]any)["group_name"] = ""
+	key, _ = OkadAccountGroup(&a)
+	require.Equal(t, "ungrouped", key)
+	a.Extra["okad"] = map[string]any{"issuer": "foreign", "source_key": "external:7"}
+	key, _ = OkadAccountGroup(&a)
+	require.Empty(t, key)
+	require.Equal(t, "unknown", OkadAccountKind(&a))
+}

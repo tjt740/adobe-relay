@@ -273,6 +273,10 @@ export default {
         batchPartial: '倍率探测部分完成：成功 {success} 个，失败 {failed} 个'
       },
       allOkadTypes: '全部账号归属',
+      okadVietnam: 'Okad · 越南账号',
+      okadGroups: 'Okad 创建的分组：全部',
+      okadUngrouped: 'Okad · 未分组',
+      okadGroupsError: 'Okad 分组加载失败，请刷新重试',
       okadCompany: 'Okad · 公司',
       okadNonCompany: 'Okad · 非公司',
       okadUnknown: 'Okad · 待识别',

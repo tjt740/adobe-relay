@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Account } from '@/types'
-import { okadAccountType } from '../okadAccountType'
+import { okadAccountType, okadAccountGroup } from '../okadAccountType'
 const account = () => ({ platform: 'adobe', type: 'oauth', credentials: { email: 'COMPANY@outlook.com' }, extra: {
   adobeteam_external_email: 'company@outlook.com',
   okad_account: { issuer: 'site', source_key: 'external:1', email: 'company@outlook.com', is_company: true }
@@ -29,5 +29,18 @@ describe('Okad company classification', () => {
     expect(okadAccountType(c)).toBe('unknown')
     c.platform = 'openai'
     expect(okadAccountType(c)).toBe('')
+  })
+})
+
+describe('Okad Vietnam and custom groups', () => {
+  it('requires verified metadata and namespaces group IDs by issuer', () => {
+    const a = account()
+    Object.assign(a.extra!.okad_account!, {is_company: false, account_type: 'vietnam', group_id: 3, group_name: '客户 A'})
+    expect(okadAccountType(a)).toBe('vietnam')
+    expect(okadAccountGroup(a)).toBe('site:3')
+    Object.assign(a.extra!.okad_account!, {group_id: null, group_name: ''})
+    expect(okadAccountGroup(a)).toBe('ungrouped')
+    a.extra!.okad = {issuer: 'foreign', source_key: 'external:1'}
+    expect(okadAccountGroup(a)).toBe('')
   })
 })

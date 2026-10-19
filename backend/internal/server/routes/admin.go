@@ -381,6 +381,8 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 	{
 		accounts.GET("", h.Admin.Account.List)
 		accounts.GET("/runtime-events", h.Admin.Account.RuntimeEvents)
+		accounts.POST("/okad-metadata", h.Admin.Account.OkadSyncAccountMetadata)
+		accounts.GET("/okad-groups", h.Admin.Account.OkadGroups)
 		accounts.GET("/okad-inventory", h.Admin.Account.OkadInventory)
 		accounts.POST("/:id/okad-verify", h.Admin.Account.OkadVerifyCredential)
 		accounts.GET("/upstream-billing-rates", h.Admin.Account.GetUpstreamBillingRates)
