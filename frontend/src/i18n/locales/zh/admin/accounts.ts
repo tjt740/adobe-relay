@@ -1,5 +1,6 @@
 export default {
     accounts: {
+      currentResult: { succeeded: '请求成功', failed: '请求失败' },
       proxyFailover: {
   "autoManaged": "代理由 IP 管理中的自动分配统一维护，每个节点最多 3 个账号。",
   "title": "自动故障切换",

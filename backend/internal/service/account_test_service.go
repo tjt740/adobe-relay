@@ -387,8 +387,9 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 			return s.sendErrorAndEnd(c, "Cookie changed before the automatic test started")
 		}
 	}
-	defer func() { s.recordConnectionTestResult(ctx, account, testErr) }()
 	healthStarted := time.Now()
+	ctx = context.WithValue(ctx, accountTestStartedAtKey{}, healthStarted)
+	defer func() { s.recordConnectionTestResult(ctx, account, testErr) }()
 	defer func() {
 		source := "test"
 		if _, automatic := ctx.Value(okadConnectionTestContextKey{}).(OkadConnectionTestJob); automatic {

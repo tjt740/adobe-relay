@@ -1,5 +1,6 @@
 export default {
     accounts: {
+      currentResult: { succeeded: 'Request succeeded', failed: 'Request failed' },
       proxyFailover: {
   "autoManaged": "Routing is managed by automatic allocation in IP management, with at most 3 accounts per node.",
   "title": "Automatic proxy failover",

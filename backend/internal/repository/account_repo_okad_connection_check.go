@@ -70,7 +70,7 @@ func (r *accountRepository) FinishOkadConnectionTest(ctx context.Context, job se
 	result, err := r.sql.ExecContext(ctx, `WITH eligible AS (
  SELECT id,($3='success'
  AND (extra->'okad_connection_test'->>'require_verification'='false' OR extra->'okad'->>'verification'='verified')
- AND status='error' AND (error_message IN ($6,$7) OR LOWER(error_message) LIKE 'authentication failed (401):%' OR LOWER(error_message) LIKE 'token refresh failed (non-retryable): adobe cookie is no longer valid%')
+ AND (status='active' OR (status='error' AND (error_message IN ($6,$7) OR LOWER(error_message) LIKE 'authentication failed (401):%' OR LOWER(error_message) LIKE 'token refresh failed (non-retryable): adobe cookie is no longer valid%')))
  AND LOWER(COALESCE(error_message,'')) NOT LIKE ALL(ARRAY['%taste_exhausted%','%quota exhausted%','%credits exhausted%','%model_not_entitled%','%user_not_entitled%','%not entitled%','%invalid_client%','%invalid_scope%'])
  AND (expires_at IS NULL OR expires_at>NOW())) AS verified
  FROM accounts WHERE id=$1 AND deleted_at IS NULL

@@ -1,10 +1,22 @@
 <template>
   <div class="flex items-center gap-2">
+    <template v-if="adobeResult">
+      <span
+        :class="['badge text-xs', adobeResult.success ? 'badge-success' : [408, 429, 529].includes(adobeResult.code) ? 'badge-warning' : 'badge-danger']"
+        :data-testid="adobeResult.source === 'test' ? 'account-last-check' : 'account-current-result'"
+        :title="[adobeResult.model, formatDateTime(adobeResult.at)].filter(Boolean).join(' · ')"
+      >
+        {{ t(adobeResult.source === 'test' ? adobeResult.success ? 'admin.accounts.bulkTest.passed' : 'admin.accounts.bulkTest.failed' : adobeResult.success ? 'admin.accounts.currentResult.succeeded' : 'admin.accounts.currentResult.failed') }}
+        <span v-if="!adobeResult.success && adobeResult.code >= 400">{{ adobeResult.code }}</span>
+      </span>
+      <span v-if="adobeResult.model" class="text-xs text-gray-500" data-testid="account-result-model">{{ adobeResult.model }}</span>
+      <OkadIntegrationStatus v-if="showOkadDetails" :account="account" />
+    </template>
+    <template v-else>
     <!-- Authentication failures include Adobe's invalid_credentials response. -->
     <template v-if="isOkadCheckPending">
       <span class="badge text-xs badge-warning">{{ okadCheckPhase === 'running' ? '正在验证 Cookie' : 'Cookie 待验证' }}</span>
     </template>
-    <span v-else-if="adobeHealthPending" class="badge text-xs badge-warning">异常待成功验证</span>
     <template v-else-if="isAuthenticationFailed">
       <span class="badge text-xs badge-danger">{{ authenticationFailureText }}</span>
       <span
@@ -211,12 +223,14 @@
         ></div>
       </div>
     </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { getAccountStatusCode, getAccountAuthenticationError, isAdobeAccountCookieError } from '@/utils/accountStatus'
 import { computed } from 'vue'
+import { adobeCurrentResult } from '@/utils/adobeCurrentResult'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import OkadIntegrationStatus from './OkadIntegrationStatus.vue'
@@ -235,7 +249,7 @@ const props = withDefaults(defineProps<{
   detailsInDialog: false
 })
 
-const adobeHealthPending = computed(() => props.account.platform === 'adobe' && Boolean((props.account.extra?.adobe_health as { pending?: boolean } | undefined)?.pending))
+const adobeResult = computed(() => adobeCurrentResult(props.account))
 
 const emit = defineEmits<{
   (e: 'show-temp-unsched', account: Account): void

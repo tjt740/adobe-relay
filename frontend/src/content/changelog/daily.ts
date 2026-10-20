@@ -6,6 +6,7 @@ export interface DailyUpdate {
 
 // Use the actual release date in Asia/Shanghai; multiple releases share one day.
 export const dailyUpdates: readonly DailyUpdate[] = [
+  { date: '2026-10-20', id: 'accountCheckState', type: 'fixed' },
   { date: '2026-10-20', id: 'okadGroups', type: 'added' },
   { date: '2026-10-18', id: 'subscriptionUI', type: 'improved' },
   { date: '2026-10-18', id: 'dailyHistory', type: 'added' },

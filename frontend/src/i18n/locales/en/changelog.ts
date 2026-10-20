@@ -12,6 +12,7 @@ export default {
       "fixed": "Fixed"
     },
     "updates": {
+      "accountCheckState": { "title": "Align account checks and recovery", "body": "Account lists show the latest completed check or request with its model, without contradictory historical error badges. Bulk and individual full image checks share guarded recovery while preserving manual pauses and credential or proxy changes." },
       "okadGroups": {
         "title": "Okad custom groups and filters across both apps",
         "body": "Create and choose groups when importing external accounts, or regroup existing accounts in bulk. Combine groups with company, Vietnam and non-company types. Sub2 filters, exports and bulk actions use the same group selection."
