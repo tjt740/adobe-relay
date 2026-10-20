@@ -8,7 +8,7 @@ on:
       operation:
         type: choice
         default: status
-        options: [status, batch, stabilize, prepare, release, verify, defer-old, defer-canary]
+        options: [status, batch, stabilize, recheck, prepare, release, verify, defer-old, defer-canary]
 permissions:
   contents: read
   actions: read
@@ -59,6 +59,6 @@ jobs:
             batch) ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes root@173.234.15.150 'python3 /opt/adobe-relay/releases/adobe-401-operations-20261020/deploy/primary/adobe-401-batch-v2.py' ;;
             stabilize) ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes root@173.234.15.150 'python3 /opt/adobe-relay/releases/adobe-401-operations-20261020/deploy/primary/adobe-401-stabilize.py' ;;
             status) ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes root@173.234.15.150 'python3 /opt/adobe-relay/releases/adobe-401-operations-20261020/deploy/primary/adobe-401-status.py' ;;
-            prepare|release|verify|defer-old|defer-canary) ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=3 root@173.234.15.150 "python3 /opt/adobe-relay/releases/adobe-401-operations-20261020/deploy/primary/adobe-401-control.py $OPERATION" ;;
+            prepare|release|verify|defer-old|defer-canary|recheck) ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=3 root@173.234.15.150 "python3 /opt/adobe-relay/releases/adobe-401-operations-20261020/deploy/primary/adobe-401-control.py $OPERATION" ;;
             *) exit 2 ;;
           esac

@@ -23,6 +23,10 @@ def repair(row):
   if not usage.get('needs_reauth')and usage.get('error_code')!='unauthenticated':
    result={**out,'ok':not bool(usage.get('error_code')or usage.get('error')),'code':'auth_valid_no_login'if not(usage.get('error_code')or usage.get('error'))else'temporary_or_non_auth_failure'}
    if result['ok']:marker.write_text(json.dumps(result))
+   else:
+    message=str(usage.get('error')or'').lower()
+    result['error_code']=usage.get('error_code')if usage.get('error_code')in['network_error','unauthenticated','rate_limited']else'other'
+    result['kind']='entitlement'if any(x in message for x in['not entitled','not_entitled','403'])else'quota'if any(x in message for x in['quota','credits exhausted','429'])else'network'if any(x in message for x in['proxy','connect','timeout','deadline','eof'])else'verification_error'
    return result
   if not matches(row,current(row)):return {**out,'code':'account_changed_or_paused'}
   # The child also has an exclusive durable account marker and the normal coordinator.
@@ -41,6 +45,8 @@ def repair(row):
 results=[]
 with concurrent.futures.ThreadPoolExecutor(max_workers=3)as pool:
  for future in concurrent.futures.as_completed([pool.submit(repair,r)for r in rows]):
-  results.append(future.result());summary={'completed':len(results),'selected':len(rows),'success':sum(bool(r.get('ok'))for r in results),'codes':dict(collections.Counter(r.get('code')for r in results)),'automatic_attempts_reset':False,'at':time.time()}
+  result=future.result();results.append(result)
+  (batch/('result-'+str(result['account_id'])+'-private.json')).write_text(json.dumps(result))
+  summary={'completed':len(results),'selected':len(rows),'success':sum(bool(r.get('ok'))for r in results),'codes':dict(collections.Counter(r.get('code')for r in results)),'automatic_attempts_reset':False,'at':time.time()}
   (batch/'progress.json').write_text(json.dumps(summary))
 (batch/'finished.json').write_text(json.dumps(summary if results else{'selected':0,'completed':0}));print(json.dumps(summary if results else{}),flush=True)
