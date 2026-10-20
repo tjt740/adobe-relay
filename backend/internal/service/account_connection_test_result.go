@@ -13,6 +13,7 @@ import (
 )
 
 type accountTestStartedAtKey struct{}
+type accountTestRecoveryPolicyKey struct{}
 
 var connectionTestHTTPCode = regexp.MustCompile(`(?i)(?:\b(?:HTTP|status(?:\s+code)?|returned|rejected)\s*[:=!]?[\s(]*|\()(4\d\d|5\d\d)\b`)
 
@@ -91,7 +92,8 @@ func (s *AccountTestService) recordConnectionTestResult(ctx context.Context, acc
 		failure := classifyAdobeError(testErr)
 		applyAdobeCooldown(ctx, s.accountRepo, account.ID, failure)
 		applyAdobeTokenInvalidation(ctx, s.accountRepo, account.ID, account.GetCredential("access_token"), failure)
-		if testErr == nil {
+		allowRecovery, policySet := ctx.Value(accountTestRecoveryPolicyKey{}).(bool)
+		if testErr == nil && (!policySet || allowRecovery) {
 			if recovery, ok := s.accountRepo.(interface {
 				RecoverAdobeAfterSuccessfulTestIfCurrent(context.Context, *Account, time.Time) (bool, error)
 			}); ok {

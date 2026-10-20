@@ -192,3 +192,14 @@ func TestAccountConnectionTestSharedAdobeRecovery(t *testing.T) {
 		}
 	}
 }
+
+func TestAccountConnectionTestObservationalScheduledPlanDoesNotRecover(t *testing.T) {
+	a := recoveryFixtureAccount(1)
+	repo := &successfulAdobeTestRepo{connectionTestResultRepo: &connectionTestResultRepo{okadRecoveryRepo: &okadRecoveryRepo{accounts: map[int64]*Account{1: a}}}}
+	svc := &AccountTestService{accountRepo: repo}
+	ctx := context.WithValue(context.Background(), accountTestStartedAtKey{}, time.Now())
+	ctx = context.WithValue(ctx, accountTestRecoveryPolicyKey{}, false)
+	svc.recordConnectionTestResult(ctx, a, nil)
+	require.Zero(t, repo.recovered)
+	require.Equal(t, []bool{true}, repo.successes)
+}
