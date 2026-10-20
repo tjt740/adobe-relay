@@ -50,8 +50,10 @@ func (s *AccountUsageService) getAdobeUsage(ctx context.Context, account *Accoun
 		return cached, nil
 	}
 
-	flightKey := fmt.Sprintf("adobe-usage:%d", account.ID)
 	manualAdobeDiagnostic := forceRefresh && source == "active" && account.Type == AccountTypeOAuth && account.Status == StatusError
+	// A forced diagnostic must not inherit an in-flight passive query's
+	// narrower refresh eligibility or cached result. Equal policies still share.
+	flightKey := fmt.Sprintf("adobe-usage:%d:%t:%t", account.ID, forceRefresh, manualAdobeDiagnostic)
 	// 共享的上游调用脱离发起者的 ctx：首个调用方取消不能让其它等待者一起失败，
 	// 更不能把取消错误写成错误快照缓存一分钟。
 	resultCh := s.cache.adobeUsageFlight.DoChan(flightKey, func() (any, error) {
