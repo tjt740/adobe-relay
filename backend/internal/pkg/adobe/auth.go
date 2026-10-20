@@ -29,6 +29,9 @@ type AccountInfo struct {
 // RefreshResult 是一次 cookie 换 token 的结果。
 type RefreshResult struct {
 	AccessToken string
+	// Cookie is the session after applying Adobe's response cookies. Keep it for the next refresh.
+	Cookie        string
+	CookieUpdated bool
 	// ExpiresIn 是上游给出的有效期（秒）；上游未返回时为 0，
 	// 此时可用 DecodeJWTExp 从 token 自身取过期时间。
 	ExpiresIn int64
@@ -187,7 +190,8 @@ func (c *Client) RefreshAccessTokenFromCookie(
 		)
 	}
 
-	result := &RefreshResult{AccessToken: accessToken, Raw: data}
+	result := &RefreshResult{AccessToken: accessToken, Cookie: refreshedCookie(cookie, c.identity.IMSRefreshURL, resp), Raw: data}
+	result.CookieUpdated = result.Cookie != cookie
 	if expiresIn, ok := claimInt(data, "expires_in"); ok {
 		result.ExpiresIn = expiresIn
 	}

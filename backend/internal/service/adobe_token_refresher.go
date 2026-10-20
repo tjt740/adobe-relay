@@ -15,9 +15,9 @@ import (
 // IMS token 通常只有约 24 小时，留 30 分钟足够覆盖一轮刷新周期。
 const adobeRefreshWindow = 30 * time.Minute
 
-// adobeTokenCredentialKeys 是一次 cookie 换 token 实际产出的字段；持久化时只写这些，
-// cookie / model_mapping 等由管理员维护的字段一律以 DB 当前值为准。
-var adobeTokenCredentialKeys = []string{"access_token", "expires_at", "_token_version"}
+// Persist only provider-issued token/runtime-session fields. The imported
+// cookie and operator model_mapping remain authoritative in the database.
+var adobeTokenCredentialKeys = []string{"access_token", "expires_at", "_token_version", adobeSessionCookieKey, adobeSessionSourceHashKey}
 
 // AdobeTokenCredentialsRepository 是 Adobe 刷新结果的条件写入边界。
 //
@@ -113,7 +113,7 @@ func (r *AdobeTokenRefresher) CanRefresh(account *Account) bool {
 	return account != nil &&
 		account.Platform == PlatformAdobe &&
 		account.Type == AccountTypeOAuth &&
-		strings.TrimSpace(account.GetCredential("cookie")) != ""
+		strings.TrimSpace(adobeEffectiveCookie(account)) != ""
 }
 
 // NeedsRefresh 在 token 缺失或即将过期时返回 true。
@@ -144,7 +144,7 @@ func (r *AdobeTokenRefresher) Refresh(ctx context.Context, account *Account) (ma
 	client := r.clients.clientForAccount(account)
 	// 不查账号信息：刷新是热路径，省掉一次往返；账号信息在账号测试时另行获取。
 	result, err := client.RefreshAccessTokenFromCookie(
-		ctx, account.GetCredential("cookie"), adobe.RefreshOptions{SkipAccountFetch: true})
+		ctx, adobeEffectiveCookie(account), adobe.RefreshOptions{SkipAccountFetch: true})
 	if err != nil {
 		var authErr *adobe.AuthError
 		if errors.As(err, &authErr) {
@@ -156,10 +156,7 @@ func (r *AdobeTokenRefresher) Refresh(ctx context.Context, account *Account) (ma
 
 	// 只更新 token 字段：cookie 与 model_mapping 等都在原 credentials 里，
 	// 直接返回新 map 会把它们抹掉。
-	return MergeCredentials(account.Credentials, map[string]any{
-		"access_token": result.AccessToken,
-		"expires_at":   adobeTokenExpiryString(result),
-	}), nil
+	return MergeCredentials(account.Credentials, adobeRefreshedSessionFields(account, result)), nil
 }
 
 // adobeTokenExpiryString 取 token 的过期时刻（RFC3339）。
