@@ -19,7 +19,7 @@ curl --fail https://creative.cheap/health
 
 受控滚动切换时，在已验证新镜像的临时实例接走新连接、旧实例排空后，可调用 `release.sh IMAGE EXPECTED_CURRENT --keep-canary-on-failure`。此模式要求同镜像临时实例健康且滚动租约有效；正式实例启动失败时保留临时实例服务，不自动启动旧版，以免旧版启动清理删除在途请求的并发槽。检查后再重试或安排排空回退。普通发布的原自动回退行为保持。
 
-最新 Sub2 应用：`816e3f6b9e8f7e11bfe9d2c7870d4da22e3322ae`，检测结果与调度恢复修复，见 [2026-10-20 发布记录](account-check-state-20261020.md)。文档归档不重复部署。
+最新 Sub2 应用：`1ea5b33354a5b10d1748b8bd623db1badd0ed7ab`，仅上线更新日志完整调度场景演示，实际调度规则保持；见 [2026-10-20 演示发布记录](account-recovery-demo-20261020.md)。文档归档不重复部署。
 
 ## 每日更新日志
 
