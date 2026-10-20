@@ -17,12 +17,12 @@ type adobeImageAPI interface {
 type adobeImageAuthRecovery func(context.Context, string, bool) (string, error)
 type adobeImageAuthContextKey struct{}
 
-func withAdobeImageAuthRecovery(ctx context.Context, p *AdobeTokenProvider, a *Account) context.Context {
+func adobeAccountAuthRecovery(p *AdobeTokenProvider, a *Account) adobeImageAuthRecovery {
 	if p == nil || p.accountRepo == nil || p.refresher == nil || a == nil || a.GetCredential("cookie") == "" {
-		return ctx
+		return nil
 	}
 	if _, ok := p.accountRepo.(AdobeTokenInvalidationRepository); !ok {
-		return ctx
+		return nil
 	}
 	expected := snapshotOAuthRefreshAccount(a)
 	expected.Extra = shallowCopyMap(a.Extra)
@@ -30,9 +30,15 @@ func withAdobeImageAuthRecovery(ctx context.Context, p *AdobeTokenProvider, a *A
 		proxy := *a.Proxy
 		expected.Proxy = &proxy
 	}
-	return context.WithValue(ctx, adobeImageAuthContextKey{}, adobeImageAuthRecovery(func(c context.Context, token string, renew bool) (string, error) {
+	return func(c context.Context, token string, renew bool) (string, error) {
 		return p.recoverRejectedToken(c, expected, token, renew)
-	}))
+	}
+}
+func withAdobeImageAuthRecovery(ctx context.Context, p *AdobeTokenProvider, a *Account) context.Context {
+	if recovery := adobeAccountAuthRecovery(p, a); recovery != nil {
+		return context.WithValue(ctx, adobeImageAuthContextKey{}, recovery)
+	}
+	return ctx
 }
 func (s *GatewayService) AdobeImageAuthContext(ctx context.Context, a *Account) context.Context {
 	if s == nil {

@@ -127,6 +127,22 @@ func (s *AccountUsageService) fetchAndCacheAdobeUsage(ctx context.Context, accou
 		}
 		bal, err = client.FetchCreditsBalance(ctx, token)
 	}
+	// Revalidation must not keep reusing a rejected, nominally unexpired bearer.
+	// Share the guarded Cookie renewal with image submission, once only.
+	if ctx.Err() == nil && adobeAuth401(err) {
+		if recover := adobeAccountAuthRecovery(s.adobeTokenProvider, account); recover != nil {
+			renewed, renewalErr := recover(ctx, token, true)
+			if renewalErr != nil {
+				return nil, renewalErr
+			}
+			if renewed != "" && renewed != token {
+				bal, err = client.FetchCreditsBalance(ctx, renewed)
+				if adobeAuth401(err) {
+					_, _ = recover(ctx, renewed, false)
+				}
+			}
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
