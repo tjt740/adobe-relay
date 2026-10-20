@@ -21,13 +21,30 @@
         <span class="ml-auto text-xs text-gray-500 dark:text-gray-400">{{ t('changelog.daily.count', { count: day.items.length }) }}</span>
         <Icon name="chevronDown" size="sm" aria-hidden="true" class="daily-chevron shrink-0 text-gray-400 transition-transform motion-reduce:transition-none" />
       </summary>
+      <div v-if="dailyOverviews[day.date]" class="border-t border-gray-100 px-5 py-5 dark:border-dark-700 sm:px-6" data-testid="daily-overview">
+        <h4 class="text-base font-semibold leading-7 text-gray-900 dark:text-white">{{ t(`changelog.daily.overviews.${dailyOverviews[day.date]}.title`) }}</h4>
+        <p class="mt-2 text-sm leading-7 text-gray-600 dark:text-gray-300">{{ t(`changelog.daily.overviews.${dailyOverviews[day.date]}.body`) }}</p>
+      </div>
       <ul class="divide-y divide-gray-100 border-t border-gray-100 px-5 dark:divide-dark-700 dark:border-dark-700 sm:px-6">
-        <li v-for="item in day.items" :key="item.id" class="py-5">
+        <li v-for="item in day.items" :key="item.id" :data-update-id="item.id" class="py-5">
           <div class="flex flex-wrap items-center gap-2.5">
             <span class="rounded-md px-2 py-0.5 text-[11px] font-medium" :class="typeStyles[item.type]">{{ t(`changelog.daily.types.${item.type}`) }}</span>
             <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ t(`changelog.daily.updates.${item.id}.title`) }}</h4>
           </div>
           <p class="mt-2 text-sm leading-7 text-gray-600 dark:text-gray-400">{{ t(`changelog.daily.updates.${item.id}.body`) }}</p>
+          <dl v-if="item.metrics?.length" class="mt-5 grid gap-3 sm:grid-cols-2" :aria-label="t('changelog.daily.measurements')" data-testid="release-metrics">
+            <div v-for="metric in item.metrics" :key="metric" class="min-w-0 rounded-xl bg-gray-50 p-4 dark:bg-dark-800">
+              <dt class="text-xs font-medium leading-5 text-gray-600 dark:text-gray-400">{{ t(`changelog.daily.updates.${item.id}.metrics.${metric}.label`) }}</dt>
+              <dd class="mt-2 text-xl font-semibold tabular-nums text-gray-900 dark:text-white">{{ t(`changelog.daily.updates.${item.id}.metrics.${metric}.value`) }}</dd>
+              <dd class="mt-2 text-xs leading-6 text-gray-600 dark:text-gray-400">{{ t(`changelog.daily.updates.${item.id}.metrics.${metric}.note`) }}</dd>
+            </div>
+          </dl>
+          <dl v-if="item.sections?.length" class="mt-5 space-y-4" data-testid="release-details">
+            <div v-for="section in item.sections" :key="section" class="border-t border-gray-100 pt-4 dark:border-dark-700">
+              <dt class="text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100">{{ t(`changelog.daily.updates.${item.id}.sections.${section}.title`) }}</dt>
+              <dd class="mt-2 text-sm leading-7 text-gray-600 dark:text-gray-300">{{ t(`changelog.daily.updates.${item.id}.sections.${section}.body`) }}</dd>
+            </div>
+          </dl>
         </li>
       </ul>
     </details>
@@ -38,7 +55,7 @@
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import AccountRecoveryDemo from './AccountRecoveryDemo.vue'
-import { dailyUpdates, groupDailyUpdates, changelogPreviews } from '@/content/changelog/daily'
+import { dailyUpdates, groupDailyUpdates, changelogPreviews, dailyOverviews } from '@/content/changelog/daily'
 
 const { t } = useI18n()
 const days = groupDailyUpdates(dailyUpdates)
@@ -52,6 +69,6 @@ const typeStyles = {
 <style scoped>
 summary { list-style: none; }
 summary::-webkit-details-marker { display: none; }
-.daily-release[open] .daily-chevron { transform: rotate(180deg); }
+.daily-release[open] > summary .daily-chevron { transform: rotate(180deg); }
 .daily-preview[open] > summary .daily-chevron { transform: rotate(180deg); }
 </style>

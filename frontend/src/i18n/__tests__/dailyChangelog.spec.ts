@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import DailyChangelog from '@/components/admin/changelog/DailyChangelog.vue'
-import { dailyUpdates, groupDailyUpdates, changelogPreviews } from '@/content/changelog/daily'
+import { dailyUpdates, groupDailyUpdates, changelogPreviews, dailyOverviews } from '@/content/changelog/daily'
 import zh from '@/i18n/locales/zh/changelog'
 import en from '@/i18n/locales/en/changelog'
 
@@ -34,6 +34,16 @@ describe('Daily changelog', () => {
         const note = messages.daily.updates[item.id as keyof typeof messages.daily.updates]
         expect(note?.title.trim()).toBeTruthy()
         expect(note?.body.trim()).toBeTruthy()
+        const detailed = note as unknown as Record<string, Record<string, Record<string, string>>>
+        for (const section of item.sections ?? []) {
+          expect(detailed.sections[section].title.trim()).toBeTruthy()
+          expect(detailed.sections[section].body.trim()).toBeTruthy()
+        }
+        for (const metric of item.metrics ?? []) {
+          expect(detailed.metrics[metric].label.trim()).toBeTruthy()
+          expect(detailed.metrics[metric].value.trim()).toBeTruthy()
+          expect(detailed.metrics[metric].note.trim()).toBeTruthy()
+        }
       }
     }
     for (const item of changelogPreviews) {
@@ -55,11 +65,25 @@ describe('Daily changelog', () => {
     expect(sections[0].findAll('li')).toHaveLength(groupDailyUpdates(dailyUpdates)[0].items.length)
     expect(wrapper.text()).toContain('订阅输入与状态卡片')
     expect(wrapper.text()).toContain('2026-10-12')
-    expect(wrapper.findAll('.daily-release li')).toHaveLength(dailyUpdates.length)
+    expect(wrapper.findAll('.daily-release [data-update-id]')).toHaveLength(dailyUpdates.length)
     const previews = wrapper.get('[data-testid="changelog-previews"]')
     expect(previews.text()).toContain('调度方案预览 · 规则尚未实施')
     expect(previews.find('[data-testid="account-recovery-demo"]').exists()).toBe(true)
     expect(previews.findAll('[data-release-date]')).toHaveLength(0)
+    const release = wrapper.get('[data-update-id="releaseSpeed"]')
+    expect(release.findAll('[data-testid="release-metrics"] > div')).toHaveLength(4)
+    expect(release.findAll('[data-testid="release-details"] > div')).toHaveLength(7)
+    expect(release.text()).toContain('不是每次发布或完整上线的固定时限')
+    expect(release.text()).toContain('生产部署步骤均跳过')
+    expect(sections[0].get('[data-testid="daily-overview"]').text()).toContain('缩短发布等待')
+    expect(wrapper.text()).not.toContain('changelog.daily.')
+    for (const id of Object.values(dailyOverviews)) {
+      for (const messages of [zh, en]) {
+        const overview = messages.daily.overviews[id as keyof typeof messages.daily.overviews]
+        expect(overview.title.trim()).toBeTruthy()
+        expect(overview.body.trim()).toBeTruthy()
+      }
+    }
     wrapper.unmount()
   })
 })

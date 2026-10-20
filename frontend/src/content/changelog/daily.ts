@@ -2,6 +2,8 @@ export interface DailyUpdate {
   date: string
   id: string
   type: 'added' | 'improved' | 'fixed'
+  sections?: readonly string[]
+  metrics?: readonly string[]
 }
 
 // Proposals have no release date and must not be counted as shipped updates.
@@ -10,8 +12,17 @@ export const changelogPreviews = [
   { id: 'accountRecoveryDemo', demo: 'account-recovery' },
 ] as const
 
+export const dailyOverviews: Readonly<Record<string, string>> = {
+  '2026-10-21': 'releaseSpeed',
+}
+
 // Use the actual release date in Asia/Shanghai; multiple releases share one day.
 export const dailyUpdates: readonly DailyUpdate[] = [
+  {
+    date: '2026-10-21', id: 'releaseSpeed', type: 'improved',
+    metrics: ['baseline', 'cold', 'warm', 'transfer'],
+    sections: ['reason', 'parallel', 'cache', 'transfer', 'scenarios', 'validation', 'boundary'],
+  },
   { date: '2026-10-20', id: 'adobeManualRevalidation', type: 'fixed' },
   { date: '2026-10-20', id: 'adobeQuotaDiagnostic', type: 'fixed' },
   { date: '2026-10-20', id: 'adobeSessionRenewal', type: 'fixed' },
