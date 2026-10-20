@@ -43,6 +43,7 @@ func (s *AccountUsageService) getAdobeUsage(ctx context.Context, account *Accoun
 		return &UsageInfo{Source: source, UpdatedAt: &now}, nil
 	}
 
+	cacheSnapshot, _ := s.cache.adobeUsageCache.Load(account.ID)
 	cached, hasCached := s.getCachedAdobeUsage(account.ID)
 	// 手动刷新必须真的打上游：错误快照也只在非强制刷新时直接返回。
 	if !forceRefresh && hasCached {
@@ -50,8 +51,10 @@ func (s *AccountUsageService) getAdobeUsage(ctx context.Context, account *Accoun
 		return cached, nil
 	}
 
-	flightKey := fmt.Sprintf("adobe-usage:%d", account.ID)
 	manualAdobeDiagnostic := forceRefresh && source == "active" && account.Type == AccountTypeOAuth && account.Status == StatusError
+	// A forced diagnostic must not inherit an in-flight passive query's
+	// narrower refresh eligibility or cached result. Equal policies still share.
+	flightKey := fmt.Sprintf("adobe-usage:%d:%t:%t", account.ID, forceRefresh, manualAdobeDiagnostic)
 	// 共享的上游调用脱离发起者的 ctx：首个调用方取消不能让其它等待者一起失败，
 	// 更不能把取消错误写成错误快照缓存一分钟。
 	resultCh := s.cache.adobeUsageFlight.DoChan(flightKey, func() (any, error) {
@@ -105,8 +108,19 @@ func (s *AccountUsageService) getAdobeUsage(ctx context.Context, account *Accoun
 		cached.Source = source
 		return cached, nil
 	}
-	s.storeAdobeUsageSnapshot(account.ID, degraded)
+	s.storeAdobeUsageErrorIfUnchanged(account.ID, degraded, cacheSnapshot)
 	return degraded, nil
+}
+
+// A late failure may belong to an older flight than a successful forced check.
+// Only replace the cache entry observed by this caller; never erase newer evidence.
+func (s *AccountUsageService) storeAdobeUsageErrorIfUnchanged(accountID int64, usage *UsageInfo, previous any) {
+	entry := &adobeUsageCache{usageInfo: cloneUsageInfo(usage), timestamp: time.Now()}
+	if previous == nil {
+		s.cache.adobeUsageCache.LoadOrStore(accountID, entry)
+	} else {
+		s.cache.adobeUsageCache.CompareAndSwap(accountID, previous, entry)
+	}
 }
 
 func (s *AccountUsageService) fetchAndCacheAdobeUsage(ctx context.Context, account *Account, source string) (*UsageInfo, error) {

@@ -94,3 +94,80 @@ func TestAdobeUsageDiagnosticDoesNotExpandBackgroundOrDisabledEligibility(t *tes
 		})
 	}
 }
+
+func TestAdobeManualUsageDiagnosticDoesNotJoinBackgroundFlight(t *testing.T) {
+	for _, backgroundTimeout := range []bool{false, true} {
+		name := "background-auth-rejection"
+		if backgroundTimeout {
+			name = "late-background-timeout"
+		}
+		t.Run(name, func(t *testing.T) {
+			old := adobeTestToken(t, map[string]any{"user_id": "org-user", "exp": time.Now().Add(time.Hour).Unix()})
+			fresh := adobeTestToken(t, map[string]any{"user_id": "org-user", "exp": time.Now().Add(2 * time.Hour).Unix()})
+			a := &Account{ID: 83, Platform: PlatformAdobe, Type: AccountTypeOAuth, Status: StatusError, Schedulable: false, Credentials: map[string]any{"cookie": "ims_sid=source", "access_token": old}}
+			repo := &rejectedTokenRepo{newAdobeGatewayCredsRepo(a)}
+			var exchanges, calls atomic.Int32
+			refresher := newAdobeTestRefresher(t, func(req *adobe.Request, n int) (*adobe.Response, error) {
+				exchanges.Add(1)
+				return adobeIMSTokenHandler(fresh, nil)(req, n)
+			})
+			started, release := make(chan struct{}), make(chan struct{})
+			client := adobeAuthCreditsFunc(func(ctx context.Context, token string) (*adobe.CreditsBalance, error) {
+				if calls.Add(1) == 1 {
+					close(started)
+					select {
+					case <-release:
+					case <-ctx.Done():
+						return nil, ctx.Err()
+					}
+					if backgroundTimeout {
+						return nil, context.DeadlineExceeded
+					}
+				}
+				if token == old {
+					return nil, adobe.NewAuthError("rejected", 401)
+				}
+				return &adobe.CreditsBalance{Total: int64Ptr(15), Available: int64Ptr(12)}, nil
+			})
+			svc := newAdobeUsageTestService(t, repo, client)
+			svc.adobeTokenProvider = newAdobeTokenProvider(repo, nil, refresher)
+			passiveDone := make(chan struct{})
+			go func() {
+				defer close(passiveDone)
+				_, _ = svc.getAdobeUsage(context.Background(), a, "passive", false)
+			}()
+			<-started
+			type result struct {
+				info *UsageInfo
+				err  error
+			}
+			manualDone := make(chan result, 1)
+			go func() {
+				info, err := svc.getAdobeUsage(context.Background(), a, "active", true)
+				manualDone <- result{info, err}
+			}()
+			var got result
+			select {
+			case got = <-manualDone:
+				close(release)
+			case <-time.After(2 * time.Second):
+				close(release)
+				got = <-manualDone
+			}
+			<-passiveDone
+			require.NoError(t, got.err)
+			require.NotNil(t, got.info)
+			require.Empty(t, got.info.ErrorCode, "manual revalidation inherited a background query's non-diagnostic refresh policy")
+			require.EqualValues(t, 1, exchanges.Load())
+			require.Equal(t, fresh, repo.storedCredential("access_token"))
+			cached, ok := svc.getCachedAdobeUsage(a.ID)
+			require.True(t, ok)
+			require.Empty(t, cached.ErrorCode, "an older background failure replaced the successful manual result")
+			repo.mu.Lock()
+			defer repo.mu.Unlock()
+			require.Equal(t, StatusError, repo.account.Status)
+			require.False(t, repo.account.Schedulable)
+
+		})
+	}
+}
