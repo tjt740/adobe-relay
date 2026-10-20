@@ -46,8 +46,8 @@ for line in raw.splitlines():
 assert old, 'No active accounts were read from the verified cutover dump'
 rows = json.loads(a.sql("SELECT coalesce(json_agg(json_build_object('id',id,'credentials',credentials,'proxy_id',proxy_id,'status',status,'schedulable',schedulable,'manual_pause',extra->'okad_manual_pause') ORDER BY id),'[]') FROM accounts WHERE deleted_at IS NULL"))
 current = {row['id']: row for row in rows}
-before = json.loads((ROOT / 'before.json').read_text())
-events = json.loads(a.sql("SELECT coalesce(json_agg(e ORDER BY id),'[]') FROM (SELECT id,account_id,from_proxy_id,to_proxy_id,created_at FROM proxy_failover_events WHERE created_at >= '" + before['at'] + "'::timestamptz) e"))
+cutover_at = datetime.datetime.strptime(dump.parent.name.split('-', 1)[0], '%Y%m%dT%H%M%SZ').replace(tzinfo=datetime.timezone.utc).isoformat()
+events = json.loads(a.sql("SELECT coalesce(json_agg(e ORDER BY id),'[]') FROM (SELECT id,account_id,from_proxy_id,to_proxy_id,created_at FROM proxy_failover_events WHERE created_at >= '" + cutover_at + "'::timestamptz) e"))
 changes = []
 for account_id in sorted(set(old) & set(current)):
     previous, latest = old[account_id], current[account_id]
