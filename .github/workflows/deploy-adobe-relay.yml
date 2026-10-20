@@ -9,6 +9,9 @@ on:
         type: choice
         default: status
         options: [status, batch, stabilize, recheck, prepare, release, verify, defer-old, defer-canary]
+concurrency:
+  group: adobe-401-repair-operations
+  cancel-in-progress: false
 permissions:
   contents: read
   actions: read
