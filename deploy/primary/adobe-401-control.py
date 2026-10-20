@@ -34,6 +34,11 @@ elif args.action.startswith('defer-'):
  print(json.dumps({'deferred_phase_started':phase,'pid':p.pid}),flush=True)
 else:
  assert(root/'after.json').exists()and(root/'rolling-finished.json').exists()
+ # Keep immutable earlier evidence when running a fresh final validation.
+ history=root/'verification-history'/datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S%fZ');history.mkdir(parents=True,mode=0o700)
+ for name in ['business-verification.json','credential-change-review.json','runtime-verification.json','final-verification.json']:
+  p=root/name
+  if p.exists():p.rename(history/name)
  for filename,output in [('observe.py','observation.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json')]:
   if filename!='observe.py' or not(root/output).exists():
    # Detailed operational data remains private on the primary.
