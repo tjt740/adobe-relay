@@ -2,7 +2,7 @@
 import collections,importlib.util,json,pathlib
 old=pathlib.Path('/opt/adobe-relay/releases/adobe-quota-diagnostic-20261020');new=pathlib.Path('/opt/adobe-relay/releases/adobe-401-repair-20261020')
 s=importlib.util.spec_from_file_location('audit',old/'audit.py');a=importlib.util.module_from_spec(s);s.loader.exec_module(a)
-batch=old/'401-manual-batch';out={}
+batch=old/('401-manual-batch-v2'if(old/'401-manual-batch-v2').exists()else'401-manual-batch');out={}
 for name in ['started','progress','finished','process-exit']:
  p=batch/(name+'.json')
  if p.exists():out['batch_'+name]=json.loads(p.read_text())
