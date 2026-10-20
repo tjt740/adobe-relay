@@ -51,6 +51,7 @@ func (s *AccountUsageService) getAdobeUsage(ctx context.Context, account *Accoun
 	}
 
 	flightKey := fmt.Sprintf("adobe-usage:%d", account.ID)
+	manualAdobeDiagnostic := forceRefresh && source == "active" && account.Type == AccountTypeOAuth && account.Status == StatusError
 	// 共享的上游调用脱离发起者的 ctx：首个调用方取消不能让其它等待者一起失败，
 	// 更不能把取消错误写成错误快照缓存一分钟。
 	resultCh := s.cache.adobeUsageFlight.DoChan(flightKey, func() (any, error) {
@@ -61,6 +62,11 @@ func (s *AccountUsageService) getAdobeUsage(ctx context.Context, account *Accoun
 		}
 		sharedCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), adobeUsageFetchTimeout)
 		defer cancel()
+		if manualAdobeDiagnostic {
+			// Permit the explicit read-only check to renew an error account's
+			// session, with the same expiry/identity guards as the image test.
+			sharedCtx = context.WithValue(sharedCtx, adobeAccountTestContextKey{}, true)
+		}
 		usage, err := s.fetchAndCacheAdobeUsage(sharedCtx, account, source)
 		if err != nil {
 			return nil, err
@@ -83,7 +89,7 @@ func (s *AccountUsageService) getAdobeUsage(ctx context.Context, account *Accoun
 			// singleflight 的结果由所有等待者共享，改 Source 前先拷贝。
 			usage := cloneUsageInfo(shared)
 			usage.Source = source
-			if source == "active" {
+			if source == "active" && !manualAdobeDiagnostic {
 				s.tryClearRecoverableAccountError(ctx, account)
 			}
 			return usage, nil
