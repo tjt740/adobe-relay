@@ -14,7 +14,7 @@ def matches(row,r):return r.get('status')=='error'and r.get('paused')is not True
 
 def repair(row):
  marker=batch/('account-'+str(row['id'])+'.json')
- if marker.exists():return json.loads(marker.read_text())
+ if marker.exists():return {'account_id':row['id'],**json.loads(marker.read_text())}
  out={'account_id':row['id'],'ok':False,'code':'not_started','at':time.time()}
  try:
   if not matches(row,current(row)):return {**out,'code':'account_changed_or_paused'}
@@ -35,7 +35,7 @@ def repair(row):
   (batch/('account-'+str(row['id'])+'-stdout-private.log')).write_text(p.stdout);(batch/('account-'+str(row['id'])+'-stderr-private.log')).write_text(p.stderr)
   result={**out,'code':'child_result_unavailable'}
   for line in p.stdout.splitlines():
-   if line.startswith('401_REPAIR_RESULT '):result=json.loads(line.split(' ',1)[1])[0]
+   if line.startswith('401_REPAIR_RESULT '):result={**out,**json.loads(line.split(' ',1)[1])[0]}
   marker.write_text(json.dumps(result));return result
  except Exception as error:
   result={**out,'code':type(error).__name__}
