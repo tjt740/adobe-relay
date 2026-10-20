@@ -33,6 +33,10 @@ if p.exists():
 p=new/'business-verification.json'
 if p.exists():
  d=json.loads(p.read_text());out['business_comparison']={'before_count':d.get('before_count'),'current_count':d.get('current_count'),'missing_ids':len(d.get('missing_ids',[])),'manual_pause_preserved':d.get('manual_pause_preserved'),'proxy_changes':sum('proxy_id'in r.get('fields',[])for r in d.get('changes',[])),'all_proxy_chains_match':all(r.get('proxy_chain_matches')for r in d.get('changes',[]))}
+for name in ['business-verify.py','review-credentials.py']:
+ p=new/(name+'.private.log')
+ if p.exists():
+  log=p.read_text();out[name+'_failure']={'proxy_chain_assertion':'Review unmatched live proxy changes'in log,'account_or_pause_assertion':'Review account changes'in log,'contains_traceback':'Traceback'in log}
 p=new/'credential-change-review.json'
 if p.exists():
  d=json.loads(p.read_text());out['credential_comparison']={'source_cookie_changes':len(d.get('cookie_changed_accounts',[])),'runtime_or_token_only_changes':len(d.get('token_fields_only_accounts',[]))}
