@@ -2,11 +2,11 @@
 import datetime,hashlib,json,os,subprocess
 from pathlib import Path
 ROOT=Path('/opt/adobe-relay/releases/adobe-401-repair-20261020')
-SHA='cc5265944792edbccae56c2fa327efb272221c46'
+SHA='8241adfe9a5850095ef6ea06ab2e9c2f991b0f48'
 os.umask(0o077)
 def inspect(name):return json.loads(subprocess.check_output(['docker','inspect',name],text=True))[0]
 proof=json.loads((ROOT/'artifact/ci-proof.json').read_text())
-assert proof['application_sha']==SHA and proof['workflow_run']==39428800847 and proof['conclusion']=='success'
+assert proof['application_sha']==SHA and proof['workflow_run']==39431314719 and proof['conclusion']=='success'
 archive=ROOT/'artifact/release-images.tar.gz'
 assert hashlib.sha256(archive.read_bytes()).hexdigest()==proof['archive_sha256']
 assert (ROOT/'artifact/release-images.tar.gz.sha256').read_text().split()==[proof['archive_sha256'],'release-images.tar.gz']

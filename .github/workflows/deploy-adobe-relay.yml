@@ -36,12 +36,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api repos/tjt740/adobe-relay/actions/runs/39428800847 > ci-run.json
-          gh run download 39428800847 --repo tjt740/adobe-relay --name release-images --dir artifact
+          gh api repos/tjt740/adobe-relay/actions/runs/39431314719 > ci-run.json
+          gh run download 39431314719 --repo tjt740/adobe-relay --name release-images --dir artifact
           python3 - <<'PY'
           import hashlib,json,pathlib
           r=json.loads(pathlib.Path('ci-run.json').read_text())
-          assert r['head_sha']=='cc5265944792edbccae56c2fa327efb272221c46' and r['conclusion']=='success' and r['status']=='completed'
+          assert r['head_sha']=='8241adfe9a5850095ef6ea06ab2e9c2f991b0f48' and r['conclusion']=='success' and r['status']=='completed'
           p=pathlib.Path('artifact');digest=hashlib.sha256((p/'release-images.tar.gz').read_bytes()).hexdigest()
           assert (p/'release-images.tar.gz.sha256').read_text().split()==[digest,'release-images.tar.gz']
           (p/'ci-proof.json').write_text(json.dumps({'application_sha':r['head_sha'],'workflow_run':r['id'],'conclusion':r['conclusion'],'archive_sha256':digest}))
