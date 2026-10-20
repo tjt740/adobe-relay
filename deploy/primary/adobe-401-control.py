@@ -35,11 +35,12 @@ elif args.action.startswith('defer-'):
 else:
  assert(root/'after.json').exists()and(root/'rolling-finished.json').exists()
  for filename,output in [('observe.py','observation.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json')]:
-  if not(root/output).exists():
+  if filename!='observe.py' or not(root/output).exists():
    # Detailed operational data remains private on the primary.
    with(root/(filename+'.private.log')).open('w')as log:subprocess.run([sys.executable,str(root/filename)],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=300)
  run('audit.py','check-rollback')
- if not(root/'final-verification.json').exists():run('final-verify.py')
+ run('audit.py','verify')
+ run('final-verify.py')
  quota_helper=pathlib.Path('/opt/adobe-relay/releases/adobe-session-renewal-20261020/verify-native-host.py')
  result=subprocess.run([sys.executable,str(quota_helper),'--port','6666','--quota-only'],capture_output=True,text=True,timeout=150)
  (root/'original-primary-quota-private.jsonl').write_text(result.stdout)
