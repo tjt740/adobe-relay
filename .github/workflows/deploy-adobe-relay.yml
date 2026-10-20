@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Repair a bounded manually authorized authentication sample
+      - name: Start explicitly authorized authentication repair batch
         env:
           SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
@@ -23,4 +23,6 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
-          ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 root@173.234.15.150 'python3 -' < deploy/primary/adobe-401-pilot.py
+          ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 root@173.234.15.150 'mkdir -p /opt/adobe-relay/releases/adobe-401-operations-20261020 && chmod 700 /opt/adobe-relay/releases/adobe-401-operations-20261020'
+          tar -czf - deploy/primary/adobe-401-{batch,manual-worker}.py | ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes root@173.234.15.150 'tar -xzf - -C /opt/adobe-relay/releases/adobe-401-operations-20261020'
+          ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes root@173.234.15.150 'python3 /opt/adobe-relay/releases/adobe-401-operations-20261020/deploy/primary/adobe-401-batch.py'
