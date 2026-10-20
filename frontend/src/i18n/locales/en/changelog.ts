@@ -1,5 +1,10 @@
+import recoveryDemo from './accountRecoveryDemo'
+
 export default {
   daily: {
+    recoveryDemo,
+    previewTitle: 'Proposal previews',
+    previewBadge: 'Scheduling proposal · Rules not implemented',
     "title": "Changelog",
     "timezone": "Daily summaries · Beijing time (UTC+8)",
     "intro": "Updates and fixes grouped by day, with changes from the same date together and the newest day first.",
@@ -12,6 +17,8 @@ export default {
       "fixed": "Fixed"
     },
     "updates": {
+      "recoveryDemoPublished": { "title": "Complete scheduling scenarios in the changelog", "body": "Explore 11 scenarios, 1–3 example extra checks, current and proposed flows, benefits, costs and limits, with bilingual text and mobile layouts. Controls affect only this browser demo. Actual scheduling, check retries and account settings are unchanged." },
+      "accountRecoveryDemo": { "title": "Interactive account recovery scenarios", "body": "Compare temporary failures, authentication, quota, operator pauses and historical resume permissions. Adjust example retry counts and inspect benefits, costs and limits. Eleven scenarios cover accepted jobs and unknown submission outcomes as well. This is a proposal for review; actual scheduling rules are unchanged." },
       "accountCheckState": { "title": "Align account checks and recovery", "body": "Account lists show the latest completed check or request with its model, without contradictory historical error badges. Bulk and individual full image checks share guarded recovery while preserving manual pauses and credential or proxy changes." },
       "okadGroups": {
         "title": "Okad custom groups and filters across both apps",

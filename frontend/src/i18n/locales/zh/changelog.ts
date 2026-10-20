@@ -1,5 +1,10 @@
+import recoveryDemo from './accountRecoveryDemo'
+
 export default {
   daily: {
+    recoveryDemo,
+    previewTitle: '方案预览',
+    previewBadge: '调度方案预览 · 规则尚未实施',
     "title": "更新日志",
     "timezone": "按北京时间汇总 · UTC+8",
     "intro": "按天记录每次更新和修复，同一天的改动合并展示，最新记录优先。",
@@ -12,6 +17,8 @@ export default {
       "fixed": "修复"
     },
     "updates": {
+      "recoveryDemoPublished": { "title": "更新日志增加完整调度场景演示", "body": "提供 11 个可切换场景、1–3 次示例重试、当前机制与候选方案的流程对比，以及收益、代价和限制说明，支持中英文与手机布局。控件只影响浏览器演示，实际调度、检测重试及账号配置保持原状。" },
+      "accountRecoveryDemo": { "title": "账号调度恢复交互演示", "body": "完整比较临时故障、鉴权、额度、人工暂停及历史恢复资格等场景，调整示例重试次数并查看收益、代价与限制。共 11 个场景，包含任务已受理与提交结果未知两类边界；当前仅供评审，实际调度规则保持。" },
       "accountCheckState": { "title": "统一检测结果与账号恢复", "body": "账号列表优先显示最新检测或请求结果，检测通过不再叠加历史异常标签，并标明检测模型；批量与单次完整出图检测共用恢复逻辑，保留人工暂停及凭据、代理变更保护。" },
       "okadGroups": {
         "title": "Okad 自定义分组与双端筛选",

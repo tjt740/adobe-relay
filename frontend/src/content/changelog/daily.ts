@@ -4,8 +4,15 @@ export interface DailyUpdate {
   type: 'added' | 'improved' | 'fixed'
 }
 
+// Proposals have no release date and must not be counted as shipped updates.
+// Move a delivered feature into dailyUpdates only on its actual Beijing release date.
+export const changelogPreviews = [
+  { id: 'accountRecoveryDemo', demo: 'account-recovery' },
+] as const
+
 // Use the actual release date in Asia/Shanghai; multiple releases share one day.
 export const dailyUpdates: readonly DailyUpdate[] = [
+  { date: '2026-10-20', id: 'recoveryDemoPublished', type: 'added' },
   { date: '2026-10-20', id: 'accountCheckState', type: 'fixed' },
   { date: '2026-10-20', id: 'okadGroups', type: 'added' },
   { date: '2026-10-18', id: 'subscriptionUI', type: 'improved' },
