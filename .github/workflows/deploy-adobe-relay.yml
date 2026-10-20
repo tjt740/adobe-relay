@@ -11,10 +11,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: adobe-relay-production
-  cancel-in-progress: false
+  # Build-only validation never holds the production deployment queue.
+  group: ${{ inputs.build_only == true && format('adobe-relay-build-{0}', github.ref) || 'adobe-relay-production' }}
+  cancel-in-progress: ${{ inputs.build_only == true }}
 jobs:
-  build:
+  backend-checks:
     if: github.ref == 'refs/heads/main' || inputs.build_only
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -34,20 +35,39 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
       - uses: actions/setup-go@v5
+        id: go
         with:
           go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
+          cache: false
+      - name: Locate Go caches
+        id: go-cache-paths
+        working-directory: backend
+        run: |
+          echo "modules=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+      # The lockfile-only setup-go key never refreshed after an exact hit,
+      # leaving newly compiled unit/race packages absent from later runs.
+      - name: Restore and update Go caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ steps.go-cache-paths.outputs.modules }}
+            ${{ steps.go-cache-paths.outputs.build }}
+          key: ${{ runner.os }}-${{ runner.arch }}-adobe-relay-go-${{ steps.go.outputs.go-version }}-${{ hashFiles('backend/go.mod', 'backend/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-adobe-relay-go-${{ steps.go.outputs.go-version }}-${{ hashFiles('backend/go.mod', 'backend/go.sum') }}-
+            ${{ runner.os }}-${{ runner.arch }}-adobe-relay-go-${{ steps.go.outputs.go-version }}-
       - name: Check deployment scripts and backend
         env:
           PROXY_FAILOVER_TEST_DATABASE_URL: postgres://postgres:failover-test@localhost:5432/postgres?sslmode=disable
           OKAD_RECOVERY_TEST_DATABASE_URL: postgres://postgres:failover-test@localhost:5432/postgres?sslmode=disable
         run: |
+          # Keep compiled dependencies, but execute tests against this run's DB.
+          go clean -testcache
           bash -n deploy/clash/release-online.sh
           bash -n deploy/primary/release.sh
+          bash -n deploy/primary/load-image.sh
           bash -n deploy/online/renew-ip-certificate.sh
           python3 -m unittest discover -s deploy/clash -p 'test_*.py'
           python3 -m unittest discover -s deploy/primary -p 'test_*.py'
@@ -66,14 +86,37 @@ jobs:
           go test -tags unit -race ./internal/service ./internal/repository ./internal/handler/admin ./internal/server/routes -run 'Okad|Adobe|Proxy|Schedulable|BulkUpdate|AccountRuntime|AccountConnectionTest|TablePreferences|BuildSMTPMessage|SendEmail|SMTP'
           go test ./internal/repository -run 'TestExpiryRespectsLiveFailoverPolicy|TestProxyUpdate|TestOkadRecoveryPostgres|TestRecoverAdobeCookieUses|TestAccountConnectionTest|TestAdobeDelivery|TestAdobeHealth|TestAdobeAlert'
           go test -tags unit ./internal/service -run 'Test(GetAdobeUsage|AdobeUsage|BuildAdobeDegradedUsage|TestAccountConnectionAdobe|FormatAdobeTestError|AccountTestServiceSendErrorAndEnd|AccountConnectionTest|OkadRecovery)'
+
+  frontend-checks:
+    if: github.ref == 'refs/heads/main' || inputs.build_only
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '9.15.9'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
       - name: Check frontend workflows
         run: |
-          npm install -g pnpm@9.15.9
-          pnpm --dir frontend install --frozen-lockfile --ignore-scripts
+          pnpm --dir frontend install --frozen-lockfile --prefer-offline --ignore-scripts
           pnpm --dir frontend exec vitest run src/components/admin/proxy/__tests__/ProxyHealthPanel.spec.ts src/components/admin/changelog/__tests__ src/components/layout/__tests__/AppSidebar.spec.ts src/router/__tests__ src/i18n/__tests__
           pnpm --dir frontend exec vitest run src/views/admin/__tests__/GroupsView.columnSettings.spec.ts src/views/admin/__tests__/GroupsView.duplicate.spec.ts src/views/admin/__tests__/GroupsView.compositePlatforms.spec.ts src/views/admin/__tests__/GroupsView.codexManifest.spec.ts
           pnpm --dir frontend exec vitest run src/views/admin/ops/components/__tests__/OpsAlertRulesCard.spec.ts src/__tests__/integration/clash-subscription.spec.ts src/views/admin/__tests__/ProxiesView.filters.spec.ts src/components/account/__tests__/ProxyFailoverPanel.spec.ts src/components/admin/proxy/__tests__/ProxyAllocationModal.spec.ts src/components/account/__tests__/EditAccountModal.spec.ts src/components/account/__tests__/AccountUsageCell.spec.ts src/components/common/__tests__/ProxySelector.testing.spec.ts src/views/admin/__tests__/AccountsView src/components/admin/account/__tests__/AccountBulkActionsBar.spec.ts src/components/admin/account/__tests__/AccountTestModal.spec.ts src/components/admin/account/__tests__/AccountBulkTestModal.spec.ts src/api/admin/__tests__/accountTest.spec.ts src/components/account/__tests__/OkadIntegrationStatus.spec.ts src/components/account/__tests__/AccountStatusIndicator.spec.ts src/components/account/__tests__/AccountHealthEvidence.spec.ts src/utils/__tests__/accountStatusEvidence.spec.ts src/composables/__tests__/useAccountLiveUpdates.spec.ts src/views/admin/ops/components/__tests__/AdobeHealthReportCard.spec.ts
           pnpm --dir frontend exec vitest run src/components/admin/account/__tests__/AccountCapacityFilter.spec.ts src/components/admin/account/__tests__/AccountTableFilters.spec.ts src/components/admin/account/__tests__/AccountCompanyBadge.spec.ts src/utils/__tests__/okadAccountType.spec.ts src/api/admin/__tests__/accountFilters.spec.ts src/utils/__tests__/tablePreferences.spec.ts src/composables/__tests__/usePersistedPageSize.spec.ts src/composables/__tests__/useTableLoader.spec.ts
+
+  # Prepare the image in parallel, keeping the final release-images artifact
+  # unavailable until every original check succeeds in the build gate below.
+  image-build:
+    if: github.ref == 'refs/heads/main' || inputs.build_only
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - name: Build amd64 image
         uses: docker/build-push-action@v6
@@ -87,14 +130,37 @@ jobs:
             GOPROXY=https://proxy.golang.org,direct
             GOSUMDB=sum.golang.org
             NPM_CONFIG_REGISTRY=https://registry.npmjs.org
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha,scope=adobe-relay-linux-amd64
+            type=gha
+          cache-to: type=gha,scope=adobe-relay-linux-amd64,mode=max
       - name: Bundle application
         env:
           IMAGE: adobe-relay:${{ github.sha }}
         run: |
           docker save "$IMAGE" | gzip > release-images.tar.gz
           sha256sum release-images.tar.gz > release-images.tar.gz.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidate-image
+          path: |
+            release-images.tar.gz
+            release-images.tar.gz.sha256
+          retention-days: 1
+          compression-level: 0
+
+  # Preserve the old contract: a successful "build" and its release-images
+  # artifact mean both check suites and image construction have passed.
+  build:
+    needs: [backend-checks, frontend-checks, image-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidate-image
+      - name: Verify checked release archive
+        run: sha256sum -c release-images.tar.gz.sha256
       - uses: actions/upload-artifact@v4
         with:
           name: release-images
@@ -106,7 +172,7 @@ jobs:
 
   deploy:
     needs: build
-    if: inputs.build_only != true
+    if: github.ref == 'refs/heads/main' && inputs.build_only != true
     runs-on: ubuntu-latest
     timeout-minutes: 25
     name: Deploy primary
@@ -137,7 +203,7 @@ jobs:
           ssh_opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=20)
           ssh "${ssh_opts[@]}" "$target" 'mkdir -p /opt/adobe-relay/deploy/primary'
           scp "${ssh_opts[@]}" deploy/primary/{release.sh,README.md} "$target:/opt/adobe-relay/deploy/primary/"
-          gzip -dc release-images.tar.gz | ssh "${ssh_opts[@]}" "$target" 'docker load'
+          bash deploy/primary/load-image.sh release-images.tar.gz "$target" "${ssh_opts[@]}"
           ssh "${ssh_opts[@]}" "$target" "bash /opt/adobe-relay/deploy/primary/release.sh '$IMAGE'"
       - name: Verify public HTTPS endpoint
         env:
