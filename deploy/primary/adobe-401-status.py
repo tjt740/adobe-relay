@@ -7,8 +7,22 @@ for name in ['started','progress','finished','process-exit']:
  p=batch/(name+'.json')
  if p.exists():out['batch_'+name]=json.loads(p.read_text())
 ids=[int(r['id'])for r in json.loads((old/'401-preflight-private.json').read_text())['accounts']if not r.get('manual_pause')]
-rows=json.loads(a.sql("SELECT coalesce(json_agg(json_build_object('status',status,'schedulable',schedulable,'paused',extra->'okad_manual_pause','token',COALESCE(credentials->>'access_token','')<>'','error_401',error_message LIKE '%401%','verification',extra->'okad'->>'verification','latest_code',extra->'adobe_health'->'latest'->>'code')),'[]') FROM accounts WHERE deleted_at IS NULL AND id IN ("+','.join(map(str,ids or[0]))+")"))
+rows=json.loads(a.sql("SELECT coalesce(json_agg(json_build_object('source_key',extra->'okad'->>'source_key','status',status,'schedulable',schedulable,'paused',extra->'okad_manual_pause','token',COALESCE(credentials->>'access_token','')<>'','error_401',error_message LIKE '%401%','verification',extra->'okad'->>'verification','latest_code',extra->'adobe_health'->'latest'->>'code')),'[]') FROM accounts WHERE deleted_at IS NULL AND id IN ("+','.join(map(str,ids or[0]))+")"))
 out['cohort']={'count':len(rows),'current_401_messages':sum(bool(r['error_401'])for r in rows),'with_token':sum(bool(r['token'])for r in rows),'paused':sum(r['paused']is True for r in rows),'verifications':dict(collections.Counter(r['verification']for r in rows)),'latest_image_codes':dict(collections.Counter(r['latest_code']for r in rows))}
+keys=sorted(set(r.get('source_key')for r in rows if str(r.get('source_key')or'').startswith('external:')))
+if keys:
+ import subprocess
+ program="""import collections,json,sys
+from sqlalchemy import select
+from app.db.session import SessionLocal
+from app.models.external_member import ExternalMember
+ids=[int(k.split(':')[1])for k in json.loads(sys.stdin.readline())]
+with SessionLocal()as db:rows=db.execute(select(ExternalMember.login_status,ExternalMember.credits_error,ExternalMember.account_profile).where(ExternalMember.id.in_(ids))).all()
+print(json.dumps({'sources':len(rows),'login_statuses':dict(collections.Counter(r[0]for r in rows)),'credit_401_warnings':sum('401'in(r[1]or'')for r in rows),'profile_kinds':dict(collections.Counter((r[2]or{}).get('current_kind','unknown')for r in rows))}))
+"""
+ result=subprocess.run(['docker','exec','-i','adobe-team-cookie-app-1','python','-c',program],input=json.dumps(keys)+'\n',capture_output=True,text=True,timeout=35)
+ if result.returncode==0:out['okad_authentication']=json.loads(result.stdout)
+ else:out['okad_authentication']={'read_failed':True}
 for name in ['progress','rolling-route-canary','rolling-route-canonical','rolling-finished','final-verification']:
  p=new/(name+'.json')
  if p.exists():
