@@ -2,7 +2,7 @@
   <div class="flex items-center gap-2">
     <template v-if="adobeResult">
       <span
-        :class="['badge text-xs', adobeResult.success ? 'badge-success' : 'badge-warning']"
+        :class="['badge text-xs', adobeResult.success ? 'badge-success' : [408, 429, 529].includes(adobeResult.code) ? 'badge-warning' : 'badge-danger']"
         :data-testid="adobeResult.source === 'test' ? 'account-last-check' : 'account-current-result'"
         :title="[adobeResult.model, formatDateTime(adobeResult.at)].filter(Boolean).join(' · ')"
       >

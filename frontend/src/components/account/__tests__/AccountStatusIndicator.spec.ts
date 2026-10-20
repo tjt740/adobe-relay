@@ -81,6 +81,15 @@ describe('AccountStatusIndicator', () => {
     expect(wrapper.find('[data-testid="account-error-details"]').exists()).toBe(false)
   })
 
+  it.each([[401, 'badge-danger'], [408, 'badge-warning']])('preserves the severity color of a newer Adobe %i failure', (code, color) => {
+    const wrapper = mount(AccountStatusIndicator, { props: { account: makeAccount({ platform: 'adobe', extra: {
+      last_check_success: true, last_check_at: '2026-10-20T02:00:00Z', adobe_health: {
+        latest: { success: false, code, source: 'business', checked_at: '2026-10-20T02:01:00Z' }
+      }
+    } }) }, global: { stubs: { Icon: true } } })
+    expect(wrapper.get('[data-testid="account-current-result"]').classes()).toContain(color)
+  })
+
   it('replaces a passed Adobe check when a newer business request fails', () => {
     const wrapper = mount(AccountStatusIndicator, { props: { account: makeAccount({ platform: 'adobe', extra: {
       last_check_success: true, last_check_at: '2026-10-20T02:00:00Z', adobe_health: {
