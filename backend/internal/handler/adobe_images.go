@@ -539,7 +539,7 @@ func (h *GatewayHandler) runAdobeImagesFailover(
 			releaseAccount()
 			return
 		}
-		result, err := h.adobeImageService.GenerateCall(generationCtx, account, token, req.call)
+		result, err := h.adobeImageService.GenerateCall(h.gatewayService.AdobeImageAuthContext(generationCtx, account), account, token, req.call)
 		h.gatewayService.RecordAdobeHealth(requestCtx, account, healthStarted, adobeHealthModel(account, req), err)
 		releaseAccount()
 		if err == nil {

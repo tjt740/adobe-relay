@@ -170,7 +170,7 @@ func (s *AdobeImageService) GenerateCall(
 		return nil, &adobe.OperationError{Stage: "prepare", Err: err}
 	}
 
-	client := s.clients.clientForAccount(account)
+	client := newAdobeAuthRetryClient(ctx, s.clients.clientForAccount(account), token)
 	timings := AdobeImageTimings{DiskBuffer: imagebuffer.FromContext(ctx) != nil}
 	stageStarted := time.Now()
 	sourceImageIDs, err := s.uploadSourceImages(ctx, client, token, call)
@@ -258,7 +258,7 @@ func (s *AdobeImageService) GenerateCall(
 // 全成或全败：任一张最终失败则整单失败。
 func generateAdobeImages(
 	ctx context.Context,
-	client *adobe.Client,
+	client adobeImageAPI,
 	token string,
 	arpSessionID string,
 	opts adobe.ImagePayloadOptions,
@@ -290,6 +290,9 @@ func generateAdobeImages(
 		})
 	}
 	if err := group.Wait(); err != nil {
+		if n > 1 {
+			return nil, &adobeImageBatchError{err}
+		}
 		return nil, err
 	}
 	return results, nil
@@ -299,7 +302,7 @@ func generateAdobeImages(
 // 文生图时返回 nil。OpenAI mask 不上传：3p Image Edit 抓包没有 usage=mask blob，
 // 真 mask 由 handler 优先转到 API key 中转号。
 func (s *AdobeImageService) uploadSourceImages(
-	ctx context.Context, client *adobe.Client, token string, call *AdobeImageCall,
+	ctx context.Context, client adobeImageAPI, token string, call *AdobeImageCall,
 ) ([]string, error) {
 	req := call.Request
 	if len(req.Uploads) == 0 && len(req.InputImageURLs) == 0 {

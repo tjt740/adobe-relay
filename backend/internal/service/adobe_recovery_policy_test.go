@@ -4,7 +4,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +35,15 @@ func (r *adobeRecoveryPolicyRepo) SetTempUnschedulable(context.Context, int64, t
 	return nil
 }
 
+func (r *adobeRecoveryPolicyRepo) UpdateAdobeTokenIfCookieUnchanged(_ context.Context, id int64, cookie string, fields map[string]any) (bool, error) {
+	a := r.accounts[id]
+	if a == nil || a.GetCredential("cookie") != cookie {
+		return false, nil
+	}
+	a.Credentials = MergeCredentials(a.Credentials, fields)
+	return true, nil
+}
+
 func TestAdobeRecoveryPolicyAll401Entrances(t *testing.T) {
 	for _, tc := range []struct {
 		name, access, body   string
@@ -46,6 +57,7 @@ func TestAdobeRecoveryPolicyAll401Entrances(t *testing.T) {
 	} {
 		for _, path := range []string{"generic", "account_test"} {
 			t.Run(path+"/"+tc.name, func(t *testing.T) {
+				wantInvalidations := tc.invalidate
 				a := adobeTestConnAccount(map[string]any{"cookie": "old-cookie", "access_token": adobeTestJWT(t, time.Now().Add(time.Hour))})
 				r := &adobeRecoveryPolicyRepo{connectionTestResultRepo: &connectionTestResultRepo{okadRecoveryRepo: &okadRecoveryRepo{accounts: map[int64]*Account{a.ID: a}}}}
 				if path == "generic" {
@@ -53,7 +65,14 @@ func TestAdobeRecoveryPolicyAll401Entrances(t *testing.T) {
 					s.okadRecovery = newTestOkadRecovery(t, r.okadRecoveryRepo, func(http.ResponseWriter, *http.Request) { t.Error("401 alone must never login") })
 					s.HandleUpstreamError(context.Background(), a, 401, http.Header{"X-Access-Error": []string{tc.access}}, []byte(tc.body))
 				} else {
-					api := &adobeFakeTransport{handler: func(*adobe.Request, int) (*adobe.Response, error) {
+					fresh := adobeTestJWT(t, time.Now().Add(2*time.Hour))
+					exchanges := 0
+					api := &adobeFakeTransport{handler: func(request *adobe.Request, _ int) (*adobe.Response, error) {
+						if strings.Contains(request.URL, "/check/v6/token") {
+							exchanges++
+							body, _ := json.Marshal(map[string]any{"access_token": fresh})
+							return &adobe.Response{StatusCode: 200, Body: body}, nil
+						}
 						return &adobe.Response{StatusCode: 401, Headers: map[string]string{"x-access-error": tc.access}, Body: []byte(tc.body)}, nil
 					}}
 					withStubbedAdobeTestClient(t, adobe.NewClient(adobe.ClientConfig{Transport: api}))
@@ -61,8 +80,14 @@ func TestAdobeRecoveryPolicyAll401Entrances(t *testing.T) {
 					require.Error(t, err)
 					require.Contains(t, response.Body.String(), `"status_code":401`)
 					require.Equal(t, []int{401}, r.codes)
+					if tc.name == "token" {
+						require.Equal(t, 1, exchanges)
+						wantInvalidations = 2
+					} else {
+						require.Zero(t, exchanges)
+					}
 				}
-				require.Equal(t, tc.invalidate, r.invalidations)
+				require.Equal(t, wantInvalidations, r.invalidations)
 				require.Equal(t, tc.cooldown, r.cooldowns)
 				require.Equal(t, "old-cookie", a.GetCredential("cookie"))
 				require.Equal(t, StatusActive, a.Status)

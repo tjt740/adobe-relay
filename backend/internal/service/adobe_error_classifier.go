@@ -49,7 +49,15 @@ type adobeFailure struct {
 //
 // adobe.IsRotatable 已经把「换个账号可能成功」的类别归好，这里补的是 sub2api
 // 侧的动作：给客户端什么状态码、要不要冷却账号。
-func classifyAdobeError(err error) adobeFailure {
+func classifyAdobeError(err error) (out adobeFailure) {
+	defer func() {
+		var operation *adobe.OperationError
+		var batch *adobeImageBatchError
+		accepted := errors.As(err, &batch) || (errors.As(err, &operation) && (operation.Stage == "poll" || operation.Stage == "download" || operation.JobID != ""))
+		if accepted && out.Failover != nil {
+			out.Failover.NextAccountAction = NextAccountStop
+		}
+	}()
 	if err == nil {
 		return adobeFailure{}
 	}

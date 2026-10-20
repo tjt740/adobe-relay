@@ -154,6 +154,10 @@ func (r *AdobeTokenRefresher) Refresh(ctx context.Context, account *Account) (ma
 		return nil, fmt.Errorf("refresh adobe token: %w", err)
 	}
 
+	expected, _ := ctx.Value(adobeTokenIdentityContextKey{}).(string)
+	if expected != "" && adobe.AccountIDFromToken(result.AccessToken) != expected {
+		return nil, adobe.NewAuthError("adobe token identity changed during renewal", 401)
+	}
 	// 只更新 token 字段：cookie 与 model_mapping 等都在原 credentials 里，
 	// 直接返回新 map 会把它们抹掉。
 	return MergeCredentials(account.Credentials, adobeRefreshedSessionFields(account, result)), nil
