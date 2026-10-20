@@ -43,6 +43,7 @@ func (s *AccountUsageService) getAdobeUsage(ctx context.Context, account *Accoun
 		return &UsageInfo{Source: source, UpdatedAt: &now}, nil
 	}
 
+	cacheSnapshot, _ := s.cache.adobeUsageCache.Load(account.ID)
 	cached, hasCached := s.getCachedAdobeUsage(account.ID)
 	// 手动刷新必须真的打上游：错误快照也只在非强制刷新时直接返回。
 	if !forceRefresh && hasCached {
@@ -107,8 +108,19 @@ func (s *AccountUsageService) getAdobeUsage(ctx context.Context, account *Accoun
 		cached.Source = source
 		return cached, nil
 	}
-	s.storeAdobeUsageSnapshot(account.ID, degraded)
+	s.storeAdobeUsageErrorIfUnchanged(account.ID, degraded, cacheSnapshot)
 	return degraded, nil
+}
+
+// A late failure may belong to an older flight than a successful forced check.
+// Only replace the cache entry observed by this caller; never erase newer evidence.
+func (s *AccountUsageService) storeAdobeUsageErrorIfUnchanged(accountID int64, usage *UsageInfo, previous any) {
+	entry := &adobeUsageCache{usageInfo: cloneUsageInfo(usage), timestamp: time.Now()}
+	if previous == nil {
+		s.cache.adobeUsageCache.LoadOrStore(accountID, entry)
+	} else {
+		s.cache.adobeUsageCache.CompareAndSwap(accountID, previous, entry)
+	}
 }
 
 func (s *AccountUsageService) fetchAndCacheAdobeUsage(ctx context.Context, account *Account, source string) (*UsageInfo, error) {
