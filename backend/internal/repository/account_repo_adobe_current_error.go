@@ -21,11 +21,13 @@ func (r *accountRepository) SetAdobeErrorIfCurrent(ctx context.Context, a *servi
  UPDATE accounts SET status='error',schedulable=false,error_message=$2,updated_at=NOW()
  WHERE id=$1 AND deleted_at IS NULL AND platform='adobe' AND type='oauth'
  AND credentials->>'cookie'=$3 AND status=$4 AND schedulable=$5
+	AND COALESCE(credentials->>'adobe_session_cookie','')=$10
+	AND COALESCE(credentials->>'adobe_session_cookie_source_hash','')=$11
  AND proxy_id IS NOT DISTINCT FROM $6
  AND COALESCE(extra->>'okad_manual_pause','false')=$7
  AND ($8::timestamptz IS NULL OR EXISTS(SELECT 1 FROM proxies WHERE id=accounts.proxy_id AND updated_at=$8))
  RETURNING id)
- INSERT INTO scheduler_outbox(event_type,account_id,group_id,payload) SELECT $9,id,NULL,NULL FROM updated`, a.ID, message, a.GetCredential("cookie"), a.Status, a.Schedulable, a.ProxyID, fmtBool(a.Extra["okad_manual_pause"] == true), proxyUpdatedAt, service.SchedulerOutboxEventAccountChanged)
+ INSERT INTO scheduler_outbox(event_type,account_id,group_id,payload) SELECT $9,id,NULL,NULL FROM updated`, a.ID, message, a.GetCredential("cookie"), a.Status, a.Schedulable, a.ProxyID, fmtBool(a.Extra["okad_manual_pause"] == true), proxyUpdatedAt, service.SchedulerOutboxEventAccountChanged, a.GetCredential("adobe_session_cookie"), a.GetCredential("adobe_session_cookie_source_hash"))
 	if err != nil {
 		return false, err
 	}

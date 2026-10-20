@@ -39,7 +39,7 @@ func (r *accountRepository) StageOkadCookie(ctx context.Context, a *service.Acco
 	result, err := r.sql.ExecContext(ctx, `
  WITH updated AS (
   UPDATE accounts AS a
-  SET credentials = (COALESCE(a.credentials, '{}'::jsonb) - 'access_token' - 'expires_at' - '_token_version') || jsonb_build_object('cookie', $1::text,'email',$16::text),
+  SET credentials = (COALESCE(a.credentials, '{}'::jsonb) - 'access_token' - 'expires_at' - '_token_version' - 'adobe_session_cookie' - 'adobe_session_cookie_source_hash') || jsonb_build_object('cookie', $1::text,'email',$16::text),
       extra = (COALESCE(a.extra,'{}'::jsonb)-'last_check_at'-'last_check_success'-'last_check_status_code') || jsonb_build_object('okad_connection_test',$11::jsonb,'adobeteam_external_email',$16::text),
       status = CASE WHEN $12 THEN 'error' ELSE a.status END,
       error_message = CASE WHEN $12 THEN $13 ELSE a.error_message END,

@@ -359,12 +359,14 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 					err: fmt.Errorf("adobe token refresh conditional repository is not configured"),
 				}
 			}
-			applied, updateErr := conditionalRepo.UpdateAdobeTokenIfCookieUnchanged(
-				ctx,
-				freshAccount.ID,
-				attemptedAccount.GetCredential("cookie"),
-				adobeTokenCredentialFields(newCredentials),
-			)
+			var applied bool
+			var updateErr error
+			fields := adobeTokenCredentialFields(newCredentials)
+			if sessions, ok := api.accountRepo.(AdobeSessionCredentialsRepository); ok {
+				applied, updateErr = sessions.UpdateAdobeSessionIfUnchanged(ctx, freshAccount.ID, adobeSessionSnapshot(attemptedAccount), fields)
+			} else {
+				applied, updateErr = conditionalRepo.UpdateAdobeTokenIfCookieUnchanged(ctx, freshAccount.ID, attemptedAccount.GetCredential("cookie"), fields)
+			}
 			if updateErr != nil {
 				slog.Error("oauth_refresh_update_failed",
 					"account_id", freshAccount.ID,

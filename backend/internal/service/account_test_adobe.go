@@ -147,7 +147,7 @@ func (s *AccountTestService) testAdobeAccountConnection(
 		conf.OutputResolution, conf.AspectRatio)})
 	s.sendEvent(c, TestEvent{Type: "status", Text: "Submitting generation job to Adobe Firefly..."})
 
-	client := adobeTestClients.clientForAccount(account)
+	client := newAdobeAuthRetryClient(withAdobeImageAuthRecovery(ctx, s.adobeTestTokenProvider(), account), adobeTestClients.clientForAccount(account), token)
 	generated, err := client.GenerateImage(ctx, adobe.GenerateImageInput{
 		Token:        token,
 		Timeout:      adobeTestTimeout,

@@ -64,7 +64,9 @@ type Response struct {
 	Attempts int
 	// Headers 的键统一小写，多值只保留第一个。
 	Headers map[string]string
-	Body    []byte
+	// SetCookies preserves every Set-Cookie header; flattening loses rotated IMS sessions.
+	SetCookies []string
+	Body       []byte
 }
 
 // Header 取响应头（大小写不敏感）。
@@ -123,9 +125,12 @@ type impersonateTransport struct {
 	identity Identity
 	proxyURL string
 
-	once   sync.Once
-	client tlsclient.HttpClient
-	initEr error
+	once            sync.Once
+	client          tlsclient.HttpClient
+	initEr          error
+	explicitCookies bool
+	explicitOnce    sync.Once
+	explicitClient  *impersonateTransport
 }
 
 func (t *impersonateTransport) ensureClient() (tlsclient.HttpClient, error) {
@@ -135,10 +140,14 @@ func (t *impersonateTransport) ensureClient() (tlsclient.HttpClient, error) {
 			t.initEr = NewRequestError(fmt.Sprintf("unknown tls-client profile: %s", t.identity.TLSProfile))
 			return
 		}
+		var jar fhttp.CookieJar
+		if !t.explicitCookies {
+			jar = tlsclient.NewCookieJar()
+		}
 		options := []tlsclient.HttpClientOption{
 			tlsclient.WithTimeoutSeconds(int(impersonateClientTimeout.Seconds())),
 			tlsclient.WithClientProfile(profile),
-			tlsclient.WithCookieJar(tlsclient.NewCookieJar()),
+			tlsclient.WithCookieJar(jar),
 			// Firefly 的提交/轮询都是普通 HTTPS；关掉 HTTP/3 以免协商出与 profile
 			// 不符的指纹。
 			tlsclient.WithDisableHttp3(),
@@ -159,6 +168,18 @@ func (t *impersonateTransport) ensureClient() (tlsclient.HttpClient, error) {
 }
 
 func (t *impersonateTransport) Do(ctx context.Context, req *Request) (*Response, error) {
+	// An explicit saved session must be authoritative. A shared jar would append
+	// its own ims_sid, sending both the persisted and cached versions.
+	if !t.explicitCookies {
+		for name := range req.Headers {
+			if strings.EqualFold(name, "cookie") {
+				t.explicitOnce.Do(func() {
+					t.explicitClient = &impersonateTransport{identity: t.identity, proxyURL: t.proxyURL, explicitCookies: true}
+				})
+				return t.explicitClient.Do(ctx, req)
+			}
+		}
+	}
 	timeout := req.Timeout
 	if timeout <= 0 {
 		timeout = defaultRequestTimeout
@@ -198,6 +219,7 @@ func (t *impersonateTransport) Do(ctx context.Context, req *Request) (*Response,
 	return &Response{
 		StatusCode: resp.StatusCode,
 		Headers:    flattenHeaders(resp.Header),
+		SetCookies: append([]string(nil), resp.Header.Values("Set-Cookie")...),
 		Body:       raw,
 	}, nil
 }
@@ -387,7 +409,7 @@ func (t *plainTransport) Do(ctx context.Context, req *Request) (*Response, error
 			out[strings.ToLower(key)] = values[0]
 		}
 	}
-	return &Response{StatusCode: resp.StatusCode, Headers: out, Body: raw}, nil
+	return &Response{StatusCode: resp.StatusCode, Headers: out, SetCookies: append([]string(nil), resp.Header.Values("Set-Cookie")...), Body: raw}, nil
 }
 
 // errBodyTooLarge 表示响应体超过 Request.MaxBodyBytes。

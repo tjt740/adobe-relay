@@ -59,22 +59,23 @@ type okadVerificationClient interface {
 }
 
 func probeOkadCredential(ctx context.Context, a *Account, client okadVerificationClient) (map[string]any, *adobe.CreditsBalance, error) {
-	result, err := client.RefreshAccessTokenFromCookie(ctx, a.GetCredential("cookie"), adobe.RefreshOptions{SkipAccountFetch: true})
+	result, err := client.RefreshAccessTokenFromCookie(ctx, adobeEffectiveCookie(a), adobe.RefreshOptions{SkipAccountFetch: true})
 	if err != nil {
 		return nil, nil, &adobe.OperationError{Stage: "token", Err: err}
 	}
+	fields := adobeRefreshedSessionFields(a, result)
 	identity, err := client.FetchAccountInfo(ctx, result.AccessToken)
 	if err != nil {
-		return nil, nil, &adobe.OperationError{Stage: "identity", Err: err}
+		return adobeSessionRenewalOnly(fields), nil, &adobe.OperationError{Stage: "identity", Err: err}
 	}
 	if identity == nil || !strings.EqualFold(strings.TrimSpace(identity.Email), adobeRecoveryEmail(a)) {
 		return nil, nil, &adobe.OperationError{Stage: "identity", Err: errOkadIdentityMismatch}
 	}
 	balance, err := client.FetchCreditsBalance(ctx, result.AccessToken)
 	if err != nil {
-		return nil, nil, &adobe.OperationError{Stage: "credits", Err: err}
+		return adobeSessionRenewalOnly(fields), nil, &adobe.OperationError{Stage: "credits", Err: err}
 	}
-	return map[string]any{"access_token": result.AccessToken, "expires_at": adobeTokenExpiryString(result)}, balance, nil
+	return fields, balance, nil
 }
 
 func okadVerificationStage(err error) string {
@@ -185,7 +186,9 @@ func (s *AccountUsageService) VerifyOkadCredential(ctx context.Context, a *Accou
 		if errors.Is(err, errOkadIdentityMismatch) {
 			code, message = "identity_mismatch", "Cookie 对应邮箱与关联账号不一致，请核对来源"
 		}
-		fields = nil
+		// IMS already rotated the session, even if a later balance request
+		// failed. Keep only that renewal; never publish an unverified token.
+		fields = adobeSessionRenewalOnly(fields)
 		// Persist only allowlisted stage/result metadata in logs. The upstream
 		// body can contain credentials and must not be logged here.
 		slog.Warn("okad_credential_verification_failed", "account_id", a.ID, "version", okadVersion(state["version"]), "stage", okadVerificationStage(err), "result", code)

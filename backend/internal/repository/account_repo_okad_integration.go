@@ -62,7 +62,7 @@ func (r *accountRepository) ApplyOkadCredential(ctx context.Context, a *service.
 		return false, err
 	}
 	result, err := r.sql.ExecContext(ctx, `WITH updated AS (
- UPDATE accounts a SET credentials=(COALESCE(credentials,'{}'::jsonb)-'access_token'-'expires_at'-'_token_version') || jsonb_build_object('cookie',$2::text),
+ UPDATE accounts a SET credentials=(COALESCE(credentials,'{}'::jsonb)-'access_token'-'expires_at'-'_token_version'-'adobe_session_cookie'-'adobe_session_cookie_source_hash') || jsonb_build_object('cookie',$2::text),
  extra=(COALESCE(extra,'{}'::jsonb)-'okad_recovery'-'last_check_at'-'last_check_success'-'last_check_status_code')||jsonb_build_object('okad',$3::jsonb,'okad_connection_test',$12::jsonb),
  status=CASE WHEN $4 THEN 'error' ELSE status END,
  error_message=CASE WHEN $4 OR $13 THEN $5 ELSE error_message END,
@@ -102,7 +102,7 @@ func (r *accountRepository) CompleteOkadVerification(ctx context.Context, a *ser
 		return false, err
 	}
 	tokenFields := map[string]any{}
-	for _, key := range []string{"access_token", "expires_at"} {
+	for _, key := range []string{"access_token", "expires_at", "adobe_session_cookie", "adobe_session_cookie_source_hash"} {
 		if v, ok := fields[key]; ok {
 			tokenFields[key] = v
 		}
