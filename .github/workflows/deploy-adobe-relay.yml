@@ -63,6 +63,8 @@ jobs:
           PROXY_FAILOVER_TEST_DATABASE_URL: postgres://postgres:failover-test@localhost:5432/postgres?sslmode=disable
           OKAD_RECOVERY_TEST_DATABASE_URL: postgres://postgres:failover-test@localhost:5432/postgres?sslmode=disable
         run: |
+          # Keep compiled dependencies, but execute tests against this run's DB.
+          go clean -testcache
           bash -n deploy/clash/release-online.sh
           bash -n deploy/primary/release.sh
           bash -n deploy/primary/load-image.sh
@@ -107,9 +109,9 @@ jobs:
           pnpm --dir frontend exec vitest run src/views/admin/ops/components/__tests__/OpsAlertRulesCard.spec.ts src/__tests__/integration/clash-subscription.spec.ts src/views/admin/__tests__/ProxiesView.filters.spec.ts src/components/account/__tests__/ProxyFailoverPanel.spec.ts src/components/admin/proxy/__tests__/ProxyAllocationModal.spec.ts src/components/account/__tests__/EditAccountModal.spec.ts src/components/account/__tests__/AccountUsageCell.spec.ts src/components/common/__tests__/ProxySelector.testing.spec.ts src/views/admin/__tests__/AccountsView src/components/admin/account/__tests__/AccountBulkActionsBar.spec.ts src/components/admin/account/__tests__/AccountTestModal.spec.ts src/components/admin/account/__tests__/AccountBulkTestModal.spec.ts src/api/admin/__tests__/accountTest.spec.ts src/components/account/__tests__/OkadIntegrationStatus.spec.ts src/components/account/__tests__/AccountStatusIndicator.spec.ts src/components/account/__tests__/AccountHealthEvidence.spec.ts src/utils/__tests__/accountStatusEvidence.spec.ts src/composables/__tests__/useAccountLiveUpdates.spec.ts src/views/admin/ops/components/__tests__/AdobeHealthReportCard.spec.ts
           pnpm --dir frontend exec vitest run src/components/admin/account/__tests__/AccountCapacityFilter.spec.ts src/components/admin/account/__tests__/AccountTableFilters.spec.ts src/components/admin/account/__tests__/AccountCompanyBadge.spec.ts src/utils/__tests__/okadAccountType.spec.ts src/api/admin/__tests__/accountFilters.spec.ts src/utils/__tests__/tablePreferences.spec.ts src/composables/__tests__/usePersistedPageSize.spec.ts src/composables/__tests__/useTableLoader.spec.ts
 
-  # Build in parallel with both check jobs. An image artifact alone is not a
-  # release approval: deploy requires all three jobs, and build_only never deploys.
-  build:
+  # Prepare the image in parallel, keeping the final release-images artifact
+  # unavailable until every original check succeeds in the build gate below.
+  image-build:
     if: github.ref == 'refs/heads/main' || inputs.build_only
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -140,6 +142,27 @@ jobs:
           sha256sum release-images.tar.gz > release-images.tar.gz.sha256
       - uses: actions/upload-artifact@v4
         with:
+          name: candidate-image
+          path: |
+            release-images.tar.gz
+            release-images.tar.gz.sha256
+          retention-days: 1
+          compression-level: 0
+
+  # Preserve the old contract: a successful "build" and its release-images
+  # artifact mean both check suites and image construction have passed.
+  build:
+    needs: [backend-checks, frontend-checks, image-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidate-image
+      - name: Verify checked release archive
+        run: sha256sum -c release-images.tar.gz.sha256
+      - uses: actions/upload-artifact@v4
+        with:
           name: release-images
           path: |
             release-images.tar.gz
@@ -148,7 +171,7 @@ jobs:
           compression-level: 0
 
   deploy:
-    needs: [backend-checks, frontend-checks, build]
+    needs: build
     if: github.ref == 'refs/heads/main' && inputs.build_only != true
     runs-on: ubuntu-latest
     timeout-minutes: 25
