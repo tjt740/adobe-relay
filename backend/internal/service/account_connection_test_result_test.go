@@ -155,3 +155,40 @@ func TestAccountConnectionTestAdobeAlertSourcesAndClassification(t *testing.T) {
 		})
 	}
 }
+
+type successfulAdobeTestRepo struct {
+	*connectionTestResultRepo
+	recovered int
+	started   time.Time
+}
+
+func (r *successfulAdobeTestRepo) RecoverAdobeAfterSuccessfulTestIfCurrent(_ context.Context, _ *Account, started time.Time) (bool, error) {
+	r.recovered++
+	r.started = started
+	return true, nil
+}
+func TestAccountConnectionTestSharedAdobeRecovery(t *testing.T) {
+	for _, automatic := range []bool{false, true} {
+		for _, success := range []bool{false, true} {
+			a := recoveryFixtureAccount(1)
+			repo := &successfulAdobeTestRepo{connectionTestResultRepo: &connectionTestResultRepo{okadRecoveryRepo: &okadRecoveryRepo{accounts: map[int64]*Account{1: a}}}}
+			svc := &AccountTestService{accountRepo: repo}
+			start := time.Now().Add(-time.Second)
+			ctx := context.WithValue(context.Background(), accountTestStartedAtKey{}, start)
+			if automatic {
+				ctx = context.WithValue(ctx, okadConnectionTestContextKey{}, OkadConnectionTestJob{AccountID: 1})
+			}
+			var err error
+			if !success {
+				err = errors.New("API returned 408")
+			}
+			svc.recordConnectionTestResult(ctx, a, err)
+			if success {
+				require.Equal(t, 1, repo.recovered)
+				require.Equal(t, start, repo.started)
+			} else {
+				require.Zero(t, repo.recovered)
+			}
+		}
+	}
+}

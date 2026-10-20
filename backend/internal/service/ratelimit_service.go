@@ -2160,6 +2160,11 @@ func (s *RateLimitService) RecoverAccountState(ctx context.Context, accountID in
 		return nil, err
 	}
 
+	return s.recoverObservedAccountState(ctx, account, options)
+}
+
+func (s *RateLimitService) recoverObservedAccountState(ctx context.Context, account *Account, options AccountRecoveryOptions) (*SuccessfulTestRecoveryResult, error) {
+	accountID := account.ID
 	result := &SuccessfulTestRecoveryResult{}
 	if account.Status == StatusError {
 		if err := s.accountRepo.ClearError(ctx, accountID); err != nil {
@@ -2192,7 +2197,16 @@ func (s *RateLimitService) RecoverAccountState(ctx context.Context, accountID in
 // RecoverAccountAfterSuccessfulTest 将一次成功测试视为正常请求，
 // 按需恢复 error / rate-limit / overload / temp-unsched / model-rate-limit 等运行时状态。
 func (s *RateLimitService) RecoverAccountAfterSuccessfulTest(ctx context.Context, accountID int64) (*SuccessfulTestRecoveryResult, error) {
-	return s.RecoverAccountState(ctx, accountID, AccountRecoveryOptions{})
+	account, err := s.accountRepo.GetByID(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	// Native Adobe checks recover through the shared, snapshot-guarded test
+	// recorder. Do not clear newer credentials, pauses or model failures here.
+	if account.Platform == PlatformAdobe && account.Type == AccountTypeOAuth {
+		return &SuccessfulTestRecoveryResult{}, nil
+	}
+	return s.recoverObservedAccountState(ctx, account, AccountRecoveryOptions{})
 }
 
 func (s *RateLimitService) ClearTempUnschedulable(ctx context.Context, accountID int64) error {

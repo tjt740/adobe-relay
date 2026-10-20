@@ -66,6 +66,33 @@ function makeAccount(overrides: Partial<Account>): Account {
 }
 
 describe('AccountStatusIndicator', () => {
+  it('shows one successful Adobe check without stale error or historical pending badges', () => {
+    const wrapper = mount(AccountStatusIndicator, { props: { account: makeAccount({
+      platform: 'adobe', status: 'error', error_message: 'Clash 订阅节点已移除，请重新选择代理并恢复账号调度',
+      extra: { last_check_success: true, last_check_status_code: 200, last_check_at: '2026-10-20T02:00:00Z', adobe_health: {
+        pending: true, latest: { success: true, code: 200, source: 'test', scope: 'gpt-image-2', checked_at: '2026-10-20T02:00:00Z' }
+      } }
+    }) }, global: { stubs: { Icon: true } } })
+    expect(wrapper.findAll('.badge')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="account-last-check"]').text()).toContain('bulkTest.passed')
+    expect(wrapper.text()).toContain('gpt-image-2')
+    expect(wrapper.text()).not.toContain('异常待成功验证')
+    expect(wrapper.text()).not.toContain('status.error')
+    expect(wrapper.find('[data-testid="account-error-details"]').exists()).toBe(false)
+  })
+
+  it('replaces a passed Adobe check when a newer business request fails', () => {
+    const wrapper = mount(AccountStatusIndicator, { props: { account: makeAccount({ platform: 'adobe', extra: {
+      last_check_success: true, last_check_at: '2026-10-20T02:00:00Z', adobe_health: {
+        latest: { success: false, code: 408, source: 'business', scope: 'gpt-image-2.5-sunburst', checked_at: '2026-10-20T02:00:00.050Z' }
+      }
+    } }) }, global: { stubs: { Icon: true } } })
+    expect(wrapper.findAll('.badge')).toHaveLength(1)
+    expect(wrapper.text()).toContain('currentResult.failed')
+    expect(wrapper.text()).toContain('408')
+    expect(wrapper.text()).not.toContain('bulkTest.passed')
+  })
+
   it.each([
     { status: 'error', error_message: 'Authentication failed (401): invalid_credentials' },
     { extra: { adobe_health: { pending: true }, last_check_success: false, last_check_status_code: 408 } },

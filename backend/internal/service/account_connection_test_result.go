@@ -12,6 +12,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
 )
 
+type accountTestStartedAtKey struct{}
+
 var connectionTestHTTPCode = regexp.MustCompile(`(?i)(?:\b(?:HTTP|status(?:\s+code)?|returned|rejected)\s*[:=!]?[\s(]*|\()(4\d\d|5\d\d)\b`)
 
 func connectionTestStatusCode(err error) int {
@@ -89,6 +91,16 @@ func (s *AccountTestService) recordConnectionTestResult(ctx context.Context, acc
 		failure := classifyAdobeError(testErr)
 		applyAdobeCooldown(ctx, s.accountRepo, account.ID, failure)
 		applyAdobeTokenInvalidation(ctx, s.accountRepo, account.ID, account.GetCredential("access_token"), failure)
+		if testErr == nil {
+			if recovery, ok := s.accountRepo.(interface {
+				RecoverAdobeAfterSuccessfulTestIfCurrent(context.Context, *Account, time.Time) (bool, error)
+			}); ok {
+				started, _ := ctx.Value(accountTestStartedAtKey{}).(time.Time)
+				if _, err := recovery.RecoverAdobeAfterSuccessfulTestIfCurrent(ctx, account, started); err != nil {
+					slog.Warn("adobe_test_recovery_failed", "account_id", account.ID, "error", err)
+				}
+			}
+		}
 		if _, automatic := ctx.Value(okadConnectionTestContextKey{}).(OkadConnectionTestJob); !automatic {
 			check, _ := account.Extra["okad_connection_test"].(map[string]any)
 			if repo, ok := s.accountRepo.(OkadConnectionTestRepository); ok && check["gated"] == true && check["key"] == OkadConnectionTestKey(account) {

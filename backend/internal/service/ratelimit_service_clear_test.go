@@ -307,3 +307,12 @@ func TestRateLimitService_RecoverAccountState_InvalidatesOAuthTokenOnErrorRecove
 	require.Len(t, invalidator.accounts, 1)
 	require.Equal(t, int64(21), invalidator.accounts[0].ID)
 }
+
+func TestRateLimitService_AdobeSuccessfulTestDoesNotClearANewerFailure(t *testing.T) {
+	repo := &rateLimitClearRepoStub{getByIDAccount: &Account{ID: 42, Platform: PlatformAdobe, Type: AccountTypeOAuth, Status: StatusError}}
+	svc := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+	_, err := svc.RecoverAccountAfterSuccessfulTest(context.Background(), 42)
+	require.NoError(t, err)
+	require.Zero(t, repo.clearErrorCalls)
+	require.Zero(t, repo.clearTempUnschedCalls)
+}
