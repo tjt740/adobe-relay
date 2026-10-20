@@ -16,7 +16,70 @@ export default {
       "improved": "Improved",
       "fixed": "Fixed"
     },
+    measurements: "Release preparation measurements and sample scope",
+    overviews: {
+      "releaseSpeed": {
+        "title": "Shorter release waits with rollout guards retained",
+        "body": "Today: parallel preparation, reusable caches and compressed transfers. Cached preparation measured about 68% shorter. Full rollout still includes backups, draining and verification. The figures below describe specific samples, not a fixed service commitment."
+      }
+    },
     "updates": {
+      releaseSpeed: {
+        "title": "Faster release preparation and compressed transfers",
+        "body": "Run backend checks, frontend checks and image builds in parallel, reuse dependency and compilation caches, and keep image transfers compressed. Formal artifacts are published only after all checks pass. Backups, draining accepted work, cutover and rollback guards remain.",
+        "metrics": {
+          "baseline": {
+            "label": "Before · one formal build",
+            "value": "17 min 29 sec",
+            "note": "A historical complete preparation run, including checks, image build and artifact publication. Server rollout is excluded."
+          },
+          "cold": {
+            "label": "First new-cache validation",
+            "value": "11 min 34 sec",
+            "note": "The first parallel validation started with an empty new Go cache. All checks passed; production deployment was skipped."
+          },
+          "warm": {
+            "label": "Cached validation · a later commit",
+            "value": "5 min 31 sec",
+            "note": "Complete preparation and the artifact gate on another commit, about 68% shorter than the historical sample. The backend check step fell from 10 min 45 sec to 1 min 29 sec."
+          },
+          "transfer": {
+            "label": "Image transfer size · historical sample",
+            "value": "About 148 → 48 MB",
+            "note": "About 68% fewer transfer bytes with compression, using decimal MB. This is a size comparison, not a measured production transfer duration."
+          }
+        },
+        "sections": {
+          "reason": {
+            "title": "Why this changed",
+            "body": "Backend checks, frontend checks and image builds previously waited for one another, so their times added up. Existing Go caches were not fully reused across later commits, leaving repeated compilation work. The image archive was already compressed but was decompressed locally before transfer, increasing network bytes."
+          },
+          "parallel": {
+            "title": "Parallel preparation with a final gate",
+            "body": "Three independent jobs now prepare concurrently. A failed check prevents publication of the formal release-images artifact and blocks deployment. Build-only validation has a separate queue and can cancel obsolete runs on the same branch. Production releases remain serialized, and later commits do not automatically cancel a rollout in progress."
+          },
+          "cache": {
+            "title": "Reuse dependencies and compilation; execute the checks",
+            "body": "Go caches are saved and restored by environment, Go version, dependency files and commit, with compatible fallback keys. Frontend jobs reuse the pnpm dependency cache; images have a dedicated build cache. Each run clears cached Go test results before executing the original test commands. Savings come from less repeated preparation and compilation."
+          },
+          "transfer": {
+            "title": "Compressed transfer and failure handling",
+            "body": "The gzip archive stays compressed over SSH and is decompressed and loaded on the primary server. Existing SHA-256 and host identity checks remain. A remote decompression or image-load failure fails the operation instead of reporting success. Loading an image alone does not switch the running application."
+          },
+          "scenarios": {
+            "title": "When it helps and what it costs",
+            "body": "Routine code changes, frontend or changelog releases, and build-only validation can all spend less time waiting. Stable dependencies and toolchains favor cache reuse. Initial runs, expired caches and major dependency changes benefit less. Parallel jobs require more concurrent CI capacity, and queueing or network conditions affect timing. Production resource allocations remain unchanged."
+          },
+          "validation": {
+            "title": "Measured results and verification scope",
+            "body": "All 44 local release-script tests passed, including 6 covering compressed transfers and error propagation. Workflow syntax passed validation, and the original test commands were compared and retained. Two complete cloud checks and builds succeeded; the second reused caches on a different commit and passed the formal artifact gate. Both were build-only validations with production deployment skipped. Their timings do not measure a live cutover."
+          },
+          "boundary": {
+            "title": "Limits and preserved production behavior",
+            "body": "5 min 31 sec is one cached preparation measurement, not a fixed duration for every release or a complete rollout. Actual deployment still requires backups, natural completion of accepted work, rolling cutover and verification; busy periods may take longer to drain. This change covers preparation and changelog presentation. Existing configuration, data, scheduling, operator pauses, SMTP, alerts, resource allocations and released features remain. It makes no claim of faster generation, higher business throughput or account recovery."
+          }
+        }
+      },
       "adobeManualRevalidation": {"title": "Independent manual revalidation", "body": "Forced manual revalidation no longer inherits an in-flight background query's result or narrower renewal policy. An older background failure cannot replace newer validation evidence. Equivalent checks still share work. Operator pauses, login attempt limits and image validation requirements remain."},
       "adobeQuotaDiagnostic": {"title": "Quota revalidation for quarantined Adobe accounts", "body": "Manual quota revalidation can renew a quarantined Adobe session. A successful balance check retains error and scheduling state; image recovery still requires its existing checks. Operator pauses and disabled or expired account limits remain."},
       "adobeSessionRenewal": {"title": "Adobe session renewal", "body": "Retain renewed Adobe sessions after token refresh and avoid appending stale cached login cookies. Quota revalidation and a definitively rejected image submission may renew and retry once; Recovery never regenerates accepted or unknown work. Late responses cannot overwrite newer sessions, and operator pauses and proxy-change guards remain. Real authentication, quota and rate limits still follow existing handling."},
