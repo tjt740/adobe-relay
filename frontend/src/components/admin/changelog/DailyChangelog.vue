@@ -1,5 +1,18 @@
 <template>
   <section :aria-label="t('changelog.daily.title')" class="space-y-4">
+    <section v-if="changelogPreviews.length" :aria-label="t('changelog.daily.previewTitle')" class="space-y-4" data-testid="changelog-previews">
+      <details v-for="preview in changelogPreviews" :key="preview.id" open class="daily-preview overflow-hidden rounded-2xl border border-amber-200 bg-white dark:border-amber-900/50 dark:bg-dark-900">
+        <summary class="flex cursor-pointer flex-wrap items-center gap-3 px-5 py-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 sm:px-6">
+          <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">{{ t('changelog.daily.previewBadge') }}</span>
+          <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ t(`changelog.daily.updates.${preview.id}.title`) }}</h3>
+          <Icon name="chevronDown" size="sm" aria-hidden="true" class="daily-chevron ml-auto shrink-0 text-gray-400 transition-transform motion-reduce:transition-none" />
+        </summary>
+        <div class="space-y-5 border-t border-amber-100 px-5 py-5 dark:border-amber-900/40 sm:px-6">
+          <p class="text-sm leading-7 text-gray-600 dark:text-gray-400">{{ t(`changelog.daily.updates.${preview.id}.body`) }}</p>
+          <AccountRecoveryDemo v-if="preview.demo === 'account-recovery'" />
+        </div>
+      </details>
+    </section>
     <details v-for="(day, index) in days" :key="day.date" :open="index === 0" class="daily-release overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-900" :data-release-date="day.date">
       <summary class="flex cursor-pointer flex-wrap items-center gap-3 px-5 py-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 sm:px-6">
         <span class="h-2 w-2 shrink-0 rounded-full" :class="index === 0 ? 'bg-primary-500' : 'bg-gray-300 dark:bg-dark-600'"></span>
@@ -24,7 +37,8 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
-import { dailyUpdates, groupDailyUpdates } from '@/content/changelog/daily'
+import AccountRecoveryDemo from './AccountRecoveryDemo.vue'
+import { dailyUpdates, groupDailyUpdates, changelogPreviews } from '@/content/changelog/daily'
 
 const { t } = useI18n()
 const days = groupDailyUpdates(dailyUpdates)
@@ -39,4 +53,5 @@ const typeStyles = {
 summary { list-style: none; }
 summary::-webkit-details-marker { display: none; }
 .daily-release[open] .daily-chevron { transform: rotate(180deg); }
+.daily-preview[open] > summary .daily-chevron { transform: rotate(180deg); }
 </style>

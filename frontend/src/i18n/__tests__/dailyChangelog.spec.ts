@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import DailyChangelog from '@/components/admin/changelog/DailyChangelog.vue'
-import { dailyUpdates, groupDailyUpdates } from '@/content/changelog/daily'
+import { dailyUpdates, groupDailyUpdates, changelogPreviews } from '@/content/changelog/daily'
 import zh from '@/i18n/locales/zh/changelog'
 import en from '@/i18n/locales/en/changelog'
 
@@ -36,18 +36,30 @@ describe('Daily changelog', () => {
         expect(note?.body.trim()).toBeTruthy()
       }
     }
+    for (const item of changelogPreviews) {
+      expect(dailyUpdates.some(update => update.id === item.id)).toBe(false)
+      expect('date' in item).toBe(false)
+      for (const messages of [zh, en]) {
+        expect(messages.daily.updates[item.id]?.title.trim()).toBeTruthy()
+        expect(messages.daily.updates[item.id]?.body.trim()).toBeTruthy()
+      }
+    }
   })
 
   it('shows one section per day, expands the latest day and preserves older entries', () => {
     const wrapper = mount(DailyChangelog)
-    const sections = wrapper.findAll('details')
+    const sections = wrapper.findAll('.daily-release')
     expect(sections).toHaveLength(new Set(dailyUpdates.map(item => item.date)).size)
     expect(sections[0].attributes('open')).toBeDefined()
     expect(sections.slice(1).every(section => section.attributes('open') === undefined)).toBe(true)
     expect(sections[0].findAll('li')).toHaveLength(groupDailyUpdates(dailyUpdates)[0].items.length)
     expect(wrapper.text()).toContain('订阅输入与状态卡片')
     expect(wrapper.text()).toContain('2026-10-12')
-    expect(wrapper.findAll('li')).toHaveLength(dailyUpdates.length)
+    expect(wrapper.findAll('.daily-release li')).toHaveLength(dailyUpdates.length)
+    const previews = wrapper.get('[data-testid="changelog-previews"]')
+    expect(previews.text()).toContain('调度方案预览 · 规则尚未实施')
+    expect(previews.find('[data-testid="account-recovery-demo"]').exists()).toBe(true)
+    expect(previews.findAll('[data-release-date]')).toHaveLength(0)
     wrapper.unmount()
   })
 })
