@@ -34,6 +34,18 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
+      - name: Read-only Adobe authentication preflight
+        if: inputs.build_only
+        env:
+          SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 root@173.234.15.150 'python3 -' < deploy/primary/adobe-401-preflight.py
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
