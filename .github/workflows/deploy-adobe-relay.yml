@@ -8,7 +8,7 @@ on:
       operation:
         type: choice
         default: status
-        options: [status, batch, stabilize, recheck, primary-diagnostic, prepare, release, verify, defer-old, defer-canary]
+        options: [status, batch, stabilize, recheck, primary-diagnostic, primary-repair, prepare, release, verify, defer-old, defer-canary]
 concurrency:
   group: adobe-401-repair-operations
   cancel-in-progress: false
@@ -32,7 +32,7 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
           ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 root@173.234.15.150 'mkdir -p /opt/adobe-relay/releases/adobe-401-operations-20261020 && chmod 700 /opt/adobe-relay/releases/adobe-401-operations-20261020'
-          tar -czf - deploy/primary/adobe-401-status.py deploy/primary/adobe-401-control.py deploy/primary/adobe-401-pilot.py deploy/primary/adobe-401-batch-v2.py deploy/primary/adobe-401-host-worker.py deploy/primary/adobe-401-stabilize.py deploy/primary/adobe-401-primary-diagnostic.py | ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes root@173.234.15.150 'tar -xzf - -C /opt/adobe-relay/releases/adobe-401-operations-20261020'
+          tar -czf - deploy/primary/adobe-401-status.py deploy/primary/adobe-401-control.py deploy/primary/adobe-401-pilot.py deploy/primary/adobe-401-batch-v2.py deploy/primary/adobe-401-host-worker.py deploy/primary/adobe-401-stabilize.py deploy/primary/adobe-401-primary-diagnostic.py deploy/primary/adobe-401-primary-repair.py | ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes root@173.234.15.150 'tar -xzf - -C /opt/adobe-relay/releases/adobe-401-operations-20261020'
       - name: Obtain the exact successful application artifact
         if: inputs.operation == 'prepare'
         env:
@@ -61,6 +61,7 @@ jobs:
           case "$OPERATION" in
             batch) ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes root@173.234.15.150 'python3 /opt/adobe-relay/releases/adobe-401-operations-20261020/deploy/primary/adobe-401-batch-v2.py' ;;
             stabilize) ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes root@173.234.15.150 'python3 /opt/adobe-relay/releases/adobe-401-operations-20261020/deploy/primary/adobe-401-stabilize.py' ;;
+            primary-repair) ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes root@173.234.15.150 'python3 /opt/adobe-relay/releases/adobe-401-operations-20261020/deploy/primary/adobe-401-primary-repair.py' ;;
             primary-diagnostic) ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes root@173.234.15.150 'python3 /opt/adobe-relay/releases/adobe-401-operations-20261020/deploy/primary/adobe-401-primary-diagnostic.py' ;;
             status) ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes root@173.234.15.150 'python3 /opt/adobe-relay/releases/adobe-401-operations-20261020/deploy/primary/adobe-401-status.py' ;;
             prepare|release|verify|defer-old|defer-canary|recheck) ssh -T -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=3 root@173.234.15.150 "python3 /opt/adobe-relay/releases/adobe-401-operations-20261020/deploy/primary/adobe-401-control.py $OPERATION" ;;
