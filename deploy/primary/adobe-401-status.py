@@ -36,6 +36,14 @@ if p.exists():
 p=new/'credential-change-review.json'
 if p.exists():
  d=json.loads(p.read_text());out['credential_comparison']={'source_cookie_changes':len(d.get('cookie_changed_accounts',[])),'runtime_or_token_only_changes':len(d.get('token_fields_only_accounts',[]))}
+p=new/'original-primary-quota-private.jsonl'
+if p.exists():
+ safe=[]
+ for line in p.read_text().splitlines():
+  if line.startswith('{'):
+   d=json.loads(line);safe.append({k:v for k,v in d.items()if k in['phase','http','error_code','needs_reauth','has_error','type']})
+ out['original_primary_quota_check']=safe
+out['original_primary_quota_helper_exists']=(old.parent/'adobe-session-renewal-20261020'/'verify-native-host.py').exists()
 for phase in ['old','canary']:
  p=new/('rolling-'+phase+'-drain-progress.json')
  if p.exists():out['drain_'+phase]=json.loads(p.read_text())['samples'][-1]
