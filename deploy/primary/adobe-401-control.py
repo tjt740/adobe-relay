@@ -40,4 +40,11 @@ else:
    with(root/(filename+'.private.log')).open('w')as log:subprocess.run([sys.executable,str(root/filename)],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=300)
  run('audit.py','check-rollback')
  if not(root/'final-verification.json').exists():run('final-verify.py')
+ quota_helper=pathlib.Path('/opt/adobe-relay/releases/adobe-session-renewal-20261020/verify-native-host.py')
+ result=subprocess.run([sys.executable,str(quota_helper),'--port','6666','--quota-only'],capture_output=True,text=True,timeout=150)
+ (root/'original-primary-quota-private.jsonl').write_text(result.stdout)
+ quota=[json.loads(line)for line in result.stdout.splitlines()if line.startswith('{')]
+ valid=result.returncode==0 and any(r.get('phase')=='primary_quota'and r.get('http')==200 and not r.get('has_error')for r in quota)
+ print(json.dumps({'original_primary_quota_validated':valid}),flush=True)
+ assert valid,'Original primary quota check failed; inspect its private result before declaring completion'
  print(json.dumps({'final_verified':True,'at':json.loads((root/'final-verification.json').read_text())['at']}),flush=True)
