@@ -1,0 +1,9 @@
+{
+  "241_add_payment_order_bonus_amount.sql": "18b6a524a9873d3e4a45e6f9bd03b6e69f4384b701825c659817e017f2e8244f",
+  "241_add_typesafe_platform.sql": "f7ddd76ff0cbb250b6a7893586d84f0be6edaa48f7fbff851807f7ac4df0767a",
+  "242_drop_platform_check_constraints.sql": "a7725f31f637208d200e0f37d5270e9f263743d99fa9e4f1bb9a7387e8be5a61",
+  "242_group_i18n.sql": "e81c6818cc806bc54365c993f4cec1634f16a311451faf5cb1a875a1358774cd",
+  "243_gemini_cached_contents.sql": "2d345cff5c64b01e705f04ec972e5d5ec3d618fe71dc7d45bc80fdd38c6a89d5",
+  "244_gemini_cached_contents_channel_usage.sql": "9072cb37752a23c3a29cc0330a69837f09c5102375ee053d7bccf14634d3da29",
+  "245_gemini_cached_contents_mutation_lease.sql": "75434a7beeb8aad09b3339708ed520604d153e99c7fe680a376e8c958aadb1e8"
+}

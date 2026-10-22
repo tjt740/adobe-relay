@@ -17,6 +17,7 @@ if phase=='prepare':
  proof=pathlib.Path('release-artifact/ci-proof.json');proof.write_text(json.dumps({'application_sha':sha,'workflow_run':int(build),'conclusion':'success','archive_sha256':digest}))
  remote("import pathlib; pathlib.Path('"+root+"/artifact').mkdir(parents=True,exist_ok=True,mode=0o700)")
  copy(pathlib.Path(__file__).parent.glob('*.py'))
+ copy([pathlib.Path(__file__).with_name('expected-new-migrations.json')])
  copy(pathlib.Path('release-artifact').glob('*'),root+'/artifact/')
  release_hash=hashlib.sha256(pathlib.Path('deploy/primary/release.sh').read_bytes()).hexdigest()
  remote(f"""import hashlib,json,pathlib,subprocess,sys
@@ -38,10 +39,11 @@ subprocess.run(['systemd-run','--unit=adobe-upstream-v0217-release','--collect',
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 """)
 elif phase=='verify':
+ copy([pathlib.Path(__file__).with_name('schema-business-verify.py'),pathlib.Path(__file__).with_name('expected-new-migrations.json'),pathlib.Path(__file__).with_name('final-verify.py')])
  remote(f"""import json,pathlib,subprocess,sys
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
 assert (r/'rolling-finished.json').exists()
-for script,output in [('observe.py','observation.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('final-verify.py','final-verification.json')]:
+for script,output in [('schema-business-verify.py','schema-business-verification.json'),('observe.py','observation.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('final-verify.py','final-verification.json')]:
  if not (r/output).exists():subprocess.run([sys.executable,str(r/script)],check=True)
 subprocess.run([sys.executable,str(r/'audit.py'),'check-rollback'],check=True)
 """)
@@ -50,7 +52,7 @@ else:
  script=f"""import json,pathlib,subprocess
 r=pathlib.Path('{root}')
 out={{'application_sha':'{sha}','files':{{}}}}
-for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','final-verification.json']:
+for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','schema-business-verification.json','final-verification.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
