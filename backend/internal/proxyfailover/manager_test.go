@@ -132,6 +132,13 @@ func testDB(t *testing.T) *sql.DB {
 		_, err = db.Exec(string(migration))
 		require.NoError(t, err)
 	}
+	_, err = db.Exec(`CREATE TABLE adobe_account_health(account_id bigint,scope text,failed_at timestamptz,status_code int,success_started_at timestamptz,PRIMARY KEY(account_id,scope));
+ ALTER TABLE accounts ADD COLUMN rate_limit_reset_at timestamptz,ADD COLUMN overload_until timestamptz,ADD COLUMN temp_unschedulable_until timestamptz;`)
+	require.NoError(t, err)
+	migration, err = os.ReadFile("../../migrations/251_adobe_408_proxy_quarantine.sql")
+	require.NoError(t, err)
+	_, err = db.Exec(string(migration))
+	require.NoError(t, err)
 	return db
 }
 

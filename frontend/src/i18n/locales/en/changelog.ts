@@ -26,8 +26,8 @@ export default {
     },
     "updates": {
       proxyVerificationPriority: {
-        "title": "Give pending credential verification priority for proxy capacity",
-        "body": "Fix accounts waiting for credential verification being treated as ordinary error accounts even when inactive bindings can give up capacity. Serve enabled business accounts first, then eligible pending verification. Existing checks continue after assignment. The panel explains free slots, slots that can be freed and the separate waiting queues.",
+        "title": "Prioritize pending verification and lend proxies to 408 recovery checks",
+        "body": "Fix verification waiting despite reclaimable capacity. With automatic allocation enabled, unresolved 408 accounts leave the regular allocation queue and borrow a proxy only for checks. Real generation on the affected model must succeed and all remaining 408 failures must recover before the binding becomes permanent. Failure or cancellation releases it. The panel and account details explain capacity and recovery conditions.",
         "sections": {
           "reason": {
             "title": "Why verification could remain stuck",
@@ -37,21 +37,29 @@ export default {
             "title": "Allocation order",
             "body": "Retain and serve enabled business accounts first, assign healthy proxies to eligible pending or retrying verification next, then handle other stopped, expired or error accounts. Pending verification can reclaim those inactive slots. The limit remains three accounts per node."
           },
+          "quarantine": {
+            "title": "Release capacity held by unresolved 408 accounts",
+            "body": "408 failures persist per model; later failures such as 500 cannot overwrite them. Unresolved accounts leave the regular proxy queue and release existing bindings in background maintenance. Cookie updates, credit checks and success on another model cannot clear the original failure. Historical aliases use the existing model catalog; Flare and Sunburst remain separate models."
+          },
+          "leases": {
+            "title": "Borrow for checks, keep only after successful recovery",
+            "body": "Manual checks, existing schedules and new-cookie checks share temporary routing, protect business demand and retain the three-account limit. Every affected model must recover. Failure and cancellation release the slot; abandoned leases expire after five minutes and are reclaimed by maintenance. This feature adds no recurring image generation and does not replay a possibly submitted check."
+          },
           "protection": {
             "title": "Assignment still requires verification",
             "body": "Priority changes proxy bindings only; it never clears errors or enables an account. Manual pauses, expired accounts, missing cookies and definitive authentication, identity, quota or entitlement failures do not qualify. Existing verification, recovery and model checks remain in control."
           },
           "wording": {
             "title": "Understand capacity and waiting counts",
-            "body": "Free slots are immediately assignable. Slots that can be freed are occupied by other accounts and are released when priority accounts need them. Waiting totals distinguish business, pending verification and other accounts. Connection and switching rules are expandable."
+            "body": "Free slots are immediately assignable. Slots that can be freed are occupied by other accounts until priority accounts need them. Regular waiting, unresolved 408 accounts and temporary checks are shown separately. Account details list remaining models and explain which model to test. Connection and switching rules are expandable."
           },
           "validation": {
             "title": "Validation scope",
-            "body": "A disposable database reproduces full-capacity starvation and verifies reclamation while preserving credentials, errors, manual state and the per-node limit. Coverage includes working business accounts, unhealthy and expired proxies, verification failures and repeated rounds. Frontend checks cover queue counts and older API responses, with synthetic bilingual desktop and mobile previews. Development validation does not establish real account verification or generation recovery."
+            "body": "Disposable database checks cover reclamation, concurrent leases, failure and cancellation, expiry, stale credentials/results, multiple models and historical aliases. Manual pauses, verification gates and scheduled recovery policy are checked. Frontend coverage includes counts, account hints, older API compatibility and bilingual layouts. Isolated data and simulated generation do not establish real account recovery."
           },
           "boundary": {
             "title": "Existing configuration and behavior",
-            "body": "No configuration keys or database migrations are added. Existing check intervals, failover, latency-switch cooldown, subscription rules, groups, SMTP and alerts are preserved. Successful proxy assignment is not proof of authentication, quota or image generation."
+            "body": "No configuration keys are added. New state tables track unresolved 408 failures, allocator pause intent and temporary test leases. Existing credentials, operator state, groups, subscriptions, SMTP and alert settings remain. Check intervals, failover and latency-switch cooldown are preserved. Releasing bindings does not guarantee distinct egress IPs; proxy connectivity is not proof of successful generation."
           }
         }
       },

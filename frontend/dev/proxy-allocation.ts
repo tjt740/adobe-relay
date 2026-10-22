@@ -16,11 +16,12 @@ apiClient.defaults.adapter = async config => {
   requests.push({ url: config.url, method: config.method })
   const enabled = config.method === 'put' ? JSON.parse(config.data).enabled : true
   const data = {
-    enabled, revision: 1, accounts_per_proxy: 3, accounts: 978, assigned: 951, waiting: 27,
-    binding_only_accounts: 963, verification_priority_accounts: 6, business_waiting: 0,
-    verification_waiting: 6, healthy_nodes: 308, available_slots: 0, reclaimable_slots: 903,
+    enabled, revision: 1, accounts_per_proxy: 3, accounts: 978, assigned: 302, waiting: 0,
+    binding_only_accounts: 287, verification_priority_accounts: 6, business_waiting: 0,
+    verification_waiting: 0, healthy_nodes: 308, available_slots: 619, reclaimable_slots: 281,
+    quarantined_408_accounts: 673, temporary_test_bindings: 3, pending_408_release: 0,
     checked_at: '2026-10-22T15:12:50+08:00',
-    nodes: Array.from({ length: 40 }, (_, i) => ({ id: i + 1, name: `Clash · 订阅 1 · 香港中转 ${String(i + 1).padStart(2, '0')}`, accounts: 3, status: i === 4 ? 'unknown' : 'healthy', latency_ms: 1000 + i * 10 })),
+    nodes: Array.from({ length: 40 }, (_, i) => ({ id: i + 1, name: `Clash · 订阅 1 · 香港中转 ${String(i + 1).padStart(2, '0')}`, accounts: i < 6 ? 0 : 3, status: i === 4 ? 'unknown' : 'healthy', latency_ms: 1000 + i * 10 })),
   }
   return { config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, data } }
 }

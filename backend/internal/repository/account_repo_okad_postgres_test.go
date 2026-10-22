@@ -54,6 +54,10 @@ func newOkadRecoveryPostgres(t *testing.T) *sql.DB {
 	require.NoError(t, err)
 	_, err = db.Exec(string(migration))
 	require.NoError(t, err)
+	migration, err = os.ReadFile("../../migrations/251_adobe_408_proxy_quarantine.sql")
+	require.NoError(t, err)
+	_, err = db.Exec(string(migration))
+	require.NoError(t, err)
 	return db
 }
 

@@ -28,23 +28,33 @@ func TestAdobeHealthPostgresEvidenceSurvivesQuietWindowsAndStaleResults(t *testi
 	record := func(success bool, model string, started, completed time.Time, code int) {
 		require.NoError(t, r.RecordAdobeHealth(ctx, a, service.AdobeHealthObservation{Success: success, Scope: model, Code: code, Reason: "upstream", Source: "test", StartedAt: started, CheckedAt: completed}))
 	}
+	blocks := func(want int) {
+		var n int
+		require.NoError(t, db.QueryRow(`SELECT count(*) FROM adobe_proxy_408_blocks WHERE account_id=1`).Scan(&n))
+		require.Equal(t, want, n)
+	}
 	report := func() *service.AdobeHealthReport {
 		p, e := (&opsRepository{db: db}).GetAdobeHealthReport(ctx, time.Now().Add(-10*time.Minute), time.Now(), nil)
 		require.NoError(t, e)
 		return p
 	}
 	record(false, "model-a", base, base.Add(time.Minute), 408)
+	blocks(1)
 	require.Equal(t, 1, report().Pending, "old failures remain unresolved outside the rolling window")
 	require.Zero(t, report().RecentPending)
 	record(true, "model-b", base.Add(2*time.Minute), base.Add(3*time.Minute), 200)
+	blocks(1)
 	require.Equal(t, 1, report().Pending, "another model cannot clear model-a")
 	record(true, "model-a", base, base.Add(4*time.Minute), 200)
+	blocks(1)
 	require.Equal(t, 1, report().Pending, "an earlier in-flight request cannot recover a later failure")
 	record(false, "model-a", base.Add(4*time.Minute), base.Add(5*time.Minute), 500)
+	blocks(1)
 	require.Equal(t, 1, report().Pending, "other error codes must not erase a pending 401/408")
 	_, err = db.Exec(`UPDATE accounts SET credentials='{"cookie":"new"}' WHERE id=1`)
 	require.NoError(t, err)
 	record(true, "model-a", base.Add(6*time.Minute), base.Add(7*time.Minute), 200)
+	blocks(1)
 	require.Equal(t, 1, report().Pending, "old Cookie success cannot clear current health")
 	a.Credentials["cookie"] = "new"
 	_, err = db.Exec(`INSERT INTO proxies(id) VALUES(12); UPDATE accounts SET proxy_id=12 WHERE id=1`)
@@ -61,6 +71,7 @@ func TestAdobeHealthPostgresEvidenceSurvivesQuietWindowsAndStaleResults(t *testi
 	require.Equal(t, 1, report().Pending, "edited proxy invalidates an older success")
 	require.NoError(t, db.QueryRow(`SELECT updated_at FROM proxies WHERE id=12`).Scan(&a.Proxy.UpdatedAt))
 	record(true, "model-a", base.Add(8*time.Minute), base.Add(9*time.Minute), 200)
+	blocks(0)
 	require.Zero(t, report().Pending)
 	require.Equal(t, 1, report().Recovered)
 	var raw []byte
@@ -70,6 +81,7 @@ func TestAdobeHealthPostgresEvidenceSurvivesQuietWindowsAndStaleResults(t *testi
 	require.Equal(t, false, health["pending"])
 	require.Contains(t, health, "last_success")
 	record(false, "model-a", base, base.Add(time.Minute), 408)
+	blocks(0)
 	require.NoError(t, db.QueryRow(`SELECT extra->'adobe_health' FROM accounts WHERE id=1`).Scan(&raw))
 	require.NoError(t, json.Unmarshal(raw, &health))
 	require.Equal(t, true, health["latest"].(map[string]any)["success"], "out-of-order persistence cannot replace newer displayed evidence")
@@ -115,6 +127,81 @@ func TestAdobeHealthPostgresRevisionAndPopulation(t *testing.T) {
 		}
 	}
 
+}
+
+func TestAdobe408PostgresHoldAliasesAndMultipleModels(t *testing.T) {
+	db := newOkadRecoveryPostgres(t)
+	_, err := db.Exec(`INSERT INTO accounts(id,platform,type,status,schedulable,credentials,extra)
+ VALUES(1,'adobe','oauth','active',true,'{"cookie":"fixture","model_mapping":{"keep":"keep"}}','{"custom":"keep"}');
+ UPDATE proxy_auto_allocation SET enabled=true`)
+	require.NoError(t, err)
+	r := &accountRepository{sql: db}
+	a := &service.Account{ID: 1, Credentials: map[string]any{"cookie": "fixture"}}
+	base := time.Now().Add(-time.Hour)
+	record := func(model string, code int, offset time.Duration) {
+		require.NoError(t, r.RecordAdobeHealth(context.Background(), a, service.AdobeHealthObservation{Scope: model, Code: code, Success: code == 200, StartedAt: base.Add(offset), CheckedAt: base.Add(offset + time.Second), Source: "test", Reason: "upstream"}))
+	}
+	record("gpt-image-2", 408, 0)
+	var sched, resume, preserved bool
+	require.NoError(t, db.QueryRow(`SELECT a.schedulable,h.resume_schedulable,
+ a.status='active' AND a.extra->>'custom'='keep' AND a.credentials->'model_mapping'='{"keep":"keep"}'::jsonb
+ FROM accounts a JOIN adobe_proxy_408_holds h ON h.account_id=a.id WHERE a.id=1`).Scan(&sched, &resume, &preserved))
+	require.False(t, sched)
+	require.True(t, resume)
+	require.True(t, preserved)
+	record("gpt-image-2", 500, time.Minute)
+	record("gpt-image-2.5-flare", 408, 2*time.Minute)
+	record("firefly-gpt-image-2", 200, 3*time.Minute)
+	var models string
+	require.NoError(t, db.QueryRow(`SELECT extra->'adobe_proxy_408'->'models' FROM accounts WHERE id=1`).Scan(&models))
+	require.JSONEq(t, `["gpt-image-2.5-flare"]`, models, "known aliases recover the same family, never another model")
+	var oldPending int
+	require.NoError(t, db.QueryRow(`SELECT count(*) FROM adobe_account_health WHERE scope='gpt-image-2' AND (success_started_at IS NULL OR success_started_at<=failed_at)`).Scan(&oldPending))
+	require.Zero(t, oldPending, "the visible health incident must also recover for the old alias")
+	record("firefly-gpt-image-2-5-flare", 200, 4*time.Minute)
+	require.NoError(t, db.QueryRow(`SELECT count(*) FROM adobe_proxy_408_blocks`).Scan(&oldPending))
+	require.Zero(t, oldPending)
+	require.NoError(t, db.QueryRow(`SELECT schedulable FROM accounts WHERE id=1`).Scan(&sched))
+	require.False(t, sched, "health evidence alone cannot authorize the lease completion or resume an account")
+}
+
+func TestAdobe408PostgresMigrationBackfillsOnlyUnresolvedAdobeFailures(t *testing.T) {
+	db := newOkadRecoveryPostgres(t)
+	_, err := db.Exec(`INSERT INTO accounts(id,platform) VALUES(1,'adobe'),(2,'adobe'),(3,'openai'),(4,'adobe');
+ INSERT INTO adobe_account_health(account_id,scope,status_code,failed_at,success_started_at) VALUES
+ (1,'model-a',408,NOW()-INTERVAL '1 day',NULL),
+ (2,'model-a',408,NOW()-INTERVAL '1 day',NOW()),
+ (3,'model-a',408,NOW(),NULL),
+ (4,'model-a',401,NOW(),NULL)`)
+	require.NoError(t, err)
+	raw, err := os.ReadFile("../../migrations/251_adobe_408_proxy_quarantine.sql")
+	require.NoError(t, err)
+	for i := 0; i < 2; i++ {
+		_, err = db.Exec(string(raw))
+		require.NoError(t, err)
+	}
+	var n int
+	require.NoError(t, db.QueryRow(`SELECT count(*) FROM adobe_proxy_408_blocks WHERE account_id=1`).Scan(&n))
+	require.Equal(t, 1, n)
+	require.NoError(t, db.QueryRow(`SELECT count(*) FROM adobe_proxy_408_blocks WHERE account_id<>1`).Scan(&n))
+	require.Zero(t, n)
+}
+
+func TestAdobe408PostgresDelayedAliasFailureCannotReopenRecoveredModel(t *testing.T) {
+	db := newOkadRecoveryPostgres(t)
+	_, err := db.Exec(`INSERT INTO accounts(id,platform,type,status,schedulable,credentials,extra) VALUES(1,'adobe','oauth','active',true,'{"cookie":"fixture"}','{}')`)
+	require.NoError(t, err)
+	r := &accountRepository{sql: db}
+	a := &service.Account{ID: 1, Credentials: map[string]any{"cookie": "fixture"}}
+	now := time.Now()
+	require.NoError(t, r.RecordAdobeHealth(context.Background(), a, service.AdobeHealthObservation{Success: true, Code: 200, Scope: "firefly-gpt-image-2", StartedAt: now.Add(-time.Minute), CheckedAt: now, Source: "test"}))
+	require.NoError(t, r.RecordAdobeHealth(context.Background(), a, service.AdobeHealthObservation{Code: 408, Scope: "gpt-image-2", StartedAt: now.Add(-10 * time.Minute), CheckedAt: now.Add(-9 * time.Minute), Source: "test"}))
+	var blocks int
+	var pending bool
+	require.NoError(t, db.QueryRow(`SELECT count(*) FROM adobe_proxy_408_blocks`).Scan(&blocks))
+	require.Zero(t, blocks)
+	require.NoError(t, db.QueryRow(`SELECT (extra->'adobe_health'->>'pending')::bool FROM accounts WHERE id=1`).Scan(&pending))
+	require.False(t, pending)
 }
 
 func TestAdobeHealthPostgresMigrationKeepsOpenIncidentFailures(t *testing.T) {

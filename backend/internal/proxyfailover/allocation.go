@@ -34,6 +34,9 @@ type AllocationView struct {
 	BusinessWaiting              int `json:"business_waiting"`
 	VerificationPriorityAccounts int `json:"verification_priority_accounts"`
 	VerificationWaiting          int `json:"verification_waiting"`
+	Quarantined408Accounts       int `json:"quarantined_408_accounts"`
+	TemporaryTestBindings        int `json:"temporary_test_bindings"`
+	Pending408Release            int `json:"pending_408_release"`
 	AllocationPolicy
 	AccountsPerProxy    int              `json:"accounts_per_proxy"`
 	Accounts            int              `json:"accounts"`
@@ -59,6 +62,18 @@ func (m *Manager) GetAllocation(ctx context.Context) (AllocationView, error) {
 	inactiveCounts := map[int64]int{}
 	for _, a := range accounts {
 		counts[a.Current]++
+		v.Accounts++
+		if a.TestLease {
+			v.TemporaryTestBindings++
+			continue
+		}
+		if a.Quarantined408 {
+			v.Quarantined408Accounts++
+			if a.Current != 0 {
+				v.Pending408Release++
+			}
+			continue
+		}
 		if a.BindingOnly && !a.VerificationPriority {
 			inactiveCounts[a.Current]++
 		}
@@ -74,7 +89,6 @@ func (m *Manager) GetAllocation(ctx context.Context) (AllocationView, error) {
 		if !a.Eligible {
 			continue
 		}
-		v.Accounts++
 		if a.BindingOnly {
 			v.BindingOnlyAccounts++
 		}
@@ -149,7 +163,9 @@ func (m *Manager) SaveAllocation(ctx context.Context, policy AllocationPolicy) (
 			return AllocationView{}, err
 		}
 		rows, e := tx.QueryContext(ctx, `UPDATE accounts SET proxy_auto_paused=true,status='error',schedulable=false,error_message=$1,updated_at=NOW()
- WHERE deleted_at IS NULL AND status='active' AND schedulable AND (auto_pause_on_expired IS NOT TRUE OR expires_at IS NULL OR expires_at>NOW()) RETURNING id`, allocationWaitingMessage)
+ WHERE deleted_at IS NULL AND status='active' AND schedulable AND (auto_pause_on_expired IS NOT TRUE OR expires_at IS NULL OR expires_at>NOW())
+ AND NOT EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=accounts.id)
+ AND NOT EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=accounts.id) RETURNING id`, allocationWaitingMessage)
 		if e != nil {
 			return AllocationView{}, e
 		}
@@ -175,6 +191,9 @@ func (m *Manager) SaveAllocation(ctx context.Context, policy AllocationPolicy) (
 			return AllocationView{}, err
 		}
 	}
+	if err = Refresh408Metadata(ctx, tx, 0); err != nil {
+		return AllocationView{}, err
+	}
 	if err = tx.Commit(); err != nil {
 		return AllocationView{}, err
 	}
@@ -193,6 +212,8 @@ type allocationAccount struct {
 	// Priority affects capacity only. Okad retains ownership of verification
 	// and scheduling; assigning a route must never resume this account.
 	VerificationPriority bool
+	Quarantined408       bool
+	TestLease            bool
 }
 
 func (a allocationAccount) priority() int {
@@ -220,7 +241,10 @@ func loadAllocationAccounts(ctx context.Context, q queryer) ([]allocationAccount
 	 AND extra->'okad_manual_pause' IS DISTINCT FROM 'true'::jsonb
 	 AND extra->'okad'->>'verification' IN ('pending','proxy_pending','verification_retry')
 	 AND error_message IN ('Okad credentials pending verification','Okad credentials pending connection test')
-	 AND NULLIF(BTRIM(credentials->>'cookie'),'') IS NOT NULL,false)
+	 AND NULLIF(BTRIM(credentials->>'cookie'),'') IS NOT NULL,false),
+	 EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=accounts.id)
+	 OR EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=accounts.id),
+	 EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=accounts.id AND l.expires_at>NOW())
  FROM accounts WHERE deleted_at IS NULL ORDER BY id`, allocationWaitingMessage)
 	if err != nil {
 		return nil, err
@@ -229,7 +253,7 @@ func loadAllocationAccounts(ctx context.Context, q queryer) ([]allocationAccount
 	result := []allocationAccount{}
 	for rows.Next() {
 		var a allocationAccount
-		if err = rows.Scan(&a.ID, &a.Current, &a.Eligible, &a.Waiting, &a.BindingOnly, &a.LastSwitch, &a.VerificationPriority); err != nil {
+		if err = rows.Scan(&a.ID, &a.Current, &a.Eligible, &a.Waiting, &a.BindingOnly, &a.LastSwitch, &a.VerificationPriority, &a.Quarantined408, &a.TestLease); err != nil {
 			return nil, err
 		}
 		result = append(result, a)
@@ -248,7 +272,11 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 	used := map[int64]int{}
 	next := map[int64]int64{}
 	for _, a := range accounts {
-		if !a.Eligible && a.Current != 0 {
+		if a.Quarantined408 && !a.TestLease {
+			next[a.ID] = 0
+			continue
+		}
+		if (!a.Eligible || a.TestLease) && a.Current != 0 {
 			used[a.Current]++
 		}
 	}
@@ -284,7 +312,7 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 	}
 	for priority := 0; priority < 3; priority++ {
 		for _, a := range ordered {
-			if !a.Eligible || a.priority() != priority {
+			if !a.Eligible || a.Quarantined408 || a.TestLease || a.priority() != priority {
 				continue
 			}
 			p, exists := ps[a.Current]
@@ -299,7 +327,7 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 			}
 		}
 		for _, a := range ordered {
-			if !a.Eligible || a.priority() != priority || next[a.ID] != 0 {
+			if !a.Eligible || a.Quarantined408 || a.TestLease || a.priority() != priority || next[a.ID] != 0 {
 				continue
 			}
 			id := best(0)
@@ -311,7 +339,7 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 		if priority == 0 {
 			for _, a := range ordered {
 				current := next[a.ID]
-				if a.BindingOnly || current == 0 || current != a.Current || !fresh(current) || now.Sub(a.LastSwitch) < softSwitchCooldown {
+				if a.BindingOnly || a.Quarantined408 || a.TestLease || current == 0 || current != a.Current || !fresh(current) || now.Sub(a.LastSwitch) < softSwitchCooldown {
 					continue
 				}
 				candidate := best(current)
@@ -389,6 +417,9 @@ func (m *Manager) allocate(ctx context.Context, tx *sql.Tx, policy AllocationPol
 	if err = persistHealth(ctx, tx, ps, hs); err != nil {
 		return err
 	}
+	if err = quarantine408(ctx, tx); err != nil {
+		return err
+	}
 	accounts, err := loadAllocationAccounts(ctx, tx)
 	if err != nil {
 		return err
@@ -399,6 +430,9 @@ func (m *Manager) allocate(ctx context.Context, tx *sql.Tx, policy AllocationPol
 	}
 	changed := []int64{}
 	for _, a := range accounts {
+		if a.Quarantined408 || a.TestLease {
+			continue
+		}
 		pid, managed := next[a.ID]
 		if !managed || (pid == a.Current && (a.BindingOnly || a.Waiting == (pid == 0))) {
 			continue
