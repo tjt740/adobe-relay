@@ -12,7 +12,9 @@ assert not subprocess.check_output(['docker','exec','adobe-relay-redis-1','redis
 assert 'upstream-v0217-20261022' not in subprocess.check_output(['iptables-save','-t','nat'],text=True)
 version=subprocess.check_output(['docker','exec',a.APP,'/app/sub2api','-version'],text=True).strip()
 assert 'Sub2API 0.2.17' in version and sha in version, 'Image version and commit must match the checked build'
-checks=a.check_preserved(json.loads((ROOT/'before.json').read_text()),a.snapshot())
+before_snapshot=json.loads((ROOT/'before.json').read_text())
+latest_snapshot=a.snapshot()
+checks=a.check_preserved(before_snapshot,latest_snapshot)
 heartbeat=json.loads(a.sql("SELECT json_build_object('at',last_success_at,'healthy',last_success_at>now()-interval '5 minutes' AND (last_error_at IS NULL OR last_success_at>last_error_at)) FROM ops_job_heartbeats WHERE job_name='ops_alert_evaluator'"))
 assert heartbeat['healthy'] and datetime.datetime.fromisoformat(heartbeat['at'])>=datetime.datetime.fromisoformat(cleanup['at']),'Wait for the canonical heartbeat after cleanup'
 def read(path):
@@ -41,6 +43,13 @@ changed_ids=sorted(c['id'] for c in business['changes'] if set(c['fields'])&{'st
 assert changed_ids==state_review['reviewed_ids']==[1150,1151,1154,1156]
 assert state_review['business_verification_sha256']==hashlib.sha256((ROOT/'business-verification.json').read_bytes()).hexdigest()
 assert state_review['all_original_failure_gates_verified'] and state_review['manual_pauses_preserved']
+initial_accounts={r['id']:r for r in before_snapshot['account_state']}
+latest_accounts={r['id']:r for r in latest_snapshot['account_state']}
+assert set(initial_accounts)==set(latest_accounts), 'Review any live account additions or removals'
+assert all(initial_accounts[i]['manual_pause']==latest_accounts[i]['manual_pause'] for i in initial_accounts), 'Preserve and review current operator actions'
+latest_changed_ids={i for i in initial_accounts if any(initial_accounts[i][k]!=latest_accounts[i][k] for k in ['status','schedulable'])}
+assert latest_changed_ids <= set(state_review['reviewed_ids']), 'Review additional live state transitions'
+assert all(latest_accounts[r['id']]['status']==r['current_status'] and latest_accounts[r['id']]['schedulable']==r['current_schedulable'] for r in state_review['accounts'])
 assert all(set(c['fields']) <= {'credentials','proxy_id','status','schedulable'} for c in business['changes'])
 assert all(c['version_advanced'] and c['issuer_compatible'] and c['source_key_compatible'] for c in credentials['cookie_changed_accounts'])
 schema=json.loads((ROOT/'schema-business-verification.json').read_text())
