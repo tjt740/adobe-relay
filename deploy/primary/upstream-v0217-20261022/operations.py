@@ -48,9 +48,13 @@ elif phase=='browser':
  for screenshot in pathlib.Path(__file__).parent.glob('live-*.png'):shutil.copy2(screenshot,evidence/screenshot.name)
 elif phase=='verify':
  copy([pathlib.Path(__file__).with_name('schema-business-verify.py'),pathlib.Path(__file__).with_name('expected-new-migrations.json'),pathlib.Path(__file__).with_name('final-verify.py')])
- remote(f"""import json,pathlib,subprocess,sys
+ remote(f"""import json,pathlib,subprocess,sys,time
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
-assert (r/'rolling-finished.json').exists()
+deadline=time.monotonic()+300
+while not (r/'rolling-finished.json').exists():
+ assert json.loads((r/'progress.json').read_text())['state']!='attention_required', 'Driver needs inspection'
+ assert time.monotonic()<deadline, 'Natural draining still in progress; no tasks interrupted'
+ time.sleep(5)
 for script,output in [('schema-business-verify.py','schema-business-verification.json'),('observe.py','observation.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('final-verify.py','final-verification.json')]:
  if not (r/output).exists():subprocess.run([sys.executable,str(r/script)],check=True)
 subprocess.run([sys.executable,str(r/'audit.py'),'check-rollback'],check=True)
