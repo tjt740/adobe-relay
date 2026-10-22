@@ -55,7 +55,7 @@ func (h *ProxyHandler) ClashPreview(c *gin.Context) {
 	var req struct {
 		URL string `json:"url"`
 	}
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64<<10)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 128<<10)
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "订阅请求格式无效")
 		return
@@ -72,10 +72,33 @@ func (h *ProxyHandler) ClashPreview(c *gin.Context) {
 	response.Success(c, result)
 }
 
+// ClashCheck only fetches the submitted feed; it never imports or probes nodes.
+func (h *ProxyHandler) ClashCheck(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	var req struct {
+		URL string `json:"url"`
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64<<10)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "订阅请求格式无效")
+		return
+	}
+	if h.clash == nil {
+		response.BadRequest(c, "Clash 服务未配置")
+		return
+	}
+	result, err := h.clash.CheckSource(c.Request.Context(), strings.TrimSpace(req.URL))
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
 func (h *ProxyHandler) ClashImport(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	var req clash.ImportRequest
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 128<<10)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 512<<10)
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "订阅请求格式无效")
 		return

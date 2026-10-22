@@ -1,5 +1,5 @@
 <template>
-  <div class="table-page-layout" :class="{ 'mobile-mode': isMobile }">
+  <div class="table-page-layout" :class="{ 'mobile-mode': isMobile, 'page-scroll-mode': scrollMode === 'page' }">
     <!-- 固定区域：操作按钮 -->
     <div v-if="$slots.actions" class="layout-section-fixed">
       <slot name="actions" />
@@ -26,6 +26,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+
+withDefaults(defineProps<{ scrollMode?: 'table' | 'page' }>(), { scrollMode: 'table' })
 
 const isMobile = ref(false)
 
@@ -57,6 +59,15 @@ onUnmounted(() => {
 .layout-section-scrollable {
   @apply flex-1 min-h-0 flex flex-col;
 }
+
+/* Tall expandable filters must not consume the table's entire fixed viewport. */
+.table-page-layout.page-scroll-mode {
+  height: auto;
+  min-height: calc(100dvh - 64px - 4rem);
+}
+.page-scroll-mode .layout-section-scrollable { flex: none; }
+.page-scroll-mode .table-scroll-container { height: auto; }
+.page-scroll-mode .table-scroll-container :deep(.table-wrapper) { max-height: 65dvh; }
 
 /* 表格滚动容器 - 增强版表体滚动方案 */
 .table-scroll-container {

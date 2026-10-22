@@ -1,6 +1,6 @@
 <template>
   <BaseDialog :show="true" :title="t('admin.proxies.clash.title')" width="extra-wide"
-    :show-close-button="!busy" :close-on-escape="!busy" @close="close">
+    content-class="clash-dialog-panel" body-class="clash-dialog-body" :show-close-button="!busy" :close-on-escape="!busy" @close="close">
     <div class="space-y-5" :aria-busy="busy">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('admin.proxies.clash.description') }}</p>
@@ -17,19 +17,10 @@
           <label for="clash-subscription-url" class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('admin.proxies.clash.url') }}</label>
           <span v-if="state?.revision" class="text-xs text-gray-500">{{ t('admin.proxies.clash.updated') }} {{ formatDateTime(state.updated_at) }}</span>
         </div>
-        <div class="flex flex-col items-start gap-3 sm:flex-row">
-          <div class="relative w-full min-w-0 flex-1">
-            <Icon name="link" size="sm" class="pointer-events-none absolute left-3 top-3.5 text-gray-400" />
-            <textarea id="clash-subscription-url" v-model="url" rows="6" autocomplete="off" autocapitalize="off" spellcheck="false"
-              class="input clash-subscription-input resize-y pl-9 pr-11 font-mono text-sm leading-6" :class="{ 'clash-subscription-hidden': !showURL }" :disabled="busy"
-              :placeholder="t(state?.url_hint ? 'admin.proxies.clash.keepURL' : 'admin.proxies.clash.urlPlaceholder')" @input="invalidatePreview" />
-            <button type="button" class="absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-dark-600 dark:hover:text-gray-200"
-              :aria-label="t(showURL ? 'admin.proxies.clash.hideURL' : 'admin.proxies.clash.showURL')" :title="t(showURL ? 'admin.proxies.clash.hideURL' : 'admin.proxies.clash.showURL')"
-              :aria-pressed="showURL" @click="showURL = !showURL">
-              <Icon :name="showURL ? 'eyeOff' : 'eye'" size="md" />
-            </button>
-          </div>
-          <button type="submit" class="btn btn-secondary h-11 shrink-0" :disabled="busy || (!url.trim() && !state?.url_hint)">
+        <SubscriptionSourceEditor v-model="url" :disabled="operationBusy" :sources="observations" @update:model-value="invalidatePreview" @checking="sourceChecking = $event" />
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <span class="text-xs text-gray-500">{{ t('admin.proxies.clash.sourceCount', { count: url.trim() ? new Set(url.trim().split(/\s+/)).size : state?.sources?.length ?? 0 }) }}</span>
+          <button type="submit" class="btn btn-secondary h-10" :disabled="busy || (!url.trim() && !state?.url_hint)">
             <Icon name="refresh" size="sm" :class="previewing ? 'motion-safe:animate-spin' : ''" />
             {{ t(previewing ? 'admin.proxies.clash.previewing' : 'admin.proxies.clash.preview') }}
           </button>
@@ -37,6 +28,10 @@
         <p class="text-xs leading-relaxed text-gray-500">{{ t('admin.proxies.clash.replaceHint') }}</p>
       </form>
 
+      <div v-if="failedSources.length" class="space-y-1 rounded-lg bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-300" role="status">
+        <p class="flex items-center gap-1.5 font-medium"><Icon name="exclamationTriangle" size="sm" />{{ t('admin.proxies.clash.partialFailure', { count: failedSources.length }) }}</p>
+        <p v-for="source in failedSources" :key="source.id">{{ t('proxyHealth.source', { index: source.index }) }} · {{ sourceReason(source) }}</p>
+      </div>
       <p v-if="errorMessage" role="alert" class="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20">{{ errorMessage }}</p>
       <p v-if="successMessage" role="status" class="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400"><Icon name="checkCircle" size="sm" />{{ successMessage }}</p>
 
@@ -97,7 +92,7 @@
             </div>
             <span v-for="protocol in protocols" :key="protocol.name" class="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600 dark:bg-dark-700 dark:text-gray-300">{{ protocol.name }} · {{ protocol.count }}</span>
           </div>
-          <div v-if="filteredNodes.length" class="max-h-80 overflow-auto rounded-xl border border-gray-200 dark:border-dark-600">
+          <div v-if="filteredNodes.length" class="overflow-x-auto rounded-xl border border-gray-200 dark:border-dark-600">
             <table class="w-full min-w-[640px] text-left text-sm">
               <thead class="sticky top-0 z-10 bg-gray-50 text-xs text-gray-500 dark:bg-dark-700">
                 <tr>
@@ -110,9 +105,10 @@
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-dark-600">
                 <tr v-for="node in filteredNodes" :key="node.name" class="hover:bg-gray-50/70 dark:hover:bg-dark-700/40">
-                  <td v-if="hasPreview" class="p-3"><input type="checkbox" :aria-label="node.name" :checked="selected.has(node.name)" :disabled="busy" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="toggle(node.name)" /></td>
+                  <td v-if="hasPreview" class="p-3"><input type="checkbox" :aria-label="node.name" :checked="selected.has(node.name)" :disabled="busy || node.retained" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="toggle(node.name)" /></td>
                   <td class="max-w-xs p-3">
                     <div class="break-words font-medium text-gray-800 dark:text-gray-100">{{ node.name }}</div>
+                    <span v-if="node.retained" class="text-xs text-amber-700 dark:text-amber-400">{{ t('admin.proxies.clash.retainedNode') }}</span>
                     <div class="mt-1 break-all font-mono text-xs text-gray-400">{{ endpoint(node.server, node.server_port) }}</div>
                   </td>
                   <td class="p-3"><span class="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium uppercase text-gray-600 dark:bg-dark-700 dark:text-gray-300">{{ node.type }}</span></td>
@@ -161,7 +157,8 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
-import { getClashSubscription, previewClashSubscription, importClashSubscription, type ClashNode, type ClashSubscription } from '@/api/admin/clash'
+import SubscriptionSourceEditor from './SubscriptionSourceEditor.vue'
+import { getClashSubscription, previewClashSubscription, importClashSubscription, type ClashNode, type ClashSource, type ClashSubscription } from '@/api/admin/clash'
 import { testProxy } from '@/api/admin/proxies'
 import { formatDateTime } from '@/utils/format'
 
@@ -170,7 +167,9 @@ const { t } = useI18n()
 const state = ref<ClashSubscription | null>(null)
 const nodes = ref<ClashNode[]>([])
 const url = ref('')
-const showURL = ref(true)
+const sourceChecking = ref(false)
+const observations = ref<ClashSource[]>([])
+const failedSources = computed(() => observations.value.filter(source => source.fetch_error))
 const search = ref('')
 const selected = ref(new Set<string>())
 const hasPreview = ref(false)
@@ -185,7 +184,8 @@ const testTotal = ref(0)
 const errorMessage = ref('')
 const successMessage = ref('')
 const results = ref<Record<number, { success: boolean; latency_ms?: number; message?: string }>>({})
-const busy = computed(() => loading.value || previewing.value || saving.value || testing.value)
+const operationBusy = computed(() => loading.value || previewing.value || saving.value || testing.value)
+const busy = computed(() => operationBusy.value || sourceChecking.value)
 const testableNodes = computed(() => (state.value?.nodes ?? []).filter(n => n.enabled && n.proxy_id))
 const healthyCount = computed(() => Object.values(results.value).filter(r => r.success).length)
 const protocols = computed(() => {
@@ -206,15 +206,19 @@ const stats = computed(() => [
 let disposed = false
 onUnmounted(() => { disposed = true })
 
+function sourceReason(source: ClashSource) {
+  if (source.fetch_error === 'http_error') return `HTTP ${source.http_status || '—'}`
+  return t(`proxyHealth.fetchReasons.${source.fetch_error}`)
+}
 function errorText(error: unknown): string {
   const e = error as { message?: string; response?: { data?: { message?: string; detail?: string } } }
   return e.response?.data?.detail || e.response?.data?.message || e.message || t('admin.proxies.clash.failed')
 }
 function close() { if (!busy.value) emit('close') }
 function requestURL() { return url.value.trim() === state.value?.url ? '' : url.value.trim() }
-function invalidatePreview() { hasPreview.value = false; nodes.value = state.value?.nodes ?? []; search.value = ''; successMessage.value = ''; errorMessage.value = '' }
+function invalidatePreview() { observations.value = []; hasPreview.value = false; nodes.value = state.value?.nodes ?? []; search.value = ''; successMessage.value = ''; errorMessage.value = '' }
 function toggle(name: string) { const next = new Set(selected.value); if (next.has(name)) next.delete(name); else next.add(name); selected.value = next }
-function selectAll() { selected.value = selected.value.size === nodes.value.length ? new Set() : new Set(nodes.value.map(n => n.name)) }
+function selectAll() { selected.value = new Set(nodes.value.filter(n => selected.value.size !== nodes.value.length || n.retained).map(n => n.name)) }
 function endpoint(host?: string, port?: number) { return host ? `${host.includes(':') && !host.startsWith('[') ? `[${host}]` : host}${port ? `:${port}` : ''}` : '—' }
 function healthLabel(node: ClashNode) {
   if (testingIDs.value.has(node.proxy_id)) return t('admin.proxies.clash.nodeTesting')
@@ -232,7 +236,7 @@ function healthClass(node: ClashNode) {
 }
 async function load() {
   loading.value = true
-  try { state.value = await getClashSubscription(); nodes.value = state.value.nodes; url.value = state.value.url ?? '' }
+  try { state.value = await getClashSubscription(); nodes.value = state.value.nodes; url.value = state.value.url ?? ''; observations.value = state.value.sources ?? [] }
   catch (e) { errorMessage.value = errorText(e) }
   finally { loading.value = false }
 }
@@ -241,8 +245,8 @@ async function preview() {
   previewing.value = true; errorMessage.value = ''; successMessage.value = ''; hasPreview.value = false; search.value = ''
   try {
     const data = await previewClashSubscription(requestURL())
-    nodes.value = data.nodes; previewRevision.value = data.revision
-    selected.value = new Set(data.nodes.filter(n => n.enabled).map(n => n.name)); hasPreview.value = true
+    nodes.value = data.nodes; previewRevision.value = data.revision; observations.value = data.sources ?? []
+    selected.value = new Set(data.nodes.filter(n => n.enabled).map(n => n.name)); hasPreview.value = !data.sources?.length || data.sources.some(source => !source.fetch_error)
   } catch (e) { nodes.value = state.value?.nodes ?? []; errorMessage.value = errorText(e) }
   finally { previewing.value = false }
 }
@@ -250,8 +254,11 @@ async function save() {
   if (busy.value || !hasPreview.value || !state.value?.configured) return
   saving.value = true; errorMessage.value = ''; successMessage.value = ''
   try {
-    state.value = await importClashSubscription(requestURL(), [...selected.value], previewRevision.value)
-    nodes.value = state.value.nodes; hasPreview.value = false; url.value = state.value.url ?? url.value; results.value = {}; search.value = ''
+    const sourceIDs = Object.fromEntries(nodes.value.filter(n => n.source_id && selected.value.has(n.name)).map(n => [n.name, n.source_id!]))
+    state.value = await (Object.keys(sourceIDs).length
+      ? importClashSubscription(requestURL(), [...selected.value], previewRevision.value, sourceIDs)
+      : importClashSubscription(requestURL(), [...selected.value], previewRevision.value))
+    nodes.value = state.value.nodes; hasPreview.value = false; url.value = state.value.url ?? url.value; results.value = {}; search.value = ''; observations.value = state.value.sources ?? []
     successMessage.value = t('admin.proxies.clash.imported', { count: state.value.nodes.filter(n => n.enabled).length })
     emit('changed', true)
   } catch (e) { errorMessage.value = errorText(e) }
@@ -280,13 +287,8 @@ onMounted(load)
 </script>
 
 <style scoped>
-.clash-subscription-input {
-  min-height: 10rem;
-}
-
-.clash-subscription-hidden {
-  -webkit-text-security: disc;
-}
+:global(.clash-dialog-panel) { max-height: calc(100dvh - 2rem); min-height: 0; overflow: hidden; }
+:global(.clash-dialog-body) { min-height: 0; overscroll-behavior-y: contain; scrollbar-gutter: stable; }
 
 .clash-progress {
   appearance: none;
