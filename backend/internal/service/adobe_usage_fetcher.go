@@ -65,12 +65,21 @@ func (s *AccountUsageService) getAdobeUsage(ctx context.Context, account *Accoun
 		}
 		sharedCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), adobeUsageFetchTimeout)
 		defer cancel()
+		routed, lease, leaseErr := prepareAdobeTestProxy(sharedCtx, s.accountRepo, account, "")
+		if leaseErr != nil {
+			return nil, leaseErr
+		}
+		// Credits are not generation evidence. Always return this borrowed slot.
+		defer finishAdobeTestProxy(sharedCtx, s.accountRepo, lease, false, false)
+		if lease != nil {
+			sharedCtx = context.WithValue(sharedCtx, adobeProxyLeaseContextKey{}, lease)
+		}
 		if manualAdobeDiagnostic {
 			// Permit the explicit read-only check to renew an error account's
 			// session, with the same expiry/identity guards as the image test.
 			sharedCtx = context.WithValue(sharedCtx, adobeAccountTestContextKey{}, true)
 		}
-		usage, err := s.fetchAndCacheAdobeUsage(sharedCtx, account, source)
+		usage, err := s.fetchAndCacheAdobeUsage(sharedCtx, routed, source)
 		if err != nil {
 			return nil, err
 		}

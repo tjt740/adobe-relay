@@ -392,6 +392,10 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	if leaseErr != nil {
 		return s.sendErrorAndEnd(c, leaseErr.Error())
 	}
+	if lease != nil {
+		ctx = context.WithValue(ctx, adobeProxyLeaseContextKey{}, lease)
+		c.Request = c.Request.WithContext(ctx)
+	}
 	defer func() {
 		allow, configured := ctx.Value(accountTestRecoveryPolicyKey{}).(bool)
 		finishAdobeTestProxy(ctx, s.accountRepo, lease, testErr == nil, !configured || allow)

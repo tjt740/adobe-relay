@@ -44,7 +44,7 @@ export default {
           },
           "leases": {
             "title": "Borrow for checks, keep only after successful recovery",
-            "body": "Manual checks, existing schedules and new-cookie checks share temporary routing, protect business demand and retain the three-account limit. Every affected model must recover. Failure and cancellation release the slot; abandoned leases expire after five minutes and are reclaimed by maintenance. This feature adds no recurring image generation and does not replay a possibly submitted check."
+            "body": "Manual checks, existing schedules and new-cookie checks share temporary routing, protect business demand and retain the three-account limit. Every affected model must recover. Failure and cancellation release the slot; abandoned leases expire after five minutes and are reclaimed by maintenance. This feature adds no recurring image generation and does not replay a possibly submitted check. Credit queries and background token refresh also borrow a proxy and always release it; neither clears model 408 failures nor restores a permanent binding."
           },
           "protection": {
             "title": "Assignment still requires verification",

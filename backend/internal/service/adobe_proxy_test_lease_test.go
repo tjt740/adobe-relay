@@ -145,3 +145,75 @@ func TestAdobeProxyLeaseCredentialOnlyVerificationAlwaysReleases(t *testing.T) {
 	require.True(t, r.released)
 	require.False(t, r.promoted)
 }
+
+func TestAdobeProxyLeaseCreditsQueryUsesBorrowedRouteAndNeverPromotes(t *testing.T) {
+	for _, source := range []string{"active", "passive"} {
+		t.Run(source, func(t *testing.T) {
+			a := adobeTestConnAccount(map[string]any{"cookie": "fixture", "access_token": "test-token"})
+			r := newLeasedCheckRepo(a)
+			client := &stubAdobeCreditsClient{balance: &adobe.CreditsBalance{Available: int64Ptr(10)}}
+			s := newAdobeUsageTestService(t, r, client)
+			adobeUsageClientFactory = func(snapshot *Account) adobeCreditsClient {
+				require.NotNil(t, snapshot.ProxyID)
+				require.EqualValues(t, 99, *snapshot.ProxyID)
+				return client
+			}
+			info, err := s.getAdobeUsage(context.Background(), a, source, false)
+			require.NoError(t, err)
+			require.Empty(t, info.Error)
+			require.Equal(t, []string{"acquire", "release"}, r.events)
+			require.Equal(t, []bool{false}, r.finishedLease)
+			_, err = s.getAdobeUsage(context.Background(), a, source, false)
+			require.NoError(t, err)
+			require.Len(t, r.scopes, 1, "cached reads need neither a route nor another upstream query")
+		})
+	}
+}
+
+func TestAdobeProxyLeaseCreditsWithoutCapacityNeverUsesDirect(t *testing.T) {
+	a := adobeTestConnAccount(nil)
+	r := newLeasedCheckRepo(a)
+	r.acquireErr = errors.New("no temporary proxy")
+	client := &stubAdobeCreditsClient{balance: &adobe.CreditsBalance{Available: int64Ptr(10)}}
+	s := newAdobeUsageTestService(t, r, client)
+	info, err := s.getAdobeUsage(context.Background(), a, "active", true)
+	require.NoError(t, err)
+	require.Contains(t, info.Error, "no temporary proxy")
+	require.Zero(t, client.calls.Load())
+	require.Empty(t, r.finishedLease)
+}
+
+func TestAdobeProxyLeaseBackgroundTokenRefreshBorrowsOrReusesOwner(t *testing.T) {
+	for _, mode := range []string{"borrow", "reuse", "no capacity"} {
+		t.Run(mode, func(t *testing.T) {
+			a := adobeTestConnAccount(nil)
+			r := newLeasedCheckRepo(a)
+			ctx := context.Background()
+			if mode == "reuse" {
+				pid := int64(99)
+				a.ProxyID = &pid
+				ctx = context.WithValue(ctx, adobeProxyLeaseContextKey{}, &AdobeProxyTestLease{AccountID: a.ID})
+			}
+			if mode == "no capacity" {
+				r.acquireErr = errors.New("no temporary proxy")
+			}
+			exec := &refreshAPIExecutorStub{needsRefresh: true, err: errors.New("synthetic refresh stops after routing"), onRefresh: func() {
+				require.NotNil(t, r.accounts[a.ID].ProxyID)
+				require.EqualValues(t, 99, *r.accounts[a.ID].ProxyID)
+			}}
+			_, err := NewOAuthRefreshAPI(r, nil).RefreshIfNeeded(ctx, a, exec, time.Hour)
+			require.Error(t, err)
+			switch mode {
+			case "borrow":
+				require.Equal(t, []string{"acquire", "release"}, r.events)
+				require.Equal(t, []bool{false}, r.finishedLease)
+			case "reuse":
+				require.Empty(t, r.events)
+				require.Equal(t, 1, exec.refreshCalls)
+			case "no capacity":
+				require.Zero(t, exec.refreshCalls)
+				require.Empty(t, r.finishedLease)
+			}
+		})
+	}
+}

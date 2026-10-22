@@ -254,6 +254,13 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 	}
 
 	// 4. 执行平台特定刷新逻辑
+	// Background token maintenance also needs a temporary route for quarantined
+	// Adobe accounts. Tests and credits queries propagate their existing owner.
+	freshAccount, lease, leaseErr := prepareAdobeTestProxy(ctx, api.accountRepo, freshAccount, "")
+	if leaseErr != nil {
+		return nil, leaseErr
+	}
+	defer finishAdobeTestProxy(ctx, api.accountRepo, lease, false, false)
 	attemptedAccount := snapshotOAuthRefreshAccount(freshAccount)
 	newCredentials, refreshErr := executor.Refresh(ctx, freshAccount)
 	if ctxErr := ctx.Err(); ctxErr != nil {
