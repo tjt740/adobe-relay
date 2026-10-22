@@ -1,0 +1,113 @@
+{
+  "pull_request": "https://github.com/tjt740/adobe-relay/pull/100",
+  "merge_sha": "94c6c163d0edcb1719327515ef5f22633def3015",
+  "workflow_run": 39761713163,
+  "ci": {
+    "application_sha": "3d0f78a461e37b8a9bbaea8a807bfede57b2a60e",
+    "workflow_run": 39761713163,
+    "conclusion": "success",
+    "archive_sha256": "2201c9b3e51727663b517d5964c54a902a2b5c30719d9c1dcad1fc6722751305"
+  },
+  "premigration_backup": {
+    "at": "2026-10-22T10:05:39.875412+00:00",
+    "backup": "/opt/adobe-relay/backups/20261022T100517Z-before-proxy-408-quarantine",
+    "database_bytes": 163109986,
+    "database_sha256": "0b05574e78f6b3cb75fdb94ff4ee303063fbcf6291c3136a44dffd600db578ae",
+    "installed_migration_count": 322,
+    "source_image": "adobe-relay:7087d7e77277c8fd953b0e372078008c48c085a5",
+    "dump_verified": true,
+    "routing_changed": false
+  },
+  "immediate_baseline": {
+    "at": "2026-10-22T10:23:39.439368+00:00",
+    "accounts": 978,
+    "bound": 825,
+    "bound_unresolved_408": 693,
+    "healthy_nodes": 273,
+    "available_slots": 0
+  },
+  "route_canary": {
+    "at": "2026-10-22T10:23:47.446102+00:00",
+    "temporary_redirect": true,
+    "source_and_canary_healthy": true
+  },
+  "route_canonical": {
+    "at": "2026-10-22T10:28:39.267418+00:00",
+    "temporary_redirect": false,
+    "source_and_canary_healthy": true
+  },
+  "final": {
+    "at": "2026-10-22T10:37:24.573356+00:00",
+    "application_sha": "3d0f78a461e37b8a9bbaea8a807bfede57b2a60e",
+    "application_version": "2026-10-22T18:37:23.828+0800\tINFO\tstdlog\tSub2API 0.2.17 (commit: 3d0f78a461e37b8a9bbaea8a807bfede57b2a60e, built: 2026-10-22T10:17:29Z)\t{\"service\": \"sub2api\", \"env\": \"bootstrap\", \"legacy_stdlog\": true}",
+    "preserved": {
+      "other_containers": true,
+      "configuration": true,
+      "resources_and_go": true,
+      "environment": true,
+      "okad_settings": true,
+      "sub2_settings_including_smtp": true,
+      "clash_nodes_bindings_and_configuration": true,
+      "alert_rules": true
+    },
+    "business_preservation": {
+      "backup_accounts": 978,
+      "checked_accounts": 978,
+      "manual_pauses_preserved": true,
+      "proxy_bindings_changed_with_event_chain": 738,
+      "cookie_rotations_with_version_advance": 0,
+      "token_fields_only_changes": 4
+    },
+    "capacity_release": {
+      "before_at": "2026-10-22T10:23:39.439368+00:00",
+      "after_at": "2026-10-22T10:35:24.475259+00:00",
+      "original_accounts": 978,
+      "current_accounts": 978,
+      "new_account_ids": [],
+      "initial_408_bindings": 693,
+      "initial_408_bindings_now_released": 693,
+      "released_on_initially_healthy_nodes": 688,
+      "initial_408_bindings_currently_testing": 0,
+      "initial_408_bindings_recovered_permanently": 0,
+      "previously_all_408_nodes_now_empty": 162,
+      "previously_all_408_nodes_healthy_before_and_after_now_empty": 154,
+      "total_bound_before": 825,
+      "total_bound_after": 148,
+      "free_healthy_slots_before": 0,
+      "free_healthy_slots_after": 649,
+      "free_healthy_slots_net_change": 649,
+      "healthy_nodes_before": 273,
+      "healthy_nodes_after": 265,
+      "quarantined_accounts_after": 830,
+      "temporary_test_bindings_after": 0,
+      "unresolved_408_regular_bindings_after": 0,
+      "manual_pauses_and_account_configuration_preserved": true,
+      "distinct_egress_ips_not_measured": true
+    },
+    "requested_408_scheduling_pauses": 8,
+    "migration_checksums_preserved": true,
+    "canonical_assets": {
+      "/assets/index-C7ECBNlr.js": "052964cd1aeb2fb396e85037fbe9ee12c4660beeb5e5f5441fee7d2bfb0dca35",
+      "/assets/ChangelogView-ngG6vEE8.js": "4001872d0bf567bc256dd52c111d3e32629738c1db09ab245ef744775535b352",
+      "/assets/ProxiesView-BWqCRpHn.js": "6053a8d78b8e320b55e66146d9179212f265188037ed909e10840d1b95c70898",
+      "/assets/AccountsView-B3Sej67-.js": "0e83e640d08f24587d493572ce4e4a02df9c4b5eb0b3ac879873354bfdc29f18"
+    },
+    "live_browser_cases": 0,
+    "browser_limitation": "Chrome tab inspection timed out twice before rollout. Live layout verification unavailable; canonical asset markers, authenticated API, runtime and exact capacity snapshots are verified separately.",
+    "heartbeat_after_temporary_process_cleanup": {
+      "at": "2026-10-22T18:36:35.439771+08:00",
+      "healthy": true
+    },
+    "passive_sample_count": 13,
+    "temporary_cleanup": {
+      "at": "2026-10-22T10:33:06.117409+00:00",
+      "temporary_container_removed": true,
+      "temporary_nat_rule_removed": true,
+      "rolling_lease_removed": true,
+      "nginx_configuration_unchanged": true
+    },
+    "adobe_custom_business_preserved": true,
+    "active_adobe_probes": false,
+    "test_mail_sent": false
+  }
+}
