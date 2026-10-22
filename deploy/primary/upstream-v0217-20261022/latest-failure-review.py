@@ -23,13 +23,13 @@ def classify(before,current,health,cutover):
  old_pause=old_extra.get('okad_manual_pause');new_pause=new_extra.get('okad_manual_pause')
  assert old_pause==new_pause and (old_pause is None or old_pause is False)
  business_auth=any(h['source']=='business' and h['stage']=='token' and h['reason']=='auth' and h['status_code']==401 and datetime.datetime.fromisoformat(h['failed_at'])>=cutover for h in health)
- assert business_auth or current.get('_background_refresh_evidence'), 'No post-cutover business or original background terminal auth evidence'
+ assert business_auth or current.get('_background_refresh_evidence') or current.get('_usage_auth_evidence'), 'No original business, background or audited usage terminal auth evidence'
  old_creds=before['credentials'];new_creds=current['credentials']
  changed={k for k in set(old_creds)|set(new_creds) if old_creds.get(k)!=new_creds.get(k)}
  assert changed <= TOKEN_KEYS|{'cookie'}, 'Operator model mapping or unrelated credentials changed'
  if old_creds.get('cookie')==new_creds.get('cookie'):
   assert current['error_message'].startswith(('Token refresh failed (non-retryable):','Authentication failed (401):'))
-  return 'original_business_auth_error_same_cookie' if business_auth else 'original_background_auth_error_same_cookie'
+  return 'original_business_auth_error_same_cookie' if business_auth else ('original_background_auth_error_same_cookie' if current.get('_background_refresh_evidence') else 'original_audited_usage_auth_error_same_cookie')
  old_okad=old_extra.get('okad',{});okad=new_extra.get('okad',{});gate=new_extra.get('okad_connection_test',{})
  assert int(okad.get('version') or 0)>int(old_okad.get('version') or 0) and okad.get('verification')=='verified'
  assert not old_okad.get('issuer') or old_okad['issuer']==okad.get('issuer')
@@ -61,10 +61,18 @@ def review(a,initial_accounts,latest_accounts):
  source=json.loads((ROOT/'reviewed-live-state-changes.json').read_text())['original_source_sha256'];assert all(v['before']==v['candidate'] for v in source.values())
  logs=subprocess.run(['docker','logs','--since',cutover.isoformat(),a.APP],text=True,capture_output=True,check=True,timeout=45)
  log_text=logs.stdout+'\n'+logs.stderr
+ usage_requests=json.loads(a.sql("SELECT coalesce(json_agg(json_build_object('id',id,'created_at',created_at,'request_body',request_body)),'[]') FROM audit_logs WHERE created_at>='"+cutover.isoformat()+"'::timestamptz AND path='/api/v1/admin/accounts/usage/batch' AND status_code=200 AND actor_role='admin'"))
  proof=[]
  for row in current:
   row['_background_refresh_evidence']=background_evidence(log_text,row)
-  proof.append({'id':row['id'],'cookie_unchanged':old[row['id']]['credentials'].get('cookie')==row['credentials'].get('cookie'),'background_terminal_evidence':row['_background_refresh_evidence'],'health':[h for h in health if h['account_id']==row['id']],'error_sha256':hashlib.sha256((row['error_message'] or '').encode()).hexdigest()})
+  row['_usage_auth_evidence']=[]
+  terminal=row['error_message'].startswith('Token refresh failed (non-retryable):') and 'adobe cookie is no longer valid' in row['error_message'].lower()
+  if terminal:
+   for request in usage_requests:
+    try:requested=json.loads(request['request_body']).get('account_ids',[])
+    except (ValueError,AttributeError):continue
+    if row['id'] in requested:row['_usage_auth_evidence'].append({'audit_id':request['id'],'at':request['created_at'],'path':'/api/v1/admin/accounts/usage/batch','terminal_cookie_error':True})
+  proof.append({'id':row['id'],'cookie_unchanged':old[row['id']]['credentials'].get('cookie')==row['credentials'].get('cookie'),'background_terminal_evidence':row['_background_refresh_evidence'],'audited_usage_evidence':row['_usage_auth_evidence'],'health':[h for h in health if h['account_id']==row['id']],'error_sha256':hashlib.sha256((row['error_message'] or '').encode()).hexdigest()})
  evidence_name='latest-failure-evidence-'+datetime.datetime.now(datetime.timezone.utc).strftime('%H%M%S')+'.json'
  a.save(evidence_name,{'accounts':proof,'credentials_in_output':False,'active_probes':False})
  result=[]
@@ -73,7 +81,7 @@ def review(a,initial_accounts,latest_accounts):
   records=[h for h in health if h['account_id']==i]
   try:kind=classify(old[i],row,records,cutover)
   except AssertionError as error:raise AssertionError('Account '+str(i)+': '+str(error)+'; inspect '+evidence_name) from error
-  result.append({'id':i,'classification':kind,'manual_pause_preserved':True,'error_sha256':hashlib.sha256((row['error_message'] or '').encode()).hexdigest(),'post_cutover_auth_failure_times':[h['failed_at'] for h in records if h['source']=='business' and h['status_code']==401 and datetime.datetime.fromisoformat(h['failed_at'])>=cutover]})
+  result.append({'id':i,'classification':kind,'manual_pause_preserved':True,'error_sha256':hashlib.sha256((row['error_message'] or '').encode()).hexdigest(),'background_evidence':row['_background_refresh_evidence'],'usage_evidence':row['_usage_auth_evidence'],'post_cutover_auth_failure_times':[h['failed_at'] for h in records if h['source']=='business' and h['status_code']==401 and datetime.datetime.fromisoformat(h['failed_at'])>=cutover]})
  assert sorted(r['id'] for r in result)==changed
  out={'at':latest_accounts and datetime.datetime.now(datetime.timezone.utc).isoformat(),'snapshot_changed_ids':changed,'reviewed_count':len(result),'accounts':result,'evidence_file':evidence_name,'source_implementation_unchanged':True,'manual_pause_preserved':True,'restored_old_data':False,'active_upstream_probes':False}
  a.save('latest-live-failure-review.json',out);return out

@@ -44,3 +44,9 @@ class LatestFailureReviewTests(TestCase):
   self.assertEqual(len(m.background_evidence(raw,row)),1)
   row['error_message']='temporary failure'
   self.assertFalse(m.background_evidence(raw,row))
+
+ def test_existing_audited_usage_error_retains_same_cookie_state(self):
+  row=copy.deepcopy(self.current);row['_usage_auth_evidence']=[{'audit_id':1,'terminal_cookie_error':True}]
+  self.assertEqual(m.classify(self.old,row,[],self.cutover),'original_audited_usage_auth_error_same_cookie')
+  row['credentials']['cookie']='unrelated-cookie'
+  with self.assertRaises(AssertionError):m.classify(self.old,row,[],self.cutover)
