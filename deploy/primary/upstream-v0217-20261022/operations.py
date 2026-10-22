@@ -1,7 +1,7 @@
 """Fixed-scope primary release bridge for unreliable local SSH connections."""
 import hashlib,json,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['prepare','start','status','browser','verify','export']
+assert phase in ['prepare','start','status','browser','review-state','approve-state','verify','export']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/upstream-v0217-20261022'
 options=['-i',str(pathlib.Path.home()/'.ssh/deploy_key'),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -46,6 +46,10 @@ elif phase=='browser':
  import shutil
  shutil.copy2(report,evidence/report.name)
  for screenshot in pathlib.Path(__file__).parent.glob('live-*.png'):shutil.copy2(screenshot,evidence/screenshot.name)
+elif phase in ['review-state','approve-state']:
+ copy([pathlib.Path(__file__).with_name('review-state-changes.py')])
+ action='capture' if phase=='review-state' else 'approve'
+ remote(f"import subprocess; subprocess.run(['python3','{root}/review-state-changes.py','{action}'],check=True)")
 elif phase=='verify':
  copy([pathlib.Path(__file__).with_name('schema-business-verify.py'),pathlib.Path(__file__).with_name('expected-new-migrations.json'),pathlib.Path(__file__).with_name('final-verify.py')])
  remote(f"""import json,pathlib,subprocess,sys,time
@@ -64,7 +68,7 @@ else:
  script=f"""import json,pathlib,subprocess
 r=pathlib.Path('{root}')
 out={{'application_sha':'{sha}','files':{{}}}}
-for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','schema-business-verification.json','final-verification.json']:
+for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','schema-business-verification.json','live-state-change-evidence.json','reviewed-live-state-changes.json','final-verification.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
