@@ -23,7 +23,7 @@ def classify(before,current,health,cutover):
  old_pause=old_extra.get('okad_manual_pause');new_pause=new_extra.get('okad_manual_pause')
  assert old_pause==new_pause and (old_pause is None or old_pause is False)
  business_auth=any(h['source']=='business' and h['stage']=='token' and h['reason']=='auth' and h['status_code']==401 and datetime.datetime.fromisoformat(h['failed_at'])>=cutover for h in health)
- assert business_auth or current.get('_background_refresh_evidence') or current.get('_usage_auth_evidence'), 'No original business, background or audited usage terminal auth evidence'
+ assert business_auth or current.get('_background_refresh_evidence') or any(e['terminal_cookie_error'] for e in current.get('_usage_auth_evidence',[])), 'No original business, background or audited usage terminal auth evidence'
  old_creds=before['credentials'];new_creds=current['credentials']
  changed={k for k in set(old_creds)|set(new_creds) if old_creds.get(k)!=new_creds.get(k)}
  assert changed <= TOKEN_KEYS|{'cookie'}, 'Operator model mapping or unrelated credentials changed'
@@ -67,11 +67,10 @@ def review(a,initial_accounts,latest_accounts):
   row['_background_refresh_evidence']=background_evidence(log_text,row)
   row['_usage_auth_evidence']=[]
   terminal=row['error_message'].startswith('Token refresh failed (non-retryable):') and 'adobe cookie is no longer valid' in row['error_message'].lower()
-  if terminal:
-   for request in usage_requests:
-    try:requested=json.loads(request['request_body']).get('account_ids',[])
-    except (ValueError,AttributeError):continue
-    if row['id'] in requested:row['_usage_auth_evidence'].append({'audit_id':request['id'],'at':request['created_at'],'path':'/api/v1/admin/accounts/usage/batch','terminal_cookie_error':True})
+  for request in usage_requests:
+   try:requested=json.loads(request['request_body']).get('account_ids',[])
+   except (ValueError,AttributeError):continue
+   if row['id'] in requested:row['_usage_auth_evidence'].append({'audit_id':request['id'],'at':request['created_at'],'path':'/api/v1/admin/accounts/usage/batch','terminal_cookie_error':terminal})
   proof.append({'id':row['id'],'cookie_unchanged':old[row['id']]['credentials'].get('cookie')==row['credentials'].get('cookie'),'background_terminal_evidence':row['_background_refresh_evidence'],'audited_usage_evidence':row['_usage_auth_evidence'],'health':[h for h in health if h['account_id']==row['id']],'error_sha256':hashlib.sha256((row['error_message'] or '').encode()).hexdigest()})
  evidence_name='latest-failure-evidence-'+datetime.datetime.now(datetime.timezone.utc).strftime('%H%M%S')+'.json'
  a.save(evidence_name,{'accounts':proof,'credentials_in_output':False,'active_probes':False})
@@ -80,7 +79,10 @@ def review(a,initial_accounts,latest_accounts):
   i=row['id'];assert row['status']==latest_accounts[i]['status'] and row['schedulable']==latest_accounts[i]['schedulable']
   records=[h for h in health if h['account_id']==i]
   try:kind=classify(old[i],row,records,cutover)
-  except AssertionError as error:raise AssertionError('Account '+str(i)+': '+str(error)+'; inspect '+evidence_name) from error
+  except AssertionError as error:
+   message=row['error_message'] or ''
+   diagnostic={'id':i,'reason':str(error),'error_category':next((prefix for prefix in ['Token refresh failed (non-retryable):','Authentication failed (401):','OAuth 401 (no refresh_token):','Okad credentials pending connection test','Okad credentials pending verification'] if message.startswith(prefix)),'other'),'signals':{word:word in message.lower() for word in ['adobe','cookie','no longer valid','invalid','expired','refresh','401','pending','limit']},'same_cookie':old[i]['credentials'].get('cookie')==row['credentials'].get('cookie'),'usage_matches':row['_usage_auth_evidence'],'background_matches':len(row['_background_refresh_evidence']),'gate_state':row['extra'].get('okad_connection_test',{}).get('state'),'evidence':evidence_name}
+   raise AssertionError(json.dumps(diagnostic)) from error
   result.append({'id':i,'classification':kind,'manual_pause_preserved':True,'error_sha256':hashlib.sha256((row['error_message'] or '').encode()).hexdigest(),'background_evidence':row['_background_refresh_evidence'],'usage_evidence':row['_usage_auth_evidence'],'post_cutover_auth_failure_times':[h['failed_at'] for h in records if h['source']=='business' and h['status_code']==401 and datetime.datetime.fromisoformat(h['failed_at'])>=cutover]})
  assert sorted(r['id'] for r in result)==changed
  out={'at':latest_accounts and datetime.datetime.now(datetime.timezone.utc).isoformat(),'snapshot_changed_ids':changed,'reviewed_count':len(result),'accounts':result,'evidence_file':evidence_name,'source_implementation_unchanged':True,'manual_pause_preserved':True,'restored_old_data':False,'active_upstream_probes':False}
