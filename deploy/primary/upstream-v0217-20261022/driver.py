@@ -15,6 +15,7 @@ if __name__=='__main__':
  os.umask(0o077)
  lock=open(ROOT/'driver.lock','a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
  assert not (ROOT/'after.json').exists(),'Already complete'
+ assert json.loads((ROOT/'premigration-backup.json').read_text())['dump_verified'], 'A verified pre-migration backup is required'
  heartbeat=None
  try:
   run_step('prepare-candidate',[sys.executable,str(ROOT/'rolling.py'),'prepare','--sha',SHA])
