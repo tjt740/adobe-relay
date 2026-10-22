@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"errors"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"net/http"
 	"sync"
 	"testing"
@@ -2127,7 +2128,7 @@ func TestMatchingPlatforms(t *testing.T) {
 		{"anthropic returns itself", PlatformAnthropic, []string{PlatformAnthropic}},
 		{"gemini returns itself", PlatformGemini, []string{PlatformGemini}},
 		{"openai returns itself", PlatformOpenAI, []string{PlatformOpenAI}},
-		{"composite returns concrete platforms", PlatformComposite, cloneAllowedQuotaPlatforms()},
+		{"composite returns concrete platforms", PlatformComposite, domain.ConcretePlatformIDs()},
 	}
 
 	for _, tt := range tests {

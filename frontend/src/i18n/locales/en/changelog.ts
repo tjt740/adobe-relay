@@ -25,6 +25,19 @@ export default {
       }
     },
     "updates": {
+      upstreamV0217: {
+        title: 'Upstream v0.2.17 feature upgrade (pending release)',
+        body: 'The candidate integrates official v0.2.17 features and fixes with adaptations for existing Adobe, Okad, proxy and scheduling behavior. This entry is not counted as a shipped update; its Beijing release date will be assigned after deployment.',
+        sections: {
+          reason: { title: 'Why upgrade', body: 'Synchronizes upstream model support, protocol compatibility and payment fixes while retaining the custom business capabilities built on the official project. The application version label is v0.2.17.' },
+          models: { title: 'Models and platforms', body: 'Adds Gemini 4 Argon, Claude Haiku 5.5, a dynamic platform catalog and multi-protocol providers, alongside group translations and explicit Gemini context caching. Availability still depends on accounts, mappings, upstream endpoints and existing configuration. No accounts or paid capabilities are enabled automatically.' },
+          gateway: { title: 'Gateway and client compatibility', body: 'Integrates Responses timestamps, Gemini thinking levels and streamed summaries, tool-result images, protocol endpoint selection and workspace-aware imports. OpenAI API-key Messages requests can use configured web-search emulation, and Gemini shared-capacity shortages use same-account backoff.' },
+          payments: { title: 'Payments, refunds and quotas', body: 'Integrates EasyPay order confirmation, deduction protection during pending refunds, Alipay refund queries, order-type validation and Stripe payment credential retrieval, together with usage-display and billing fixes. Existing merchant and payment settings are retained.' },
+          compatibility: { title: 'Custom business adaptations', body: 'Registers Adobe and Kiro in the new catalog while retaining model listings, manual proxy selection, automatic failover, Okad test and manual-pause protections, default pagination and shared controls. New in-flight balance reservations and API-key creation limits require explicit configuration, preserving existing admission and concurrency behavior. Adobe image endpoints, 451 responses, usage, quality labels and memory protection retain the existing custom implementation.' },
+          validation: { title: 'Validation scope', body: 'Development checks cover frontend and backend code, platform and gateway compatibility, existing business regressions, rollout guards and an isolated PostgreSQL upgrade. Fixtures are synthetic, and inherited baseline failures are recorded separately. These checks do not establish production deployment, peak throughput or upstream account recovery.' },
+          boundary: { title: 'Upgrade limits and rollout', body: 'Upstream removes gpt-5.5 scheduling and listings for ChatGPT OAuth / SetupToken accounts; API-key accounts are outside that retirement rule. Adobe GPT Image models are outside its scope. Deployment still requires reviewing current mappings, running versions and configuration, followed by backup and controlled draining. Old databases and manual account states must not be restored or overwritten.' },
+        },
+      },
       clashSubscriptions: {
         "title": "Individual subscription management, independent fetches and scrolling fixes",
         "body": "Removes the eight-URL limit and adds a list editor alongside bulk input and individual feed checks. Foreground fetches and background refresh share a concurrency limit, report failures per source and retain existing nodes and bindings for failed sources. Status icons, colored node counts and page scrolling are improved. Existing node, proxy-binding and configuration protections remain in effect.",

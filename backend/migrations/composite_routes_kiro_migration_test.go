@@ -69,6 +69,12 @@ func TestCompositeRouteTargetPlatformFinalStateCoversAllPlatforms(t *testing.T) 
 	// 取该文件里最后一处 CHECK (target_platform IN (...))，即约束终态。
 	checkRe := regexp.MustCompile(`CHECK \(target_platform IN \(([^)]*)\)\)`)
 	matches := checkRe.FindAllStringSubmatch(normalized, -1)
+	// The upstream catalog refactor deliberately removes SQL platform allowlists.
+	if last == "242_drop_platform_check_constraints.sql" {
+		require.Empty(t, matches)
+		require.Contains(t, normalized, "DROP CONSTRAINT IF EXISTS composite_model_routes_target_platform_check")
+		return
+	}
 	require.NotEmpty(t, matches,
 		"migration %s rebuilds the constraint but has no CHECK (target_platform IN (...))", last)
 

@@ -12,6 +12,12 @@ export const changelogPreviews = [
   { id: 'accountRecoveryDemo', demo: 'account-recovery' },
 ] as const
 
+// Prepared release notes have no deployment date and are not rendered as shipped.
+// Move the entry into dailyUpdates on its actual Asia/Shanghai deployment date.
+export const pendingDailyUpdates: readonly Omit<DailyUpdate, 'date'>[] = [
+  { id: 'upstreamV0217', type: 'improved', sections: ['reason', 'models', 'gateway', 'payments', 'compatibility', 'validation', 'boundary'] },
+]
+
 export const dailyOverviews: Readonly<Record<string, string>> = {
   '2026-10-22': 'clashSubscriptions',
   '2026-10-21': 'releaseSpeed',
