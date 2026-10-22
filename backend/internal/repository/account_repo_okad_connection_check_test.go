@@ -115,3 +115,25 @@ func TestOkadConnectionTestQueuePostgresConcurrentClaims(t *testing.T) {
 	}
 	require.Len(t, seen, 200)
 }
+
+func TestOkad408QueueCanClaimUnboundAccountWithoutBypassingOtherModelBlock(t *testing.T) {
+	db := newOkadRecoveryPostgres(t)
+	_, err := db.Exec(`INSERT INTO accounts(id,platform,type,status,schedulable,credentials,extra) VALUES(1,'adobe','oauth','active',true,'{"cookie":"fixture"}','{}');
+ INSERT INTO adobe_proxy_408_blocks VALUES(1,'another-model',NOW()-INTERVAL '1 day')`)
+	require.NoError(t, err)
+	r := &accountRepository{sql: db}
+	a := &service.Account{ID: 1, Status: service.StatusActive, Schedulable: true, Credentials: map[string]any{"cookie": "fixture"}}
+	require.NoError(t, r.QueueOkadConnectionTest(context.Background(), a, service.OkadConnectionTestKey(a), false))
+	_, err = db.Exec(`UPDATE proxy_auto_allocation SET enabled=true`)
+	require.NoError(t, err)
+	job, err := r.ClaimOkadConnectionTest(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	require.Nil(t, job.ProxyID)
+	require.NoError(t, r.FinishOkadConnectionTest(context.Background(), *job, "success"))
+	var sched bool
+	var status string
+	require.NoError(t, db.QueryRow(`SELECT status,schedulable FROM accounts WHERE id=1`).Scan(&status, &sched))
+	require.Equal(t, service.StatusError, status)
+	require.False(t, sched)
+}

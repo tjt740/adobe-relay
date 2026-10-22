@@ -18,6 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      proxyVerificationPriority: { title: 'Prioritize business capacity and lend proxies for 408 checks', body: 'Today fixes verification accounts waiting despite reclaimable capacity. Business demand comes first, followed by eligible pending verification. Unresolved 408 accounts release regular proxies and borrow one only for checks, keeping a binding after successful recovery. Today’s v0.2.17 upgrade and independent subscription management remain, with existing configuration and manual-pause rules preserved.' },
       clashSubscriptions: {"title": "v0.2.17 features and independent subscription updates", "body": "Today: integrate upstream v0.2.17 model, protocol and payment fixes while retaining Adobe, Okad and custom scheduling protections; remove the eight-URL cap, add row editing and checks alongside bulk input, and use bounded concurrency with independent source outcomes. Successful sources can update while failed sources retain saved nodes and bindings. Status icons, colored counts and scrolling improve; existing node budgets, manual account state and configuration remain protected."},
       "releaseSpeed": {
         "title": "Shorter release waits with rollout guards retained",
@@ -25,6 +26,44 @@ export default {
       }
     },
     "updates": {
+      proxyVerificationPriority: {
+        "title": "Prioritize pending verification and lend proxies to 408 recovery checks",
+        "body": "Fix verification waiting despite reclaimable capacity. With automatic allocation enabled, unresolved 408 accounts leave the regular allocation queue and borrow a proxy only for checks. Real generation on the affected model must succeed and all remaining 408 failures must recover before the binding becomes permanent. Failure or cancellation releases it. The panel and account details explain capacity and recovery conditions.",
+        "sections": {
+          "reason": {
+            "title": "Why verification could remain stuck",
+            "body": "An account with a saved new cookie may still need a proxy for verification. Treating it as an ordinary error account prevented it from reclaiming capacity occupied by inactive accounts."
+          },
+          "priority": {
+            "title": "Allocation order",
+            "body": "Retain and serve enabled business accounts first, assign healthy proxies to eligible pending or retrying verification next, then handle other stopped, expired or error accounts. Pending verification can reclaim those inactive slots. The limit remains three accounts per node."
+          },
+          "quarantine": {
+            "title": "Release capacity held by unresolved 408 accounts",
+            "body": "408 failures persist per model; later failures such as 500 cannot overwrite them. Unresolved accounts leave the regular proxy queue and release existing bindings in background maintenance. Cookie updates, credit checks and success on another model cannot clear the original failure. Historical aliases use the existing model catalog; Flare and Sunburst remain separate models."
+          },
+          "leases": {
+            "title": "Borrow for checks, keep only after successful recovery",
+            "body": "Manual checks, existing schedules and new-cookie checks share temporary routing, protect business demand and retain the three-account limit. Every affected model must recover. Failure and cancellation release the slot; abandoned leases expire after five minutes and are reclaimed by maintenance. This feature adds no recurring image generation and does not replay a possibly submitted check. Credit queries and background token refresh also borrow a proxy and always release it; neither clears model 408 failures nor restores a permanent binding."
+          },
+          "protection": {
+            "title": "Assignment still requires verification",
+            "body": "Priority changes proxy bindings only; it never clears errors or enables an account. Manual pauses, expired accounts, missing cookies and definitive authentication, identity, quota or entitlement failures do not qualify. Existing verification, recovery and model checks remain in control."
+          },
+          "wording": {
+            "title": "Understand capacity and waiting counts",
+            "body": "Free slots are immediately assignable. Slots that can be freed are occupied by other accounts until priority accounts need them. Regular waiting, unresolved 408 accounts and temporary checks are shown separately. Account details list remaining models and explain which model to test. Connection and switching rules are expandable."
+          },
+          "validation": {
+            "title": "Validation scope",
+            "body": "Disposable database checks cover reclamation, concurrent leases, failure and cancellation, expiry, stale credentials/results, multiple models and historical aliases. Manual pauses, verification gates and scheduled recovery policy are checked. Frontend coverage includes counts, account hints, older API compatibility and bilingual layouts. Isolated data and simulated generation do not establish real account recovery."
+          },
+          "boundary": {
+            "title": "Existing configuration and behavior",
+            "body": "No configuration keys are added. New state tables track unresolved 408 failures, allocator pause intent and temporary test leases. Existing credentials, operator state, groups, subscriptions, SMTP and alert settings remain. Check intervals, failover and latency-switch cooldown are preserved. Releasing bindings does not guarantee distinct egress IPs; proxy connectivity is not proof of successful generation."
+          }
+        }
+      },
       upstreamV0217: {
         title: 'Upstream v0.2.17 feature upgrade',
         body: 'Integrates official v0.2.17 features and fixes with adaptations for existing Adobe, Okad, proxy and scheduling behavior. Existing configuration and business data are retained; new capabilities depend on accounts, endpoints and explicit settings.',

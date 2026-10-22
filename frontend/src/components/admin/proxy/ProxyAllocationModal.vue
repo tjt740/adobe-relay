@@ -10,8 +10,13 @@
             <input v-model="enabled" type="checkbox" :disabled="saving" class="h-4 w-4 rounded text-primary-600" @change="dirty = true; saved = false" />
             {{ t('admin.proxies.allocation.enable') }}
           </label>
-          <p class="mt-2 text-xs leading-relaxed text-gray-500">{{ t('admin.proxies.allocation.behavior') }}</p>
-          <p class="mt-2 text-xs leading-relaxed text-gray-500">{{ t('admin.proxies.allocation.disableHint') }}</p>
+          <p class="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-300">{{ t('admin.proxies.allocation.priorityHint') }}</p>
+          <p class="mt-2 text-sm leading-relaxed text-gray-500">{{ t('admin.proxies.allocation.verificationHint') }}</p>
+          <details class="mt-3 text-xs leading-relaxed text-gray-500">
+            <summary class="cursor-pointer">{{ t('admin.proxies.allocation.rulesTitle') }}</summary>
+            <p class="mt-2">{{ t('admin.proxies.allocation.behavior') }}</p>
+            <p class="mt-2">{{ t('admin.proxies.allocation.disableHint') }}</p>
+          </details>
         </div>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <div v-for="stat in stats" :key="stat.label" class="rounded-xl border border-gray-200 p-3 dark:border-dark-600">
@@ -19,11 +24,21 @@
             <p class="mt-1 text-2xl font-semibold tabular-nums">{{ stat.value }}</p>
           </div>
         </div>
-        <p v-if="view.binding_only_accounts" class="text-sm text-gray-500" data-testid="binding-only-hint">
-          {{ t('admin.proxies.allocation.bindingOnlyHint', { count: view.binding_only_accounts }) }}
+        <div v-if="view.quarantined_408_accounts !== undefined" class="rounded-lg bg-sky-50 p-3 text-sm leading-relaxed text-sky-800 dark:bg-sky-900/20 dark:text-sky-300" data-testid="quarantine-408">
+          <p class="font-medium">{{ t('admin.proxies.allocation.quarantineSummary', { count: view.quarantined_408_accounts, testing: view.temporary_test_bindings ?? 0 }) }}</p>
+          <p class="mt-1">{{ t('admin.proxies.allocation.quarantineHint') }}</p>
+          <p class="mt-1">{{ t('admin.proxies.allocation.quarantineTestHint') }}</p>
+          <p v-if="view.enabled && view.pending_408_release" class="mt-1" data-testid="pending-408-release">{{ t('admin.proxies.allocation.pending408Release', { count: view.pending_408_release }) }}</p>
+        </div>
+        <p class="text-sm leading-relaxed text-gray-500" data-testid="capacity-hint">{{ t('admin.proxies.allocation.capacityHint') }}</p>
+        <p v-if="otherBindingAccounts" class="text-sm text-gray-500" data-testid="binding-only-hint">
+          {{ t('admin.proxies.allocation.bindingOnlyHint', { count: otherBindingAccounts }) }}
         </p>
         <p v-if="view.enabled && view.waiting" role="status" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
           {{ t('admin.proxies.allocation.waitingHint', { count: view.waiting }) }}
+          <span v-if="view.business_waiting !== undefined && view.verification_waiting !== undefined" class="mt-1 block" data-testid="waiting-breakdown">
+            {{ t('admin.proxies.allocation.waitingBreakdown', { business: view.business_waiting, verification: view.verification_waiting, other: otherWaiting }) }}
+          </span>
         </p>
         <p class="text-xs text-gray-500">{{ t('admin.proxies.allocation.checkedAt') }}：{{ view.checked_at ? new Date(view.checked_at).toLocaleString() : t('admin.proxies.allocation.pending') }}</p>
         <div v-if="view.nodes.length" class="max-h-72 overflow-auto rounded-xl border border-gray-200 dark:border-dark-600">
@@ -45,11 +60,13 @@
         <p v-else class="text-sm text-gray-500">{{ t('admin.proxies.allocation.noNodes') }}</p>
       </template>
       <p v-else-if="loading" role="status" class="text-sm text-gray-500">{{ t('common.loading') }}</p>
+    </div>
+    <template #footer>
       <div class="flex justify-end gap-3">
         <button class="btn btn-secondary" :disabled="loading || saving" @click="refresh(true)">{{ t('common.refresh') }}</button>
         <button class="btn btn-primary" :disabled="!view || !dirty || saving || loading" @click="save">{{ t('common.save') }}</button>
       </div>
-    </div>
+    </template>
   </BaseDialog>
 </template>
 
@@ -71,6 +88,8 @@ const saved = ref(false)
 const error = ref('')
 let alive = true
 let timer: ReturnType<typeof setInterval> | undefined
+const otherBindingAccounts = computed(() => Math.max(0, (view.value?.binding_only_accounts ?? 0) - (view.value?.verification_priority_accounts ?? 0)))
+const otherWaiting = computed(() => Math.max(0, (view.value?.waiting ?? 0) - (view.value?.business_waiting ?? 0) - (view.value?.verification_waiting ?? 0)))
 const stats = computed(() => [
   { label: t('admin.proxies.allocation.assigned'), value: view.value?.assigned ?? 0 },
   { label: t('admin.proxies.allocation.waiting'), value: view.value?.waiting ?? 0 },

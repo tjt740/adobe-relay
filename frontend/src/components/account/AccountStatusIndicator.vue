@@ -1,5 +1,8 @@
 <template>
   <div class="flex items-center gap-2">
+    <span v-if="proxy408?.managed" class="badge text-xs badge-warning" data-testid="account-408-quarantine" :title="t('admin.proxies.allocation.account408Hint')">
+      {{ t(proxy408.state === 'testing' ? 'admin.proxies.allocation.account408Testing' : 'admin.proxies.allocation.account408Waiting') }}
+    </span>
     <template v-if="adobeResult">
       <span
         :class="['badge text-xs', adobeResult.success ? 'badge-success' : [408, 429, 529].includes(adobeResult.code) ? 'badge-warning' : 'badge-danger']"
@@ -384,6 +387,7 @@ const tempUnschedulableError = computed(() => {
   return props.account.temp_unschedulable_reason || ''
 })
 const accountStatusCode = computed(() => getAccountStatusCode(props.account))
+const proxy408 = computed(() => props.account.extra?.adobe_proxy_408 as { managed?: boolean; state?: string } | undefined)
 const authenticationError = computed(() => getAccountAuthenticationError(props.account, t('admin.accounts.status.authenticationFailedHint')))
 const isAdobeCookieError = (message: string) => isAdobeAccountCookieError(props.account, message)
 

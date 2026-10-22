@@ -3,6 +3,7 @@ package admin
 import (
 	"errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	"github.com/Wei-Shaw/sub2api/internal/proxyfailover"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -89,6 +90,10 @@ func (h *AccountHandler) OkadVerifyCredential(c *gin.Context) {
 	}
 	a, err = h.accountUsageService.VerifyOkadCredential(c.Request.Context(), a)
 	if err != nil {
+		if errors.Is(err, proxyfailover.ErrNoTestProxy) || errors.Is(err, proxyfailover.ErrTestBusy) {
+			response.Error(c, 503, err.Error())
+			return
+		}
 		response.Error(c, 409, "验证期间账号状态已变化，请重新读取")
 		return
 	}

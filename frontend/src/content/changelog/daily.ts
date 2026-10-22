@@ -18,12 +18,13 @@ export const pendingDailyUpdates: readonly Omit<DailyUpdate, 'date'>[] = [
 ]
 
 export const dailyOverviews: Readonly<Record<string, string>> = {
-  '2026-10-22': 'clashSubscriptions',
+  '2026-10-22': 'proxyVerificationPriority',
   '2026-10-21': 'releaseSpeed',
 }
 
 // Use the actual release date in Asia/Shanghai; multiple releases share one day.
 export const dailyUpdates: readonly DailyUpdate[] = [
+  { date: '2026-10-22', id: 'proxyVerificationPriority', type: 'fixed', sections: ['reason', 'priority', 'quarantine', 'leases', 'protection', 'wording', 'validation', 'boundary'] },
   { date: '2026-10-22', id: 'upstreamV0217', type: 'improved', sections: ['reason', 'models', 'gateway', 'payments', 'compatibility', 'validation', 'boundary'] },
   { date: '2026-10-22', id: 'clashSubscriptions', type: 'improved', sections: ['reason', 'fetching', 'editing', 'status', 'scrolling', 'validation', 'boundary'] },
   {

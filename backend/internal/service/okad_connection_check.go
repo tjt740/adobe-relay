@@ -133,14 +133,33 @@ func (s *AccountTestService) runOkadConnectionTest(ctx context.Context, repo Oka
 	// covers token exchange. Do not reconnect/login or retry failed tests here.
 	testCtx, cancel := context.WithTimeout(context.WithValue(ctx, okadConnectionTestContextKey{}, job), 3*time.Minute)
 	defer cancel()
+	state := "failed"
+	a, err := s.accountRepo.GetByID(testCtx, job.AccountID)
+	if err != nil {
+		_ = repo.FinishOkadConnectionTest(ctx, job, "interrupted")
+		return
+	}
+	if a.Platform != PlatformAdobe || a.Type != AccountTypeOAuth || OkadConnectionTestKey(a) != job.Key {
+		_ = repo.FinishOkadConnectionTest(ctx, job, "interrupted")
+		return
+	}
+	a, lease, err := prepareAdobeTestProxy(testCtx, s.accountRepo, a, adobeHealthTestModel(a, ""))
+	if err != nil {
+		_ = repo.FinishOkadConnectionTest(ctx, job, "proxy_pending")
+		return
+	}
+	defer func() { finishAdobeTestProxy(ctx, s.accountRepo, lease, state == "success", true) }()
+	if lease != nil {
+		job.ProxyID = a.ProxyID
+		if a.Proxy != nil {
+			job.ProxyUpdatedAt = &a.Proxy.UpdatedAt
+		}
+		testCtx = context.WithValue(testCtx, okadConnectionTestContextKey{}, job)
+		testCtx = context.WithValue(testCtx, adobeProxyLeaseContextKey{}, lease)
+	}
 	if verifier, ok := s.accountRepo.(interface {
 		OkadVerificationProxyReady(context.Context, *Account) (bool, error)
 	}); ok {
-		a, err := s.accountRepo.GetByID(testCtx, job.AccountID)
-		if err != nil {
-			_ = repo.FinishOkadConnectionTest(ctx, job, "interrupted")
-			return
-		}
 		ready, err := verifier.OkadVerificationProxyReady(testCtx, a)
 		if err != nil || !ready {
 			_ = repo.FinishOkadConnectionTest(ctx, job, "proxy_pending")
@@ -148,7 +167,6 @@ func (s *AccountTestService) runOkadConnectionTest(ctx context.Context, repo Oka
 		}
 	}
 	result, err := s.RunTestBackground(testCtx, job.AccountID, "")
-	state := "failed"
 	if err == nil && result != nil && result.Status == "success" {
 		state = "success"
 	}

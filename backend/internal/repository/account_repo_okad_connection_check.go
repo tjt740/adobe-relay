@@ -47,7 +47,9 @@ func (r *accountRepository) ClaimOkadConnectionTest(ctx context.Context) (*servi
  AND (extra->'okad_connection_test'->>'next_check_at' IS NULL OR (extra->'okad_connection_test'->>'next_check_at')::timestamptz<=NOW())
  AND extra->'okad_connection_test'->>'key'=encode(sha256(convert_to(credentials->>'cookie','UTF8')),'hex')
  AND (extra->'okad_connection_test'->>'require_verification'='false' OR extra->'okad'->>'verification'='verified')
- AND (proxy_id IS NOT NULL OR NOT EXISTS(SELECT 1 FROM proxy_auto_allocation WHERE enabled))
+ AND (proxy_id IS NOT NULL OR NOT EXISTS(SELECT 1 FROM proxy_auto_allocation WHERE enabled)
+ OR EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=accounts.id)
+ OR EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=accounts.id))
  ORDER BY extra->'okad_connection_test'->>'queued_at',id FOR UPDATE SKIP LOCKED LIMIT 1)
  UPDATE accounts a SET extra=jsonb_set(a.extra,'{okad_connection_test}',a.extra->'okad_connection_test'||
  jsonb_build_object('state','running','started_at',NOW())),updated_at=NOW()
@@ -69,6 +71,7 @@ func (r *accountRepository) ClaimOkadConnectionTest(ctx context.Context) (*servi
 func (r *accountRepository) FinishOkadConnectionTest(ctx context.Context, job service.OkadConnectionTestJob, state string) error {
 	result, err := r.sql.ExecContext(ctx, `WITH eligible AS (
  SELECT id,($3='success'
+ AND NOT EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=accounts.id)
  AND (extra->'okad_connection_test'->>'require_verification'='false' OR extra->'okad'->>'verification'='verified')
  AND (status='active' OR (status='error' AND (error_message IN ($6,$7) OR LOWER(error_message) LIKE 'authentication failed (401):%' OR LOWER(error_message) LIKE 'token refresh failed (non-retryable): adobe cookie is no longer valid%')))
  AND LOWER(COALESCE(error_message,'')) NOT LIKE ALL(ARRAY['%taste_exhausted%','%quota exhausted%','%credits exhausted%','%model_not_entitled%','%user_not_entitled%','%not entitled%','%invalid_client%','%invalid_scope%'])
@@ -84,7 +87,8 @@ func (r *accountRepository) FinishOkadConnectionTest(ctx context.Context, job se
  a.extra->'okad_connection_test'||jsonb_build_object('state',$3::text,'finished_at',NOW(),'next_check_at',CASE WHEN $3='proxy_pending' THEN NOW()+INTERVAL '30 seconds' ELSE NULL END)),
  status=CASE WHEN e.verified THEN 'active' ELSE a.status END,
  schedulable=CASE WHEN e.verified AND a.extra->'okad_connection_test'->>'gated'='true'
- AND a.extra->'okad_connection_test'->>'resume'='true' AND COALESCE(a.extra->>'okad_manual_pause','false')<>'true' THEN true ELSE a.schedulable END,
+ AND a.extra->'okad_connection_test'->>'resume'='true' AND COALESCE(a.extra->>'okad_manual_pause','false')<>'true'
+ AND NOT EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=a.id) THEN true ELSE a.schedulable END,
  error_message=CASE WHEN e.verified THEN NULL ELSE a.error_message END,updated_at=NOW()
  FROM eligible e WHERE a.id=e.id RETURNING a.id)
  INSERT INTO scheduler_outbox(event_type,account_id,group_id,payload) SELECT $8,id,NULL,NULL FROM updated`, job.AccountID, job.Key, state, job.ProxyID, job.ProxyUpdatedAt, service.OkadConnectionTestPending, service.OkadVerificationPending, service.SchedulerOutboxEventAccountChanged, job.Manual)

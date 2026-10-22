@@ -296,6 +296,9 @@ type accountPolicy struct {
 }
 
 func (m *Manager) check(ctx context.Context) error {
+	if err := m.releaseExpiredTests(ctx); err != nil {
+		return err
+	}
 	tx, err := m.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

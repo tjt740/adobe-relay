@@ -14,6 +14,22 @@ vi.mock('vue-i18n', () => ({ useI18n: () => ({
 }) }))
 
 describe('Daily changelog', () => {
+  it('includes the proxy fix on its Beijing release date with complete bilingual notes', () => {
+    const item = dailyUpdates.find(update => update.id === 'proxyVerificationPriority')!
+    expect(item).toBeDefined()
+    expect(item.date).toBe('2026-10-22')
+    expect(pendingDailyUpdates.some(update => update.id === item.id)).toBe(false)
+    for (const messages of [zh, en]) {
+      const note = messages.daily.updates.proxyVerificationPriority
+      expect(note.title.trim()).toBeTruthy()
+      for (const key of item.sections ?? []) {
+        const section = note.sections[key as keyof typeof note.sections]
+        expect(section.title.trim()).toBeTruthy()
+        expect(section.body.trim()).toBeTruthy()
+      }
+    }
+  })
+
   it('combines releases on the same date and orders days newest first', () => {
     const grouped = groupDailyUpdates([
       { date: '2026-10-17', id: 'earlier', type: 'fixed' },
@@ -66,7 +82,7 @@ describe('Daily changelog', () => {
     const item = dailyUpdates.find(update => update.id === 'clashSubscriptions')!
     expect(item.date).toBe('2026-10-22')
     expect(item.sections).toHaveLength(7)
-    expect(dailyOverviews[item.date]).toBe('clashSubscriptions')
+    expect(dailyOverviews[item.date]).toBe('proxyVerificationPriority')
     for (const messages of [zh, en]) {
       expect(messages.daily.updates.clashSubscriptions.title).not.toMatch(/待发布|pending release/)
       expect(messages.daily.updates.clashSubscriptions.body).not.toMatch(/尚未部署|has not been deployed/)
@@ -93,7 +109,7 @@ describe('Daily changelog', () => {
     expect(release.text()).toContain('不是每次发布或完整上线的固定时限')
     expect(release.text()).toContain('生产部署步骤均跳过')
     expect(wrapper.get('[data-release-date="2026-10-21"] [data-testid="daily-overview"]').text()).toContain('缩短发布等待')
-    expect(sections[0].get('[data-testid="daily-overview"]').text()).toContain('订阅独立更新')
+    expect(sections[0].get('[data-testid="daily-overview"]').text()).toContain('代理名额优先保障业务')
     expect(wrapper.text()).not.toContain('changelog.daily.')
     for (const id of Object.values(dailyOverviews)) {
       for (const messages of [zh, en]) {

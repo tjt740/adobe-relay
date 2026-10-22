@@ -158,6 +158,12 @@ func (s *AccountUsageService) VerifyOkadCredential(ctx context.Context, a *Accou
 	}
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
+	a, lease, leaseErr := prepareAdobeTestProxy(ctx, s.accountRepo, a, "")
+	if leaseErr != nil {
+		return nil, leaseErr
+	}
+	// Credential-only verification never promotes the temporary route.
+	defer finishAdobeTestProxy(ctx, s.accountRepo, lease, false, false)
 	ready, err := repo.OkadVerificationProxyReady(ctx, a)
 	var fields map[string]any
 	var balance *adobe.CreditsBalance

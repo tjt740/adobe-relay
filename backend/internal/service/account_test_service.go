@@ -388,6 +388,18 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 			return s.sendErrorAndEnd(c, "Cookie changed before the automatic test started")
 		}
 	}
+	account, lease, leaseErr := prepareAdobeTestProxy(ctx, s.accountRepo, account, adobeHealthTestModel(account, modelID))
+	if leaseErr != nil {
+		return s.sendErrorAndEnd(c, leaseErr.Error())
+	}
+	if lease != nil {
+		ctx = context.WithValue(ctx, adobeProxyLeaseContextKey{}, lease)
+		c.Request = c.Request.WithContext(ctx)
+	}
+	defer func() {
+		allow, configured := ctx.Value(accountTestRecoveryPolicyKey{}).(bool)
+		finishAdobeTestProxy(ctx, s.accountRepo, lease, testErr == nil, !configured || allow)
+	}()
 	healthStarted := time.Now()
 	ctx = context.WithValue(ctx, accountTestStartedAtKey{}, healthStarted)
 	defer func() { s.recordConnectionTestResult(ctx, account, testErr) }()
