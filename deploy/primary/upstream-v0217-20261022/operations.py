@@ -90,7 +90,7 @@ else:
  script=f"""import json,pathlib,subprocess
 r=pathlib.Path('{root}')
 out={{'application_sha':'{sha}','files':{{}}}}
-for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','schema-business-verification.json','live-state-change-evidence.json','state-change-diagnostic.json','precutover-live-state-changes.json','latest-live-failure-review.json','reviewed-live-state-changes.json','final-verification.json']:
+for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','schema-business-verification.json','live-state-change-evidence.json','state-change-diagnostic.json','precutover-live-state-changes.json','latest-live-failure-review.json','reviewed-live-state-changes.json','final-verification.json']+[p.name for p in r.glob('latest-failure-evidence-*.json')]:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
