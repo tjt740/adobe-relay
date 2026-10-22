@@ -6,6 +6,11 @@ export interface DailyUpdate {
   metrics?: readonly string[]
 }
 
+// Validated change awaiting release; assign its Beijing deployment date before shipping.
+export const unreleasedUpdates: readonly Omit<DailyUpdate, 'date'>[] = [
+  { id: 'proxyVerificationPriority', type: 'fixed', sections: ['reason', 'priority', 'protection', 'wording', 'validation', 'boundary'] },
+]
+
 // Proposals have no release date and must not be counted as shipped updates.
 // Move a delivered feature into dailyUpdates only on its actual Beijing release date.
 export const changelogPreviews = [

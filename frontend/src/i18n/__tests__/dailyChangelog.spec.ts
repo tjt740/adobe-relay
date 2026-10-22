@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import DailyChangelog from '@/components/admin/changelog/DailyChangelog.vue'
-import { dailyUpdates, groupDailyUpdates, changelogPreviews, dailyOverviews } from '@/content/changelog/daily'
+import { dailyUpdates, groupDailyUpdates, changelogPreviews, dailyOverviews, unreleasedUpdates } from '@/content/changelog/daily'
 import zh from '@/i18n/locales/zh/changelog'
 import en from '@/i18n/locales/en/changelog'
 
@@ -14,6 +14,22 @@ vi.mock('vue-i18n', () => ({ useI18n: () => ({
 }) }))
 
 describe('Daily changelog', () => {
+  it('keeps the verified proxy fix undated until deployment with complete bilingual notes', () => {
+    const item = unreleasedUpdates.find(update => update.id === 'proxyVerificationPriority')!
+    expect(item).toBeDefined()
+    expect('date' in item).toBe(false)
+    expect(dailyUpdates.some(update => update.id === item.id)).toBe(false)
+    for (const messages of [zh, en]) {
+      const note = messages.daily.updates.proxyVerificationPriority
+      expect(note.title.trim()).toBeTruthy()
+      for (const key of item.sections ?? []) {
+        const section = note.sections[key as keyof typeof note.sections]
+        expect(section.title.trim()).toBeTruthy()
+        expect(section.body.trim()).toBeTruthy()
+      }
+    }
+  })
+
   it('combines releases on the same date and orders days newest first', () => {
     const grouped = groupDailyUpdates([
       { date: '2026-10-17', id: 'earlier', type: 'fixed' },

@@ -25,6 +25,36 @@ export default {
       }
     },
     "updates": {
+      proxyVerificationPriority: {
+        "title": "Give pending credential verification priority for proxy capacity",
+        "body": "Fix accounts waiting for credential verification being treated as ordinary error accounts even when inactive bindings can give up capacity. Serve enabled business accounts first, then eligible pending verification. Existing checks continue after assignment. The panel explains free slots, slots that can be freed and the separate waiting queues.",
+        "sections": {
+          "reason": {
+            "title": "Why verification could remain stuck",
+            "body": "An account with a saved new cookie may still need a proxy for verification. Treating it as an ordinary error account prevented it from reclaiming capacity occupied by inactive accounts."
+          },
+          "priority": {
+            "title": "Allocation order",
+            "body": "Retain and serve enabled business accounts first, assign healthy proxies to eligible pending or retrying verification next, then handle other stopped, expired or error accounts. Pending verification can reclaim those inactive slots. The limit remains three accounts per node."
+          },
+          "protection": {
+            "title": "Assignment still requires verification",
+            "body": "Priority changes proxy bindings only; it never clears errors or enables an account. Manual pauses, expired accounts, missing cookies and definitive authentication, identity, quota or entitlement failures do not qualify. Existing verification, recovery and model checks remain in control."
+          },
+          "wording": {
+            "title": "Understand capacity and waiting counts",
+            "body": "Free slots are immediately assignable. Slots that can be freed are occupied by other accounts and are released when priority accounts need them. Waiting totals distinguish business, pending verification and other accounts. Connection and switching rules are expandable."
+          },
+          "validation": {
+            "title": "Validation scope",
+            "body": "A disposable database reproduces full-capacity starvation and verifies reclamation while preserving credentials, errors, manual state and the per-node limit. Coverage includes working business accounts, unhealthy and expired proxies, verification failures and repeated rounds. Frontend checks cover queue counts and older API responses, with synthetic bilingual desktop and mobile previews. Development validation does not establish real account verification or generation recovery."
+          },
+          "boundary": {
+            "title": "Existing configuration and behavior",
+            "body": "No configuration keys or database migrations are added. Existing check intervals, failover, latency-switch cooldown, subscription rules, groups, SMTP and alerts are preserved. Successful proxy assignment is not proof of authentication, quota or image generation."
+          }
+        }
+      },
       clashSubscriptions: {
         "title": "Individual subscription management, independent fetches and scrolling fixes",
         "body": "Removes the eight-URL limit and adds a list editor alongside bulk input and individual feed checks. Foreground fetches and background refresh share a concurrency limit, report failures per source and retain existing nodes and bindings for failed sources. Status icons, colored node counts and page scrolling are improved. Existing node, proxy-binding and configuration protections remain in effect.",
