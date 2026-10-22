@@ -71,11 +71,14 @@ func TestFetchSourceHeadersAndRedactedErrors(t *testing.T) {
 	require.Len(t, nodes, 1)
 	require.Equal(t, "exhausted", sources[0].BlockReason(time.Now()))
 	require.Equal(t, sources[0].ID, nodes[0].SourceID)
-	_, _, err = fetchSubscriptionDetails(context.Background(), feed.Client(), feed.URL+"/bad?token=private")
-	require.Error(t, err)
-	require.NotContains(t, err.Error(), "token")
-	require.NotContains(t, err.Error(), "private payload")
-	require.Contains(t, err.Error(), "订阅 1")
+	_, sources, err = fetchSubscriptionDetails(context.Background(), feed.Client(), feed.URL+"/bad?token=private")
+	require.NoError(t, err, "individual failures are returned as source outcomes")
+	require.Equal(t, "http_error", sources[0].FetchError)
+	encoded, err := json.Marshal(sources)
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), "token")
+	require.NotContains(t, string(encoded), "private payload")
+
 }
 func sourceTestDB(t *testing.T) *sql.DB {
 	t.Helper()

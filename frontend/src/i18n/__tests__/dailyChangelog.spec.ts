@@ -56,6 +56,17 @@ describe('Daily changelog', () => {
     }
   })
 
+  it('records the subscription release on its Beijing deployment date', () => {
+    const item = dailyUpdates.find(update => update.id === 'clashSubscriptions')!
+    expect(item.date).toBe('2026-10-22')
+    expect(item.sections).toHaveLength(7)
+    expect(dailyOverviews[item.date]).toBe('clashSubscriptions')
+    for (const messages of [zh, en]) {
+      expect(messages.daily.updates.clashSubscriptions.title).not.toMatch(/待发布|pending release/)
+      expect(messages.daily.updates.clashSubscriptions.body).not.toMatch(/尚未部署|has not been deployed/)
+    }
+  })
+
   it('shows one section per day, expands the latest day and preserves older entries', () => {
     const wrapper = mount(DailyChangelog)
     const sections = wrapper.findAll('.daily-release')
@@ -75,7 +86,8 @@ describe('Daily changelog', () => {
     expect(release.findAll('[data-testid="release-details"] > div')).toHaveLength(7)
     expect(release.text()).toContain('不是每次发布或完整上线的固定时限')
     expect(release.text()).toContain('生产部署步骤均跳过')
-    expect(sections[0].get('[data-testid="daily-overview"]').text()).toContain('缩短发布等待')
+    expect(wrapper.get('[data-release-date="2026-10-21"] [data-testid="daily-overview"]').text()).toContain('缩短发布等待')
+    expect(sections[0].get('[data-testid="daily-overview"]').text()).toContain('订阅独立更新')
     expect(wrapper.text()).not.toContain('changelog.daily.')
     for (const id of Object.values(dailyOverviews)) {
       for (const messages of [zh, en]) {

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import ClashSubscriptionModal from '@/components/admin/proxy/ClashSubscriptionModal.vue'
-import { getClashSubscription, previewClashSubscription, importClashSubscription, type ClashSubscription } from '@/api/admin/clash'
+import { getClashSubscription, previewClashSubscription, importClashSubscription, checkClashSource, type ClashSubscription } from '@/api/admin/clash'
 import { testProxy } from '@/api/admin/proxies'
 
-vi.mock('@/api/admin/clash', () => ({ getClashSubscription: vi.fn(), previewClashSubscription: vi.fn(), importClashSubscription: vi.fn() }))
+vi.mock('@/api/admin/clash', () => ({ getClashSubscription: vi.fn(), previewClashSubscription: vi.fn(), importClashSubscription: vi.fn(), checkClashSource: vi.fn() }))
 vi.mock('@/api/admin/proxies', () => ({ testProxy: vi.fn() }))
 vi.mock('@/utils/format', () => ({ formatDateTime: (s: string) => s }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
@@ -84,13 +84,13 @@ describe('Clash subscription workflow', () => {
     vi.mocked(getClashSubscription).mockResolvedValue({ ...saved, url: 'https://subscription.example/private' })
     const w = await setup()
     const input = w.get('#clash-subscription-url')
-    expect(input.element.tagName).toBe('TEXTAREA')
-    expect(input.classes()).not.toContain('clash-subscription-hidden')
+    expect(input.element.tagName).toBe('INPUT')
+    expect(input.attributes('type')).toBe('text')
     expect(input.element).toHaveProperty('value', 'https://subscription.example/private')
     await w.get('button[aria-label="admin.proxies.clash.hideURL"]').trigger('click')
-    expect(input.classes()).toContain('clash-subscription-hidden')
+    expect(input.attributes('type')).toBe('password')
     await w.get('button[aria-label="admin.proxies.clash.showURL"]').trigger('click')
-    expect(input.classes()).not.toContain('clash-subscription-hidden')
+    expect(input.attributes('type')).toBe('text')
     expect(w.text()).toContain('jp.example.com:443')
     expect(w.text()).toContain('mihomo:20000')
     await w.get('form').trigger('submit'); await flushPromises()
@@ -148,6 +148,60 @@ describe('Clash subscription workflow', () => {
     expect(w.find('input[aria-label="US"]').exists()).toBe(false)
     await w.get('footer .btn-primary').trigger('click'); await flushPromises()
     expect(importClashSubscription).toHaveBeenCalledWith('', ['Japan', 'US'], 2)
+  })
+
+  it('preserves more than eight URLs when switching between bulk and list editors', async () => {
+    const w = await setup()
+    const findButton = (key: string) => w.findAll('button').find(button => button.text() === key)!
+    await findButton('admin.proxies.clash.bulkMode').trigger('click')
+    const urls = Array.from({ length: 12 }, (_, i) => `https://feed${i}.example/sub`).join('\n')
+    await w.get('#clash-bulk-urls').setValue(urls)
+    await findButton('admin.proxies.clash.listMode').trigger('click')
+    expect(w.findAll('[data-testid="subscription-row"]')).toHaveLength(12)
+    await w.get('#clash-subscription-url').setValue('https://changed.example/sub')
+    await findButton('admin.proxies.clash.bulkMode').trigger('click')
+    expect((w.get('#clash-bulk-urls').element as HTMLTextAreaElement).value).toContain('https://changed.example/sub')
+    await w.get('form').trigger('submit'); await flushPromises()
+    expect(previewClashSubscription).toHaveBeenCalledWith(urls.replace('https://feed0.example/sub', 'https://changed.example/sub'))
+  })
+  it('checks only the requested row without importing or testing existing proxies', async () => {
+    vi.mocked(checkClashSource).mockResolvedValue({ id: 'one', index: 1, url_hint: '', node_count: 9 })
+    vi.mocked(getClashSubscription).mockResolvedValue({ ...saved, url: 'https://one.example/sub\nhttps://two.example/sub' })
+    const w = await setup()
+    await w.findAll('[data-testid="subscription-row"]')[1].findAll('button')[0].trigger('click'); await flushPromises()
+    expect(checkClashSource).toHaveBeenCalledWith('https://two.example/sub')
+    expect(previewClashSubscription).not.toHaveBeenCalled()
+    expect(importClashSubscription).not.toHaveBeenCalled()
+    expect(testProxy).not.toHaveBeenCalled()
+    expect(w.text()).toContain('admin.proxies.clash.sourceReadable')
+  })
+  it('keeps failed-source nodes selected and allows other subscriptions to save', async () => {
+    vi.mocked(previewClashSubscription).mockResolvedValue({ ...saved, sources: [
+      { id: 'one', index: 1, url_hint: '', node_count: 1 },
+      { id: 'two', index: 2, url_hint: '', node_count: 0, fetch_error: 'http_error', http_status: 503 }
+    ], nodes: [{ ...saved.nodes[0], source_id: 'one' }, { name: 'Retained', type: 'ss', proxy_id: 8, source_id: 'two', enabled: true, retained: true }] })
+    const w = await setup()
+    await w.get('form').trigger('submit'); await flushPromises()
+    expect(w.get('input[aria-label="Retained"]').attributes('disabled')).toBeDefined()
+    expect(w.text()).toContain('HTTP 503')
+    await w.findAll('button').find(button => button.text() === 'admin.proxies.clash.selectNone')!.trigger('click')
+    expect((w.get('input[aria-label="Retained"]').element as HTMLInputElement).checked).toBe(true)
+    await w.get('footer .btn-primary').trigger('click'); await flushPromises()
+    expect(importClashSubscription).toHaveBeenCalledWith('', ['Retained'], 2, { Retained: 'two' })
+  })
+  it('does not allow an all-failed preview to overwrite the saved configuration', async () => {
+    vi.mocked(previewClashSubscription).mockResolvedValue({ ...saved, sources: [{ id: 'one', index: 1, url_hint: '', node_count: 0, fetch_error: 'connection_failed' }], nodes: [{ ...saved.nodes[0], retained: true }] })
+    const w = await setup()
+    await w.get('form').trigger('submit'); await flushPromises()
+    expect(w.text()).toContain('admin.proxies.clash.partialFailure')
+    expect(w.get('footer .btn-primary').attributes('disabled')).toBeDefined()
+  })
+
+  it('does not claim a new or migrated subscription was successfully checked with zero nodes', async () => {
+    vi.mocked(getClashSubscription).mockResolvedValue({ ...saved, url: 'https://one.example/sub', sources: [{ id: 'one', index: 1, url_hint: '', node_count: 0, checked_at: '0001-01-01T00:00:00Z' }] })
+    const w = await setup()
+    expect(w.text()).not.toContain('admin.proxies.clash.sourceReadable')
+    expect(w.get('footer .btn-primary').attributes('disabled')).toBeDefined()
   })
 
 })

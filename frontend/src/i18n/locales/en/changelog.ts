@@ -18,12 +18,47 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      clashSubscriptions: {"title": "Independent subscription updates with list and bulk management", "body": "Today: remove the eight-URL cap, add row editing and checks alongside bulk input, and use bounded concurrency with independent source outcomes. Successful sources can update while failed sources retain saved nodes and bindings. Status icons, colored counts and scrolling improve; existing node budgets, manual account state and configuration remain protected."},
       "releaseSpeed": {
         "title": "Shorter release waits with rollout guards retained",
         "body": "Today: parallel preparation, reusable caches and compressed transfers. Cached preparation measured about 68% shorter. Full rollout still includes backups, draining and verification. The figures below describe specific samples, not a fixed service commitment."
       }
     },
     "updates": {
+      clashSubscriptions: {
+        "title": "Individual subscription management, independent fetches and scrolling fixes",
+        "body": "Removes the eight-URL limit and adds a list editor alongside bulk input and individual feed checks. Foreground fetches and background refresh share a concurrency limit, report failures per source and retain existing nodes and bindings for failed sources. Status icons, colored node counts and page scrolling are improved. Existing node, proxy-binding and configuration protections remain in effect.",
+        "sections": {
+          "reason": {
+            "title": "Why this changed",
+            "body": "The fixed eight-URL cap rejected larger subscription lists. Serial fetching also caused one failed feed to abort the entire preview or import. The new flow reports each source separately to reduce interference between unrelated feeds."
+          },
+          "fetching": {
+            "title": "Independent fetching and fair refresh",
+            "body": "Foreground and background work share at most four network fetches. Each feed has eight seconds after receiving a slot; previews have a 35-second overall budget. Unfinished sources are identified separately, and background work prioritizes the oldest observations. Fetches run outside SQL transactions and completed observations are saved. Existing exhaustion, expiry and failure backoff rules remain."
+          },
+          "editing": {
+            "title": "List, bulk input and individual checks",
+            "body": "Add, edit or remove URLs in the list and check each feed download and parse result. Bulk mode keeps one URL per line and preserves edits when switching modes. Duplicate URLs are merged and visibility controls remain. Individual checks do not save configuration, probe node connectivity or contact Adobe."
+          },
+          "status": {
+            "title": "Status icons and colored node counts",
+            "body": "Expand, collapse, manage and refresh controls include icons. Reachable counts use green, failed counts red and unconfirmed counts amber, with a separate total and accessible text. Reachability still does not prove account authorization, credits or generation availability."
+          },
+          "scrolling": {
+            "title": "Long lists and window scrolling",
+            "body": "The IP management page uses natural document scrolling so expanded subscription health does not squeeze out the table or pagination. The subscription dialog uses one vertical body scroll area with a fixed header and actions. Wide node tables retain horizontal scrolling."
+          },
+          "validation": {
+            "title": "Development validation and scope",
+            "body": "Coverage includes more than eight feeds, shared concurrency, independent failures, duplicates, cancellation, reordered URLs, preserved proxy bindings, all-failure no-op behavior, list/bulk switching and individual checks. Validation uses synthetic feeds, a disposable database and local pages; it does not establish a production rollout, real proxy throughput or upstream recovery."
+          },
+          "boundary": {
+            "title": "Preserved behavior and limits",
+            "body": "The 8 MiB per-feed, 512 combined-node, request text size, URL safety, revision conflict and runtime rollback protections remain. Failed or unfinished sources keep their saved nodes. Explicitly deleting a URL or deselecting nodes from a successful feed follows the existing removal flow. All-failed imports do not save. Resource limits, account state, scheduling, SMTP and alert configuration are outside this change."
+          }
+        }
+      },
       releaseSpeed: {
         "title": "Faster release preparation and compressed transfers",
         "body": "Run backend checks, frontend checks and image builds in parallel, reuse dependency and compilation caches, and keep image transfers compressed. Formal artifacts are published only after all checks pass. Backups, draining accepted work, cutover and rollback guards remain.",

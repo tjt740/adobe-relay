@@ -4,21 +4,23 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
+	"database/sql/driver"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
 // Source health is separate from the runtime revision: monitoring must never
 // reload listeners, replace node definitions, or publish subscription secrets.
 type Source struct {
+	NodeCount     int            `json:"node_count"`
 	ID            string         `json:"id"`
 	Index         int            `json:"index"`
 	URLHint       string         `json:"url_hint"`
@@ -119,6 +121,14 @@ func normalizeSources(s *State) {
 	}
 	s.Sources = sources
 	for i, n := range s.Nodes {
+		if n.OriginalName == "" {
+			s.Nodes[i].OriginalName = n.Name
+			if len(urls) > 1 {
+				if _, name, ok := strings.Cut(n.Name, " · "); ok && strings.HasPrefix(n.Name, "订阅") {
+					s.Nodes[i].OriginalName = name
+				}
+			}
+		}
 		if n.SourceID != "" {
 			continue
 		}
@@ -166,48 +176,67 @@ func fetchFeed(ctx context.Context, client *http.Client, raw string, index int) 
 	if err != nil {
 		return fail("invalid_subscription")
 	}
+	src.NodeCount = len(nodes)
 	src.LastSuccessAt = now
 	for i := range nodes {
 		nodes[i].SourceID = src.ID
+		nodes[i].OriginalName = nodes[i].Name
 	}
 	return nodes, src, nil
 }
 func fetchSubscriptionDetails(ctx context.Context, client *http.Client, raw string) ([]Node, []Source, error) {
-	urls := strings.Fields(raw)
-	if len(urls) == 0 || len(urls) > 8 {
-		return nil, nil, fmt.Errorf("请输入 1–8 个订阅链接")
+	urls, err := subscriptionURLs(raw)
+	if err != nil {
+		return nil, nil, err
+	}
+	batch, cancel := context.WithTimeout(ctx, 35*time.Second)
+	defer cancel()
+	jobs := make([]feedJob, len(urls))
+	sources := make([]Source, len(urls))
+	bySource := make([][]Node, len(urls))
+	for i, u := range urls {
+		jobs[i] = feedJob{url: u, index: i + 1}
+		sources[i] = Source{ID: sourceID(u), Index: i + 1, URLHint: sourceHint(u), FetchError: "not_checked"}
+	}
+	total := 0
+	tooMany := false
+	fetchFeeds(batch, client, jobs, func(r feedResult) {
+		total += len(r.nodes)
+		if total > maxNodes {
+			tooMany = true
+			cancel()
+			return
+		}
+		sources[r.src.Index-1] = r.src
+		bySource[r.src.Index-1] = r.nodes
+	})
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	if tooMany {
+		return nil, nil, fmt.Errorf("合并后的订阅节点超过 %d 个", maxNodes)
 	}
 	all := []Node{}
-	sources := []Source{}
-	seen := map[string]bool{}
-	for index, u := range urls {
-		if seen[sourceID(u)] {
-			return nil, nil, fmt.Errorf("订阅链接重复")
-		}
-		seen[sourceID(u)] = true
-		nodes, src, err := fetchFeed(ctx, client, u, index+1)
-		if err != nil {
-			return nil, nil, err
-		}
-		sources = append(sources, src)
+	for i, nodes := range bySource {
 		if len(urls) > 1 {
-			for i := range nodes {
-				name := []rune(fmt.Sprintf("订阅%d · %s", index+1, nodes[i].Name))
+			for j := range nodes {
+				name := []rune(fmt.Sprintf("订阅%d · %s", i+1, nodes[j].Name))
 				if len(name) > 90 {
 					name = name[:90]
 				}
-				nodes[i].Name = string(name)
-				nodes[i].Config["name"] = nodes[i].Name
+				nodes[j].Name = string(name)
+				nodes[j].Config["name"] = nodes[j].Name
 			}
 		}
 		all = append(all, nodes...)
-		if len(all) > maxNodes {
-			return nil, nil, fmt.Errorf("合并后的订阅节点超过 %d 个", maxNodes)
-		}
 	}
 	return all, sources, nil
 }
 func mergeSourceObservation(old, observed Source) Source {
+	if observed.FetchError == "not_checked" {
+		old.Index, old.URLHint = observed.Index, observed.URLHint
+		return old
+	}
 	observed.Failures = 0
 	if observed.FetchError != "" {
 		observed.Failures = min(old.Failures+1, 100)
@@ -257,55 +286,61 @@ func (m *Manager) monitorSources(ctx context.Context) {
 	}
 }
 func (m *Manager) refreshSources(ctx context.Context) error {
-	tx, err := m.db.BeginTx(ctx, nil)
+	return m.refreshSourcesWithin(ctx, 20*time.Second)
+}
+
+func (m *Manager) refreshSourcesWithin(ctx context.Context, budget time.Duration) error {
+	// A session lock elects one monitor without keeping a SQL transaction open
+	// during network IO. Imports remain protected by the revision/URL comparison.
+	conn, err := m.db.Conn(ctx)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer conn.Close()
 	var leader bool
-	if err = tx.QueryRowContext(ctx, `SELECT pg_try_advisory_xact_lock(240202617)`).Scan(&leader); err != nil || !leader {
+	if err = conn.QueryRowContext(ctx, `SELECT pg_try_advisory_lock(240202617)`).Scan(&leader); err != nil || !leader {
 		return err
 	}
-	s, err := loadState(ctx, tx, false)
+	defer func() {
+		unlock, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+		defer cancel()
+		var released bool
+		if e := conn.QueryRowContext(unlock, `SELECT pg_advisory_unlock(240202617)`).Scan(&released); e != nil || !released {
+			// Do not return a session with an uncertain advisory lock to the pool.
+			_ = conn.Raw(func(any) error { return driver.ErrBadConn })
+		}
+	}()
+	s, err := loadState(ctx, conn, false)
 	if err != nil {
 		return err
 	}
 	normalizeSources(&s)
-	type result struct{ src Source }
-	results := make(chan result, len(s.Sources))
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, 4)
 	urls := strings.Fields(s.URL)
+	jobs := []feedJob{}
 	for i, src := range s.Sources {
-		if !sourceRefreshDue(src, time.Now()) {
-			continue
+		if sourceRefreshDue(src, time.Now()) {
+			jobs = append(jobs, feedJob{url: urls[i], index: i + 1})
 		}
-		wg.Add(1)
-		go func(index int, old Source) {
-			defer wg.Done()
-			select {
-			case sem <- struct{}{}:
-			case <-ctx.Done():
-				return
-			}
-			defer func() { <-sem }()
-			attempt, cancel := context.WithTimeout(ctx, 8*time.Second)
-			defer cancel()
-			_, observed, _ := fetchFeed(attempt, m.fetchClient, urls[index], index+1)
-			if ctx.Err() == nil {
-				results <- result{mergeSourceObservation(old, observed)}
-			}
-		}(i, src)
 	}
-	wg.Wait()
-	close(results)
+	// Oldest observations go first. Unfinished sources stay due for the next pass.
+	sort.SliceStable(jobs, func(i, j int) bool {
+		return s.Sources[jobs[i].index-1].CheckedAt.Before(s.Sources[jobs[j].index-1].CheckedAt)
+	})
 	observations := map[string]Source{}
-	for r := range results {
-		observations[r.src.ID] = r.src
-	}
+	batch, cancel := context.WithTimeout(ctx, budget)
+	fetchFeeds(batch, m.fetchClient, jobs, func(r feedResult) {
+		old := s.Sources[r.src.Index-1]
+		observations[r.src.ID] = mergeSourceObservation(old, r.src)
+	})
+	cancel()
 	if len(observations) == 0 {
 		return nil
 	}
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	current, err := loadState(ctx, tx, true)
 	if err != nil {
 		return err

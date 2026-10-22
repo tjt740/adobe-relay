@@ -32,6 +32,7 @@ type State struct {
 }
 
 type View struct {
+	Sources    []Source   `json:"sources"`
 	Configured bool       `json:"configured"`
 	Ready      bool       `json:"ready"`
 	URL        string     `json:"url"`
@@ -42,9 +43,10 @@ type View struct {
 }
 
 type ImportRequest struct {
-	URL      string   `json:"url"`
-	Names    []string `json:"names"`
-	Revision int64    `json:"revision"`
+	SourceIDs map[string]string `json:"source_ids,omitempty"`
+	URL       string            `json:"url"`
+	Names     []string          `json:"names"`
+	Revision  int64             `json:"revision"`
 }
 
 type Manager struct {
@@ -97,11 +99,12 @@ func loadState(ctx context.Context, q interface {
 }
 
 func (m *Manager) view(s State) View {
+	normalizeSources(&s)
 	hint := ""
-	if u, err := url.Parse(s.URL); err == nil && u.Host != "" {
-		hint = u.Scheme + "://" + u.Host + "/••••"
+	if urls := strings.Fields(s.URL); len(urls) > 0 {
+		hint = sourceHint(urls[0])
 	}
-	v := View{Configured: m.configured(), URL: s.URL, URLHint: hint, Revision: s.Revision, UpdatedAt: s.UpdatedAt, Nodes: make([]NodeView, 0, len(s.Nodes))}
+	v := View{Sources: s.Sources, Configured: m.configured(), URL: s.URL, URLHint: hint, Revision: s.Revision, UpdatedAt: s.UpdatedAt, Nodes: make([]NodeView, 0, len(s.Nodes))}
 	for _, n := range s.Nodes {
 		if n.Enabled {
 			v.Nodes = append(v.Nodes, m.nodeView(n))
@@ -188,7 +191,12 @@ func (m *Manager) Preview(ctx context.Context, raw string) (View, error) {
 	if raw == "" {
 		raw = s.URL
 	}
-	nodes, err := fetchSubscription(ctx, m.fetchClient, raw)
+	nodes, sources, err := fetchSubscriptionDetails(ctx, m.fetchClient, raw)
+	if err != nil {
+		return View{}, err
+	}
+	normalizeSources(&s)
+	nodes, retained, err := preserveFailedSources(s, nodes, sources)
 	if err != nil {
 		return View{}, err
 	}
@@ -199,11 +207,14 @@ func (m *Manager) Preview(ctx context.Context, raw string) (View, error) {
 		}
 	}
 	v := m.view(s)
+	v.Sources = sources
 	v.Nodes = make([]NodeView, 0, len(nodes))
 	for _, n := range nodes {
 		old, ok := existing[n.Name]
 		n.ProxyID, n.Port, n.Enabled = old.ProxyID, old.Port, !ok || old.Enabled
-		v.Nodes = append(v.Nodes, m.nodeView(n))
+		nv := m.nodeView(n)
+		nv.Retained = retained[n.Name]
+		v.Nodes = append(v.Nodes, nv)
 	}
 	return v, nil
 }
@@ -235,6 +246,17 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 	if err != nil {
 		return View{}, err
 	}
+	fetched, retained, err := preserveFailedSources(snapshot, fetched, sources)
+	if err != nil {
+		return View{}, err
+	}
+	anySuccess := false
+	for _, src := range sources {
+		anySuccess = anySuccess || src.FetchError == ""
+	}
+	if !anySuccess {
+		return View{}, errors.New("所有订阅均未成功获取，已保留现有配置")
+	}
 	selected := make(map[string]bool, len(req.Names))
 	for _, n := range req.Names {
 		if selected[n] {
@@ -242,14 +264,29 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 		}
 		selected[n] = true
 	}
+	// A fetch failure must never implicitly retire that source's saved proxies.
+	for name := range retained {
+		selected[name] = true
+	}
 	byName := map[string]Node{}
 	for _, n := range fetched {
 		byName[n.Name] = n
 	}
+	failedSourceIDs := map[string]bool{}
+	for _, src := range sources {
+		failedSourceIDs[src.ID] = src.FetchError != ""
+	}
 	for n := range selected {
 		if _, ok := byName[n]; !ok {
+			if id := req.SourceIDs[n]; id != "" && failedSourceIDs[id] {
+				delete(selected, n)
+				continue
+			}
 			return View{}, errors.New("订阅节点已变化，请重新预览后导入")
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return View{}, err
 	}
 	// Once external changes start, finish the bounded transaction even if the HTTP
 	// caller disconnects. Otherwise cancellation releases the row lock mid-restore.
@@ -277,7 +314,8 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 			sources[i] = mergeSourceObservation(old, src)
 		}
 	}
-	next := State{Sources: sources, URL: raw, Revision: previous.Revision + 1, UpdatedAt: time.Now().UTC(), Nodes: make([]Node, 0)}
+	urls, _ := subscriptionURLs(raw)
+	next := State{Sources: sources, URL: strings.Join(urls, "\n"), Revision: previous.Revision + 1, UpdatedAt: time.Now().UTC(), Nodes: make([]Node, 0)}
 	oldByName := map[string]Node{}
 	usedPorts := map[int]bool{}
 	retiredIDs := []int64{}
@@ -285,11 +323,19 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 		// Mihomo creates new listeners before closing removed ones. Reserve all
 		// previous ports for this reload; retired ports become free next import.
 		usedPorts[n.Port] = true
+		if failedSourceIDs[n.SourceID] && !n.Enabled {
+			// Preserve legacy disabled nodes without enabling them after a failed fetch.
+			next.Nodes = append(next.Nodes, n)
+			continue
+		}
 		if n.Enabled && selected[n.Name] {
 			oldByName[n.Name] = n
 		} else {
 			retiredIDs = append(retiredIDs, n.ProxyID)
 		}
+	}
+	if len(fetched)+len(next.Nodes) > maxNodes {
+		return View{}, errors.New("保留停用节点后超过节点上限")
 	}
 	// Lock and detach affected accounts before changing proxies, matching the
 	// account -> failover policy -> proxy lock order used by automatic failover.
@@ -326,6 +372,9 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 		next.Nodes = append(next.Nodes, n)
 	}
 	for _, n := range next.Nodes {
+		if !n.Enabled {
+			continue
+		}
 		result, e := tx.ExecContext(ctx, `UPDATE proxies SET status='active',updated_at=NOW() WHERE id=$1 AND deleted_at IS NULL`, n.ProxyID)
 		if e != nil {
 			return View{}, e
@@ -339,7 +388,9 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 	if len(next.Nodes) > 0 {
 		ids := make([]int64, 0, len(next.Nodes))
 		for _, n := range next.Nodes {
-			ids = append(ids, n.ProxyID)
+			if n.Enabled {
+				ids = append(ids, n.ProxyID)
+			}
 		}
 		rawIDs, _ := json.Marshal(ids)
 		rows, e := tx.QueryContext(ctx, `UPDATE accounts SET extra=COALESCE(extra,'{}'::jsonb)-'upstream_billing_probe'-'ollama_cloud_usage_snapshot',updated_at=NOW() WHERE deleted_at IS NULL AND proxy_id IN (SELECT jsonb_array_elements_text($1::jsonb)::bigint) RETURNING id`, string(rawIDs))
@@ -414,6 +465,7 @@ func marker(s State) string {
 	s.Nodes = append([]Node(nil), s.Nodes...)
 	for i := range s.Nodes {
 		s.Nodes[i].SourceID = ""
+		s.Nodes[i].OriginalName = ""
 	}
 	b, _ := json.Marshal(s)
 	sum := sha256.Sum256(b)

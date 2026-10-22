@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <TablePageLayout>
+    <TablePageLayout scroll-mode="page">
       <template #filters>
         <div class="proxy-toolbar">
           <div class="proxy-toolbar-main">

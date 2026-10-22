@@ -1,6 +1,22 @@
 import { apiClient } from '../client'
 
+export interface ClashSource {
+  id: string
+  index: number
+  url_hint: string
+  node_count: number
+  fetch_error?: string
+  http_status?: number
+  checked_at?: string
+}
+
+export async function checkClashSource(url: string): Promise<ClashSource> {
+  return (await apiClient.post<ClashSource>('/admin/proxies/clash/check', { url }, { timeout: 45000 })).data
+}
+
 export interface ClashNode {
+  source_id?: string
+  retained?: boolean
   name: string
   type: string
   server?: string
@@ -12,6 +28,7 @@ export interface ClashNode {
 }
 
 export interface ClashSubscription {
+  sources?: ClashSource[]
   configured: boolean
   ready: boolean
   url?: string
@@ -31,8 +48,8 @@ export async function previewClashSubscription(url: string): Promise<ClashSubscr
   return data
 }
 
-export async function importClashSubscription(url: string, names: string[], revision: number): Promise<ClashSubscription> {
-  const { data } = await apiClient.post<ClashSubscription>('/admin/proxies/clash/import', { url, names, revision }, { timeout: 120000 })
+export async function importClashSubscription(url: string, names: string[], revision: number, sourceIDs?: Record<string, string>): Promise<ClashSubscription> {
+  const { data } = await apiClient.post<ClashSubscription>('/admin/proxies/clash/import', { url, names, revision, source_ids: sourceIDs }, { timeout: 120000 })
   return data
 }
 

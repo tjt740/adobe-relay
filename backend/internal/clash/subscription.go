@@ -20,17 +20,19 @@ const maxBody = 8 << 20
 const maxNodes = 512
 
 type Node struct {
-	SourceID string         `json:"source_id,omitempty"`
-	Name     string         `json:"name"`
-	Type     string         `json:"type"`
-	Config   map[string]any `json:"config"`
-	ProxyID  int64          `json:"proxy_id"`
-	Port     int            `json:"port"`
-	Password string         `json:"password"`
-	Enabled  bool           `json:"enabled"`
+	OriginalName string         `json:"original_name,omitempty"`
+	SourceID     string         `json:"source_id,omitempty"`
+	Name         string         `json:"name"`
+	Type         string         `json:"type"`
+	Config       map[string]any `json:"config"`
+	ProxyID      int64          `json:"proxy_id"`
+	Port         int            `json:"port"`
+	Password     string         `json:"password"`
+	Enabled      bool           `json:"enabled"`
 }
 
 type NodeView struct {
+	Retained   bool   `json:"retained,omitempty"`
 	SourceID   string `json:"source_id,omitempty"`
 	Name       string `json:"name"`
 	Type       string `json:"type"`
@@ -295,7 +297,14 @@ func publicIP(ip net.IP) bool {
 }
 
 func subscriptionClient() *http.Client {
-	transport := &http.Transport{TLSHandshakeTimeout: 10 * time.Second, ResponseHeaderTimeout: 20 * time.Second}
+	transport := &http.Transport{
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 20 * time.Second,
+		MaxIdleConns:          sourceConcurrency * 2,
+		MaxIdleConnsPerHost:   2,
+		MaxConnsPerHost:       sourceConcurrency,
+		IdleConnTimeout:       time.Minute,
+	}
 	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 		host, port, err := net.SplitHostPort(address)
 		if err != nil {
@@ -327,6 +336,9 @@ func subscriptionClient() *http.Client {
 }
 
 func fetchSubscription(ctx context.Context, client *http.Client, raw string) ([]Node, error) {
-	nodes, _, err := fetchSubscriptionDetails(ctx, client, raw)
+	nodes, sources, err := fetchSubscriptionDetails(ctx, client, raw)
+	if err == nil && len(nodes) == 0 && len(sources) > 0 {
+		return nil, fmt.Errorf("订阅 %d（%s）获取失败：%s", sources[0].Index, sources[0].URLHint, sources[0].FetchError)
+	}
 	return nodes, err
 }

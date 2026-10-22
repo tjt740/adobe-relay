@@ -13,11 +13,13 @@ export const changelogPreviews = [
 ] as const
 
 export const dailyOverviews: Readonly<Record<string, string>> = {
+  '2026-10-22': 'clashSubscriptions',
   '2026-10-21': 'releaseSpeed',
 }
 
 // Use the actual release date in Asia/Shanghai; multiple releases share one day.
 export const dailyUpdates: readonly DailyUpdate[] = [
+  { date: '2026-10-22', id: 'clashSubscriptions', type: 'improved', sections: ['reason', 'fetching', 'editing', 'status', 'scrolling', 'validation', 'boundary'] },
   {
     date: '2026-10-21', id: 'releaseSpeed', type: 'improved',
     metrics: ['baseline', 'cold', 'warm', 'transfer'],
