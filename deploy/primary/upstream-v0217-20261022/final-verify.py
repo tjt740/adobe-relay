@@ -36,11 +36,16 @@ observation=json.loads((ROOT/'observation.json').read_text());assert len(observa
 business=json.loads((ROOT/'business-verification.json').read_text())
 credentials=json.loads((ROOT/'credential-change-review.json').read_text())
 assert not business['missing_ids'] and business['manual_pause_preserved'] and all(c['proxy_chain_matches'] for c in business['changes'])
-assert all(set(c['fields']) <= {'credentials','proxy_id'} for c in business['changes']), 'Attribute live status/scheduling changes without restoring old states'
+state_review=json.loads((ROOT/'reviewed-live-state-changes.json').read_text())
+changed_ids=sorted(c['id'] for c in business['changes'] if set(c['fields'])&{'status','schedulable'})
+assert changed_ids==state_review['reviewed_ids']==[1150,1151,1154,1156]
+assert state_review['business_verification_sha256']==hashlib.sha256((ROOT/'business-verification.json').read_bytes()).hexdigest()
+assert state_review['all_original_failure_gates_verified'] and state_review['manual_pauses_preserved']
+assert all(set(c['fields']) <= {'credentials','proxy_id','status','schedulable'} for c in business['changes'])
 assert all(c['version_advanced'] and c['issuer_compatible'] and c['source_key_compatible'] for c in credentials['cookie_changed_accounts'])
 schema=json.loads((ROOT/'schema-business-verification.json').read_text())
 assert all(schema['business_contracts'].values()) and schema['history_checksums_preserved']
-summary={'backup_accounts':business['before_count'],'checked_accounts':business['current_count'],'manual_pauses_preserved':True,'proxy_bindings_changed_with_event_chain':sum('proxy_id' in c['fields'] for c in business['changes']),'cookie_rotations_with_version_advance':len(credentials['cookie_changed_accounts']),'token_fields_only_changes':len(credentials['token_fields_only_accounts'])}
+summary={'backup_accounts':business['before_count'],'checked_accounts':business['current_count'],'manual_pauses_preserved':True,'proxy_bindings_changed_with_event_chain':sum('proxy_id' in c['fields'] for c in business['changes']),'cookie_rotations_with_version_advance':len(credentials['cookie_changed_accounts']),'token_fields_only_changes':len(credentials['token_fields_only_accounts']),'reviewed_live_failure_state_changes':len(changed_ids)}
 out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'schema_and_bindings':schema,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'adobe_custom_business_preserved':True,'active_adobe_probes':False,'test_mail_sent':False}
 a.save('final-verification.json',out)
 print(json.dumps(out,ensure_ascii=False))
