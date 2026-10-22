@@ -18,7 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
-      clashSubscriptions: {"title": "Independent subscription updates with list and bulk management", "body": "Today: remove the eight-URL cap, add row editing and checks alongside bulk input, and use bounded concurrency with independent source outcomes. Successful sources can update while failed sources retain saved nodes and bindings. Status icons, colored counts and scrolling improve; existing node budgets, manual account state and configuration remain protected."},
+      clashSubscriptions: {"title": "v0.2.17 features and independent subscription updates", "body": "Today: integrate upstream v0.2.17 model, protocol and payment fixes while retaining Adobe, Okad and custom scheduling protections; remove the eight-URL cap, add row editing and checks alongside bulk input, and use bounded concurrency with independent source outcomes. Successful sources can update while failed sources retain saved nodes and bindings. Status icons, colored counts and scrolling improve; existing node budgets, manual account state and configuration remain protected."},
       "releaseSpeed": {
         "title": "Shorter release waits with rollout guards retained",
         "body": "Today: parallel preparation, reusable caches and compressed transfers. Cached preparation measured about 68% shorter. Full rollout still includes backups, draining and verification. The figures below describe specific samples, not a fixed service commitment."
@@ -62,6 +62,19 @@ export default {
             "body": "No configuration keys are added. New state tables track unresolved 408 failures, allocator pause intent and temporary test leases. Existing credentials, operator state, groups, subscriptions, SMTP and alert settings remain. Check intervals, failover and latency-switch cooldown are preserved. Releasing bindings does not guarantee distinct egress IPs; proxy connectivity is not proof of successful generation."
           }
         }
+      },
+      upstreamV0217: {
+        title: 'Upstream v0.2.17 feature upgrade',
+        body: 'Integrates official v0.2.17 features and fixes with adaptations for existing Adobe, Okad, proxy and scheduling behavior. Existing configuration and business data are retained; new capabilities depend on accounts, endpoints and explicit settings.',
+        sections: {
+          reason: { title: 'Why upgrade', body: 'Synchronizes upstream model support, protocol compatibility and payment fixes while retaining the custom business capabilities built on the official project. The application version label is v0.2.17.' },
+          models: { title: 'Models and platforms', body: 'Adds Gemini 4 Argon, Claude Haiku 5.5, a dynamic platform catalog and multi-protocol providers, alongside group translations and explicit Gemini context caching. Availability still depends on accounts, mappings, upstream endpoints and existing configuration. No accounts or paid capabilities are enabled automatically.' },
+          gateway: { title: 'Gateway and client compatibility', body: 'Integrates Responses timestamps, Gemini thinking levels and streamed summaries, tool-result images, protocol endpoint selection and workspace-aware imports. OpenAI API-key Messages requests can use configured web-search emulation, and Gemini shared-capacity shortages use same-account backoff.' },
+          payments: { title: 'Payments, refunds and quotas', body: 'Integrates EasyPay order confirmation, deduction protection during pending refunds, Alipay refund queries, order-type validation and Stripe payment credential retrieval, together with usage-display and billing fixes. Existing merchant and payment settings are retained.' },
+          compatibility: { title: 'Custom business adaptations', body: 'Registers Adobe and Kiro in the new catalog while retaining model listings, manual proxy selection, automatic failover, Okad test and manual-pause protections, default pagination and shared controls. New in-flight balance reservations and API-key creation limits require explicit configuration, preserving existing admission and concurrency behavior. Adobe image endpoints, 451 responses, usage, quality labels and memory protection retain the existing custom implementation.' },
+          validation: { title: 'Validation scope', body: 'Development checks cover frontend and backend code, platform and gateway compatibility, existing business regressions, rollout guards and an isolated PostgreSQL upgrade. Fixtures are synthetic, and inherited baseline failures are recorded separately. Production cutover separately requires backups, draining, runtime checks and data verification. These checks do not establish peak throughput or upstream account recovery.' },
+          boundary: { title: 'Upgrade limits and rollout', body: 'Upstream removes gpt-5.5 scheduling and listings for ChatGPT OAuth / SetupToken accounts; API-key accounts are outside that retirement rule. Adobe GPT Image models are outside its scope. Deployment still requires reviewing current mappings, running versions and configuration, followed by backup and controlled draining. Old databases and manual account states must not be restored or overwritten.' },
+        },
       },
       clashSubscriptions: {
         "title": "Individual subscription management, independent fetches and scrolling fixes",

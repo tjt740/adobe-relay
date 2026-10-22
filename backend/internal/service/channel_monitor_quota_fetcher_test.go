@@ -80,17 +80,26 @@ func (s *stubMonitorCNBalanceSource) QueryBalanceForAccount(ctx context.Context,
 }
 
 type stubMonitorAccountSource struct {
+	mu       sync.Mutex
 	accounts map[int64]*Account
 	err      error
 	calls    int
 }
 
 func (s *stubMonitorAccountSource) GetByID(ctx context.Context, id int64) (*Account, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.calls++
 	if s.err != nil {
 		return nil, s.err
 	}
 	return s.accounts[id], nil
+}
+
+func (s *stubMonitorAccountSource) callCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.calls
 }
 
 func newQuotaFetcherTestSetup(t *testing.T) (*ChannelMonitorQuotaFetcher, *stubMonitorUsageSource, *stubMonitorCNQuotaSource, *stubMonitorCNBalanceSource, *stubMonitorAccountSource) {
@@ -239,7 +248,7 @@ func TestQuotaFetcher_LoadsAccountOnceAndPassesItThrough(t *testing.T) {
 
 		fetcher.Fetch(context.Background(), 21)
 
-		require.Equal(t, 1, accounts.calls)
+		require.Equal(t, 1, accounts.callCount())
 		require.Same(t, acc, usage.getLastAccount())
 		require.Equal(t, 1, usage.getCalls())
 	})
@@ -252,7 +261,7 @@ func TestQuotaFetcher_LoadsAccountOnceAndPassesItThrough(t *testing.T) {
 
 		fetcher.Fetch(context.Background(), 22)
 
-		require.Equal(t, 1, accounts.calls)
+		require.Equal(t, 1, accounts.callCount())
 		require.Same(t, acc, cnQuota.lastAccount)
 		require.Equal(t, 1, cnQuota.calls)
 	})
@@ -265,7 +274,7 @@ func TestQuotaFetcher_LoadsAccountOnceAndPassesItThrough(t *testing.T) {
 
 		fetcher.Fetch(context.Background(), 23)
 
-		require.Equal(t, 1, accounts.calls)
+		require.Equal(t, 1, accounts.callCount())
 		require.Same(t, acc, cnBalance.lastAccount)
 		require.Equal(t, 1, cnBalance.calls)
 	})

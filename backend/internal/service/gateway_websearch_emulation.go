@@ -54,33 +54,51 @@ func getWebSearchManager() *websearch.Manager {
 // "enabled" (force on), "disabled" (force off), "default" (follow channel).
 // Kiro OAuth uses channel-level switch only.
 func (s *GatewayService) shouldEmulateWebSearch(ctx context.Context, account *Account, groupID *int64, body []byte) bool {
-	if getWebSearchManager() == nil {
+	return shouldEmulateWebSearchFor(ctx, s.settingService, s.channelService, account, groupID, body)
+}
+
+// shouldEmulateWebSearchFor is shared by the Anthropic gateway and the OpenAI
+// gateway's /v1/messages path.
+func shouldEmulateWebSearchFor(
+	ctx context.Context, settingService *SettingService, channelService *ChannelService,
+	account *Account, groupID *int64, body []byte,
+) bool {
+	if getWebSearchManager() == nil || account == nil || settingService == nil {
+		return false
+	}
+	// OpenAI OAuth/setup-token accounts retain native search regardless of
+	// channel configuration. Only API key accounts opt into emulation.
+	if account.Platform == PlatformOpenAI && account.Type != AccountTypeAPIKey {
 		return false
 	}
 	if !isOnlyWebSearchToolInBody(body) {
 		return false
 	}
-	if !s.settingService.IsWebSearchEmulationEnabled(ctx) {
+	if !settingService.IsWebSearchEmulationEnabled(ctx) {
 		return false
 	}
 
-	if account == nil {
-		return false
+	channelEnabled := func() bool {
+		if groupID == nil || channelService == nil {
+			return false
+		}
+		ch, err := channelService.GetChannelForGroup(ctx, *groupID)
+		return err == nil && ch != nil && ch.IsWebSearchEmulationEnabled(account.Platform)
 	}
-
 	switch {
-	case account.Platform == PlatformAnthropic && account.Type == AccountTypeAPIKey:
-		mode := account.GetWebSearchEmulationMode()
-		switch mode {
+	case (account.Platform == PlatformAnthropic || account.Platform == PlatformOpenAI) && account.Type == AccountTypeAPIKey:
+		switch account.GetWebSearchEmulationMode() {
 		case WebSearchModeEnabled:
 			return true
 		case WebSearchModeDisabled:
 			return false
 		default:
-			return s.isChannelWebSearchEmulationEnabled(ctx, groupID, account.Platform)
+			return channelEnabled()
 		}
+	case account.Platform == PlatformAnthropic:
+		return channelEnabled()
 	case isKiroDirectModeAccount(account):
-		return s.isChannelWebSearchEmulationEnabled(ctx, groupID, account.Platform)
+		return channelEnabled()
 	default:
 		return false
 	}
@@ -91,10 +109,7 @@ func (s *GatewayService) isChannelWebSearchEmulationEnabled(ctx context.Context,
 		return false
 	}
 	ch, err := s.channelService.GetChannelForGroup(ctx, *groupID)
-	if err != nil || ch == nil {
-		return false
-	}
-	return ch.IsWebSearchEmulationEnabled(platform)
+	return err == nil && ch != nil && ch.IsWebSearchEmulationEnabled(platform)
 }
 
 // isOnlyWebSearchToolInBody checks if the body contains exactly one web_search tool.
@@ -174,19 +189,29 @@ func extractWebSearchTextFromContent(content gjson.Result) string {
 	return ""
 }
 
-// handleWebSearchEmulation intercepts a web-search-only request,
-// calls a third-party search API, and constructs an Anthropic-format response.
-func (s *GatewayService) handleWebSearchEmulation(
-	ctx context.Context, c *gin.Context, account *Account, parsed *ParsedRequest,
-) (*ForwardResult, error) {
+// handleWebSearchEmulation preserves the original query and Kiro cache accounting.
+func (s *GatewayService) handleWebSearchEmulation(ctx context.Context, c *gin.Context, account *Account, parsed *ParsedRequest) (*ForwardResult, error) {
 	startTime := time.Now()
-
-	// Release the serial queue lock immediately — we don't need upstream.
 	if parsed.OnUpstreamAccepted != nil {
 		parsed.OnUpstreamAccepted()
 	}
+	model := parsed.Model
+	if model == "" {
+		model = defaultWebSearchModel
+	}
+	body := parsed.Body.Bytes()
+	return writeEmulatedWebSearchResult(ctx, c, account, webSearchQueryForParsedRequest(parsed), model, parsed.Stream, startTime, func() (int, *kiroCacheEmulationUsage) {
+		inputTokens := estimateKiroInputTokens(ctx, body)
+		return inputTokens, s.buildKiroCacheEmulationUsage(ctx, account, parsed.Group, body, model, inputTokens)
+	})
+}
 
-	query := webSearchQueryForParsedRequest(parsed)
+// writeEmulatedWebSearch serves the OpenAI API-key Messages entry point.
+func writeEmulatedWebSearch(ctx context.Context, c *gin.Context, account *Account, body []byte, model string, stream bool) (*ForwardResult, error) {
+	return writeEmulatedWebSearchResult(ctx, c, account, extractSearchQueryFromBody(body), model, stream, time.Now(), func() (int, *kiroCacheEmulationUsage) { return estimateKiroInputTokens(ctx, body), nil })
+}
+
+func writeEmulatedWebSearchResult(ctx context.Context, c *gin.Context, account *Account, query, model string, stream bool, startTime time.Time, buildUsage func() (int, *kiroCacheEmulationUsage)) (*ForwardResult, error) {
 	if query == "" {
 		return nil, fmt.Errorf("web search emulation: no query found in messages")
 	}
@@ -209,15 +234,12 @@ func (s *GatewayService) handleWebSearchEmulation(
 	slog.Info("web search emulation: search completed",
 		"provider", providerName, "results_count", len(resp.Results))
 
-	model := parsed.Model
 	if model == "" {
 		model = defaultWebSearchModel
 	}
-	body := parsed.Body.Bytes()
-	inputTokens := estimateKiroInputTokens(ctx, body)
-	cacheUsage := s.buildKiroCacheEmulationUsage(ctx, account, parsed.Group, body, model, inputTokens)
-
-	if parsed.Stream {
+	// Preserve the original accounting order: failed searches must not update cache state.
+	inputTokens, cacheUsage := buildUsage()
+	if stream {
 		return writeWebSearchStreamResponse(c, query, resp, model, startTime, inputTokens, cacheUsage)
 	}
 	return writeWebSearchNonStreamResponse(c, query, resp, model, startTime, inputTokens, cacheUsage)

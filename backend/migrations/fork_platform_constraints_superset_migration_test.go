@@ -23,7 +23,7 @@ func TestForkPlatformConstraintsSupersetMigration(t *testing.T) {
 	require.Contains(t, sql,
 		"ADD CONSTRAINT channel_monitor_request_templates_provider_check CHECK (provider IN ('openai', 'anthropic', 'gemini', 'grok', 'antigravity', 'kiro', 'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go'))")
 
-	// 必须是最后一个重建平台约束的迁移，否则乱序补跑的旧迁移会在它之后再次收窄约束。
+	// The last constraint rebuild must preserve the fork platforms before the catalog migration drops it.
 	entries, err := FS.ReadDir(".")
 	require.NoError(t, err)
 	var touching []string
@@ -40,5 +40,5 @@ func TestForkPlatformConstraintsSupersetMigration(t *testing.T) {
 		}
 	}
 	sort.Strings(touching)
-	require.Equal(t, name, touching[len(touching)-1])
+	require.Equal(t, "241_add_typesafe_platform.sql", touching[len(touching)-1])
 }
