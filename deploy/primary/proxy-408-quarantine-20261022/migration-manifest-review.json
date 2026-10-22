@@ -1,0 +1,9 @@
+{
+  "application_sha": "3d0f78a461e37b8a9bbaea8a807bfede57b2a60e",
+  "filename": "251_adobe_408_proxy_quarantine.sql",
+  "raw_file_sha256": "2117773e6596ac2f17feb8fc518626219a94fc2f846fe4a7d6df851123d75e1d",
+  "migration_runner_blob": "55da5f027fdff25e322a97c649ad0e0efe3ec769",
+  "runner_rule": "SHA256(strings.TrimSpace(content))",
+  "expected_database_checksum": "f8fe100c4c703cb30921d15b1f7943593110bdacd6dbb9046ccbad1c9c81072c",
+  "production_database_modified": false
+}
