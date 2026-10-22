@@ -48,14 +48,16 @@ latest_accounts={r['id']:r for r in latest_snapshot['account_state']}
 assert set(initial_accounts)==set(latest_accounts), 'Review any live account additions or removals'
 assert all(initial_accounts[i]['manual_pause']==latest_accounts[i]['manual_pause'] for i in initial_accounts), 'Preserve and review current operator actions'
 latest_changed_ids={i for i in initial_accounts if any(initial_accounts[i][k]!=latest_accounts[i][k] for k in ['status','schedulable'])}
-latest_state_differences=[{'id':i,'before_status':initial_accounts[i]['status'],'before_schedulable':initial_accounts[i]['schedulable'],'current_status':latest_accounts[i]['status'],'current_schedulable':latest_accounts[i]['schedulable']} for i in sorted(latest_changed_ids)]
-assert latest_changed_ids <= set(state_review['reviewed_ids']), 'Review additional live state transitions: '+json.dumps(latest_state_differences)
+failure_spec=importlib.util.spec_from_file_location('failure_review',ROOT/'latest-failure-review.py')
+failure_review=importlib.util.module_from_spec(failure_spec);failure_spec.loader.exec_module(failure_review)
+latest_failures=failure_review.review(a,initial_accounts,latest_accounts)
+assert latest_failures['snapshot_changed_ids']==sorted(latest_changed_ids)
 assert all(latest_accounts[r['id']]['status']==r['current_status'] and latest_accounts[r['id']]['schedulable']==r['current_schedulable'] for r in state_review['accounts'])
 assert all(set(c['fields']) <= {'credentials','proxy_id','status','schedulable'} for c in business['changes'])
 assert all(c['version_advanced'] and c['issuer_compatible'] and c['source_key_compatible'] for c in credentials['cookie_changed_accounts'])
 schema=json.loads((ROOT/'schema-business-verification.json').read_text())
 assert all(schema['business_contracts'].values()) and schema['history_checksums_preserved']
 summary={'backup_accounts':business['before_count'],'checked_accounts':business['current_count'],'manual_pauses_preserved':True,'proxy_bindings_changed_with_event_chain':sum('proxy_id' in c['fields'] for c in business['changes']),'cookie_rotations_with_version_advance':len(credentials['cookie_changed_accounts']),'token_fields_only_changes':len(credentials['token_fields_only_accounts']),'reviewed_live_failure_state_changes':len(changed_ids)}
-out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'schema_and_bindings':schema,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'latest_account_ids_and_manual_states_preserved':True,'latest_account_states_compared_with_actual_cutover':True,'adobe_custom_business_preserved':True,'active_adobe_probes':False,'test_mail_sent':False}
+out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'schema_and_bindings':schema,'latest_live_failure_review':latest_failures,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'latest_account_ids_and_manual_states_preserved':True,'latest_account_states_compared_with_actual_cutover':True,'adobe_custom_business_preserved':True,'active_adobe_probes':False,'test_mail_sent':False}
 a.save('final-verification.json',out)
 print(json.dumps(out,ensure_ascii=False))

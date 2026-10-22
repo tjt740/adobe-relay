@@ -54,7 +54,7 @@ elif phase in ['review-state','approve-state']:
  action='capture' if phase=='review-state' else 'approve'
  remote(f"import subprocess; subprocess.run(['python3','{root}/review-state-changes.py','{action}'],check=True)")
 elif phase=='verify':
- copy([pathlib.Path(__file__).with_name('schema-business-verify.py'),pathlib.Path(__file__).with_name('expected-new-migrations.json'),pathlib.Path(__file__).with_name('final-verify.py'),pathlib.Path(__file__).with_name('cutover-state.py')])
+ copy([pathlib.Path(__file__).with_name('schema-business-verify.py'),pathlib.Path(__file__).with_name('expected-new-migrations.json'),pathlib.Path(__file__).with_name('final-verify.py'),pathlib.Path(__file__).with_name('cutover-state.py'),pathlib.Path(__file__).with_name('latest-failure-review.py')])
  remote(f"""import json,pathlib,subprocess,sys,time
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
 deadline=time.monotonic()+300
@@ -90,7 +90,7 @@ else:
  script=f"""import json,pathlib,subprocess
 r=pathlib.Path('{root}')
 out={{'application_sha':'{sha}','files':{{}}}}
-for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','schema-business-verification.json','live-state-change-evidence.json','state-change-diagnostic.json','precutover-live-state-changes.json','reviewed-live-state-changes.json','final-verification.json']:
+for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','schema-business-verification.json','live-state-change-evidence.json','state-change-diagnostic.json','precutover-live-state-changes.json','latest-live-failure-review.json','reviewed-live-state-changes.json','final-verification.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
