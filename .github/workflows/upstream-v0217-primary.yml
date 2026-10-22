@@ -4,7 +4,7 @@ on:
     inputs:
       phase:
         type: choice
-        options: [prepare, start, status, browser, review-state, approve-state, verify, export]
+        options: [prepare, start, status, browser, review-state, approve-state, verify, export, archive]
         required: true
         default: status
       application_sha:

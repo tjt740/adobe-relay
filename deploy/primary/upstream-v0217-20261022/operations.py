@@ -1,7 +1,7 @@
 """Fixed-scope primary release bridge for unreliable local SSH connections."""
 import hashlib,json,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['prepare','start','status','browser','review-state','approve-state','verify','export']
+assert phase in ['prepare','start','status','browser','review-state','approve-state','verify','export','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/upstream-v0217-20261022'
 options=['-i',str(pathlib.Path.home()/'.ssh/deploy_key'),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -65,6 +65,25 @@ while not (r/'rolling-finished.json').exists():
 for script,output in [('cutover-state.py','cutover-account-state.json'),('schema-business-verify.py','schema-business-verification.json'),('observe.py','observation.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('final-verify.py','final-verification.json')]:
  if not (r/output).exists():subprocess.run([sys.executable,str(r/script)],check=True)
 subprocess.run([sys.executable,str(r/'audit.py'),'check-rollback'],check=True)
+""")
+elif phase=='archive':
+ remote(f"""import json,pathlib,subprocess
+r=pathlib.Path('{root}');final=json.loads((r/'final-verification.json').read_text())
+assert final['application_sha']=='{sha}' and all(final['preserved'].values())
+app=json.loads(subprocess.check_output(['docker','inspect','adobe-relay-app-1']))[0]
+assert app['Config']['Image']=='adobe-relay:{sha}' and app['State']['Health']['Status']=='healthy'
+(r/'publication').mkdir(exist_ok=True,mode=0o700)
+""")
+ copy(['deploy/primary/README.md','deploy/primary/upstream-v0.2.17-upgrade-20261022.md'],root+'/publication/')
+ remote(f"""import datetime,hashlib,json,pathlib,shutil
+r=pathlib.Path('{root}')
+for name in ['README.md','upstream-v0.2.17-upgrade-20261022.md']:
+ p=r/'publication'/name;assert '{sha}' in p.read_text()
+ dest=pathlib.Path('/opt/adobe-relay/deploy/primary')/name
+ temp=dest.with_suffix('.publishing');shutil.copy2(p,temp);temp.replace(dest)
+shutil.copy2(r/'publication/upstream-v0.2.17-upgrade-20261022.md',r/'release-notes.md')
+out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','server_release_notes_synced':True,'business_data_changed':False,'application_restarted':False}}
+(r/'publication.json').write_text(json.dumps(out));print(json.dumps(out))
 """)
 else:
  evidence=pathlib.Path('primary-release-evidence');evidence.mkdir(exist_ok=True)

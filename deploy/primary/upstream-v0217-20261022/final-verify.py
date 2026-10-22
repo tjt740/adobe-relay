@@ -48,7 +48,8 @@ latest_accounts={r['id']:r for r in latest_snapshot['account_state']}
 assert set(initial_accounts)==set(latest_accounts), 'Review any live account additions or removals'
 assert all(initial_accounts[i]['manual_pause']==latest_accounts[i]['manual_pause'] for i in initial_accounts), 'Preserve and review current operator actions'
 latest_changed_ids={i for i in initial_accounts if any(initial_accounts[i][k]!=latest_accounts[i][k] for k in ['status','schedulable'])}
-assert latest_changed_ids <= set(state_review['reviewed_ids']), 'Review additional live state transitions'
+latest_state_differences=[{'id':i,'before_status':initial_accounts[i]['status'],'before_schedulable':initial_accounts[i]['schedulable'],'current_status':latest_accounts[i]['status'],'current_schedulable':latest_accounts[i]['schedulable']} for i in sorted(latest_changed_ids)]
+assert latest_changed_ids <= set(state_review['reviewed_ids']), 'Review additional live state transitions: '+json.dumps(latest_state_differences)
 assert all(latest_accounts[r['id']]['status']==r['current_status'] and latest_accounts[r['id']]['schedulable']==r['current_schedulable'] for r in state_review['accounts'])
 assert all(set(c['fields']) <= {'credentials','proxy_id','status','schedulable'} for c in business['changes'])
 assert all(c['version_advanced'] and c['issuer_compatible'] and c['source_key_compatible'] for c in credentials['cookie_changed_accounts'])
