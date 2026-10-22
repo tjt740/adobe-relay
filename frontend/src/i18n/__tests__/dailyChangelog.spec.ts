@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import DailyChangelog from '@/components/admin/changelog/DailyChangelog.vue'
-import { dailyUpdates, groupDailyUpdates, changelogPreviews, dailyOverviews } from '@/content/changelog/daily'
+import { dailyUpdates, groupDailyUpdates, changelogPreviews, dailyOverviews, pendingDailyUpdates } from '@/content/changelog/daily'
 import zh from '@/i18n/locales/zh/changelog'
 import en from '@/i18n/locales/en/changelog'
 
@@ -30,6 +30,12 @@ describe('Daily changelog', () => {
     for (const item of dailyUpdates) {
       expect(item.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
       expect(new Date(item.date).toISOString().slice(0, 10)).toBe(item.date)
+    }
+    for (const item of pendingDailyUpdates) {
+      expect('date' in item).toBe(false)
+      expect(dailyUpdates.some(released => released.id === item.id)).toBe(false)
+    }
+    for (const item of [...dailyUpdates, ...pendingDailyUpdates]) {
       for (const messages of [zh, en]) {
         const note = messages.daily.updates[item.id as keyof typeof messages.daily.updates]
         expect(note?.title.trim()).toBeTruthy()

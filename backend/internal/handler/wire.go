@@ -123,6 +123,7 @@ func ProvideGatewayHandler(
 	settingService *service.SettingService,
 	coordinator *securityaudit.Coordinator,
 	proxyRecovery *proxyfailover.Manager,
+	geminiCachedContentService *service.GeminiCachedContentService,
 ) *GatewayHandler {
 	h := NewGatewayHandler(gatewayService, openAIGatewayService, geminiCompatService, antigravityGatewayService,
 		userService, concurrencyService, billingCacheService, usageService, apiKeyService, usageRecordWorkerPool,
@@ -130,6 +131,7 @@ func ProvideGatewayHandler(
 		adobeImageService, cfg, settingService)
 	h.securityAuditCoordinator = coordinator
 	h.proxyRouteRecovery = proxyRecovery
+	h.geminiCachedContentService = geminiCachedContentService
 	return h
 }
 

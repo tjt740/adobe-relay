@@ -1,5 +1,7 @@
 # 主服务器发布
 
+发布准备：上游 v0.2.17 功能合并与本站业务适配已完成，按已授权的主服务器受控滚动流程发布，实际应用身份和结果在上线后归档。见 [升级范围与开发验证](upstream-v0.2.17-upgrade-20261022.md)。
+
 自 2026-10-11 起，本项目所有正式发布仅更新主服务器 **173.234.15.150**，网站为 **https://creative.cheap**，API 为 `https://creative.cheap/v1`。国内 `47.106.176.71` 和菲律宾 `8.212.129.43` 不再是发布目标。
 
 推送 `main` 后由 `.github/workflows/deploy-adobe-relay.yml` 测试、构建 linux/amd64 镜像并发布到主服务器；也可在 Actions 手动运行 main。发布使用 `PRIMARY_SSH_KEY` 和 `PRIMARY_KNOWN_HOSTS`，SSH 用户为 root，严格校验已有主机公钥。
