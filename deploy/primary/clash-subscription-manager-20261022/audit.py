@@ -74,7 +74,28 @@ def snapshot():
     return out
 
 
+def reviewed_setting_hashes(original, review=None):
+    expected = dict(original)
+    if review is None:
+        return expected
+    key = review['key']
+    assert key == 'claude_code_client_version_synced', 'Only the independently synced client version can be reviewed'
+    assert review['service_tree_before'] == review['service_tree_candidate'] == '839be5cf5eb4e1e0d16ebf349530550052c75766'
+    assert review['event'] == 'claude_code_version_synced'
+    assert re.fullmatch('[0-9a-f]{64}', review['evidence_log_sha256'])
+    old, new = review['old_value'], review['new_value']
+    assert re.fullmatch(r'\d+\.\d+\.\d+', old) and re.fullmatch(r'\d+\.\d+\.\d+', new)
+    assert tuple(map(int, new.split('.'))) > tuple(map(int, old.split('.'))), 'Automatic version must advance'
+    assert hashlib.md5(old.encode()).hexdigest() == expected[key] == review['old_hash']
+    assert hashlib.md5(new.encode()).hexdigest() == review['new_hash']
+    expected[key] = review['new_hash']
+    return expected
+
+
 def check_preserved(before, current):
+    review_file = ROOT / 'reviewed-automatic-settings.json'
+    review = json.loads(review_file.read_text()) if review_file.exists() else None
+    expected_settings = reviewed_setting_hashes(before['settings_hashes'], review)
     checks = {
         'other_containers': all(current['containers'].get(name, {}).get('id') == value['id'] and
                                 current['containers'][name]['image_id'] == value['image_id']
@@ -83,7 +104,7 @@ def check_preserved(before, current):
         'resources_and_go': all(current['containers'][name]['resources'] == item['resources'] and current['containers'][name]['go_env'] == item['go_env'] for name, item in before['containers'].items()),
         'environment': current['env_without_image_hash'] == before['env_without_image_hash'],
         'okad_settings': current['okad_settings_hash'] == before['okad_settings_hash'],
-        'sub2_settings_including_smtp': current['settings_hashes'] == before['settings_hashes'],
+        'sub2_settings_including_smtp': current['settings_hashes'] == expected_settings,
         'clash_nodes_bindings_and_configuration': current['clash_contract_hash'] == before['clash_contract_hash'],
         'alert_rules': current['rules_hash'] == before['rules_hash'],
     }
