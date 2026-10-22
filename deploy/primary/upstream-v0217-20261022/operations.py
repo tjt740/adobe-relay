@@ -1,7 +1,7 @@
 """Fixed-scope primary release bridge for unreliable local SSH connections."""
 import hashlib,json,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['prepare','start','status','verify','export']
+assert phase in ['prepare','start','status','browser','verify','export']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/upstream-v0217-20261022'
 options=['-i',str(pathlib.Path.home()/'.ssh/deploy_key'),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -38,6 +38,14 @@ assert not (r/'progress.json').exists(), 'Driver already started; inspect its ev
 subprocess.run(['systemd-run','--unit=adobe-upstream-v0217-release','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/driver.log','--property=StandardError=append:{root}/driver.log','/usr/bin/python3',str(r/'driver.py')],check=True)
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 """)
+elif phase=='browser':
+ subprocess.run(['node',str(pathlib.Path(__file__).with_name('live-browser-check.cjs'))],check=True,timeout=420)
+ report=pathlib.Path(__file__).with_name('live-browser-verification.json')
+ copy([report])
+ evidence=pathlib.Path('primary-release-evidence');evidence.mkdir(exist_ok=True)
+ import shutil
+ shutil.copy2(report,evidence/report.name)
+ for screenshot in pathlib.Path(__file__).parent.glob('live-*.png'):shutil.copy2(screenshot,evidence/screenshot.name)
 elif phase=='verify':
  copy([pathlib.Path(__file__).with_name('schema-business-verify.py'),pathlib.Path(__file__).with_name('expected-new-migrations.json'),pathlib.Path(__file__).with_name('final-verify.py')])
  remote(f"""import json,pathlib,subprocess,sys

@@ -36,6 +36,7 @@ observation=json.loads((ROOT/'observation.json').read_text());assert len(observa
 business=json.loads((ROOT/'business-verification.json').read_text())
 credentials=json.loads((ROOT/'credential-change-review.json').read_text())
 assert not business['missing_ids'] and business['manual_pause_preserved'] and all(c['proxy_chain_matches'] for c in business['changes'])
+assert all(set(c['fields']) <= {'credentials','proxy_id'} for c in business['changes']), 'Attribute live status/scheduling changes without restoring old states'
 assert all(c['version_advanced'] and c['issuer_compatible'] and c['source_key_compatible'] for c in credentials['cookie_changed_accounts'])
 schema=json.loads((ROOT/'schema-business-verification.json').read_text())
 assert all(schema['business_contracts'].values()) and schema['history_checksums_preserved']

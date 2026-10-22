@@ -4,7 +4,7 @@ on:
     inputs:
       phase:
         type: choice
-        options: [prepare, start, status, verify, export]
+        options: [prepare, start, status, browser, verify, export]
         required: true
         default: status
       application_sha:
@@ -51,6 +51,11 @@ jobs:
           path: release-artifact
           run-id: ${{ inputs.build_run }}
           github-token: ${{ github.token }}
+      - name: Prepare pinned headless browser
+        if: inputs.phase == 'browser'
+        run: |
+          npm install --prefix "$RUNNER_TEMP/v0217-browser" playwright@1.62.1 --ignore-scripts --no-audit --no-fund
+          "$RUNNER_TEMP/v0217-browser/node_modules/.bin/playwright" install --with-deps chromium
       - name: Operate guarded primary release
         env:
           SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
@@ -58,6 +63,7 @@ jobs:
           APP_SHA: ${{ inputs.application_sha }}
           BUILD_RUN: ${{ inputs.build_run }}
           PHASE: ${{ inputs.phase }}
+          NODE_PATH: ${{ runner.temp }}/v0217-browser/node_modules
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
