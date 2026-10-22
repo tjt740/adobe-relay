@@ -54,7 +54,7 @@ elif phase in ['review-state','approve-state']:
  action='capture' if phase=='review-state' else 'approve'
  remote(f"import subprocess; subprocess.run(['python3','{root}/review-state-changes.py','{action}'],check=True)")
 elif phase=='verify':
- copy([pathlib.Path(__file__).with_name('schema-business-verify.py'),pathlib.Path(__file__).with_name('expected-new-migrations.json'),pathlib.Path(__file__).with_name('final-verify.py')])
+ copy([pathlib.Path(__file__).with_name('schema-business-verify.py'),pathlib.Path(__file__).with_name('expected-new-migrations.json'),pathlib.Path(__file__).with_name('final-verify.py'),pathlib.Path(__file__).with_name('cutover-state.py')])
  remote(f"""import json,pathlib,subprocess,sys,time
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
 deadline=time.monotonic()+300
@@ -62,7 +62,7 @@ while not (r/'rolling-finished.json').exists():
  assert json.loads((r/'progress.json').read_text())['state']!='attention_required', 'Driver needs inspection'
  assert time.monotonic()<deadline, 'Natural draining still in progress; no tasks interrupted'
  time.sleep(5)
-for script,output in [('schema-business-verify.py','schema-business-verification.json'),('observe.py','observation.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('final-verify.py','final-verification.json')]:
+for script,output in [('cutover-state.py','cutover-account-state.json'),('schema-business-verify.py','schema-business-verification.json'),('observe.py','observation.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('final-verify.py','final-verification.json')]:
  if not (r/output).exists():subprocess.run([sys.executable,str(r/script)],check=True)
 subprocess.run([sys.executable,str(r/'audit.py'),'check-rollback'],check=True)
 """)
@@ -71,7 +71,7 @@ else:
  script=f"""import json,pathlib,subprocess
 r=pathlib.Path('{root}')
 out={{'application_sha':'{sha}','files':{{}}}}
-for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','schema-business-verification.json','live-state-change-evidence.json','state-change-diagnostic.json','reviewed-live-state-changes.json','final-verification.json']:
+for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','schema-business-verification.json','live-state-change-evidence.json','state-change-diagnostic.json','precutover-live-state-changes.json','reviewed-live-state-changes.json','final-verification.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
