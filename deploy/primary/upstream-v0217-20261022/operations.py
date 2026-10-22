@@ -47,7 +47,10 @@ elif phase=='browser':
  shutil.copy2(report,evidence/report.name)
  for screenshot in pathlib.Path(__file__).parent.glob('live-*.png'):shutil.copy2(screenshot,evidence/screenshot.name)
 elif phase in ['review-state','approve-state']:
- copy([pathlib.Path(__file__).with_name('review-state-changes.py')])
+ copy([pathlib.Path(__file__).with_name('review-state-changes.py'),pathlib.Path(__file__).with_name('state-change-diagnostic.py')])
+ if phase=='review-state':
+  remote(f"import subprocess; subprocess.run(['python3','{root}/state-change-diagnostic.py'],check=True)")
+  sys.exit(0)
  action='capture' if phase=='review-state' else 'approve'
  remote(f"import subprocess; subprocess.run(['python3','{root}/review-state-changes.py','{action}'],check=True)")
 elif phase=='verify':
@@ -68,7 +71,7 @@ else:
  script=f"""import json,pathlib,subprocess
 r=pathlib.Path('{root}')
 out={{'application_sha':'{sha}','files':{{}}}}
-for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','schema-business-verification.json','live-state-change-evidence.json','reviewed-live-state-changes.json','final-verification.json']:
+for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','schema-business-verification.json','live-state-change-evidence.json','state-change-diagnostic.json','reviewed-live-state-changes.json','final-verification.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
