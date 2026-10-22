@@ -36,3 +36,11 @@ class LatestFailureReviewTests(TestCase):
   self.assertEqual(m.classify(self.old,row,[],self.cutover),'original_background_auth_error_same_cookie')
   self.assertFalse(m.background_evidence(raw.replace('no longer valid','temporarily unavailable'),row))
   self.assertFalse(m.background_evidence(raw.replace('"account_id": 7','"account_id": 8'),row))
+
+ def test_existing_redacted_permanent_wrapper_requires_typed_current_error(self):
+  import json
+  row=copy.deepcopy(self.current);row['id']=7;row['error_message']='Token refresh failed (non-retryable): adobe cookie is no longer valid: synthetic auth rejection'
+  raw=json.dumps({'msg':'token_refresh.account_refresh_failed','account_id':7,'platform':'adobe','error':'account OAuth credentials permanently rejected'})
+  self.assertEqual(len(m.background_evidence(raw,row)),1)
+  row['error_message']='temporary failure'
+  self.assertFalse(m.background_evidence(raw,row))

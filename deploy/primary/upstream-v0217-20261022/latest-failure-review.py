@@ -10,8 +10,10 @@ def background_evidence(raw,row):
   except (ValueError,json.JSONDecodeError):continue
   if meta.get('account_id')!=row['id'] or meta.get('platform')!='adobe':continue
   error=meta.get('error','')
-  if not isinstance(error,str) or 'adobe cookie is no longer valid' not in error.lower():continue
-  if not row['error_message'].endswith(error):continue
+  if not isinstance(error,str):continue
+  exact_terminal=('adobe cookie is no longer valid' in error.lower() and row['error_message'].endswith(error))
+  wrapped_terminal=(error=='account OAuth credentials permanently rejected' and row['error_message'].startswith('Token refresh failed (non-retryable):') and 'adobe cookie is no longer valid' in row['error_message'].lower())
+  if not (exact_terminal or wrapped_terminal):continue
   evidence.append({'event':'token_refresh.account_refresh_failed','line_sha256':hashlib.sha256(line.encode()).hexdigest(),'error_sha256':hashlib.sha256(error.encode()).hexdigest(),'same_terminal_error':True})
  return evidence
 
