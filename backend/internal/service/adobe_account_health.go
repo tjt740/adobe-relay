@@ -14,14 +14,18 @@ import (
 // Only allowlisted classifications are persisted. Raw upstream bodies, URLs,
 // cookies and tokens must never enter the account status or email report.
 type AdobeHealthObservation struct {
-	Success   bool      `json:"success"`
-	Code      int       `json:"code"`
-	Reason    string    `json:"reason"`
-	Stage     string    `json:"stage"`
-	Source    string    `json:"source"`
-	Scope     string    `json:"scope"`
-	StartedAt time.Time `json:"started_at"`
-	CheckedAt time.Time `json:"checked_at"`
+	ProxyID            *int64     `json:"proxy_id,omitempty"`
+	SourceID           string     `json:"source_id,omitempty"`
+	ProxyUpdatedAt     *time.Time `json:"proxy_updated_at,omitempty"`
+	SubmissionRejected bool       `json:"submission_rejected,omitempty"`
+	Success            bool       `json:"success"`
+	Code               int        `json:"code"`
+	Reason             string     `json:"reason"`
+	Stage              string     `json:"stage"`
+	Source             string     `json:"source"`
+	Scope              string     `json:"scope"`
+	StartedAt          time.Time  `json:"started_at"`
+	CheckedAt          time.Time  `json:"checked_at"`
 }
 
 type AdobeHealthRecorder interface {
@@ -48,6 +52,7 @@ func adobeHealthObservation(start time.Time, source, model string, err error) Ad
 
 	var op *adobe.OperationError
 	if errors.As(err, &op) {
+		o.SubmissionRejected = op.SubmissionRejected
 		switch op.Stage {
 		case "token", "prepare", "upload", "submit", "poll", "download":
 			o.Stage = op.Stage
@@ -103,6 +108,8 @@ func adobeHealthObservation(start time.Time, source, model string, err error) Ad
 	return o
 }
 
+type adobeRouteSourceKey struct{}
+
 func recordAdobeHealth(ctx context.Context, repo AccountRepository, a *Account, start time.Time, source, model string, err error) {
 	if a == nil || a.Platform != PlatformAdobe || a.IsSyntheticUITest() || errors.Is(err, context.Canceled) {
 		return
@@ -113,13 +120,23 @@ func recordAdobeHealth(ctx context.Context, repo AccountRepository, a *Account, 
 	}
 	persist, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
-	if e := recorder.RecordAdobeHealth(persist, a, adobeHealthObservation(start, source, model, err)); e != nil {
+	observation := adobeHealthObservation(start, source, model, err)
+	observation.SourceID, _ = ctx.Value(adobeRouteSourceKey{}).(string)
+	if e := recorder.RecordAdobeHealth(persist, a, observation); e != nil {
 		slog.Warn("adobe_health_save_failed", "account_id", a.ID, "error", e)
 	}
 }
 
 func (s *GatewayService) RecordAdobeHealth(ctx context.Context, a *Account, start time.Time, model string, err error) {
 	recordAdobeHealth(ctx, s.accountRepo, a, start, "business", model, err)
+}
+
+func (s *GatewayService) AdobeGenerationRouteContext(ctx context.Context, a *Account) (context.Context, bool) {
+	if repo, ok := s.accountRepo.(AdobeRouteReviewRepository); ok {
+		source, ready, err := repo.AdobeTestRoute(ctx, a)
+		return context.WithValue(ctx, adobeRouteSourceKey{}, source), err == nil && ready
+	}
+	return ctx, true
 }
 
 func AdobeHealthReason(reason string) (string, string) {
@@ -153,7 +170,11 @@ func adobeHealthTestModel(a *Account, model string) string {
 			model = ids[0]
 		}
 	}
-	return a.GetMappedModel(model)
+	mapped := a.GetMappedModel(model)
+	if resolved, err := adobe.ResolveImage(adobe.ImageRequest{ModelID: mapped}); err == nil {
+		return resolved.Family
+	}
+	return mapped
 }
 
 func (s *AccountTestService) AccountRuntimeRevision(ctx context.Context) (string, error) {

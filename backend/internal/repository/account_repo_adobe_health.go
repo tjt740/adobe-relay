@@ -77,6 +77,14 @@ func (r *accountRepository) RecordAdobeHealth(ctx context.Context, a *service.Ac
 	if err != nil {
 		return err
 	}
+	o.ProxyID = a.ProxyID
+	o.ProxyUpdatedAt = proxyUpdatedAt
+	if a.ProxyID != nil && proxyUpdatedAt != nil && !service.IsAdobeRelayAccount(a) {
+		o.SourceID, err = proxyfailover.RecordGeneration(ctx, tx, *a.ProxyID, *proxyUpdatedAt, o.SourceID, id, a.GetCredential("cookie"), a.GetCredential("api_key"), o.Scope, o.Success, o.Code, o.Stage, o.SubmissionRejected, o.StartedAt, o.CheckedAt)
+		if err != nil {
+			return err
+		}
+	}
 	var matchingScopes []string
 	if o.Success || o.Code == 408 {
 		matchingScopes, err = adobeHealthMatchingScopes(ctx, tx, id, o.Scope)

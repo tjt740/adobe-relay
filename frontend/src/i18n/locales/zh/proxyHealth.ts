@@ -1,4 +1,9 @@
 export default {
+  generationBlocked: '{count} 个节点因 Adobe 生成异常或人工隔离暂停新生成',
+  generationRouteBlocked: 'Adobe 出口待复核，暂停新生成',
+  nodeBalance: '所属订阅剩余 {remaining}',
+  balanceUnknown: '所属订阅流量未知',
+
   reachableCount: "可达 {count}",
   failedCount: "故障 {count}",
   unknownCount: "待确认 {count}",

@@ -1,4 +1,9 @@
 export default {
+  generationBlocked: '{count} nodes paused for Adobe generation failures or operator exclusion',
+  generationRouteBlocked: 'Adobe route awaiting review; new generation paused',
+  nodeBalance: 'Subscription remaining: {remaining}',
+  balanceUnknown: 'Subscription traffic unknown',
+
   reachableCount: "{count} reachable",
   failedCount: "{count} failed",
   unknownCount: "{count} unconfirmed",

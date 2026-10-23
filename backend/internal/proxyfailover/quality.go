@@ -52,3 +52,11 @@ func betterLatencyRoute(current, candidate health) bool {
 	before, after := routeLatency(current), routeLatency(candidate)
 	return current.SlowChecks >= 3 && after*10 <= before*7 && before-after >= 500
 }
+
+func generationRouteScore(p proxy, h health, used int) int64 {
+	score := routeScore(h, used)
+	if p.generationProven {
+		return max(1, score/2)
+	}
+	return score
+}

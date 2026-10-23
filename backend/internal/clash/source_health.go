@@ -374,6 +374,36 @@ type ProxySource struct {
 	Reason           string
 }
 
+// LoadProxySource projects only a node's quota metadata. Per-request routing
+// must not materialize every proxy credential or private subscription URL.
+func LoadProxySource(ctx context.Context, db *sql.DB, id int64) (ProxySource, error) {
+	var source string
+	var raw []byte
+	err := db.QueryRowContext(ctx, `SELECT COALESCE(n->>'source_id',''),s->'traffic'
+ FROM clash_subscription c CROSS JOIN LATERAL jsonb_array_elements(COALESCE(c.document->'nodes','[]')) n
+ LEFT JOIN LATERAL jsonb_array_elements(COALESCE(c.document->'sources','[]')) s ON s->>'id'=n->>'source_id'
+ WHERE c.id=1 AND (n->>'proxy_id')::bigint=$1 LIMIT 1`, id).Scan(&source, &raw)
+	if err == sql.ErrNoRows {
+		return ProxySource{}, nil
+	}
+	if err != nil {
+		return ProxySource{}, err
+	}
+	if source == "" {
+		legacy, e := LoadProxySources(ctx, db)
+		return legacy[id], e
+	}
+	var traffic *SourceTraffic
+	if len(raw) > 0 {
+		if err = json.Unmarshal(raw, &traffic); err != nil {
+			return ProxySource{}, err
+		}
+	}
+	src := Source{ID: source, Traffic: traffic}
+	reason := src.BlockReason(time.Now())
+	return ProxySource{ID: source, Blocked: reason != "", Reason: reason, TrafficAvailable: traffic != nil && traffic.Total > 0 && traffic.remaining() > 0 && time.Since(traffic.ObservedAt) <= 15*time.Minute}, nil
+}
+
 func LoadProxySources(ctx context.Context, q interface {
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 }) (map[int64]ProxySource, error) {

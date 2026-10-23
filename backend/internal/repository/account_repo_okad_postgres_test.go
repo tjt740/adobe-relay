@@ -62,6 +62,14 @@ func newOkadRecoveryPostgres(t *testing.T) *sql.DB {
 	require.NoError(t, err)
 	_, err = db.Exec(string(migration))
 	require.NoError(t, err)
+	clashMigration, err := os.ReadFile("../../migrations/240_clash_subscription.sql")
+	require.NoError(t, err)
+	_, err = db.Exec(string(clashMigration))
+	require.NoError(t, err)
+	routeMigration, err := os.ReadFile("../../migrations/253_adobe_route_health.sql")
+	require.NoError(t, err)
+	_, err = db.Exec(string(routeMigration))
+	require.NoError(t, err)
 	return db
 }
 

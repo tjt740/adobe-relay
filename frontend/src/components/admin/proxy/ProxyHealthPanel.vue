@@ -12,12 +12,16 @@
     <p v-if="failed" role="status" class="mt-2 text-xs text-amber-600">{{ t('proxyHealth.readFailed') }}</p>
     <p v-else-if="loading && !view" class="mt-2 text-xs text-gray-500">{{ t('common.loading') }}</p>
     <p v-if="view?.sources.length" class="mt-2 text-xs text-gray-500">{{ t('proxyHealth.sourceSummary', { total: view.sources.length, abnormal: problemSources.length }) }}</p>
-    <div v-if="!expanded && problemSources.length" class="mt-2 space-y-1">
-      <p v-for="source in problemSources" :key="source.id" class="break-all rounded-md px-2 py-1 text-xs" :class="severity(source.status)">
+    <div v-if="!expanded && view?.sources.length" class="mt-2 grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
+      <p v-for="source in view.sources" :key="source.id" class="break-all rounded-md px-2 py-1 text-xs" :class="severity(source.status)">
         {{ t('proxyHealth.source', { index: source.index }) }} · {{ t(`proxyHealth.states.${source.status}`) }} · {{ source.url_hint }} · {{ source.id.slice(-6) }}
+        <span class="mt-1 block font-medium">{{ source.traffic_known ? t('proxyHealth.remaining', { remaining: bytes(source.remaining_bytes), total: bytes(source.total_bytes) }) : t('proxyHealth.trafficUnknown') }}</span>
+        <span v-if="source.expires_at" class="mt-1 block opacity-75">{{ t('proxyHealth.expires') }} {{ formatDateTime(source.expires_at) }}</span>
+        <span v-if="source.traffic_observed_at" class="mt-1 block opacity-75">{{ t('proxyHealth.observed') }} {{ formatDateTime(source.traffic_observed_at) }}</span>
+        <span v-if="source.generation_blocked" class="mt-1 block text-amber-700 dark:text-amber-300">{{ t('proxyHealth.generationBlocked', { count: source.generation_blocked }) }}</span>
       </p>
     </div>
-    <div v-if="expanded && view?.sources.length" class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <div v-if="expanded && view?.sources.length" class="mt-3 grid max-h-96 gap-3 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
       <article v-for="source in view.sources" :key="source.id" class="subscription-card relative min-w-0 overflow-hidden rounded-xl border bg-white p-4 text-gray-700 dark:bg-dark-800 dark:text-gray-300" :class="`subscription-card--${tone(source.status)}`">
         <span class="subscription-watermark" aria-hidden="true">{{ t(`proxyHealth.watermarks.${source.status}`) }}</span>
         <div class="relative pr-32">
@@ -33,6 +37,7 @@
           <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"><Icon name="questionCircle" size="xs" aria-hidden="true" />{{ t('proxyHealth.unknownCount', { count: source.unknown }) }}</span>
           <span class="inline-flex items-center gap-1 text-gray-500 dark:text-gray-400"><Icon name="server" size="xs" aria-hidden="true" />{{ t('proxyHealth.totalCount', { count: source.nodes }) }}</span>
         </div>
+        <p v-if="source.generation_blocked" class="mt-2 text-xs text-amber-700 dark:text-amber-300">{{ t('proxyHealth.generationBlocked', { count: source.generation_blocked }) }}</p>
         <p v-if="source.status === 'exhausted' || source.status === 'expired'" class="mt-2 text-xs font-medium">{{ t('proxyHealth.excluded') }}</p>
         <p v-if="source.fetch_error" class="mt-2 text-xs">{{ t('proxyHealth.fetchFailed', { reason: fetchReason(source.fetch_error, source.http_status) }) }}</p>
         <p v-if="source.traffic_observed_at" class="mt-1 text-xs opacity-75">{{ t('proxyHealth.observed') }} {{ formatDateTime(source.traffic_observed_at) }}</p>
@@ -57,7 +62,7 @@ import { useI18n } from 'vue-i18n'
 import { getProxyHealth, type ProxyHealth } from '@/api/admin/clash'
 import { formatDateTime } from '@/utils/format'
 import Icon from '@/components/icons/Icon.vue'
-const emit = defineEmits<{ manage: [] }>()
+const emit = defineEmits<{ manage: []; loaded: [view: ProxyHealth] }>()
 const { t } = useI18n()
 const view = ref<ProxyHealth | null>(null)
 const loading = ref(false)
@@ -91,7 +96,7 @@ function fetchReason(reason: string, status?: number) {
 async function refresh() {
   if (loading.value) return
   loading.value = true
-  try { const data = await getProxyHealth(); if (alive) { view.value = data; failed.value = false } }
+  try { const data = await getProxyHealth(); if (alive) { view.value = data; emit('loaded', data); failed.value = false } }
   catch { if (alive) failed.value = true }
   finally { loading.value = false }
 }

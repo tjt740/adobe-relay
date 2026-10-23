@@ -75,6 +75,7 @@ jobs:
           bash -n deploy/primary/rollback-okad-sub2.sh
           cd backend
           go test -race ./internal/clash ./internal/proxyfailover ./migrations
+          CLASH_TEST_DATABASE_URL="$PROXY_FAILOVER_TEST_DATABASE_URL" go test -race ./internal/clash -run Source
           go test -tags unit -race ./internal/service -run 'FreshSnapshot|SchedulerSnapshot'
           go test -race ./internal/pkg/runtimediag
           go test -race ./internal/pkg/httputil ./internal/pkg/imagebuffer

@@ -23,7 +23,7 @@ func (f imageAuthFake) UploadImage(c context.Context, token string, b []byte, m 
 	return f.upload(c, token, b, m)
 }
 func rejectedImage(stage string) error {
-	return &adobe.OperationError{Stage: stage, Attempts: 1, Err: adobe.NewAuthError("rejected", 401)}
+	return &adobe.OperationError{Stage: stage, Attempts: 1, SubmissionRejected: stage == "submit", Err: adobe.NewAuthError("rejected", 401)}
 }
 
 func TestAdobeImageAuthRetryOnlyUnacceptedImageOnce(t *testing.T) {
@@ -58,7 +58,7 @@ func TestAdobeImageAuthRetryOnlyUnacceptedImageOnce(t *testing.T) {
 }
 
 func TestAdobeImageAuthRetryNeverReplaysAcceptedOrUnknownWork(t *testing.T) {
-	for _, err := range []error{rejectedImage("poll"), rejectedImage("download"), &adobe.OperationError{Stage: "submit", JobID: "accepted", Err: adobe.NewAuthError("rejected", 401)}, &adobe.OperationError{Stage: "submit", Err: context.DeadlineExceeded}, adobe.NewQuotaExhaustedError("quota", 401), adobe.NewAuthError("request blocked", 403)} {
+	for _, err := range []error{&adobe.OperationError{Stage: "submit", Err: adobe.NewAuthError("ambiguous authentication response", 401)}, rejectedImage("poll"), rejectedImage("download"), &adobe.OperationError{Stage: "submit", JobID: "accepted", Err: adobe.NewAuthError("rejected", 401)}, &adobe.OperationError{Stage: "submit", Err: context.DeadlineExceeded}, adobe.NewQuotaExhaustedError("quota", 401), adobe.NewAuthError("request blocked", 403)} {
 		calls, renewals := 0, 0
 		c := &adobeAuthRetryClient{source: context.Background(), token: "old", api: imageAuthFake{generate: func(context.Context, adobe.GenerateImageInput) (*adobe.GenerateResult, error) {
 			calls++
@@ -73,6 +73,54 @@ func TestAdobeImageAuthRetryNeverReplaysAcceptedOrUnknownWork(t *testing.T) {
 		require.ErrorIs(t, got, err)
 		require.Equal(t, 1, calls)
 		require.Zero(t, renewals)
+	}
+}
+
+func TestAdobeImageAuthRetryHonorsSDKAcceptanceProofAndSourceBudget(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		accepted bool
+		headers  map[string]string
+		body     string
+	}{
+		{"unaccepted 401 can renew once", false, nil, `{"error_code":"invalid_credentials"}`},
+		{"401 with accepted job id", true, nil, `{"jobId":"accepted","error":"unauthorized"}`},
+		{"401 with job link", true, map[string]string{"x-override-status-link": "https://firefly-3p.ff.adobe.io/jobs/accepted"}, `{"error":"unauthorized"}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			api := &adobeFakeTransport{}
+			client := adobeSubmitPollDownload(t, api, []byte("PNG"))
+			success := api.handler
+			submits := 0
+			api.handler = func(req *adobe.Request, n int) (*adobe.Response, error) {
+				if req.URL == adobe.ImageSubmitURL {
+					submits++
+					if submits == 1 {
+						return &adobe.Response{StatusCode: 401, Headers: tc.headers, Body: []byte(tc.body)}, nil
+					}
+				}
+				return success(req, n)
+			}
+			ctx := adobe.WithSingleSubmission(context.Background())
+			renewals := 0
+			c := &adobeAuthRetryClient{api: client, source: ctx, token: "old", recover: func(_ context.Context, _ string, renew bool) (string, error) {
+				if renew {
+					renewals++
+				}
+				return "fresh", nil
+			}}
+			result, err := c.GenerateImage(ctx, adobe.GenerateImageInput{Options: adobe.ImagePayloadOptions{Prompt: "fixture", AspectRatio: "1:1", UpstreamModelID: "gpt-image"}})
+			if tc.accepted {
+				require.Error(t, err)
+				require.Equal(t, 1, submits)
+				require.Zero(t, renewals)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, []byte("PNG"), result.Bytes)
+				require.Equal(t, 2, submits)
+				require.Equal(t, 1, renewals)
+			}
+		})
 	}
 }
 

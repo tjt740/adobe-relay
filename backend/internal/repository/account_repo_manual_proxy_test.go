@@ -57,3 +57,19 @@ func TestManualProxyBindingPreservesLatestRouteAcrossBackgroundUpdate(t *testing
 		require.NoError(t, client.Close())
 	}
 }
+
+func TestManualProxyDirectRouteRemainsAvailableWithAutomaticAllocationEnabled(t *testing.T) {
+	db := newOkadRecoveryPostgres(t)
+	_, err := db.Exec(`UPDATE proxy_auto_allocation SET enabled=true WHERE id=1`)
+	require.NoError(t, err)
+	r := &accountRepository{sql: db}
+	account := &service.Account{ID: 99, Extra: map[string]any{"manual_proxy_enabled": true}}
+	source, ready, err := r.AdobeTestRoute(context.Background(), account)
+	require.NoError(t, err)
+	require.Equal(t, "direct", source)
+	require.True(t, ready)
+	account.Extra = nil
+	_, ready, err = r.AdobeTestRoute(context.Background(), account)
+	require.NoError(t, err)
+	require.False(t, ready, "automatic accounts still cannot bypass proxy allocation with direct egress")
+}

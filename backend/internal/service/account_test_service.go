@@ -22,6 +22,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -373,7 +374,7 @@ func createTestPayload(modelID string) (map[string]any, error) {
 // modelID is optional - if empty, defaults to claude.DefaultTestModel
 // mode is optional - "compact" routes OpenAI accounts to the /responses/compact probe path
 // opts is optional media (image/audio data URLs for real generation / STT).
-func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int64, modelID string, prompt string, mode string, opts ...AccountTestOptions) (testErr error) {
+func (s *AccountTestService) testAccountConnectionOnce(c *gin.Context, accountID int64, modelID string, prompt string, mode string, opts ...AccountTestOptions) (testErr error) {
 	initAccountTestLogger(c, accountID, modelID, mode)
 	ctx := c.Request.Context()
 	testOpts := firstAccountTestOptions(opts)
@@ -383,20 +384,64 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Account not found")
 	}
+	review, _ := ctx.Value(adobeRouteReviewKey{}).(*adobeRouteReview)
+	if review != nil && !sameAdobeReviewCredentials(account, review.initial) {
+		return s.sendErrorAndEnd(c, "Cookie changed during route review")
+	}
 	if job, ok := ctx.Value(okadConnectionTestContextKey{}).(OkadConnectionTestJob); ok {
-		if account.Platform != PlatformAdobe || account.Type != AccountTypeOAuth || OkadConnectionTestKey(account) != job.Key || !okadTestProxyMatches(account, job) {
+		if account.Platform != PlatformAdobe || account.Type != AccountTypeOAuth || OkadConnectionTestKey(account) != job.Key || ((review == nil || review.attempts == 0) && !okadTestProxyMatches(account, job)) {
 			return s.sendErrorAndEnd(c, "Cookie changed before the automatic test started")
 		}
 	}
+	if review != nil {
+		review.account = account
+	}
 	account, lease, leaseErr := prepareAdobeTestProxy(ctx, s.accountRepo, account, adobeHealthTestModel(account, modelID))
 	if leaseErr != nil {
+		if review != nil {
+			review.proxyPending = true
+		}
 		return s.sendErrorAndEnd(c, leaseErr.Error())
+	}
+	if review != nil {
+		review.account, review.lease = account, lease
+		if !sameAdobeReviewCredentials(account, review.initial) {
+			return s.sendErrorAndEnd(c, "Cookie changed during route review")
+		}
+		source, ready, e := s.accountRepo.(AdobeRouteReviewRepository).AdobeTestRoute(ctx, account)
+		if e != nil || (!ready && lease == nil) || slices.Contains(review.sources, source) {
+			review.proxyPending = true
+			return s.sendErrorAndEnd(c, "暂无可用出口供 Adobe 检测；等待代理分配后复核")
+		}
+		ctx = context.WithValue(ctx, adobeRouteSourceKey{}, source)
+		review.source = source
+		review.attempts++
+		if job, ok := ctx.Value(okadConnectionTestContextKey{}).(OkadConnectionTestJob); ok {
+			job.ProxyID = account.ProxyID
+			if account.Proxy != nil {
+				job.ProxyUpdatedAt = &account.Proxy.UpdatedAt
+			}
+			ctx = context.WithValue(ctx, okadConnectionTestContextKey{}, job)
+			if verifier, ok := s.accountRepo.(interface {
+				OkadVerificationProxyReady(context.Context, *Account) (bool, error)
+			}); ok {
+				ready, e := verifier.OkadVerificationProxyReady(ctx, account)
+				if e != nil || !ready {
+					review.proxyPending = true
+					return s.sendErrorAndEnd(c, "Adobe 自动检测等待可用代理")
+				}
+			}
+		}
+		c.Request = c.Request.WithContext(ctx)
 	}
 	if lease != nil {
 		ctx = context.WithValue(ctx, adobeProxyLeaseContextKey{}, lease)
 		c.Request = c.Request.WithContext(ctx)
 	}
 	defer func() {
+		if review != nil {
+			return
+		}
 		allow, configured := ctx.Value(accountTestRecoveryPolicyKey{}).(bool)
 		finishAdobeTestProxy(ctx, s.accountRepo, lease, testErr == nil, !configured || allow)
 	}()
@@ -3481,6 +3526,12 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 }
 
 func (s *AccountTestService) sendEvent(c *gin.Context, event TestEvent) {
+	if value, exists := c.Get(adobeRouteReviewEventKey); exists && event.Type == "error" {
+		if review, ok := value.(*adobeRouteReview); ok && review != nil {
+			review.lastError = &event
+			return
+		}
+	}
 	if event.Type == "test_complete" {
 		if suppress, ok := c.Get(accountTestSuppressCompletionContextKey); ok {
 			if suppressCompletion, _ := suppress.(bool); suppressCompletion {

@@ -19,7 +19,7 @@ const probeURL = "https://firefly-3p.ff.adobe.io/v2/3p-images/generate-async"
 
 func probeAdobe(ctx context.Context, p proxy) health {
 	result := health{Status: "unhealthy", Message: "connection_failed"}
-	if !p.available(time.Now()) {
+	if !p.networkAvailable(time.Now()) {
 		result.Message = "proxy_unavailable"
 		return result
 	}

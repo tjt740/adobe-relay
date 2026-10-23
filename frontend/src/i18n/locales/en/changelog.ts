@@ -18,6 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      adobeRouteReview: {"title": "Check subscription traffic and review Adobe routes across sources", "body": "Today adds manual IP settings per account, visible source traffic, bounded three-source review, generation cooldown and safe submission handling. Existing features, operator pauses and configuration remain protected; network reachability and account credits are not generation proof."},
       proxyVerificationPriority: { title: 'Prioritize business capacity and lend proxies for 408 checks', body: 'Today fixes verification accounts waiting despite reclaimable capacity. Business demand comes first, followed by eligible pending verification. Unresolved 408 accounts release regular proxies and borrow one only for checks, keeping a binding after successful recovery. Today’s v0.2.17 upgrade and independent subscription management remain, with existing configuration and manual-pause rules preserved.' },
       clashSubscriptions: {"title": "v0.2.17 features and independent subscription updates", "body": "Today: integrate upstream v0.2.17 model, protocol and payment fixes while retaining Adobe, Okad and custom scheduling protections; remove the eight-URL cap, add row editing and checks alongside bulk input, and use bounded concurrency with independent source outcomes. Successful sources can update while failed sources retain saved nodes and bindings. Status icons, colored counts and scrolling improve; existing node budgets, manual account state and configuration remain protected."},
       "releaseSpeed": {
@@ -52,10 +53,48 @@ export default {
           },
           "boundary": {
             "title": "Operating boundary",
-            "body": "Administrators select and maintain manual routes; invalid nodes are not repaired automatically. Explicit deletion of a proxy or subscription retains existing cleanup protections. Models, quota, concurrency, alerts and Cookie recovery rules are unchanged."
+            "body": "Manual mode pins the proxy selection; its provider may still change the public egress IP. Administrators maintain the selected route. Exhausted or expired subscriptions, the exclusion of node 1290 and generation cooldown remain enforced. Explicit deletion of a proxy or subscription retains cleanup protections. Models, quota, concurrency, alerts and Cookie recovery rules are unchanged."
           }
         }
       },
+      adobeRouteReview: {
+  "title": "Subscription traffic visibility and Adobe review across sources",
+  "body": "IP management shows remaining traffic, expiry and observation time for every Clash source, with source IDs on individual nodes. Explicitly unaccepted Adobe 408/429 submissions can be reviewed through up to three different sources; generation health is independent of basic reachability.",
+  "sections": {
+    "reason": {
+      "title": "Why credits and website success can coexist with failures",
+      "body": "Adobe image credits and proxy subscription traffic are separate allowances. A funded account can still receive 408 through a specific route even when website generation works. HEAD reachability is also insufficient proof of real generation. Subscription quota, network probes and generation evidence now remain separate."
+    },
+    "balance": {
+      "title": "Find the actual source and remaining traffic",
+      "body": "Collapsed source cards also show traffic, expiry and observation time. Each node shows its saved source identity and remaining traffic, rather than inferring ownership from an outdated name prefix. Known exhausted or expired sources are excluded from new automatic allocation and native Adobe submissions; existing allocation seeks another eligible route. Missing or older-than-15-minute traffic information is unknown. Previously confirmed exhaustion or expiry remains protected until valid new evidence replaces it. Values represent provider-reported traffic bytes, not money or Adobe credits."
+    },
+    "review": {
+      "title": "Review up to three different sources",
+      "body": "Manual, batch, scheduled and post-cookie full tests share the same review. For explicit unaccepted submit-stage 408/429 responses, the same account, cookie, model and parameters can use another subscription. Such rejections receive one submission per source, with at most three different sources and immediate stop on success. Three genuine failures produce a failed test with actual evidence. Insufficient eligible sources or capacity is reported as pending review without inventing three failures. Disabled automatic allocation and operator-fixed routing are respected."
+    },
+    "circuit": {
+      "title": "Generation failures are independent of HEAD probes",
+      "body": "Three different accounts receiving generation-stage 408 on the same node revision and model within five minutes pause new Adobe generation for at least five minutes. HEAD success cannot clear this state. After cooldown, only one temporary test may review the route; a newer real success on the affected model is required. New allocation favors recent real success after quota, capacity and reachability requirements. Existing healthy bindings retain affinity. One failing account does not block an entire subscription, and no generation polling loop is added."
+    },
+    "safety": {
+      "title": "Accepted or uncertain jobs are never resubmitted",
+      "body": "Poll or download failures, submit transport timeouts, 5xx and error responses carrying a job location do not prove that generation never started. Native generation therefore cannot be replayed on another account for these outcomes; existing polling and same-image download retries stay on the original job. Explicit unaccepted 401 retains the existing single session-renewal boundary. Cross-source review does not multiply the old three submissions per node or add Okad login attempts."
+    },
+    "protection": {
+      "title": "Capacity, credentials and operator pauses remain protected",
+      "body": "Reviews retain the three-accounts-per-node limit, temporary ownership and business priority. Failure or cancellation returns borrowed routing, while interrupted leases expire. Permanent retention requires genuine success, matching credential and route snapshots, recovery of every blocked model and an enabled recovery policy. Operator pauses, expiry, verification gates and scheduled AutoRecover choices remain intact. Existing subscriptions, configuration, mail, alerts and resource limits are not reset. Failed transient reviews without a real 408 return only scheduling temporarily taken by that lease; 429 keeps its existing cooldown instead of becoming a permanent 408 hold. Operator pauses, new verification gates and genuine 408 blocks remain enforced."
+    },
+    "validation": {
+      "title": "Validation and its limits",
+      "body": "Isolated database and concurrent regressions cover exhaustion, excluding sibling nodes from one source, third-source success, three failures, insufficient sources, lease release, one half-open review, operator pauses and uncertain jobs. Frontend checks cover always-visible balances, unknown traffic and retained evidence. A production case completed submission, polling and download after changing subscription; that proves only the tested account, model and route at that time, not pool-wide or all-model recovery."
+    },
+    "boundary": {
+      "title": "Different sources do not guarantee different public IPs",
+      "body": "Subscriptions can share networks and a node can change its egress IP. This phase separates reviews by subscription identity, without presenting source counts as independent IP counts. Missing traffic remains unknown. Three failures mean this test did not pass; 408 alone cannot establish invalid cookies. This bounded review extends the single-attempt test policy described on October 22 while retaining capacity reclamation and real-success requirements."
+    }
+  }
+},
       proxyVerificationPriority: {
         "title": "Prioritize pending verification and lend proxies to 408 recovery checks",
         "body": "Fix verification waiting despite reclaimable capacity. With automatic allocation enabled, unresolved 408 accounts leave the regular allocation queue and borrow a proxy only for checks. Real generation on the affected model must succeed and all remaining 408 failures must recover before the binding becomes permanent. Failure or cancellation releases it. The panel and account details explain capacity and recovery conditions.",

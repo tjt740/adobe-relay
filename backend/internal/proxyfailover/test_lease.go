@@ -18,6 +18,7 @@ var ErrNoTestProxy = errors.New("暂无可用代理供检测，请稍后重试�
 type TestLease struct {
 	AccountID int64
 	Owner     string
+	SourceID  string
 }
 
 func credentialHashSQL(alias string) string {
@@ -134,9 +135,25 @@ func (m *Manager) AcquireTestProxy(ctx context.Context, id int64, scope string) 
 	var blocked bool
 	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM adobe_proxy_408_blocks WHERE account_id=$1)
  OR EXISTS(SELECT 1 FROM adobe_proxy_408_holds WHERE account_id=$1)`, id).Scan(&blocked)
-	if err != nil || !blocked {
+	if err != nil {
 		return nil, err
 	}
+	opts, _ := ctx.Value(testRouteOptionsKey{}).(TestRouteOptions)
+	// Existing healthy bindings keep their affinity. A review or unusable route
+	// borrows under the same ownership/capacity and operator-state protections.
+	psInitial, err := loadProxies(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	var currentID int64
+	var originalResume bool
+	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(proxy_id,0),COALESCE(schedulable,false) OR COALESCE(proxy_auto_paused AND error_message=$2,false) FROM accounts WHERE id=$1`, id, allocationWaitingMessage).Scan(&currentID, &originalResume); err != nil {
+		return nil, err
+	}
+	if !blocked && len(opts.ExcludeSources) == 0 && (currentID == 0 || psInitial[currentID].available(time.Now())) {
+		return nil, nil
+	}
+
 	// Reconcile regular business demand first; this also expires abandoned leases.
 	if err = m.allocate(ctx, tx, policy, false); err != nil {
 		return nil, err
@@ -181,13 +198,22 @@ func (m *Manager) AcquireTestProxy(ctx context.Context, id int64, scope string) 
 	var best int64
 	for pid, p := range ps {
 		h := hs[pid]
-		if !p.available(time.Now()) || h.Status != "healthy" || h.fingerprint != p.fingerprint() || time.Since(h.CheckedAt) > clash.ProbeFreshness(len(ps)) {
+		if !testRouteAvailable(p, opts, time.Now()) || h.Status != "healthy" || h.fingerprint != p.fingerprint() || time.Since(h.CheckedAt) > clash.ProbeFreshness(len(ps)) {
 			continue
+		}
+		if p.generationBlocked {
+			var busyRoute bool
+			if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM adobe_proxy_test_leases WHERE proxy_id=$1 AND expires_at>NOW())`, pid).Scan(&busyRoute); err != nil {
+				return nil, err
+			}
+			if busyRoute {
+				continue
+			}
 		}
 		if used[pid] >= accountsPerProxy && victims[pid] == 0 {
 			continue
 		}
-		if best == 0 || routeScore(h, used[pid]) < routeScore(hs[best], used[best]) {
+		if best == 0 || generationRouteScore(p, h, used[pid]) < generationRouteScore(ps[best], hs[best], used[best]) {
 			best = pid
 		}
 	}
@@ -206,22 +232,35 @@ func (m *Manager) AcquireTestProxy(ctx context.Context, id int64, scope string) 
 			return nil, err
 		}
 	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO adobe_proxy_408_holds(account_id,resume_schedulable)
+ SELECT id,$2::boolean FROM accounts WHERE id=$1
+ ON CONFLICT(account_id) DO NOTHING`, id, originalResume); err != nil {
+		return nil, err
+	}
 	random := make([]byte, 16)
 	if _, err = rand.Read(random); err != nil {
 		return nil, err
 	}
 	owner := hex.EncodeToString(random)
-	if _, err = tx.ExecContext(ctx, `INSERT INTO adobe_proxy_test_leases(account_id,owner,proxy_id,proxy_updated_at,credential_hash,scope,expires_at)
- SELECT a.id,$2,$3,$4,`+credentialHashSQL("a.")+`,$5,NOW()+INTERVAL '5 minutes' FROM accounts a WHERE a.id=$1`, id, owner, best, ps[best].UpdatedAt, scope); err != nil {
+	var returnSchedulable *bool
+	if !blocked {
+		returnSchedulable = &originalResume
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO adobe_proxy_test_leases(account_id,owner,proxy_id,proxy_updated_at,credential_hash,scope,expires_at,return_schedulable)
+ SELECT a.id,$2,$3,$4,`+credentialHashSQL("a.")+`,$5,NOW()+INTERVAL '5 minutes',$6::boolean FROM accounts a WHERE a.id=$1`, id, owner, best, ps[best].UpdatedAt, scope, returnSchedulable); err != nil {
 		return nil, err
 	}
 	if _, err = tx.ExecContext(ctx, `SELECT set_config('sub2api.proxy_allocator','on',true)`); err != nil {
 		return nil, err
 	}
+	var previous int64
+	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(proxy_id,0) FROM accounts WHERE id=$1`, id).Scan(&previous); err != nil {
+		return nil, err
+	}
 	if _, err = tx.ExecContext(ctx, `UPDATE accounts SET proxy_id=$2,proxy_fallback_origin_id=NULL,schedulable=false,updated_at=NOW() WHERE id=$1`, id, best); err != nil {
 		return nil, err
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO proxy_failover_events(account_id,from_proxy_id,to_proxy_id) VALUES($1,0,$2)`, id, best); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO proxy_failover_events(account_id,from_proxy_id,to_proxy_id) VALUES($1,$2,$3)`, id, previous, best); err != nil {
 		return nil, err
 	}
 	if err = allocationOutbox(ctx, tx, []int64{id}); err != nil {
@@ -233,7 +272,7 @@ func (m *Manager) AcquireTestProxy(ctx context.Context, id int64, scope string) 
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
-	return &TestLease{AccountID: id, Owner: owner}, nil
+	return &TestLease{AccountID: id, Owner: owner, SourceID: routeSource(ps[best])}, nil
 }
 
 func (m *Manager) FinishTestProxy(ctx context.Context, lease TestLease, success, allowResume bool) error {
@@ -249,7 +288,8 @@ func (m *Manager) FinishTestProxy(ctx context.Context, lease TestLease, success,
 	var pid int64
 	var scope, hash string
 	var acquired, proxyUpdated, expires time.Time
-	err = tx.QueryRowContext(ctx, `SELECT proxy_id,scope,credential_hash,acquired_at,proxy_updated_at,expires_at FROM adobe_proxy_test_leases WHERE account_id=$1 AND owner=$2 FOR UPDATE`, lease.AccountID, lease.Owner).Scan(&pid, &scope, &hash, &acquired, &proxyUpdated, &expires)
+	var returnSchedulable sql.NullBool
+	err = tx.QueryRowContext(ctx, `SELECT proxy_id,scope,credential_hash,acquired_at,proxy_updated_at,expires_at,return_schedulable FROM adobe_proxy_test_leases WHERE account_id=$1 AND owner=$2 FOR UPDATE`, lease.AccountID, lease.Owner).Scan(&pid, &scope, &hash, &acquired, &proxyUpdated, &expires, &returnSchedulable)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
@@ -304,6 +344,20 @@ func (m *Manager) FinishTestProxy(ctx context.Context, lease TestLease, success,
 		if err != nil {
 			return err
 		}
+		if returnSchedulable.Valid && returnSchedulable.Bool {
+			// Undo only a pause owned by a non-408 review. Cooldown timestamps
+			// remain intact: a 429 still waits its normal 15 seconds. New 408,
+			// credentials, verification gates and operator pauses never bypass it.
+			_, err = tx.ExecContext(ctx, `UPDATE accounts a SET schedulable=true,updated_at=NOW()
+ WHERE a.id=$1 AND NOT EXISTS(SELECT 1 FROM adobe_proxy_408_blocks WHERE account_id=a.id)
+ AND a.status='active' AND COALESCE(a.error_message,'')='' AND NOT a.proxy_auto_paused
+ AND (a.expires_at IS NULL OR a.expires_at>NOW()) AND a.extra->'okad_manual_pause' IS DISTINCT FROM 'true'::jsonb
+ AND (a.extra->'okad_connection_test'->>'gated' IS DISTINCT FROM 'true' OR a.extra->'okad_connection_test'->>'state'='success')
+ AND (a.extra->'okad_connection_test'->>'require_verification' IS DISTINCT FROM 'true' OR a.extra->'okad'->>'verification'='verified')`, lease.AccountID)
+			if err != nil {
+				return err
+			}
+		}
 		if err = allocationOutbox(ctx, tx, []int64{lease.AccountID}); err != nil {
 			return err
 		}
@@ -313,6 +367,12 @@ func (m *Manager) FinishTestProxy(ctx context.Context, lease TestLease, success,
 	}
 	if keep {
 		if _, err = tx.ExecContext(ctx, `DELETE FROM adobe_proxy_408_holds WHERE account_id=$1`, lease.AccountID); err != nil {
+			return err
+		}
+	}
+	if returnSchedulable.Valid {
+		if _, err = tx.ExecContext(ctx, `DELETE FROM adobe_proxy_408_holds h WHERE account_id=$1
+ AND NOT EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=h.account_id)`, lease.AccountID); err != nil {
 			return err
 		}
 	}
