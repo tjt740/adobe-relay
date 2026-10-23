@@ -36,3 +36,9 @@ class AutomaticSettingReviewTests(TestCase):
             self.assertTrue(all(m.check_preserved(before,current).values()))
             current['settings_hashes']['smtp']='unreviewed'
             with self.assertRaises(AssertionError):m.check_preserved(before,current)
+
+    def test_codex_sync_uses_its_own_unchanged_source_and_event(self):
+        old={'openai_codex_client_version_synced':hashlib.md5(b'0.172.0').hexdigest()}
+        review={**self.review,'key':'openai_codex_client_version_synced','old_value':'0.172.0','new_value':'0.174.0','old_hash':old['openai_codex_client_version_synced'],'new_hash':hashlib.md5(b'0.174.0').hexdigest(),'sync_source_path':'backend/internal/service/openai_codex_version_sync_service.go','sync_source_before':'677845f2ce6082ca3c9a651669efda3e6db43f3f7140dc29e715f71cd5625b83','sync_source_candidate':'677845f2ce6082ca3c9a651669efda3e6db43f3f7140dc29e715f71cd5625b83','event':'openai_codex_version_synced'}
+        self.assertEqual(m.reviewed_setting_hashes(old,review)['openai_codex_client_version_synced'],review['new_hash'])
+        with self.assertRaises(AssertionError):m.reviewed_setting_hashes(old,{**review,'event':'claude_code_version_synced'})

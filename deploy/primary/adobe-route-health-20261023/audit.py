@@ -79,10 +79,15 @@ def reviewed_setting_hashes(original, review=None):
     if review is None:
         return expected
     key = review['key']
-    assert key == 'claude_code_client_version_synced', 'Only the independently synced client version can be reviewed'
-    assert review['sync_source_path'] == 'backend/internal/service/claude_code_version_sync_service.go'
-    assert review['sync_source_before'] == review['sync_source_candidate'] == 'b477e00bc6a393ee4cf985ae881ce3e036603e8e96f6bf3bdcb0a302b91fba5b'
-    assert review['event'] == 'claude_code_version_synced'
+    sources = {
+        'claude_code_client_version_synced': ('backend/internal/service/claude_code_version_sync_service.go', 'b477e00bc6a393ee4cf985ae881ce3e036603e8e96f6bf3bdcb0a302b91fba5b', 'claude_code_version_synced'),
+        'openai_codex_client_version_synced': ('backend/internal/service/openai_codex_version_sync_service.go', '677845f2ce6082ca3c9a651669efda3e6db43f3f7140dc29e715f71cd5625b83', 'openai_codex_version_synced'),
+    }
+    assert key in sources, 'Only independently synced client versions can be reviewed'
+    path, checksum, event = sources[key]
+    assert review['sync_source_path'] == path
+    assert review['sync_source_before'] == review['sync_source_candidate'] == checksum
+    assert review['event'] == event
     assert re.fullmatch('[0-9a-f]{64}', review['evidence_log_sha256'])
     old, new = review['old_value'], review['new_value']
     assert re.fullmatch(r'\d+\.\d+\.\d+', old) and re.fullmatch(r'\d+\.\d+\.\d+', new)

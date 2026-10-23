@@ -2,7 +2,7 @@
 import hashlib,inspect,json,pathlib,re,subprocess,sys
 from candidate_history import archive_candidate
 phase,sha,build=sys.argv[1:]
-assert phase in ['prepare','start','status','verify','scoped-test','export']
+assert phase in ['prepare','start','status','verify','resume-preflight','scoped-test','export']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-route-health-20261023'
 options=['-i',str(pathlib.Path.home()/'.ssh/deploy_key'),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -38,6 +38,12 @@ assert json.loads((r/'image-loaded.json').read_text())['sha']=='{sha}'
 assert not (r/'progress.json').exists(), 'Driver already started; inspect its evidence'
 subprocess.run(['systemd-run','--unit=adobe-route-health-release-20261023','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/driver.log','--property=StandardError=append:{root}/driver.log','/usr/bin/python3',str(r/'driver.py')],check=True)
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
+""")
+elif phase=='resume-preflight':
+ copy([pathlib.Path(__file__).parent/name for name in ['audit.py','resume-preflight.py']])
+ remote(f"""import pathlib,subprocess,sys
+r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
+subprocess.run([sys.executable,str(r/'resume-preflight.py')],check=True)
 """)
 elif phase=='scoped-test':
  remote(f"""import hashlib,json,pathlib,subprocess
