@@ -1,6 +1,6 @@
 <template>
   <BaseDialog :show="true" :title="t('admin.proxies.clash.title')" width="extra-wide"
-    content-class="clash-dialog-panel" body-class="clash-dialog-body" :show-close-button="!busy" :close-on-escape="!busy" @close="close">
+    content-class="clash-dialog-panel" body-class="clash-dialog-body" :show-close-button="!closeBlocked" :close-on-escape="!closeBlocked" @close="close">
     <div class="space-y-5" :aria-busy="busy">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('admin.proxies.clash.description') }}</p>
@@ -33,7 +33,7 @@
         <p v-for="source in failedSources" :key="source.id">{{ t('proxyHealth.source', { index: source.index }) }} · {{ sourceReason(source) }}</p>
       </div>
       <p v-if="errorMessage" role="alert" class="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20">{{ errorMessage }}</p>
-      <p v-if="successMessage" role="status" class="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400"><Icon name="checkCircle" size="sm" />{{ successMessage }}</p>
+      <p v-if="successMessage || testSummary" role="status" class="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400"><Icon name="checkCircle" size="sm" />{{ successMessage || testSummary }}</p>
 
       <div v-if="loading || previewing" role="status" class="rounded-xl border border-gray-200 p-5 dark:border-dark-600" data-testid="clash-loading">
         <div class="mb-5 flex items-center gap-3">
@@ -66,6 +66,7 @@
             {{ saving ? t('admin.proxies.clash.importing') : t('admin.proxies.clash.testing', { done: testDone, total: testTotal }) }}
           </div>
           <p v-if="saving" class="mt-1 text-xs text-primary-600 dark:text-primary-400">{{ t('admin.proxies.clash.savingHint') }}</p>
+          <p v-if="testing" class="mt-1 text-xs text-primary-600 dark:text-primary-400">{{ t('admin.proxies.clash.backgroundHint') }}</p>
           <progress v-if="testing" :value="testDone" :max="testTotal || 1" :aria-label="t('admin.proxies.clash.testProgress')" class="clash-progress mt-3 h-1.5 w-full overflow-hidden rounded-full"></progress>
         </div>
 
@@ -143,7 +144,7 @@
       </template>
     </div>
     <template #footer>
-      <button type="button" class="btn btn-secondary" :disabled="busy" @click="close">{{ t('common.close') }}</button>
+      <button type="button" class="btn btn-secondary" :disabled="closeBlocked" @click="close">{{ t(testing ? 'admin.proxies.clash.runInBackground' : 'common.close') }}</button>
       <button type="button" class="btn btn-primary" :disabled="busy || !hasPreview || !state?.configured" @click="save">
         <Icon :name="saving ? 'refresh' : 'download'" size="sm" :class="saving ? 'motion-safe:animate-spin' : ''" />
         {{ saving ? t('admin.proxies.clash.importing') : t('admin.proxies.clash.import') }}
@@ -153,13 +154,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import SubscriptionSourceEditor from './SubscriptionSourceEditor.vue'
 import { getClashSubscription, previewClashSubscription, importClashSubscription, type ClashNode, type ClashSource, type ClashSubscription } from '@/api/admin/clash'
-import { testProxy } from '@/api/admin/proxies'
+import { storeToRefs } from 'pinia'
+import { useClashNodeTestStore } from '@/stores/clashNodeTests'
 import { formatDateTime } from '@/utils/format'
 
 const emit = defineEmits<{ close: []; changed: [resetPage?: boolean] }>()
@@ -177,17 +179,15 @@ const previewRevision = ref(0)
 const loading = ref(true)
 const previewing = ref(false)
 const saving = ref(false)
-const testing = ref(false)
-const testingIDs = ref(new Set<number>())
-const testDone = ref(0)
-const testTotal = ref(0)
+const nodeTests = useClashNodeTestStore()
+const { testing, testingIDs, done: testDone, total: testTotal, results, healthyCount, completed } = storeToRefs(nodeTests)
 const errorMessage = ref('')
 const successMessage = ref('')
-const results = ref<Record<number, { success: boolean; latency_ms?: number; message?: string }>>({})
 const operationBusy = computed(() => loading.value || previewing.value || saving.value || testing.value)
 const busy = computed(() => operationBusy.value || sourceChecking.value)
 const testableNodes = computed(() => (state.value?.nodes ?? []).filter(n => n.enabled && n.proxy_id))
-const healthyCount = computed(() => Object.values(results.value).filter(r => r.success).length)
+const closeBlocked = computed(() => loading.value || previewing.value || saving.value || sourceChecking.value)
+const testSummary = computed(() => completed.value ? t('admin.proxies.clash.testComplete', { success: healthyCount.value, failed: testTotal.value - healthyCount.value }) : '')
 const protocols = computed(() => {
   const counts = new Map<string, number>()
   for (const node of nodes.value) counts.set(node.type.toUpperCase(), (counts.get(node.type.toUpperCase()) ?? 0) + 1)
@@ -203,8 +203,7 @@ const stats = computed(() => [
   { label: t('admin.proxies.clash.assignedNodes'), value: testableNodes.value.length, detail: t('admin.proxies.clash.assignedHint'), color: 'text-primary-600 dark:text-primary-400' },
   { label: t('admin.proxies.clash.healthyNodes'), value: Object.keys(results.value).length ? healthyCount.value : '—', detail: t('admin.proxies.clash.testedCount', { count: Object.keys(results.value).length }), color: 'text-emerald-600 dark:text-emerald-400' }
 ])
-let disposed = false
-onUnmounted(() => { disposed = true })
+watch(completed, finished => { if (finished) emit('changed') })
 
 function sourceReason(source: ClashSource) {
   if (source.fetch_error === 'http_error') return `HTTP ${source.http_status || '—'}`
@@ -212,9 +211,9 @@ function sourceReason(source: ClashSource) {
 }
 function errorText(error: unknown): string {
   const e = error as { message?: string; response?: { data?: { message?: string; detail?: string } } }
-  return e.response?.data?.detail || e.response?.data?.message || e.message || t('admin.proxies.clash.failed')
+  return e?.response?.data?.detail || e?.response?.data?.message || e?.message || t('admin.proxies.clash.failed')
 }
-function close() { if (!busy.value) emit('close') }
+function close() { if (!closeBlocked.value) emit('close') }
 function requestURL() { return url.value.trim() === state.value?.url ? '' : url.value.trim() }
 function invalidatePreview() { observations.value = []; hasPreview.value = false; nodes.value = state.value?.nodes ?? []; search.value = ''; successMessage.value = ''; errorMessage.value = '' }
 function toggle(name: string) { const next = new Set(selected.value); if (next.has(name)) next.delete(name); else next.add(name); selected.value = next }
@@ -258,7 +257,7 @@ async function save() {
     state.value = await (Object.keys(sourceIDs).length
       ? importClashSubscription(requestURL(), [...selected.value], previewRevision.value, sourceIDs)
       : importClashSubscription(requestURL(), [...selected.value], previewRevision.value))
-    nodes.value = state.value.nodes; hasPreview.value = false; url.value = state.value.url ?? url.value; results.value = {}; search.value = ''; observations.value = state.value.sources ?? []
+    nodes.value = state.value.nodes; hasPreview.value = false; url.value = state.value.url ?? url.value; nodeTests.clearResults(); search.value = ''; observations.value = state.value.sources ?? []
     successMessage.value = t('admin.proxies.clash.imported', { count: state.value.nodes.filter(n => n.enabled).length })
     emit('changed', true)
   } catch (e) { errorMessage.value = errorText(e) }
@@ -266,22 +265,8 @@ async function save() {
 }
 async function testNodes() {
   if (busy.value || !testableNodes.value.length) return
-  testing.value = true; testDone.value = 0; errorMessage.value = ''; successMessage.value = ''; results.value = {}
-  const queue = [...testableNodes.value]; testTotal.value = queue.length
-  async function worker() {
-    while (queue.length && !disposed) {
-      const node = queue.shift()!
-      testingIDs.value.add(node.proxy_id)
-      try { results.value[node.proxy_id] = await testProxy(node.proxy_id) }
-      catch (e) { results.value[node.proxy_id] = { success: false, message: errorText(e) } }
-      finally { testingIDs.value.delete(node.proxy_id); testDone.value++ }
-    }
-  }
-  try {
-    await Promise.all(Array.from({ length: Math.min(4, queue.length) }, worker))
-    successMessage.value = t('admin.proxies.clash.testComplete', { success: healthyCount.value, failed: testTotal.value - healthyCount.value })
-    emit('changed')
-  } finally { testing.value = false }
+  errorMessage.value = ''; successMessage.value = ''
+  await nodeTests.start(testableNodes.value, errorText)
 }
 onMounted(load)
 </script>

@@ -1,6 +1,8 @@
+import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import ProxiesView from '../ProxiesView.vue'
+import { useClashNodeTestStore } from '@/stores/clashNodeTests'
 
 const { listProxies, getAllWithCount } = vi.hoisted(() => ({
   listProxies: vi.fn(),
@@ -47,6 +49,7 @@ const mountView = () => shallowMount(ProxiesView, {
 let wrapper: ReturnType<typeof mountView>
 
 beforeEach(() => {
+  setActivePinia(createPinia())
   vi.clearAllMocks()
   getAllWithCount.mockResolvedValue([])
   listProxies.mockResolvedValue({ items: [], total: 100, pages: 5 })
@@ -100,6 +103,29 @@ describe('proxy list filter pagination', () => {
 
     expect(listProxies.mock.lastCall?.[0]).toBe(2)
     expect(wrapper.get('[data-test="page"]').text()).toBe('2')
+  })
+
+  it('shows background progress, reopens the dialog, and refreshes on completion while closed', async () => {
+    wrapper = mountView()
+    await flushPromises()
+    const task = useClashNodeTestStore()
+    task.total = 7; task.done = 2; task.testing = true
+    await flushPromises()
+    expect(wrapper.get('[data-testid="clash-background-test-status"] progress').attributes('value')).toBe('2')
+    await wrapper.findAll('button').find(b => b.text() === 'admin.proxies.clash.viewTestProgress')!.trigger('click')
+    expect(wrapper.findComponent({ name: 'ClashSubscriptionModal' }).exists()).toBe(true)
+    wrapper.getComponent({ name: 'ClashSubscriptionModal' }).vm.$emit('close')
+    await flushPromises()
+    const calls = listProxies.mock.calls.length
+    task.done = 7; task.testing = false
+    await flushPromises()
+    expect(listProxies).toHaveBeenCalledTimes(calls + 1)
+    expect(wrapper.get('[data-testid="clash-background-test-status"]').text()).toContain('admin.proxies.clash.testComplete')
+    expect(wrapper.findComponent({ name: 'ClashSubscriptionModal' }).exists()).toBe(false)
+    wrapper.unmount()
+    wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.get('[data-testid="clash-background-test-status"]').text()).toContain('admin.proxies.clash.testComplete')
   })
 
   it('returns to page one after a subscription change removes old proxies', async () => {
