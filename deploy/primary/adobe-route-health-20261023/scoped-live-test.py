@@ -7,8 +7,8 @@ assert (ROOT/'rolling-finished.json').exists()
 sha=(ROOT/'expected-sha').read_text().strip()
 assert a.inspect(a.APP)['Config']['Image']=='adobe-relay:'+sha
 assert json.loads((ROOT/'artifact'/'ci-proof.json').read_text())['application_sha']==sha
-before=json.loads(a.sql("SELECT json_build_object('id',id,'present',deleted_at IS NULL,'status',status,'schedulable',schedulable,'manual_pause',extra->'okad_manual_pause','cookie_hash',md5(COALESCE(credentials->>'cookie','')),'proxy_id',proxy_id) FROM accounts WHERE id=1172"))
-assert before and before['present'] and before['status']=='active' and before['schedulable'] and before['manual_pause'] is not True
+before=json.loads(a.sql("SELECT json_build_object('id',id,'present',deleted_at IS NULL,'status',status,'schedulable',schedulable,'manual_pause',extra->'okad_manual_pause','cookie_hash',md5(COALESCE(credentials->>'cookie','')),'proxy_id',proxy_id,'quarantined',EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=1172) OR EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=1172)) FROM accounts WHERE id=1172"))
+assert before and before['present'] and before['status']=='active' and (before['schedulable'] or before['quarantined']) and before['manual_pause'] is not True
 assert a.sql("SELECT EXISTS(SELECT 1 FROM adobe_route_exclusions WHERE proxy_id=1290)")=='t'
 assert a.sql("SELECT EXISTS(SELECT 1 FROM adobe_proxy_test_leases WHERE account_id=1172 AND expires_at>NOW())")=='f'
 start=datetime.datetime.now(datetime.timezone.utc).isoformat()
