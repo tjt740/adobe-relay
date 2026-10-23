@@ -48,5 +48,7 @@ func TestAdobeDiagnosticsDoNotResubmitAcceptedJobs(t *testing.T) {
 		require.Equal(t, 502, failure.Failover.StatusCode)
 	}
 	failure := classifyAdobeError(&adobe.OperationError{Stage: "submit", Err: adobe.NewUpstreamTemporaryError("HTTP 503", 503, adobe.ErrorTypeStatus)})
+	require.Equal(t, NextAccountStop, failure.Failover.NextAccountAction, "5xx submission outcome is unknown")
+	failure = classifyAdobeError(&adobe.OperationError{Stage: "submit", SubmissionRejected: true, Err: adobe.NewUpstreamTemporaryError("HTTP 408", 408, adobe.ErrorTypeStatus)})
 	require.Equal(t, NextAccountRetry, failure.Failover.NextAccountAction)
 }

@@ -58,6 +58,10 @@ type proxy struct {
 	sourceTrafficAvailable                     bool
 	sourceID                                   string
 	sourceBlocked                              bool
+	generationBlocked                          bool
+	generationProven                           bool
+	excluded                                   bool
+	retryAfter                                 time.Time
 	ID                                         int64
 	Protocol, Host, Username, Password, Status string
 	Port                                       int
@@ -67,6 +71,9 @@ type proxy struct {
 }
 
 func (p proxy) available(now time.Time) bool {
+	return !p.generationBlocked && !p.excluded && p.networkAvailable(now)
+}
+func (p proxy) networkAvailable(now time.Time) bool {
 	return !p.sourceBlocked && !p.Deleted && p.Status == "active" && (!p.ExpiresAt.Valid || p.ExpiresAt.Time.After(now))
 }
 func (p proxy) fingerprint() string {
@@ -119,6 +126,9 @@ func loadProxies(ctx context.Context, q queryer) (map[int64]proxy, error) {
 			p.sourceTrafficAvailable = source.TrafficAvailable
 			result[id] = p
 		}
+	}
+	if err := loadGenerationHealth(ctx, q, result); err != nil {
+		return nil, err
 	}
 	return result, nil
 }
@@ -312,6 +322,9 @@ func (m *Manager) check(ctx context.Context) error {
 	if !locked {
 		return nil
 	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM adobe_route_observations WHERE id IN (SELECT id FROM adobe_route_observations WHERE checked_at<NOW()-INTERVAL '7 days' ORDER BY checked_at LIMIT 5000)`); err != nil {
+		return err
+	}
 	var automatic AllocationPolicy
 	if err = tx.QueryRowContext(ctx, `SELECT enabled,revision FROM proxy_auto_allocation WHERE id=1`).Scan(&automatic.Enabled, &automatic.Revision); err != nil {
 		return err
@@ -387,7 +400,7 @@ func (m *Manager) check(ctx context.Context) error {
 
 func choose(p Policy, ps map[int64]proxy, hs map[int64]health, now time.Time) int64 {
 	current := hs[p.CurrentProxyID]
-	if current.Status != "unhealthy" || current.Failures < 2 || now.Sub(current.CheckedAt) > freshness || current.fingerprint != ps[p.CurrentProxyID].fingerprint() {
+	if ps[p.CurrentProxyID].available(now) && (current.Status != "unhealthy" || current.Failures < 2 || now.Sub(current.CheckedAt) > freshness || current.fingerprint != ps[p.CurrentProxyID].fingerprint()) {
 		return 0
 	}
 	for _, id := range append([]int64{p.PrimaryProxyID}, p.BackupProxyIDs...) {

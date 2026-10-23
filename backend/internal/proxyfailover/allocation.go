@@ -207,6 +207,7 @@ func (m *Manager) SaveAllocation(ctx context.Context, policy AllocationPolicy) (
 type allocationAccount struct {
 	ID, Current       int64
 	Eligible, Waiting bool
+	Adobe             bool
 	LastSwitch        time.Time
 	BindingOnly       bool
 	// Priority affects capacity only. Okad retains ownership of verification
@@ -244,7 +245,7 @@ func loadAllocationAccounts(ctx context.Context, q queryer) ([]allocationAccount
 	 AND NULLIF(BTRIM(credentials->>'cookie'),'') IS NOT NULL,false),
 	 EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=accounts.id)
 	 OR EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=accounts.id),
-	 EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=accounts.id AND l.expires_at>NOW())
+	 EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=accounts.id AND l.expires_at>NOW()),platform='adobe'
  FROM accounts WHERE deleted_at IS NULL ORDER BY id`, allocationWaitingMessage)
 	if err != nil {
 		return nil, err
@@ -253,7 +254,7 @@ func loadAllocationAccounts(ctx context.Context, q queryer) ([]allocationAccount
 	result := []allocationAccount{}
 	for rows.Next() {
 		var a allocationAccount
-		if err = rows.Scan(&a.ID, &a.Current, &a.Eligible, &a.Waiting, &a.BindingOnly, &a.LastSwitch, &a.VerificationPriority, &a.Quarantined408, &a.TestLease); err != nil {
+		if err = rows.Scan(&a.ID, &a.Current, &a.Eligible, &a.Waiting, &a.BindingOnly, &a.LastSwitch, &a.VerificationPriority, &a.Quarantined408, &a.TestLease, &a.Adobe); err != nil {
 			return nil, err
 		}
 		result = append(result, a)
@@ -287,15 +288,15 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 		}
 		return ordered[i].ID < ordered[j].ID
 	})
-	fresh := func(id int64) bool {
+	fresh := func(id int64, adobe bool) bool {
 		p, ok := ps[id]
 		h := hs[id]
-		return ok && p.available(now) && h.Status == "healthy" && h.fingerprint == p.fingerprint() && now.Sub(h.CheckedAt) <= clash.ProbeFreshness(len(ps))
+		return ok && allocationRouteAvailable(p, now, adobe) && h.Status == "healthy" && h.fingerprint == p.fingerprint() && now.Sub(h.CheckedAt) <= clash.ProbeFreshness(len(ps))
 	}
-	best := func(except int64) int64 {
+	best := func(except int64, adobe bool) int64 {
 		var chosen int64
 		for id := range ps {
-			if id == except || used[id] >= accountsPerProxy || !fresh(id) {
+			if id == except || used[id] >= accountsPerProxy || !fresh(id, adobe) {
 				continue
 			}
 			if chosen != 0 && ps[id].sourceTrafficAvailable != ps[chosen].sourceTrafficAvailable {
@@ -304,7 +305,7 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 				}
 				continue
 			}
-			if chosen == 0 || routeScore(hs[id], used[id]) < routeScore(hs[chosen], used[chosen]) || (routeScore(hs[id], used[id]) == routeScore(hs[chosen], used[chosen]) && id < chosen) {
+			if chosen == 0 || generationRouteScore(ps[id], hs[id], used[id]) < generationRouteScore(ps[chosen], hs[chosen], used[chosen]) || (generationRouteScore(ps[id], hs[id], used[id]) == generationRouteScore(ps[chosen], hs[chosen], used[chosen]) && id < chosen) {
 				chosen = id
 			}
 		}
@@ -317,8 +318,8 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 			}
 			p, exists := ps[a.Current]
 			h := hs[a.Current]
-			keep := fresh(a.Current)
-			if (!a.Waiting || a.BindingOnly) && exists && p.available(now) && h.fingerprint == p.fingerprint() && !(h.Status == "unhealthy" && h.Failures >= 2) {
+			keep := fresh(a.Current, a.Adobe)
+			if (!a.Waiting || a.BindingOnly) && exists && allocationRouteAvailable(p, now, a.Adobe) && h.fingerprint == p.fingerprint() && !(h.Status == "unhealthy" && h.Failures >= 2) {
 				keep = true
 			}
 			if keep && used[a.Current] < accountsPerProxy {
@@ -330,7 +331,7 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 			if !a.Eligible || a.Quarantined408 || a.TestLease || a.priority() != priority || next[a.ID] != 0 {
 				continue
 			}
-			id := best(0)
+			id := best(0, a.Adobe)
 			next[a.ID] = id
 			if id != 0 {
 				used[id]++
@@ -339,10 +340,10 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 		if priority == 0 {
 			for _, a := range ordered {
 				current := next[a.ID]
-				if a.BindingOnly || a.Quarantined408 || a.TestLease || current == 0 || current != a.Current || !fresh(current) || now.Sub(a.LastSwitch) < softSwitchCooldown {
+				if a.BindingOnly || a.Quarantined408 || a.TestLease || current == 0 || current != a.Current || !fresh(current, a.Adobe) || now.Sub(a.LastSwitch) < softSwitchCooldown {
 					continue
 				}
-				candidate := best(current)
+				candidate := best(current, a.Adobe)
 				if candidate != 0 && (!ps[current].sourceTrafficAvailable || ps[candidate].sourceTrafficAvailable) && betterLatencyRoute(hs[current], hs[candidate]) {
 					next[a.ID] = candidate
 					used[current]--

@@ -53,7 +53,7 @@ func classifyAdobeError(err error) (out adobeFailure) {
 	defer func() {
 		var operation *adobe.OperationError
 		var batch *adobeImageBatchError
-		accepted := errors.As(err, &batch) || (errors.As(err, &operation) && (operation.Stage == "poll" || operation.Stage == "download" || operation.JobID != ""))
+		accepted := errors.As(err, &batch) || (errors.As(err, &operation) && (operation.Stage == "poll" || operation.Stage == "download" || operation.JobID != "" || (operation.Stage == "submit" && !adobe.CanRetrySubmission(err))))
 		if accepted && out.Failover != nil {
 			out.Failover.NextAccountAction = NextAccountStop
 		}

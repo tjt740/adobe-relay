@@ -14,6 +14,9 @@ func ProbeFreshness(nodes int) time.Duration {
 }
 
 type SourceView struct {
+	ProxyIDs          []int64    `json:"proxy_ids"`
+	BlockedProxyIDs   []int64    `json:"blocked_proxy_ids"`
+	GenerationBlocked int        `json:"generation_blocked"`
 	ID                string     `json:"id"`
 	Index             int        `json:"index"`
 	URLHint           string     `json:"url_hint"`
@@ -97,8 +100,28 @@ func (m *Manager) Health(ctx context.Context) (HealthView, error) {
 	if err != nil {
 		return v, err
 	}
+	blocked := map[int64]bool{}
+	rows, err = m.db.QueryContext(ctx, `SELECT p.id FROM proxies p WHERE
+     EXISTS(SELECT 1 FROM adobe_route_exclusions e WHERE e.proxy_id=p.id)
+     OR EXISTS(SELECT 1 FROM adobe_route_health h WHERE h.proxy_id=p.id AND h.proxy_updated_at=p.updated_at AND h.retry_after IS NOT NULL)`)
+	if err != nil {
+		return v, err
+	}
+	for rows.Next() {
+		var id int64
+		if err = rows.Scan(&id); err != nil {
+			rows.Close()
+			return v, err
+		}
+		blocked[id] = true
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return v, err
+	}
 	for _, src := range s.Sources {
-		sv := SourceView{ID: src.ID, Index: src.Index, URLHint: src.URLHint, Status: "checking", FetchError: src.FetchError, HTTPStatus: src.HTTPStatus, CheckedAt: src.CheckedAt, LastSuccessAt: src.LastSuccessAt}
+		sv := SourceView{ProxyIDs: []int64{}, BlockedProxyIDs: []int64{}, ID: src.ID, Index: src.Index, URLHint: src.URLHint, Status: "checking", FetchError: src.FetchError, HTTPStatus: src.HTTPStatus, CheckedAt: src.CheckedAt, LastSuccessAt: src.LastSuccessAt}
 		if t := src.Traffic; t != nil {
 			sv.TrafficObservedAt = &t.ObservedAt
 			if t.Total > 0 && time.Since(t.ObservedAt) <= 15*time.Minute {
@@ -114,6 +137,13 @@ func (m *Manager) Health(ctx context.Context) (HealthView, error) {
 			}
 		}
 		for _, node := range s.Nodes {
+			if node.SourceID == src.ID && node.ProxyID > 0 {
+				sv.ProxyIDs = append(sv.ProxyIDs, node.ProxyID)
+				if blocked[node.ProxyID] {
+					sv.BlockedProxyIDs = append(sv.BlockedProxyIDs, node.ProxyID)
+					sv.GenerationBlocked++
+				}
+			}
 			if !node.Enabled || node.SourceID != src.ID {
 				continue
 			}

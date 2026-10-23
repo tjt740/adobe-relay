@@ -129,6 +129,10 @@ func (s *AccountTestService) stopOkadConnectionTests() {
 }
 
 func (s *AccountTestService) runOkadConnectionTest(ctx context.Context, repo OkadConnectionTestRepository, job OkadConnectionTestJob) {
+	if _, ok := s.accountRepo.(AdobeRouteReviewRepository); ok {
+		s.runOkadRouteReview(ctx, repo, job)
+		return
+	}
 	// The normal test already has an upstream timeout. This outer bound also
 	// covers token exchange. Do not reconnect/login or retry failed tests here.
 	testCtx, cancel := context.WithTimeout(context.WithValue(ctx, okadConnectionTestContextKey{}, job), 3*time.Minute)

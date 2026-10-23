@@ -635,7 +635,7 @@ func (c *Client) downloadMeasured(ctx context.Context, mediaURL string, maxBytes
 // postSubmit 发送 generate-async 提交，只对 Adobe 降载状态码（408/429）在同一账号上退避重试。
 //
 // 5xx/451 不在同一账号重试：请求可能已被上游受理，中间层才回了错误，同号重发会叠加
-// 重复的付费任务；这类错误交给 handler 换号，最坏提交次数从 3×换号数降到换号数。
+// 重复的付费任务；原生 handler 也不得因这类未知结果重新提交。
 func (c *Client) postSubmit(
 	ctx context.Context, rawURL string, headers map[string]string, order []string, body []byte,
 ) (result *Response, retErr error) {
@@ -643,7 +643,15 @@ func (c *Client) postSubmit(
 	attempt := 0
 	defer func() { retErr = operationError(retErr, "submit", started, attempt, result, "") }()
 	var last *Response
-	for attempt = 1; attempt <= submitAttempts; attempt++ {
+	limit := submitAttempts
+	budget, _ := ctx.Value(singleSubmissionKey{}).(*submissionBudget)
+	if budget != nil {
+		limit = 1
+	}
+	for attempt = 1; attempt <= limit; attempt++ {
+		if budget != nil && !budget.used.CompareAndSwap(false, true) {
+			return nil, NewRequestError("source submission budget exhausted; no additional job submitted")
+		}
 		resp, err := c.transport.Do(ctx, &Request{
 			Method:      http.MethodPost,
 			URL:         rawURL,
@@ -660,10 +668,15 @@ func (c *Client) postSubmit(
 		}
 		resp.Attempts = attempt
 		last = resp
-		if !isSubmitLoadSheddingStatus(resp.StatusCode) || IsContentRejectedBody(string(resp.Body)) {
+		// A proven authentication rejection can still use the existing single
+		// session renewal. It did not start a generation on this source.
+		if budget != nil && resp.StatusCode == http.StatusUnauthorized && rejectedSubmission(resp) {
+			budget.used.Store(false)
+		}
+		if !isSubmitLoadSheddingStatus(resp.StatusCode) || !rejectedSubmission(resp) || IsContentRejectedBody(string(resp.Body)) {
 			return resp, nil
 		}
-		if attempt == submitAttempts {
+		if attempt == limit {
 			return resp, nil
 		}
 		if err := waitSubmitRetry(ctx, attempt); err != nil {

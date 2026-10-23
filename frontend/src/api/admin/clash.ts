@@ -54,6 +54,9 @@ export async function importClashSubscription(url: string, names: string[], revi
 }
 
 export interface ProxySourceHealth {
+  proxy_ids: number[]
+  blocked_proxy_ids: number[]
+  generation_blocked: number
   id: string
   index: number
   url_hint: string
