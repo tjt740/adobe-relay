@@ -101,6 +101,14 @@
             </div>
           </div>
         </div>
+        <div v-if="clashTestTotal" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50 p-3 text-sm dark:border-primary-800 dark:bg-primary-900/20" role="status" data-testid="clash-background-test-status">
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-primary-700 dark:text-primary-300">{{ clashTesting ? t('admin.proxies.clash.testing', { done: clashTestDone, total: clashTestTotal }) : t('admin.proxies.clash.testComplete', { success: clashHealthyCount, failed: clashTestTotal - clashHealthyCount }) }}</p>
+            <p v-if="clashTesting" class="mt-1 text-xs text-primary-600 dark:text-primary-400">{{ t('admin.proxies.clash.backgroundHint') }}</p>
+            <progress v-if="clashTesting" :value="clashTestDone" :max="clashTestTotal" :aria-label="t('admin.proxies.clash.testProgress')" class="mt-2 h-1.5 w-full max-w-md"></progress>
+          </div>
+          <button class="btn btn-secondary btn-sm" @click="showClashSubscription = true">{{ t('admin.proxies.clash.viewTestProgress') }}</button>
+        </div>
         <ProxyHealthPanel @manage="showClashSubscription = true" @loaded="proxyHealth = $event" />
       </template>
 
@@ -987,9 +995,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { storeToRefs } from 'pinia'
+import { useClashNodeTestStore } from '@/stores/clashNodeTests'
 import { adminAPI } from '@/api/admin'
 import type { Proxy, ProxyAccountSummary, ProxyProtocol, ProxyQualityCheckResult } from '@/types'
 import type { Column } from '@/components/common/types'
@@ -1021,6 +1031,10 @@ import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
 const { t } = useI18n()
 const appStore = useAppStore()
 const showClashSubscription = ref(false)
+const { testing: clashTesting, done: clashTestDone, total: clashTestTotal, healthyCount: clashHealthyCount } = storeToRefs(useClashNodeTestStore())
+watch(clashTesting, (running, wasRunning) => {
+  if (wasRunning && !running && !showClashSubscription.value) loadProxies()
+})
 const showProxyAllocation = ref(false)
 const { copyToClipboard } = useClipboard()
 

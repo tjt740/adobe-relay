@@ -1,24 +1,27 @@
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import ClashSubscriptionModal from '@/components/admin/proxy/ClashSubscriptionModal.vue'
 import { getClashSubscription, previewClashSubscription, importClashSubscription, checkClashSource, type ClashSubscription } from '@/api/admin/clash'
 import { testProxy } from '@/api/admin/proxies'
+import { useClashNodeTestStore } from '@/stores/clashNodeTests'
 
 vi.mock('@/api/admin/clash', () => ({ getClashSubscription: vi.fn(), previewClashSubscription: vi.fn(), importClashSubscription: vi.fn(), checkClashSource: vi.fn() }))
-vi.mock('@/api/admin/proxies', () => ({ testProxy: vi.fn() }))
+vi.mock('@/api/admin/proxies', () => ({ testProxy: vi.fn(), default: {} }))
 vi.mock('@/utils/format', () => ({ formatDateTime: (s: string) => s }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock('vue-i18n', async () => ({ ...await vi.importActual<typeof import('vue-i18n')>('vue-i18n'), useI18n: () => ({ t: (key: string) => key }) }))
 
 const saved: ClashSubscription = {
   configured: true, ready: true, revision: 2, url_hint: 'https://example.com/••••', updated_at: '2026-09-24T00:00:00Z',
   nodes: [{ name: 'Japan', type: 'ss', server: 'jp.example.com', server_port: 443, proxy_id: 7, proxy_host: 'mihomo', proxy_port: 20000, enabled: true }]
 }
 async function setup() {
-  const wrapper = mount(ClashSubscriptionModal, { global: { stubs: { BaseDialog: { template: '<div><slot /><footer><slot name="footer" /></footer></div>' } } } })
+  const wrapper = mount(ClashSubscriptionModal, { global: { stubs: { BaseDialog: { name: 'BaseDialog', template: '<div><slot /><footer><slot name="footer" /></footer></div>' } } } })
   await flushPromises()
   return wrapper
 }
 beforeEach(() => {
+  setActivePinia(createPinia())
   vi.resetAllMocks()
   vi.mocked(getClashSubscription).mockResolvedValue(saved)
   vi.mocked(previewClashSubscription).mockResolvedValue({ ...saved, nodes: [...saved.nodes, { name: 'US', type: 'vmess', proxy_id: 0, enabled: true }] })
@@ -72,6 +75,47 @@ describe('Clash subscription workflow', () => {
     expect(testProxy).toHaveBeenCalledWith(7)
     expect(w.text()).toContain('42 ms')
     expect(w.emitted('changed')).toHaveLength(1)
+  })
+  it('continues queued tests after closing and unmounting, then restores progress on reopen', async () => {
+    const nodes = Array.from({ length: 7 }, (_, i) => ({ ...saved.nodes[0], name: `Node ${i}`, proxy_id: i + 1 }))
+    vi.mocked(getClashSubscription).mockResolvedValue({ ...saved, nodes })
+    const pending = new Map<number, (result: { success: boolean; latency_ms: number }) => void>()
+    vi.mocked(testProxy).mockImplementation(id => new Promise(resolve => { pending.set(id, resolve) }))
+    const w = await setup()
+    await w.findAll('button').find(b => b.text() === 'admin.proxies.clash.test')!.trigger('click')
+    expect(testProxy).toHaveBeenCalledTimes(4)
+    expect(w.attributes('show-close-button')).toBe('true')
+    expect(w.attributes('close-on-escape')).toBe('true')
+    const close = w.get('footer .btn-secondary')
+    expect(close.text()).toBe('admin.proxies.clash.runInBackground')
+    expect(close.attributes('disabled')).toBeUndefined()
+    await close.trigger('click')
+    expect(w.emitted('close')).toHaveLength(1)
+    w.unmount()
+
+    pending.get(1)!({ success: true, latency_ms: 21 }); await flushPromises()
+    expect(testProxy).toHaveBeenCalledTimes(5)
+    const reopened = await setup()
+    expect(reopened.get('progress').attributes('value')).toBe('1')
+    expect(reopened.get('progress').attributes('max')).toBe('7')
+    expect(reopened.text()).toContain('21 ms')
+    await reopened.findAll('button').find(b => b.text() === 'admin.proxies.clash.testing')!.trigger('click')
+    expect(testProxy).toHaveBeenCalledTimes(5)
+    reopened.getComponent({ name: 'BaseDialog' }).vm.$emit('close')
+    expect(reopened.emitted('close')).toHaveLength(1)
+    reopened.unmount()
+
+    for (const id of [2, 3, 4, 5]) pending.get(id)!({ success: true, latency_ms: 42 })
+    await flushPromises()
+    expect(testProxy).toHaveBeenCalledTimes(7)
+    for (const id of [6, 7]) pending.get(id)!({ success: true, latency_ms: 42 })
+    await flushPromises()
+    const finished = await setup()
+    expect(finished.find('progress').exists()).toBe(false)
+    expect(finished.text()).toContain('admin.proxies.clash.testComplete')
+    expect(finished.text()).toContain('21 ms')
+    expect(useClashNodeTestStore().done).toBe(7)
+    finished.unmount()
   })
   it('disables importing until the runtime has been configured', async () => {
     vi.mocked(getClashSubscription).mockResolvedValue({ ...saved, configured: false, ready: false })

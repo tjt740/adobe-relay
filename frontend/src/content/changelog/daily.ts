@@ -18,6 +18,7 @@ export const pendingDailyUpdates: readonly Omit<DailyUpdate, 'date'>[] = [
 ]
 
 export const dailyOverviews: Readonly<Record<string, string>> = {
+  '2026-10-24': 'clashBackgroundTests',
   '2026-10-23': 'adobeRouteReview',
   '2026-10-22': 'proxyVerificationPriority',
   '2026-10-21': 'releaseSpeed',
@@ -25,6 +26,7 @@ export const dailyOverviews: Readonly<Record<string, string>> = {
 
 // Use the actual release date in Asia/Shanghai; multiple releases share one day.
 export const dailyUpdates: readonly DailyUpdate[] = [
+  { date: '2026-10-24', id: 'clashBackgroundTests', type: 'improved', sections: ['reason', 'progress', 'protection', 'validation', 'boundary'] },
   { date: '2026-10-23', id: 'manualAccountIP', type: 'added', sections: ['reason', 'control', 'routing', 'protection', 'validation', 'boundary'] },
   { date: '2026-10-23', id: 'adobeRouteReview', type: 'fixed', sections: ["reason", "balance", "review", "circuit", "safety", "protection", "validation", "boundary"] },
   { date: '2026-10-22', id: 'proxyVerificationPriority', type: 'fixed', sections: ['reason', 'priority', 'quarantine', 'leases', 'protection', 'wording', 'validation', 'boundary'] },
