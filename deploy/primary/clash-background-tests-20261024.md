@@ -15,3 +15,5 @@
 审计目录 `/opt/adobe-relay/releases/clash-background-tests-20261024/`。回退镜像 `adobe-relay:before-clash-background-tests-20261024` 保留手动代理模式支持；仅先运行 `audit.py check-rollback` 只读检查。真正回退前重新检查后续版本、配置、任务并受控排空，不恢复旧数据库或绕过守卫。
 
 实际应用 SHA、正式 CI、备份、切流／清理时间、生产验证与限制在完成后归档。
+
+构建准备记录：候选 `49a2a1ba4` 的正式后端／前端检查通过，前端镜像构建约 928 秒、Go 编译约 1207 秒，镜像导出和导入均完成，但缓存导出触及原 45 分钟 job 时限，运行 `39992279563` 被取消，未产生 release-images、未部署。镜像任务时间预算提高至 75 分钟，缓存导出单独限 5 分钟且仅缓存保存错误可忽略；编译、原测试、镜像导出、归档 SHA256 与正式发布产物门禁继续强制成功。参数依据 [Docker GHA 缓存文档](https://docs.docker.com/build/cache/backends/gha/)。冷缓存、网络和 runner 资源仍可能影响总耗时，不承诺固定上线时间。

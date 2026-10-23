@@ -115,7 +115,7 @@ jobs:
   image-build:
     if: github.ref == 'refs/heads/main' || inputs.build_only
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -134,7 +134,9 @@ jobs:
           cache-from: |
             type=gha,scope=adobe-relay-linux-amd64
             type=gha
-          cache-to: type=gha,scope=adobe-relay-linux-amd64,mode=max
+          # Cache export is optional. A cold build must still reach the checked
+          # release artifact even when saving the next-run cache is slow.
+          cache-to: type=gha,scope=adobe-relay-linux-amd64,mode=max,timeout=5m,ignore-error=true
       - name: Bundle application
         env:
           IMAGE: adobe-relay:${{ github.sha }}
