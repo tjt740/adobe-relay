@@ -2,7 +2,7 @@
 import hashlib,inspect,json,pathlib,re,subprocess,sys
 from candidate_history import archive_candidate
 phase,sha,build=sys.argv[1:]
-assert phase in ['prepare','start','status','verify','export']
+assert phase in ['prepare','start','status','verify','scoped-test','export']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-route-health-20261023'
 options=['-i',str(pathlib.Path.home()/'.ssh/deploy_key'),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -39,6 +39,16 @@ assert not (r/'progress.json').exists(), 'Driver already started; inspect its ev
 subprocess.run(['systemd-run','--unit=adobe-route-health-release-20261023','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/driver.log','--property=StandardError=append:{root}/driver.log','/usr/bin/python3',str(r/'driver.py')],check=True)
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 """)
+elif phase=='scoped-test':
+ remote(f"""import hashlib,json,pathlib,subprocess
+r=pathlib.Path('{root}')
+assert (r/'expected-sha').read_text().strip()=='{sha}'
+assert json.loads((r/'final-verification.json').read_text())['application_sha']=='{sha}'
+assert hashlib.sha256((r/'scoped-live-test.py').read_bytes()).hexdigest()=='f5cf0228788aff3907eb84d4ca510076e5b7a2d09cc17d57a8ac34148a850fb5'
+assert not (r/'scoped-live-test-started.json').exists(), 'Already started; inspect the result without replaying'
+subprocess.run(['systemd-run','--unit=adobe-route-scoped-test-20261023','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/scoped-live-test.log','--property=StandardError=append:{root}/scoped-live-test.log','/usr/bin/python3',str(r/'scoped-live-test.py')],check=True)
+print(json.dumps({{'single_test_dispatched':True,'application_sha':'{sha}','account_id':1172,'model':'gpt-image-2'}}))
+""")
 elif phase=='verify':
  remote(f"""import json,pathlib,subprocess,sys
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
@@ -52,11 +62,19 @@ else:
  script=f"""import json,pathlib,subprocess
 r=pathlib.Path('{root}')
 out={{'application_sha':'{sha}','files':{{}}}}
-for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','final-verification.json']:
+for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','final-verification.json','scoped-live-test-started.json','scoped-live-test-response.json','scoped-live-test.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
  if p.exists():out['files'][p.name]=json.loads(p.read_text())['samples'][-1]
+log=r/'driver.log'
+if log.exists():out['driver_errors']=[line for line in log.read_text().splitlines() if line.startswith(('AssertionError:','RuntimeError:','subprocess.CalledProcessError:'))][-8:]
+if (r/'progress.json').exists() and json.loads((r/'progress.json').read_text()).get('state')=='attention_required':
+ import importlib.util
+ spec=importlib.util.spec_from_file_location('audit',r/'audit.py');a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
+ before=json.loads((r/'before.json').read_text());current=a.snapshot()
+ out['preservation_diff']={{k:{{'before':before[k],'current':current[k]}} for k in ['settings_hashes','config_hashes','env_without_image_hash','okad_settings_hash','clash_contract_hash','rules_hash'] if before[k]!=current[k]}}
+ out['container_state']={{k:{{'id':v['id'],'image':v['image'],'health':v['health'],'restarts':v['restarts']}} for k,v in current['containers'].items()}}
 print(json.dumps(out,ensure_ascii=False))
 """
  p=subprocess.run(['ssh',*options,target,'python3 -'],input=script,text=True,capture_output=True,check=True,timeout=90)
