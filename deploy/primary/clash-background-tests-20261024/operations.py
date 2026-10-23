@@ -87,5 +87,7 @@ if (r/'progress.json').exists() and json.loads((r/'progress.json').read_text()).
  out['other_protected_changes']=[k for k in ['config_hashes','env_without_image_hash','okad_settings_hash','clash_contract_hash','rules_hash'] if before[k]!=current[k]]
 print(json.dumps(out,ensure_ascii=False))
 """
+ copy([pathlib.Path(__file__).parent/'route-guard-review.py'])
+ remote(f"import pathlib,subprocess,sys; r=pathlib.Path('{root}'); subprocess.run([sys.executable,str(r/'route-guard-review.py')],check=True) if (r/'after.json').exists() else None")
  p=subprocess.run(['ssh',*options,target,'python3 -'],input=script,text=True,capture_output=True,check=True,timeout=90)
  (evidence/'release-status.json').write_text(p.stdout);print(p.stdout)
