@@ -109,7 +109,10 @@ describe('Daily changelog', () => {
     expect(release.text()).toContain('不是每次发布或完整上线的固定时限')
     expect(release.text()).toContain('生产部署步骤均跳过')
     expect(wrapper.get('[data-release-date="2026-10-21"] [data-testid="daily-overview"]').text()).toContain('缩短发布等待')
-    expect(sections[0].get('[data-testid="daily-overview"]').text()).toContain('代理名额优先保障业务')
+    const latest = groupDailyUpdates(dailyUpdates)[0]
+    const overview = dailyOverviews[latest.date] as keyof typeof zh.daily.overviews
+    expect(sections[0].get('[data-testid="daily-overview"]').text()).toContain(zh.daily.overviews[overview].title)
+    expect(wrapper.get('[data-release-date="2026-10-22"] [data-testid="daily-overview"]').text()).toContain('代理名额优先保障业务')
     expect(wrapper.text()).not.toContain('changelog.daily.')
     for (const id of Object.values(dailyOverviews)) {
       for (const messages of [zh, en]) {
