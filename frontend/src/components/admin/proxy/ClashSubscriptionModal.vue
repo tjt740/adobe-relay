@@ -154,7 +154,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -203,8 +203,7 @@ const stats = computed(() => [
   { label: t('admin.proxies.clash.assignedNodes'), value: testableNodes.value.length, detail: t('admin.proxies.clash.assignedHint'), color: 'text-primary-600 dark:text-primary-400' },
   { label: t('admin.proxies.clash.healthyNodes'), value: Object.keys(results.value).length ? healthyCount.value : '—', detail: t('admin.proxies.clash.testedCount', { count: Object.keys(results.value).length }), color: 'text-emerald-600 dark:text-emerald-400' }
 ])
-let disposed = false
-onUnmounted(() => { disposed = true })
+watch(completed, finished => { if (finished) emit('changed') })
 
 function sourceReason(source: ClashSource) {
   if (source.fetch_error === 'http_error') return `HTTP ${source.http_status || '—'}`
@@ -268,7 +267,6 @@ async function testNodes() {
   if (busy.value || !testableNodes.value.length) return
   errorMessage.value = ''; successMessage.value = ''
   await nodeTests.start(testableNodes.value, errorText)
-  if (!disposed) emit('changed')
 }
 onMounted(load)
 </script>
