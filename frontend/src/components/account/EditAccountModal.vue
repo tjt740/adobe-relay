@@ -1824,10 +1824,24 @@
           <label class="input-label mb-0">{{ t('admin.accounts.proxy') }}</label>
           <ProxyAdBanner />
         </div>
+        <div class="mb-3 flex items-center justify-between gap-4 rounded-xl bg-gray-50 p-3 dark:bg-dark-800">
+          <div>
+            <label for="manual-proxy-enabled" class="text-sm font-medium text-gray-900 dark:text-white">{{ t('admin.accounts.manualProxy.title') }}</label>
+            <p id="manual-proxy-hint" class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.manualProxy.hint') }}</p>
+          </div>
+          <button id="manual-proxy-enabled" data-testid="manual-proxy-toggle" type="button" role="switch"
+            :aria-checked="manualProxyEnabled" aria-describedby="manual-proxy-hint"
+            @click="manualProxyEnabled = !manualProxyEnabled; proxyManuallyChanged = true"
+            class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+            :class="manualProxyEnabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'">
+            <span class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform"
+              :class="manualProxyEnabled ? 'translate-x-5' : 'translate-x-0'" />
+          </button>
+        </div>
         <ProxySelector v-model="form.proxy_id" :proxies="proxies" @update:model-value="proxyManuallyChanged = true" />
         <ProxyFailoverPanel
           v-if="show && account.platform === 'adobe' && account.type === 'oauth'"
-          :key="account.id" :account-id="account.id" :selected-proxy-id="form.proxy_id" :proxies="proxies"
+          :manual-mode="manualProxyEnabled" :key="account.id" :account-id="account.id" :selected-proxy-id="form.proxy_id" :proxies="proxies"
           @current="id => { if (!proxyManuallyChanged) form.proxy_id = id }"
         />
       </div>
@@ -4369,6 +4383,7 @@ const mixedChannelWarningMessageText = computed(() => {
 })
 
 const proxyManuallyChanged = ref(false)
+const manualProxyEnabled = ref(false)
 
 const form = reactive({
   name: '',
@@ -4485,6 +4500,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   form.name = newAccount.name
   form.notes = newAccount.notes || ''
   proxyManuallyChanged.value = false
+  manualProxyEnabled.value = newAccount.extra?.manual_proxy_enabled === true
   form.proxy_id = newAccount.proxy_id
   form.concurrency = newAccount.concurrency
   form.load_factor = newAccount.load_factor ?? null
@@ -6402,6 +6418,11 @@ const handleSubmit = async () => {
         delete newExtra.upstream_request_id_header
       }
       updatePayload.extra = newExtra
+    }
+
+    // Only send the mode when edited; unrelated saves retain the latest setting.
+    if (!isSparkShadow.value && manualProxyEnabled.value !== (props.account.extra?.manual_proxy_enabled === true)) {
+      updatePayload.manual_proxy_enabled = manualProxyEnabled.value
     }
 
     if (updatePayload.extra && typeof updatePayload.extra === 'object') {

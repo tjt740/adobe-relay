@@ -31,9 +31,10 @@ func Refresh408Metadata(ctx context.Context, tx *sql.Tx, id int64) error {
 	_, err := tx.ExecContext(ctx, `WITH state AS (
  SELECT a.id,CASE WHEN EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=a.id)
  OR EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=a.id)
- THEN jsonb_build_object('managed',EXISTS(SELECT 1 FROM proxy_auto_allocation WHERE enabled),'state',CASE WHEN EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=a.id AND l.expires_at>NOW())
+ THEN jsonb_build_object('managed',a.extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb AND EXISTS(SELECT 1 FROM proxy_auto_allocation WHERE enabled),'state',CASE WHEN a.extra->'manual_proxy_enabled'='true'::jsonb THEN 'manual' WHEN EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=a.id AND l.expires_at>NOW())
  THEN 'testing' ELSE 'quarantined' END,'models',COALESCE((SELECT jsonb_agg(scope ORDER BY scope) FROM adobe_proxy_408_blocks b WHERE b.account_id=a.id),'[]'::jsonb))
- ELSE NULL::jsonb END AS value FROM accounts a WHERE a.deleted_at IS NULL AND a.platform='adobe' AND ($1::bigint=0 OR a.id=$1)
+ ELSE NULL::jsonb END AS value FROM accounts a WHERE a.deleted_at IS NULL AND a.platform='adobe'
+ AND ($1::bigint=0 OR a.id=$1)
  AND (a.extra ? 'adobe_proxy_408' OR EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=a.id)
  OR EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=a.id))
 ), changed AS (UPDATE accounts a SET extra=CASE WHEN s.value IS NULL THEN a.extra-'adobe_proxy_408'
@@ -61,6 +62,7 @@ func lockTestRouting(ctx context.Context, tx *sql.Tx) (AllocationPolicy, error) 
 func quarantine408(ctx context.Context, tx *sql.Tx) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM adobe_proxy_test_leases l WHERE expires_at<=NOW() OR NOT EXISTS(
  SELECT 1 FROM accounts a JOIN proxies p ON p.id=l.proxy_id WHERE a.id=l.account_id AND a.deleted_at IS NULL
+ AND a.extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb
  AND a.proxy_id=l.proxy_id AND `+credentialHashSQL("a.")+`=l.credential_hash
  AND p.updated_at=l.proxy_updated_at AND p.deleted_at IS NULL AND p.status='active'
  AND (p.expires_at IS NULL OR p.expires_at>NOW()))`); err != nil {
@@ -68,6 +70,7 @@ func quarantine408(ctx context.Context, tx *sql.Tx) error {
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO adobe_proxy_408_holds(account_id,resume_schedulable)
 	SELECT a.id,COALESCE(a.schedulable,false) OR COALESCE(a.proxy_auto_paused AND a.error_message=$1,false) FROM accounts a WHERE a.deleted_at IS NULL AND a.platform='adobe'
+ AND a.extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb
  AND (EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=a.id)
  OR EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=a.id))
  AND NOT EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=a.id)
@@ -76,6 +79,7 @@ func quarantine408(ctx context.Context, tx *sql.Tx) error {
 	}
 	rows, err := tx.QueryContext(ctx, `WITH previous AS MATERIALIZED (
  SELECT a.id,a.proxy_id FROM accounts a WHERE a.deleted_at IS NULL AND a.platform='adobe'
+ AND a.extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb
  AND EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=a.id)
  AND NOT EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=a.id)
  AND (a.proxy_id IS NOT NULL OR a.schedulable)
@@ -120,6 +124,13 @@ func (m *Manager) AcquireTestProxy(ctx context.Context, id int64, scope string) 
 	if !policy.Enabled {
 		return nil, nil
 	}
+	var manual bool
+	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(extra->'manual_proxy_enabled'='true'::jsonb,false) FROM accounts WHERE id=$1`, id).Scan(&manual); err != nil {
+		return nil, err
+	}
+	if manual {
+		return nil, nil
+	}
 	var blocked bool
 	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM adobe_proxy_408_blocks WHERE account_id=$1)
  OR EXISTS(SELECT 1 FROM adobe_proxy_408_holds WHERE account_id=$1)`, id).Scan(&blocked)
@@ -162,7 +173,7 @@ func (m *Manager) AcquireTestProxy(ctx context.Context, id int64, scope string) 
 	for _, a := range accounts {
 		if a.Current != 0 {
 			used[a.Current]++
-			if a.BindingOnly && !a.VerificationPriority && !a.Quarantined408 && !a.TestLease {
+			if !a.ManualProxy && a.BindingOnly && !a.VerificationPriority && !a.Quarantined408 && !a.TestLease {
 				victims[a.Current] = a.ID
 			}
 		}
@@ -251,6 +262,7 @@ func (m *Manager) FinishTestProxy(ctx context.Context, lease TestLease, success,
 	}
 	var current, proved bool
 	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM accounts a JOIN proxies p ON p.id=a.proxy_id WHERE a.id=$1 AND a.deleted_at IS NULL
+ AND a.extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb
  AND a.proxy_id=$2 AND `+credentialHashSQL("a.")+`=$3 AND p.updated_at=$4 AND p.deleted_at IS NULL AND p.status='active'
  AND (p.expires_at IS NULL OR p.expires_at>NOW())),
  NOT EXISTS(SELECT 1 FROM adobe_proxy_408_blocks WHERE account_id=$1)

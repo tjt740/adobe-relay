@@ -31,3 +31,9 @@ PROXY_FAILOVER_TEST_DATABASE_URL='postgres://USER:PASS@localhost:15432/postgres?
 ```
 
 前端回归：`ProxyFailoverPanel.spec.ts`、`EditAccountModal.spec.ts`、`ProxySelector.testing.spec.ts`。
+
+## 手动 IP 设置
+
+账号编辑中的「手动 IP 设置」随「更新」保存。默认关闭；开启后固定所选代理（无代理为直连），自动分配、自动切换和 408 释放均跳过该账号，检测不临时借用其他出口。绑定仍计入节点容量，也不能作为检测的可回收名额。人工暂停、当前错误及模型成功证据要求保持；关闭后恢复原管理规则。明确删除节点或订阅仍执行原清理保护。
+
+管理更新参数为 `manual_proxy_enabled?: boolean`，账号读取为 `extra.manual_proxy_enabled`；迁移 `252_account_manual_proxy.sql` 保留其他原有触发器保护。相关回归见 `manual_proxy_test.go` 及账号编辑测试。发布准备和验证范围见 `deploy/primary/account-manual-ip-20261023.md`，本说明不代表已经部署。

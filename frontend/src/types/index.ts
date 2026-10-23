@@ -1646,6 +1646,7 @@ export interface CreateAccountRequest {
 }
 
 export interface UpdateAccountRequest {
+  manual_proxy_enabled?: boolean
   name?: string
   notes?: string | null
   type?: AccountType

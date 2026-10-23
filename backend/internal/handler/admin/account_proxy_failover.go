@@ -34,7 +34,7 @@ func (h *AccountHandler) proxyFailoverRequest(c *gin.Context, save bool) {
 		view, err = h.proxyFailover.Get(c.Request.Context(), id)
 	}
 	switch {
-	case errors.Is(err, proxyfailover.ErrConflict), errors.Is(err, proxyfailover.ErrAutoManaged):
+	case errors.Is(err, proxyfailover.ErrConflict), errors.Is(err, proxyfailover.ErrAutoManaged), errors.Is(err, proxyfailover.ErrManualProxy):
 		response.Error(c, 409, err.Error())
 	case errors.Is(err, proxyfailover.ErrInvalid):
 		response.Error(c, 400, err.Error())

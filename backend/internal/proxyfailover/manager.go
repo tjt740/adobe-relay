@@ -49,6 +49,7 @@ type Event struct {
 }
 type View struct {
 	Policy
+	ManualProxy bool     `json:"manual_proxy_enabled"`
 	AutoManaged bool     `json:"auto_managed"`
 	State       string   `json:"state"`
 	Health      []health `json:"health"`
@@ -142,8 +143,8 @@ func (m *Manager) Get(ctx context.Context, id int64) (View, error) {
 	v := View{Policy: Policy{BackupProxyIDs: []int64{}}, Health: []health{}, Events: []Event{}, State: "disabled"}
 	var raw []byte
 	var active bool
-	err := m.db.QueryRowContext(ctx, `SELECT COALESCE(a.proxy_id,0),COALESCE(f.enabled,false),COALESCE(f.primary_proxy_id,a.proxy_id,0),COALESCE(f.backup_proxy_ids,'[]'::jsonb),COALESCE(f.revision,0),a.status='active' AND a.schedulable AND (a.expires_at IS NULL OR a.expires_at>NOW())
- FROM accounts a LEFT JOIN account_proxy_failover f ON f.account_id=a.id WHERE a.id=$1 AND a.deleted_at IS NULL AND a.platform='adobe' AND a.type='oauth'`, id).Scan(&v.CurrentProxyID, &v.Enabled, &v.PrimaryProxyID, &raw, &v.Revision, &active)
+	err := m.db.QueryRowContext(ctx, `SELECT COALESCE(a.proxy_id,0),COALESCE(f.enabled,false),COALESCE(f.primary_proxy_id,a.proxy_id,0),COALESCE(f.backup_proxy_ids,'[]'::jsonb),COALESCE(f.revision,0),a.status='active' AND a.schedulable AND (a.expires_at IS NULL OR a.expires_at>NOW()),COALESCE(a.extra->'manual_proxy_enabled'='true'::jsonb,false)
+ FROM accounts a LEFT JOIN account_proxy_failover f ON f.account_id=a.id WHERE a.id=$1 AND a.deleted_at IS NULL AND a.platform='adobe' AND a.type='oauth'`, id).Scan(&v.CurrentProxyID, &v.Enabled, &v.PrimaryProxyID, &raw, &v.Revision, &active, &v.ManualProxy)
 	if err != nil {
 		return v, err
 	}
@@ -191,6 +192,9 @@ func (m *Manager) Get(ctx context.Context, id int64) (View, error) {
 	if v.AutoManaged {
 		v.State = "auto_managed"
 	}
+	if v.ManualProxy {
+		v.State = "manual"
+	}
 	rows, err := m.db.QueryContext(ctx, `SELECT from_proxy_id,to_proxy_id,created_at FROM proxy_failover_events WHERE account_id=$1 ORDER BY id DESC LIMIT 10`, id)
 	if err != nil {
 		return v, err
@@ -213,9 +217,13 @@ func (m *Manager) Save(ctx context.Context, id int64, p Policy) (View, error) {
 	}
 	defer tx.Rollback()
 	var current int64
-	err = tx.QueryRowContext(ctx, `SELECT COALESCE(proxy_id,0) FROM accounts WHERE id=$1 AND deleted_at IS NULL AND platform='adobe' AND type='oauth' FOR UPDATE`, id).Scan(&current)
+	var manual bool
+	err = tx.QueryRowContext(ctx, `SELECT COALESCE(proxy_id,0),COALESCE(extra->'manual_proxy_enabled'='true'::jsonb,false) FROM accounts WHERE id=$1 AND deleted_at IS NULL AND platform='adobe' AND type='oauth' FOR UPDATE`, id).Scan(&current, &manual)
 	if err != nil {
 		return View{}, err
+	}
+	if manual {
+		return View{}, ErrManualProxy
 	}
 	var autoEnabled bool
 	if err = tx.QueryRowContext(ctx, `SELECT enabled FROM proxy_auto_allocation WHERE id=1`).Scan(&autoEnabled); err != nil {
@@ -323,7 +331,7 @@ func (m *Manager) check(ctx context.Context) error {
 		return tx.Commit()
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT f.account_id,f.primary_proxy_id,f.backup_proxy_ids,f.revision,COALESCE(a.proxy_id,0) FROM account_proxy_failover f JOIN accounts a ON a.id=f.account_id
- WHERE f.enabled AND a.deleted_at IS NULL AND a.platform='adobe' AND a.type='oauth' AND a.status='active' AND a.schedulable AND (a.expires_at IS NULL OR a.expires_at>NOW()) ORDER BY f.account_id`)
+ WHERE f.enabled AND a.extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb AND a.deleted_at IS NULL AND a.platform='adobe' AND a.type='oauth' AND a.status='active' AND a.schedulable AND (a.expires_at IS NULL OR a.expires_at>NOW()) ORDER BY f.account_id`)
 	if err != nil {
 		return err
 	}
@@ -402,7 +410,7 @@ func choose(p Policy, ps map[int64]proxy, hs map[int64]health, now time.Time) in
 func (m *Manager) switchProxy(ctx context.Context, tx *sql.Tx, a accountPolicy, next int64, ps map[int64]proxy, hs map[int64]health) error {
 	var current int64
 	var eligible bool
-	err := tx.QueryRowContext(ctx, `SELECT COALESCE(proxy_id,0),deleted_at IS NULL AND platform='adobe' AND type='oauth' AND status='active' AND schedulable AND (expires_at IS NULL OR expires_at>NOW()) FROM accounts WHERE id=$1 FOR UPDATE`, a.ID).Scan(&current, &eligible)
+	err := tx.QueryRowContext(ctx, `SELECT COALESCE(proxy_id,0),extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb AND deleted_at IS NULL AND platform='adobe' AND type='oauth' AND status='active' AND schedulable AND (expires_at IS NULL OR expires_at>NOW()) FROM accounts WHERE id=$1 FOR UPDATE`, a.ID).Scan(&current, &eligible)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}

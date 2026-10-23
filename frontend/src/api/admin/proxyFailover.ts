@@ -8,6 +8,7 @@ export interface ProxyFailoverPolicy {
   current_proxy_id: number
 }
 export interface ProxyFailoverView extends ProxyFailoverPolicy {
+  manual_proxy_enabled?: boolean
   auto_managed?: boolean
   state: string
   health: Array<{ proxy_id: number; status: string; failures: number; latency_ms: number; checked_at: string; message: string }>

@@ -15,6 +15,18 @@ async function panel(selectedProxyId = 1) {
   return wrapper
 }
 describe('Proxy failover policy', () => {
+  it('blocks independent failover while manual IP mode is staged or persisted', async () => {
+    const wrapper = await panel()
+    await wrapper.get('input[type="checkbox"]').setValue(false)
+    await wrapper.setProps({ manualMode: true })
+    expect(wrapper.get('input[type="checkbox"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('.btn-primary').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('admin.accounts.manualProxy.failoverHint')
+    expect(saveProxyFailover).not.toHaveBeenCalled()
+    vi.mocked(getProxyFailover).mockResolvedValue({ ...initial(), manual_proxy_enabled: true, state: 'manual' })
+    const persisted = await panel()
+    expect(persisted.get('.btn-primary').attributes('disabled')).toBeDefined()
+  })
   it('prevents individual policies from bypassing global allocation', async () => {
     vi.mocked(getProxyFailover).mockResolvedValue({ ...initial(), auto_managed: true, state: 'auto_managed' })
     const wrapper = await panel()

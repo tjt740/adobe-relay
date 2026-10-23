@@ -26,6 +26,36 @@ export default {
       }
     },
     "updates": {
+      manualAccountIP: {
+        "title": "Manual IP settings per account",
+        "body": "Pin a selected proxy per account, including accounts with 408 failures. Automatic allocation and IP switching skip manual accounts.",
+        "sections": {
+          "reason": {
+            "title": "Keep operator-selected routes",
+            "body": "Useful for network diagnosis, fixed egress and manual routing of 408 accounts. Existing allocation and 408 release rules could overwrite a chosen binding, so each account gains an explicit routing-mode switch."
+          },
+          "control": {
+            "title": "Save with the account edit",
+            "body": "Enable Manual IP settings beside the proxy selector, choose a proxy and click Update. Cancel discards the edit; No proxy explicitly selects direct routing. The switch defaults off and existing accounts keep their mode."
+          },
+          "routing": {
+            "title": "Skip automatic routing changes",
+            "body": "Manual accounts skip ordinary allocation, latency optimization, failover, expiry fallback and 408 proxy release. Checks, quota queries and renewal use the selected route without borrowing or replacing it. Manual bindings still consume node capacity and cannot be reclaimed. Turning the switch off restores normal management."
+          },
+          "protection": {
+            "title": "Routing ownership preserves account protection",
+            "body": "Keep model failure evidence, credentials, operator pauses and verification and scheduling requirements. Enabling the mode does not resume an account or clear errors. Finishing an older check or saving an older background snapshot cannot take over the manual route or mode."
+          },
+          "validation": {
+            "title": "Validation scope",
+            "body": "Local regressions cover save and reload, manual 408 bindings, maintenance, shared capacity, in-flight check completion and stale snapshots. Isolated tests do not prove real Adobe generation or peak throughput; production status belongs in the actual deployment record."
+          },
+          "boundary": {
+            "title": "Operating boundary",
+            "body": "Administrators select and maintain manual routes; invalid nodes are not repaired automatically. Explicit deletion of a proxy or subscription retains existing cleanup protections. Models, quota, concurrency, alerts and Cookie recovery rules are unchanged."
+          }
+        }
+      },
       proxyVerificationPriority: {
         "title": "Prioritize pending verification and lend proxies to 408 recovery checks",
         "body": "Fix verification waiting despite reclaimable capacity. With automatic allocation enabled, unresolved 408 accounts leave the regular allocation queue and borrow a proxy only for checks. Real generation on the affected model must succeed and all remaining 408 failures must recover before the binding becomes permanent. Failure or cancellation releases it. The panel and account details explain capacity and recovery conditions.",

@@ -534,6 +534,9 @@ func (r *accountRepository) updateLockedAccount(
 		return nil, err
 	}
 	account.Extra = extra
+	if err := preserveManualProxyBinding(ctx, client, account); err != nil {
+		return nil, err
+	}
 
 	schedulable := account.Schedulable
 	if account.Status == service.StatusError {
@@ -616,6 +619,34 @@ func (r *accountRepository) updateLockedAccount(
 	builder.SetNillableParentAccountID(account.ParentAccountID)
 
 	return builder.Save(ctx)
+}
+
+// The row is already locked by lockAndMergeAccountProbeExtra. A background
+// credential refresh must not restore the route from its earlier account snapshot.
+func preserveManualProxyBinding(ctx context.Context, client *dbent.Client, account *service.Account) error {
+	if account.Extra["manual_proxy_enabled"] != true || account.ProxyIDExplicitUpdate {
+		return nil
+	}
+	rows, err := client.QueryContext(ctx, `SELECT proxy_id FROM accounts WHERE id=$1`, account.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		return service.ErrAccountNotFound
+	}
+	var current sql.NullInt64
+	if err := rows.Scan(&current); err != nil {
+		return err
+	}
+	account.ProxyID = nil
+	if current.Valid {
+		account.ProxyID = &current.Int64
+	}
+	return rows.Err()
 }
 
 func lockAndMergeAccountProbeExtra(
@@ -742,6 +773,14 @@ func lockAndMergeAccountProbeExtra(
 		}
 	}
 	extra := service.MergeOpenAICodexTicketExtra(copyJSONMap(normalizeJSONMap(account.Extra)), currentExtra)
+	// Background refreshes and stale editors cannot overwrite the operator's mode.
+	delete(extra, "manual_proxy_enabled")
+	if value, exists := currentExtra["manual_proxy_enabled"]; exists {
+		extra["manual_proxy_enabled"] = value
+	}
+	if account.ManualProxyEnabledUpdate != nil {
+		extra["manual_proxy_enabled"] = *account.ManualProxyEnabledUpdate
+	}
 	for _, key := range []string{
 		service.UpstreamBillingProbeEnabledExtraKey,
 		service.UpstreamBillingRateSyncEnabledExtraKey,

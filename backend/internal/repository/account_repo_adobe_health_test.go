@@ -228,3 +228,24 @@ func TestAdobeHealthPostgresMigrationKeepsOpenIncidentFailures(t *testing.T) {
 	require.NoError(t, db.QueryRow(`SELECT EXTRACT(EPOCH FROM NOW()-failed_at)/60 FROM adobe_account_health WHERE account_id=2`).Scan(&duration))
 	require.InDelta(t, 64, duration, 1)
 }
+
+func TestManual408HealthRecordsFailureWithoutTakingRoutingOwnership(t *testing.T) {
+	db := newOkadRecoveryPostgres(t)
+	_, err := db.Exec(`INSERT INTO accounts(id,platform,type,status,schedulable,credentials,extra) VALUES(1,'adobe','oauth','active',true,'{"cookie":"c"}','{"manual_proxy_enabled":true,"custom":"keep"}');
+ UPDATE proxy_auto_allocation SET enabled=true;`)
+	require.NoError(t, err)
+	now := time.Now()
+	repo := &accountRepository{sql: db}
+	// The request started before manual mode; the current row controls routing ownership.
+	require.NoError(t, repo.RecordAdobeHealth(context.Background(), &service.Account{ID: 1, Credentials: map[string]any{"cookie": "c"}}, service.AdobeHealthObservation{Code: 408, Scope: "model-a", Reason: "timeout", Source: "business", StartedAt: now.Add(-time.Minute), CheckedAt: now}))
+	var schedulable bool
+	require.NoError(t, db.QueryRow(`SELECT schedulable FROM accounts WHERE id=1`).Scan(&schedulable))
+	require.True(t, schedulable)
+	var blocks, holds int
+	require.NoError(t, db.QueryRow(`SELECT (SELECT count(*) FROM adobe_proxy_408_blocks WHERE account_id=1),(SELECT count(*) FROM adobe_proxy_408_holds WHERE account_id=1)`).Scan(&blocks, &holds))
+	require.Equal(t, 1, blocks)
+	require.Zero(t, holds)
+	var state string
+	require.NoError(t, db.QueryRow(`SELECT extra->'adobe_proxy_408'->>'state' FROM accounts WHERE id=1`).Scan(&state))
+	require.Equal(t, "manual", state)
+}

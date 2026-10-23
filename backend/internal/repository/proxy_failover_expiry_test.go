@@ -39,6 +39,7 @@ func TestExpiryRespectsLiveFailoverPolicy(t *testing.T) {
  CREATE TABLE account_proxy_failover(account_id bigint PRIMARY KEY,enabled bool);
  INSERT INTO proxies(id,status) VALUES(1,'active'),(2,'active');
  INSERT INTO accounts(id,proxy_id,type,extra) VALUES(1,1,'oauth','{}'),(2,1,'oauth','{}'),(3,1,'oauth','{}');
+ INSERT INTO accounts(id,proxy_id,type,extra) VALUES(4,1,'oauth','{"manual_proxy_enabled":true}');
  INSERT INTO account_proxy_failover(account_id,enabled) VALUES(1,true),(2,false);`)
 	require.NoError(t, err)
 	repo := &proxyRepository{}
@@ -53,7 +54,7 @@ func TestExpiryRespectsLiveFailoverPolicy(t *testing.T) {
 		require.NoError(t, err)
 		require.ElementsMatch(t, []int64{2, 3}, changed)
 		var current int64
-		require.NoError(t, db.QueryRow("SELECT proxy_id FROM accounts WHERE id=1").Scan(&current))
+		require.NoError(t, db.QueryRow("SELECT min(proxy_id) FROM accounts WHERE id IN (1,4)").Scan(&current))
 		require.EqualValues(t, 1, current, "enabled health policy owns routing, including when all backups fail")
 	}
 }
