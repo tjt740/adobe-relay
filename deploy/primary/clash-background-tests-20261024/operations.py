@@ -38,6 +38,8 @@ subprocess.run(['systemd-run','--unit=clash-background-tests-release-20261024','
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 """)
 elif phase=='verify':
+ remote(f"import pathlib,hashlib; r=pathlib.Path('{root}'); p=r/'final-verify.original.py'; p.write_bytes((r/'final-verify.py').read_bytes()) if not p.exists() else None; assert hashlib.sha256(p.read_bytes()).hexdigest()=='ccc0fd760b6e60e8882a878064ec5c7d5fd3b899856ddccaf0550bd22352acc4'")
+ copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','route_guard.py']])
  remote(f"""import json,pathlib,subprocess,sys
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
 assert (r/'rolling-finished.json').exists()
