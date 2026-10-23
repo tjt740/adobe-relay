@@ -11,13 +11,14 @@ import (
 // OperationError preserves the original typed error while identifying the failed
 // stage. URLs and credentials are deliberately excluded from its metadata.
 type OperationError struct {
-	Stage             string
-	UpstreamRequestID string
-	JobID             string
-	Attempts          int
-	ElapsedMS         int64
-	DownloadFallback  bool
-	Err               error
+	Stage              string
+	UpstreamRequestID  string
+	JobID              string
+	Attempts           int
+	ElapsedMS          int64
+	DownloadFallback   bool
+	SubmissionRejected bool
+	Err                error
 }
 
 func (e *OperationError) Error() string { return e.Err.Error() }
@@ -43,7 +44,7 @@ func operationError(err error, stage string, started time.Time, attempts int, re
 			break
 		}
 	}
-	return &OperationError{Stage: stage, UpstreamRequestID: id, JobID: diagnosticJobID(jobURL),
+	return &OperationError{Stage: stage, UpstreamRequestID: id, JobID: diagnosticJobID(jobURL), SubmissionRejected: stage == "submit" && rejectedSubmission(resp),
 		Attempts: attempts, ElapsedMS: time.Since(started).Milliseconds(), Err: err}
 }
 

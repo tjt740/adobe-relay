@@ -66,7 +66,7 @@ func TestAdobeSubmit429BriefCooldownDoesNotChangeAcceptedJobsOrCredentials(t *te
 		{"submit", 429, true}, {"poll", 429, false}, {"download", 429, false}, {"submit", 408, false}, {"submit", 503, false},
 	} {
 		t.Run(fmt.Sprintf("%s/%d", tc.stage, tc.status), func(t *testing.T) {
-			err := &adobe.OperationError{Stage: tc.stage, Attempts: 3, Err: adobe.NewUpstreamTemporaryError("busy", tc.status, adobe.ErrorTypeStatus)}
+			err := &adobe.OperationError{Stage: tc.stage, Attempts: 3, SubmissionRejected: tc.stage == "submit" && (tc.status == 408 || tc.status == 429), Err: adobe.NewUpstreamTemporaryError("busy", tc.status, adobe.ErrorTypeStatus)}
 			f := classifyAdobeError(err)
 			require.False(t, f.InvalidateToken)
 			if tc.cool {

@@ -101,7 +101,7 @@
             </div>
           </div>
         </div>
-        <ProxyHealthPanel @manage="showClashSubscription = true" />
+        <ProxyHealthPanel @manage="showClashSubscription = true" @loaded="proxyHealth = $event" />
       </template>
 
       <template #table>
@@ -135,8 +135,13 @@
             />
           </template>
 
-          <template #cell-name="{ value }">
+          <template #cell-name="{ value, row }">
             <span class="font-medium text-gray-900 dark:text-white">{{ value }}</span>
+            <div v-if="sourceForProxy(row.id)" class="mt-1 max-w-64 break-words text-xs text-gray-500">
+              {{ t('proxyHealth.source', { index: sourceForProxy(row.id)!.index }) }} · {{ sourceForProxy(row.id)!.id.slice(-6) }}
+              <span class="block">{{ sourceForProxy(row.id)!.traffic_known ? t('proxyHealth.nodeBalance', { remaining: formatTraffic(sourceForProxy(row.id)!.remaining_bytes) }) : t('proxyHealth.balanceUnknown') }}</span>
+              <span v-if="sourceForProxy(row.id)!.blocked_proxy_ids?.includes(row.id)" class="block text-amber-600">{{ t('proxyHealth.generationRouteBlocked') }}</span>
+            </div>
           </template>
 
           <template #cell-protocol="{ value }">
@@ -998,6 +1003,10 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import ImportDataModal from '@/components/admin/proxy/ImportDataModal.vue'
 import ProxyAllocationModal from '@/components/admin/proxy/ProxyAllocationModal.vue'
 import ProxyHealthPanel from '@/components/admin/proxy/ProxyHealthPanel.vue'
+import type { ProxyHealth } from '@/api/admin/clash'
+const proxyHealth = ref<ProxyHealth | null>(null)
+function sourceForProxy(id: number) { return proxyHealth.value?.sources.find(s => s.proxy_ids?.includes(id)) }
+function formatTraffic(value: number | null) { return value === null ? '—' : `${(value / 1024 ** 3).toFixed(2)} GiB` }
 import ClashSubscriptionModal from '@/components/admin/proxy/ClashSubscriptionModal.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'

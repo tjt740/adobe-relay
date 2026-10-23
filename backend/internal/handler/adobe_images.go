@@ -466,6 +466,14 @@ func (h *GatewayHandler) runAdobeImagesFailover(
 			continue
 		}
 
+		if !service.IsAdobeRelayAccount(account) {
+			var ready bool
+			requestCtx, ready = h.gatewayService.AdobeGenerationRouteContext(requestCtx, account)
+			if !ready {
+				failedAccountIDs[account.ID] = struct{}{}
+				continue
+			}
+		}
 		releaseAccount, acquired, err := h.concurrencyHelper.TryAcquireAccountSlot(requestCtx, account.ID, account.Concurrency)
 		if err != nil {
 			reqLog.Warn("adobe_images.account_slot_acquire_failed", zap.Int64("account_id", account.ID), zap.Error(err))
@@ -563,7 +571,11 @@ func (h *GatewayHandler) runAdobeImagesFailover(
 			adobeImagesError(c, http.StatusBadGateway, "api_error", "Upstream request failed")
 			return
 		}
-		if service.IsAdobeContentRejected(failover) && !service.IsAdobeRelayAccount(account) {
+		if !adobe.CanRetrySubmission(err) {
+			adobeImagesFailoverError(c, failover)
+			return
+		}
+		if service.IsAdobeContentRejected(failover) && !service.IsAdobeRelayAccount(account) && failover.ShouldRetryNextAccount() {
 			skipAdobeNative = true
 			h.gatewayService.ExcludeAdobeNativeAccounts(requestCtx, apiKey.GroupID, failedAccountIDs)
 			reqLog.Warn("adobe_images.content_rejected_skip_native",

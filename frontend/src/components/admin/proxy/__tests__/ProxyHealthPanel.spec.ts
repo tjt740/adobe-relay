@@ -13,7 +13,7 @@ vi.mock('vue-i18n', async () => ({ ...await vi.importActual<typeof import('vue-i
  }
 }) }))
 enableAutoUnmount(afterEach)
-const fixture = (): ProxyHealth => ({ checked_at: '2026-10-17T02:14:00+08:00', sources: [{ id: 'abcdef123456', index: 2, url_hint: 'https://provider.example/••••', status: 'exhausted', checked_at: '2026-10-17T02:14:00+08:00', last_success_at: '2026-10-17T02:14:00+08:00', traffic_known: true, remaining_bytes: 0, total_bytes: 1024 ** 3, traffic_observed_at: '2026-10-17T02:14:00+08:00', expires_at: null, nodes: 8, healthy: 0, failed: 8, unknown: 0, bound_accounts: 3 }], groups: [{ id: 7, name: '客户测试', total: 4, enabled: 0, available: 0, waiting_proxy: 0 }] })
+const fixture = (): ProxyHealth => ({ checked_at: '2026-10-17T02:14:00+08:00', sources: [{ proxy_ids: [1290], blocked_proxy_ids: [1290], generation_blocked: 1, id: 'abcdef123456', index: 2, url_hint: 'https://provider.example/••••', status: 'exhausted', checked_at: '2026-10-17T02:14:00+08:00', last_success_at: '2026-10-17T02:14:00+08:00', traffic_known: true, remaining_bytes: 0, total_bytes: 1024 ** 3, traffic_observed_at: '2026-10-17T02:14:00+08:00', expires_at: null, nodes: 8, healthy: 0, failed: 8, unknown: 0, bound_accounts: 3 }], groups: [{ id: 7, name: '客户测试', total: 4, enabled: 0, available: 0, waiting_proxy: 0 }] })
 async function panel() {
   const wrapper = mount(ProxyHealthPanel)
   await flushPromises(); await wrapper.get('button[aria-expanded]').trigger('click'); return wrapper
@@ -24,7 +24,9 @@ describe('Proxy subscription health', () => {
     const w = mount(ProxyHealthPanel); await flushPromises()
     expect(w.get('button[aria-expanded]').attributes('aria-expanded')).toBe('false')
     expect(w.text()).toContain('订阅流量耗尽'); expect(w.text()).toContain('provider.example')
-    expect(w.text()).not.toContain('剩余 0.0 MiB')
+    expect(w.text()).toContain('剩余 0.0 MiB')
+    expect(w.text()).toContain('1 个节点因 Adobe')
+    expect(w.emitted('loaded')).toHaveLength(1)
   })
   it('locates the exhausted subscription without revealing its token', async () => {
     const w = await panel()

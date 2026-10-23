@@ -164,6 +164,8 @@ func TestSourceHealthViewIsReadOnlyAndExplainsGroupCapacity(t *testing.T) {
 	_, err := db.Exec(`UPDATE clash_subscription SET document=$1`, string(raw))
 	require.NoError(t, err)
 	_, err = db.Exec(`CREATE TABLE proxies(id bigint,deleted_at timestamptz,status text,expires_at timestamptz,updated_at timestamptz);
+ CREATE TABLE adobe_route_exclusions(proxy_id bigint,proxy_updated_at timestamptz);
+ CREATE TABLE adobe_route_health(proxy_id bigint,proxy_updated_at timestamptz,retry_after timestamptz);
  CREATE TABLE proxy_failover_health(proxy_id bigint,status text,failures int,checked_at timestamptz);
  CREATE TABLE accounts(id bigint,proxy_id bigint,status text,schedulable bool,proxy_auto_paused bool,deleted_at timestamptz,expires_at timestamptz,auto_pause_on_expired bool,temp_unschedulable_until timestamptz,overload_until timestamptz,rate_limit_reset_at timestamptz);
  CREATE TABLE groups(id bigint PRIMARY KEY,name text,status text,platform text,deleted_at timestamptz);
