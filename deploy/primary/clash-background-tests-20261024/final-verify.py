@@ -1,6 +1,7 @@
 """Read-only release verification after temporary routing and container cleanup."""
 import datetime,hashlib,importlib.util,json,re,subprocess,urllib.request
 from pathlib import Path
+from route_guard import validate_excluded_route
 ROOT=Path('/opt/adobe-relay/releases/clash-background-tests-20261024')
 spec=importlib.util.spec_from_file_location('audit',ROOT/'audit.py');a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
 sha=(ROOT/'expected-sha').read_text().strip()
@@ -53,10 +54,13 @@ for source in health['sources']:
  if source['traffic_known']:assert 0<=source['remaining_bytes']<=source['total_bytes']
  else:assert source['remaining_bytes'] is None and source['total_bytes'] is None
 exclusion=json.loads(a.sql("SELECT json_build_object('excluded',EXISTS(SELECT 1 FROM adobe_route_exclusions WHERE proxy_id=1290),'status',(SELECT status FROM proxies WHERE id=1290),'bindings',(SELECT count(*) FROM accounts WHERE deleted_at IS NULL AND proxy_id=1290),'leases',(SELECT count(*) FROM adobe_proxy_test_leases WHERE proxy_id=1290))"))
-assert exclusion=={'excluded':True,'status':'inactive','bindings':0,'leases':0}
-health_proof={'sources':health['sources'],'excluded_1290':exclusion,'active_adobe_requests':False,'http_writes':False}
+review=json.loads((ROOT/'route-guard-review.json').read_text())
+assert review['cutover_backup']==json.loads((ROOT/'after.json').read_text())['backup']
+route_checks=validate_excluded_route(review,exclusion)
+assert a.inspect(a.APP)['RestartCount']==0 and not a.inspect(a.APP)['State']['OOMKilled']
+health_proof={'sources':health['sources'],'excluded_1290':exclusion,'cutover_route_checks':route_checks,'active_adobe_requests':False,'http_writes':False}
 a.save('route-api-verification.json',health_proof)
 
-out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'migration_checksums_preserved':True,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'adobe_custom_business_preserved':True,'route_api_verified':True,'excluded_1290':exclusion,'active_adobe_probes':False,'test_mail_sent':False}
+out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'migration_checksums_preserved':True,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'adobe_custom_business_preserved':True,'route_api_verified':True,'excluded_1290':exclusion,'cutover_route_checks':route_checks,'active_adobe_probes':False,'test_mail_sent':False}
 a.save('final-verification.json',out)
 print(json.dumps(out,ensure_ascii=False))

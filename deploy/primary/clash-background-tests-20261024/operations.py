@@ -38,6 +38,8 @@ subprocess.run(['systemd-run','--unit=clash-background-tests-release-20261024','
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 """)
 elif phase=='verify':
+ remote(f"import pathlib,hashlib; r=pathlib.Path('{root}'); p=r/'final-verify.original.py'; p.write_bytes((r/'final-verify.py').read_bytes()) if not p.exists() else None; assert hashlib.sha256(p.read_bytes()).hexdigest()=='ccc0fd760b6e60e8882a878064ec5c7d5fd3b899856ddccaf0550bd22352acc4'")
+ copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','route_guard.py']])
  remote(f"""import json,pathlib,subprocess,sys
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
 assert (r/'rolling-finished.json').exists()
@@ -87,5 +89,7 @@ if (r/'progress.json').exists() and json.loads((r/'progress.json').read_text()).
  out['other_protected_changes']=[k for k in ['config_hashes','env_without_image_hash','okad_settings_hash','clash_contract_hash','rules_hash'] if before[k]!=current[k]]
 print(json.dumps(out,ensure_ascii=False))
 """
+ copy([pathlib.Path(__file__).parent/'route-guard-review.py'])
+ remote(f"import pathlib,subprocess,sys; r=pathlib.Path('{root}'); subprocess.run([sys.executable,str(r/'route-guard-review.py')],check=True) if (r/'after.json').exists() else None")
  p=subprocess.run(['ssh',*options,target,'python3 -'],input=script,text=True,capture_output=True,check=True,timeout=90)
  (evidence/'release-status.json').write_text(p.stdout);print(p.stdout)
