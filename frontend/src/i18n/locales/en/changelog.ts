@@ -53,7 +53,7 @@ export default {
     },
     "protection": {
       "title": "Capacity, credentials and operator pauses remain protected",
-      "body": "Reviews retain the three-accounts-per-node limit, temporary ownership and business priority. Failure or cancellation returns borrowed routing, while interrupted leases expire. Permanent retention requires genuine success, matching credential and route snapshots, recovery of every blocked model and an enabled recovery policy. Operator pauses, expiry, verification gates and scheduled AutoRecover choices remain intact. Existing subscriptions, configuration, mail, alerts and resource limits are not reset."
+      "body": "Reviews retain the three-accounts-per-node limit, temporary ownership and business priority. Failure or cancellation returns borrowed routing, while interrupted leases expire. Permanent retention requires genuine success, matching credential and route snapshots, recovery of every blocked model and an enabled recovery policy. Operator pauses, expiry, verification gates and scheduled AutoRecover choices remain intact. Existing subscriptions, configuration, mail, alerts and resource limits are not reset. Failed transient reviews without a real 408 return only scheduling temporarily taken by that lease; 429 keeps its existing cooldown instead of becoming a permanent 408 hold. Operator pauses, new verification gates and genuine 408 blocks remain enforced."
     },
     "validation": {
       "title": "Validation and its limits",

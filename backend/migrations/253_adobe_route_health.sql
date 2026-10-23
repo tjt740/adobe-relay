@@ -1,5 +1,9 @@
 -- Node observations describe real generation, independently of HEAD probes.
 -- No production IDs, credentials or subscription URLs are embedded here.
+-- NULL keeps the existing unresolved-408 release policy. A transient review
+-- records only the scheduling state temporarily taken by its own lease.
+ALTER TABLE adobe_proxy_test_leases ADD COLUMN return_schedulable BOOLEAN;
+
 CREATE TABLE adobe_route_exclusions (
  proxy_id BIGINT PRIMARY KEY REFERENCES proxies(id) ON DELETE CASCADE,
  proxy_updated_at TIMESTAMPTZ NOT NULL,
