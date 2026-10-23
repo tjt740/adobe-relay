@@ -68,14 +68,23 @@ a.save('release-completion.json',{{'at':datetime.datetime.now(datetime.timezone.
 print((r/'release-completion.json').read_text())
 """)
 elif phase=='scoped-test':
- remote(f"""import hashlib,json,pathlib,subprocess
-r=pathlib.Path('{root}')
+ helper=pathlib.Path(__file__).parent/'scoped-live-test.py';encoded=base64.b64encode(helper.read_bytes()).decode();checksum=hashlib.sha256(helper.read_bytes()).hexdigest()
+ remote(f"""import base64,fcntl,hashlib,json,pathlib,shutil,subprocess
+r=pathlib.Path('{root}');lock=open(r/'scoped-test-dispatch.lock','a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
 assert (r/'expected-sha').read_text().strip()=='{sha}'
 assert json.loads((r/'final-verification.json').read_text())['application_sha']=='{sha}'
-assert hashlib.sha256((r/'scoped-live-test.py').read_bytes()).hexdigest()=='f5cf0228788aff3907eb84d4ca510076e5b7a2d09cc17d57a8ac34148a850fb5'
 assert not (r/'scoped-live-test-started.json').exists(), 'Already started; inspect the result without replaying'
-subprocess.run(['systemd-run','--unit=adobe-route-scoped-test-20261023','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/scoped-live-test.log','--property=StandardError=append:{root}/scoped-live-test.log','/usr/bin/python3',str(r/'scoped-live-test.py')],check=True)
-print(json.dumps({{'single_test_dispatched':True,'application_sha':'{sha}','account_id':1172,'model':'gpt-image-2'}}))
+assert subprocess.run(['systemctl','is-active','--quiet','adobe-route-scoped-test-20261023.service']).returncode!=0
+helper=r/'scoped-live-test.py';previous=hashlib.sha256(helper.read_bytes()).hexdigest()
+assert previous in ['f5cf0228788aff3907eb84d4ca510076e5b7a2d09cc17d57a8ac34148a850fb5','{checksum}']
+if previous!='{checksum}':
+ h=r/'attempt-history'/'scoped-precondition';h.mkdir(parents=True,exist_ok=False,mode=0o700)
+ shutil.copy2(helper,h/helper.name)
+ if (r/'scoped-live-test.log').exists():shutil.move(r/'scoped-live-test.log',h/'scoped-live-test.log')
+ data=base64.b64decode('{encoded}');assert hashlib.sha256(data).hexdigest()=='{checksum}'
+ helper.write_bytes(data);helper.chmod(0o600)
+subprocess.run(['systemd-run','--unit=adobe-route-scoped-test-20261023','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/scoped-live-test.log','--property=StandardError=append:{root}/scoped-live-test.log','/usr/bin/python3',str(helper)],check=True)
+print(json.dumps({{'single_test_dispatched':True,'application_sha':'{sha}','account_id':1172,'model':'gpt-image-2','helper_sha256':'{checksum}'}}))
 """)
 elif phase=='verify':
  remote(f"""import json,pathlib,subprocess,sys
