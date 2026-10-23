@@ -339,16 +339,16 @@ func (m *Manager) FinishTestProxy(ctx context.Context, lease TestLease, success,
 		if err != nil {
 			return err
 		}
-		if !keep && returnSchedulable.Valid {
+		if returnSchedulable.Valid && returnSchedulable.Bool {
 			// Undo only a pause owned by a non-408 review. Cooldown timestamps
 			// remain intact: a 429 still waits its normal 15 seconds. New 408,
 			// credentials, verification gates and operator pauses never bypass it.
-			_, err = tx.ExecContext(ctx, `UPDATE accounts a SET schedulable=$2,updated_at=NOW()
+			_, err = tx.ExecContext(ctx, `UPDATE accounts a SET schedulable=true,updated_at=NOW()
  WHERE a.id=$1 AND NOT EXISTS(SELECT 1 FROM adobe_proxy_408_blocks WHERE account_id=a.id)
  AND a.status='active' AND COALESCE(a.error_message,'')='' AND NOT a.proxy_auto_paused
  AND (a.expires_at IS NULL OR a.expires_at>NOW()) AND a.extra->'okad_manual_pause' IS DISTINCT FROM 'true'::jsonb
  AND (a.extra->'okad_connection_test'->>'gated' IS DISTINCT FROM 'true' OR a.extra->'okad_connection_test'->>'state'='success')
- AND (a.extra->'okad_connection_test'->>'require_verification' IS DISTINCT FROM 'true' OR a.extra->'okad'->>'verification'='verified')`, lease.AccountID, returnSchedulable.Bool)
+ AND (a.extra->'okad_connection_test'->>'require_verification' IS DISTINCT FROM 'true' OR a.extra->'okad'->>'verification'='verified')`, lease.AccountID)
 			if err != nil {
 				return err
 			}
