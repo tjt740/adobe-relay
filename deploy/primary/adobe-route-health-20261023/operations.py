@@ -1,8 +1,8 @@
 """Fixed-scope primary release bridge for unreliable local SSH connections."""
-import hashlib,inspect,json,pathlib,re,subprocess,sys
+import base64,hashlib,inspect,json,pathlib,re,subprocess,sys
 from candidate_history import archive_candidate
 phase,sha,build=sys.argv[1:]
-assert phase in ['prepare','start','status','verify','resume-preflight','scoped-test','export']
+assert phase in ['prepare','start','status','verify','resume-preflight','scoped-test','archive','export']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-route-health-20261023'
 options=['-i',str(pathlib.Path.home()/'.ssh/deploy_key'),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -45,6 +45,28 @@ elif phase=='resume-preflight':
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
 subprocess.run([sys.executable,str(r/'resume-preflight.py')],check=True)
 """)
+elif phase=='archive':
+ documents={'release-notes.md':pathlib.Path('deploy/primary/adobe-route-health-20261023.md'),'primary-README.md':pathlib.Path('deploy/primary/README.md')}
+ payload={name:base64.b64encode(path.read_bytes()).decode() for name,path in documents.items()}
+ remote(f"""import base64,datetime,fcntl,importlib.util,json,pathlib,subprocess
+r=pathlib.Path('{root}');held=[]
+for path in ['/opt/adobe-relay/shared/.adobe-deploy.lock','/opt/adobe-relay/.release.lock','/opt/adobe-team-cookie/.release.lock','/opt/adobe-team-cookie/.incremental-release.lock']:
+ f=open(path,'a');fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB);held.append(f)
+spec=importlib.util.spec_from_file_location('audit',r/'audit.py');a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
+assert a.inspect(a.APP)['Config']['Image']=='adobe-relay:{sha}'
+core=json.loads((r/'final-verification.json').read_text());test=json.loads((r/'scoped-live-test.json').read_text())
+assert core['application_sha']==test['application_sha']=='{sha}'
+assert test['manual_pause_preserved'] and test['cookie_unchanged'] and not test['retried_outer_post']
+checks=a.check_preserved(json.loads((r/'before.json').read_text()),a.snapshot())
+assert not (r/'release-completion.json').exists(), 'Archive already completed; inspect its evidence'
+files={{}}
+for name,value in {payload!r}.items():
+ data=base64.b64decode(value);assert b'PENDING' not in data
+ path=r/name;path.write_bytes(data);path.chmod(0o600);files[name]=a.digest(data)
+ if name=='primary-README.md':pathlib.Path('/opt/adobe-relay/deploy/primary/README.md').write_bytes(data)
+a.save('release-completion.json',{{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','core_verified_at':core['at'],'scoped_test_at':test['at'],'scoped_test_success':test['success'],'scoped_test_actual_adobe_request':test['actual_adobe_test'],'active_outer_test_requests':1,'mail_sent':False,'preserved':checks,'published_document_hashes':files,'cutover_backup':json.loads((r/'after.json').read_text())['backup']}})
+print((r/'release-completion.json').read_text())
+""")
 elif phase=='scoped-test':
  remote(f"""import hashlib,json,pathlib,subprocess
 r=pathlib.Path('{root}')
@@ -68,11 +90,17 @@ else:
  script=f"""import json,pathlib,subprocess
 r=pathlib.Path('{root}')
 out={{'application_sha':'{sha}','files':{{}}}}
-for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','final-verification.json','scoped-live-test-started.json','scoped-live-test-response.json','scoped-live-test.json']:
+for name in ['progress.json','premigration-backup.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','final-verification.json','scoped-live-test-started.json','scoped-live-test-response.json','scoped-live-test.json','release-completion.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
  if p.exists():out['files'][p.name]=json.loads(p.read_text())['samples'][-1]
+test_log=r/'scoped-live-test.log'
+if test_log.exists():out['scoped_test_errors']=[line for line in test_log.read_text().splitlines() if line.startswith(('AssertionError','RuntimeError','KeyError','TypeError','ValueError','urllib.error.')) or line.startswith('    assert')][-8:]
+if (r/'scoped-live-test.log').exists() and not (r/'scoped-live-test-started.json').exists():
+ import importlib.util
+ spec=importlib.util.spec_from_file_location('audit',r/'audit.py');a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
+ out['scoped_test_preconditions']=json.loads(a.sql("SELECT json_build_object('id',id,'present',deleted_at IS NULL,'status',status,'schedulable',schedulable,'manual_pause',extra->'okad_manual_pause','proxy_id',proxy_id) FROM accounts WHERE id=1172"))
 log=r/'driver.log'
 if log.exists():out['driver_errors']=[line for line in log.read_text().splitlines() if line.startswith(('AssertionError:','RuntimeError:','subprocess.CalledProcessError:'))][-8:]
 if (r/'progress.json').exists() and json.loads((r/'progress.json').read_text()).get('state')=='attention_required':
