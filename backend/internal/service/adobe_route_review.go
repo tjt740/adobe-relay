@@ -59,7 +59,7 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, id int64, mod
 		if review.source != "" {
 			review.sources = append(review.sources, review.source)
 		}
-		if err == nil || ctx.Err() != nil || !adobe.CanRetrySubmission(err) || (connectionTestStatusCode(err) != 408 && connectionTestStatusCode(err) != 429) || round == 2 {
+		if (review.account != nil && review.account.Extra["manual_proxy_enabled"] == true) || err == nil || ctx.Err() != nil || !adobe.CanRetrySubmission(err) || (connectionTestStatusCode(err) != 408 && connectionTestStatusCode(err) != 429) || round == 2 {
 			break
 		}
 		finishAdobeTestProxy(ctx, s.accountRepo, review.lease, false, false)

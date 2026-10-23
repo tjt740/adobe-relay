@@ -18,7 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
-      adobeRouteReview: {"title": "Check subscription traffic and review Adobe routes across sources", "body": "Today adds visible source traffic, bounded three-source review, generation cooldown and safe submission handling. Existing features, operator pauses and configuration remain protected; network reachability and account credits are not generation proof."},
+      adobeRouteReview: {"title": "Check subscription traffic and review Adobe routes across sources", "body": "Today adds manual IP settings per account, visible source traffic, bounded three-source review, generation cooldown and safe submission handling. Existing features, operator pauses and configuration remain protected; network reachability and account credits are not generation proof."},
       proxyVerificationPriority: { title: 'Prioritize business capacity and lend proxies for 408 checks', body: 'Today fixes verification accounts waiting despite reclaimable capacity. Business demand comes first, followed by eligible pending verification. Unresolved 408 accounts release regular proxies and borrow one only for checks, keeping a binding after successful recovery. Today’s v0.2.17 upgrade and independent subscription management remain, with existing configuration and manual-pause rules preserved.' },
       clashSubscriptions: {"title": "v0.2.17 features and independent subscription updates", "body": "Today: integrate upstream v0.2.17 model, protocol and payment fixes while retaining Adobe, Okad and custom scheduling protections; remove the eight-URL cap, add row editing and checks alongside bulk input, and use bounded concurrency with independent source outcomes. Successful sources can update while failed sources retain saved nodes and bindings. Status icons, colored counts and scrolling improve; existing node budgets, manual account state and configuration remain protected."},
       "releaseSpeed": {
@@ -27,6 +27,36 @@ export default {
       }
     },
     "updates": {
+      manualAccountIP: {
+        "title": "Manual IP settings per account",
+        "body": "Pin a selected proxy per account, including accounts with 408 failures. Automatic allocation and IP switching skip manual accounts.",
+        "sections": {
+          "reason": {
+            "title": "Keep operator-selected routes",
+            "body": "Useful for network diagnosis, fixed egress and manual routing of 408 accounts. Existing allocation and 408 release rules could overwrite a chosen binding, so each account gains an explicit routing-mode switch."
+          },
+          "control": {
+            "title": "Save with the account edit",
+            "body": "Enable Manual IP settings beside the proxy selector, choose a proxy and click Update. Cancel discards the edit; No proxy explicitly selects direct routing. The switch defaults off and existing accounts keep their mode."
+          },
+          "routing": {
+            "title": "Skip automatic routing changes",
+            "body": "Manual accounts skip ordinary allocation, latency optimization, failover, expiry fallback and 408 proxy release. Checks, quota queries and renewal use the selected route without borrowing or replacing it. Manual bindings still consume node capacity and cannot be reclaimed. Turning the switch off restores normal management."
+          },
+          "protection": {
+            "title": "Routing ownership preserves account protection",
+            "body": "Keep model failure evidence, credentials, operator pauses and verification and scheduling requirements. Enabling the mode does not resume an account or clear errors. Finishing an older check or saving an older background snapshot cannot take over the manual route or mode."
+          },
+          "validation": {
+            "title": "Validation scope",
+            "body": "Local regressions cover save and reload, manual 408 bindings, maintenance, shared capacity, in-flight check completion and stale snapshots. Isolated tests do not prove real Adobe generation or peak throughput; production status belongs in the actual deployment record."
+          },
+          "boundary": {
+            "title": "Operating boundary",
+            "body": "Manual mode pins the proxy selection; its provider may still change the public egress IP. Administrators maintain the selected route. Exhausted or expired subscriptions, the exclusion of node 1290 and generation cooldown remain enforced. Explicit deletion of a proxy or subscription retains cleanup protections. Models, quota, concurrency, alerts and Cookie recovery rules are unchanged."
+          }
+        }
+      },
       adobeRouteReview: {
   "title": "Subscription traffic visibility and Adobe review across sources",
   "body": "IP management shows remaining traffic, expiry and observation time for every Clash source, with source IDs on individual nodes. Explicitly unaccepted Adobe 408/429 submissions can be reviewed through up to three different sources; generation health is independent of basic reachability.",

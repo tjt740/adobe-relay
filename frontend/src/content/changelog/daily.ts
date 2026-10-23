@@ -25,6 +25,7 @@ export const dailyOverviews: Readonly<Record<string, string>> = {
 
 // Use the actual release date in Asia/Shanghai; multiple releases share one day.
 export const dailyUpdates: readonly DailyUpdate[] = [
+  { date: '2026-10-23', id: 'manualAccountIP', type: 'added', sections: ['reason', 'control', 'routing', 'protection', 'validation', 'boundary'] },
   { date: '2026-10-23', id: 'adobeRouteReview', type: 'fixed', sections: ["reason", "balance", "review", "circuit", "safety", "protection", "validation", "boundary"] },
   { date: '2026-10-22', id: 'proxyVerificationPriority', type: 'fixed', sections: ['reason', 'priority', 'quarantine', 'leases', 'protection', 'wording', 'validation', 'boundary'] },
   { date: '2026-10-22', id: 'upstreamV0217', type: 'improved', sections: ['reason', 'models', 'gateway', 'payments', 'compatibility', 'validation', 'boundary'] },

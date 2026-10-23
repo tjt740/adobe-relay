@@ -45,6 +45,9 @@ func (r *accountRepository) AdobeTestRoute(ctx context.Context, a *service.Accou
 		return "", false, errors.New("proxy routing storage unavailable")
 	}
 	if a.ProxyID == nil {
+		if a.Extra["manual_proxy_enabled"] == true {
+			return "direct", true, nil
+		}
 		var automatic bool
 		if err := db.QueryRowContext(ctx, `SELECT enabled FROM proxy_auto_allocation WHERE id=1`).Scan(&automatic); err != nil {
 			return "", false, err

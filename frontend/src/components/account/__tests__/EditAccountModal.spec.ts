@@ -2037,6 +2037,45 @@ describe('EditAccountModal OpenAI 自动使用重置卡', () => {
 
 
 describe('EditAccountModal Adobe model mapping', () => {
+  it('stages manual IP mode and the chosen route together until Update', async () => {
+    const account = buildAdobeAccount()
+    account.proxy_id = 1
+    account.extra = { okad_manual_pause: true, last_check_status_code: 408 }
+    const wrapper = mountModal(account)
+    expect(wrapper.get('[data-testid="manual-proxy-toggle"]').attributes('aria-checked')).toBe('false')
+    await wrapper.get('[data-testid="manual-proxy-toggle"]').trigger('click')
+    expect(updateAccountMock).not.toHaveBeenCalled()
+    wrapper.findComponent({ name: 'ProxySelector' }).vm.$emit('update:modelValue', 3)
+    wrapper.findComponent({ name: 'ProxyFailoverPanel' }).vm.$emit('current', 2)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]).toMatchObject({ proxy_id: 3, manual_proxy_enabled: true })
+    expect(updateAccountMock.mock.calls[0]?.[1]).not.toHaveProperty('extra')
+    wrapper.unmount()
+  })
+  it('loads manual mode and only sends an explicit mode change', async () => {
+    const account = buildAdobeAccount()
+    account.extra = { manual_proxy_enabled: true }
+    const wrapper = mountModal(account)
+    expect(wrapper.get('[data-testid="manual-proxy-toggle"]').attributes('aria-checked')).toBe('true')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]).not.toHaveProperty('manual_proxy_enabled')
+    wrapper.unmount()
+    updateAccountMock.mockClear()
+    const reopened = mountModal(account)
+    await reopened.get('[data-testid="manual-proxy-toggle"]').trigger('click')
+    await reopened.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]).toMatchObject({ manual_proxy_enabled: false })
+    reopened.unmount()
+  })
+  it('pins an explicit direct route', async () => {
+    const account = buildAdobeAccount()
+    account.proxy_id = null
+    const wrapper = mountModal(account)
+    await wrapper.get('[data-testid="manual-proxy-toggle"]').trigger('click')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]).toMatchObject({ proxy_id: 0, manual_proxy_enabled: true })
+    wrapper.unmount()
+  })
   it('preserves background failover when saving unrelated fields', async () => {
     const account = buildAdobeAccount()
     account.proxy_id = 1

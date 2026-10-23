@@ -14,6 +14,8 @@ import (
 const accountsPerProxy = 3
 const allocationWaitingMessage = "自动代理分配：等待可用节点（每个节点最多 3 个账号）"
 
+var ErrManualProxy = errors.New("manual IP mode is enabled; disable it in account settings before configuring automatic failover")
+
 var ErrAutoManaged = errors.New("automatic proxy allocation is enabled; manage it in IP management")
 
 type AllocationPolicy struct {
@@ -62,6 +64,9 @@ func (m *Manager) GetAllocation(ctx context.Context) (AllocationView, error) {
 	inactiveCounts := map[int64]int{}
 	for _, a := range accounts {
 		counts[a.Current]++
+		if a.ManualProxy {
+			continue
+		}
 		v.Accounts++
 		if a.TestLease {
 			v.TemporaryTestBindings++
@@ -163,7 +168,7 @@ func (m *Manager) SaveAllocation(ctx context.Context, policy AllocationPolicy) (
 			return AllocationView{}, err
 		}
 		rows, e := tx.QueryContext(ctx, `UPDATE accounts SET proxy_auto_paused=true,status='error',schedulable=false,error_message=$1,updated_at=NOW()
- WHERE deleted_at IS NULL AND status='active' AND schedulable AND (auto_pause_on_expired IS NOT TRUE OR expires_at IS NULL OR expires_at>NOW())
+ WHERE deleted_at IS NULL AND extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb AND status='active' AND schedulable AND (auto_pause_on_expired IS NOT TRUE OR expires_at IS NULL OR expires_at>NOW())
  AND NOT EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=accounts.id)
  AND NOT EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=accounts.id) RETURNING id`, allocationWaitingMessage)
 		if e != nil {
@@ -187,7 +192,7 @@ func (m *Manager) SaveAllocation(ctx context.Context, policy AllocationPolicy) (
 			return AllocationView{}, err
 		}
 		// A legacy per-account switch must not bypass the shared capacity limit.
-		if _, err = tx.ExecContext(ctx, `UPDATE account_proxy_failover SET enabled=false,revision=revision+1,updated_at=NOW() WHERE enabled`); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE account_proxy_failover SET enabled=false,revision=revision+1,updated_at=NOW() WHERE enabled AND NOT EXISTS(SELECT 1 FROM accounts a WHERE a.id=account_proxy_failover.account_id AND a.extra->'manual_proxy_enabled'='true'::jsonb)`); err != nil {
 			return AllocationView{}, err
 		}
 	}
@@ -214,6 +219,7 @@ type allocationAccount struct {
 	// and scheduling; assigning a route must never resume this account.
 	VerificationPriority bool
 	Quarantined408       bool
+	ManualProxy          bool
 	TestLease            bool
 }
 
@@ -245,7 +251,8 @@ func loadAllocationAccounts(ctx context.Context, q queryer) ([]allocationAccount
 	 AND NULLIF(BTRIM(credentials->>'cookie'),'') IS NOT NULL,false),
 	 EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=accounts.id)
 	 OR EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=accounts.id),
-	 EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=accounts.id AND l.expires_at>NOW()),platform='adobe'
+	 EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=accounts.id AND l.expires_at>NOW()),
+ COALESCE(extra->'manual_proxy_enabled'='true'::jsonb,false),platform='adobe'
  FROM accounts WHERE deleted_at IS NULL ORDER BY id`, allocationWaitingMessage)
 	if err != nil {
 		return nil, err
@@ -254,7 +261,7 @@ func loadAllocationAccounts(ctx context.Context, q queryer) ([]allocationAccount
 	result := []allocationAccount{}
 	for rows.Next() {
 		var a allocationAccount
-		if err = rows.Scan(&a.ID, &a.Current, &a.Eligible, &a.Waiting, &a.BindingOnly, &a.LastSwitch, &a.VerificationPriority, &a.Quarantined408, &a.TestLease, &a.Adobe); err != nil {
+		if err = rows.Scan(&a.ID, &a.Current, &a.Eligible, &a.Waiting, &a.BindingOnly, &a.LastSwitch, &a.VerificationPriority, &a.Quarantined408, &a.TestLease, &a.ManualProxy, &a.Adobe); err != nil {
 			return nil, err
 		}
 		result = append(result, a)
@@ -273,6 +280,12 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 	used := map[int64]int{}
 	next := map[int64]int64{}
 	for _, a := range accounts {
+		if a.ManualProxy {
+			if a.Current != 0 {
+				used[a.Current]++
+			}
+			continue
+		}
 		if a.Quarantined408 && !a.TestLease {
 			next[a.ID] = 0
 			continue
@@ -313,7 +326,7 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 	}
 	for priority := 0; priority < 3; priority++ {
 		for _, a := range ordered {
-			if !a.Eligible || a.Quarantined408 || a.TestLease || a.priority() != priority {
+			if a.ManualProxy || !a.Eligible || a.Quarantined408 || a.TestLease || a.priority() != priority {
 				continue
 			}
 			p, exists := ps[a.Current]
@@ -328,7 +341,7 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 			}
 		}
 		for _, a := range ordered {
-			if !a.Eligible || a.Quarantined408 || a.TestLease || a.priority() != priority || next[a.ID] != 0 {
+			if a.ManualProxy || !a.Eligible || a.Quarantined408 || a.TestLease || a.priority() != priority || next[a.ID] != 0 {
 				continue
 			}
 			id := best(0, a.Adobe)
@@ -340,7 +353,7 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 		if priority == 0 {
 			for _, a := range ordered {
 				current := next[a.ID]
-				if a.BindingOnly || a.Quarantined408 || a.TestLease || current == 0 || current != a.Current || !fresh(current, a.Adobe) || now.Sub(a.LastSwitch) < softSwitchCooldown {
+				if a.ManualProxy || a.BindingOnly || a.Quarantined408 || a.TestLease || current == 0 || current != a.Current || !fresh(current, a.Adobe) || now.Sub(a.LastSwitch) < softSwitchCooldown {
 					continue
 				}
 				candidate := best(current, a.Adobe)
@@ -431,7 +444,7 @@ func (m *Manager) allocate(ctx context.Context, tx *sql.Tx, policy AllocationPol
 	}
 	changed := []int64{}
 	for _, a := range accounts {
-		if a.Quarantined408 || a.TestLease {
+		if a.ManualProxy || a.Quarantined408 || a.TestLease {
 			continue
 		}
 		pid, managed := next[a.ID]
