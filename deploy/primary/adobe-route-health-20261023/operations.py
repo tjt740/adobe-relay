@@ -15,7 +15,18 @@ if phase=='prepare':
  digest=hashlib.sha256(archive.read_bytes()).hexdigest()
  assert pathlib.Path(str(archive)+'.sha256').read_text().split()==[digest,archive.name]
  proof=pathlib.Path('release-artifact/ci-proof.json');proof.write_text(json.dumps({'application_sha':sha,'workflow_run':int(build),'conclusion':'success','archive_sha256':digest}))
- remote("import pathlib; pathlib.Path('"+root+"/artifact').mkdir(parents=True,exist_ok=True,mode=0o700)")
+ remote(f"""import datetime,json,pathlib,shutil
+r=pathlib.Path('{root}');(r/'artifact').mkdir(parents=True,exist_ok=True,mode=0o700)
+previous=r/'image-loaded.json'
+if previous.exists() and json.loads(previous.read_text())['sha']!='{sha}':
+ assert not (r/'rolling-prepared.json').exists() and not (r/'progress.json').exists(), 'Never supersede a candidate after startup'
+ old=json.loads(previous.read_text())['sha'];h=r/'candidate-history'/old
+ h.mkdir(parents=True,exist_ok=False,mode=0o700)
+ for name in ['image-loaded.json','expected-sha','expected-run','artifact/ci-proof.json']:
+  p=r/name
+  if p.exists():shutil.copy2(p,h/p.name)
+ (h/'superseded.json').write_text(json.dumps({{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'replaced_by':'{sha}','application_started':False,'customer_traffic':False}}))
+""")
  copy(pathlib.Path(__file__).parent.glob('*.py'))
  copy([pathlib.Path(__file__).parent/'expected-new-migrations.json'])
  copy(pathlib.Path('release-artifact').glob('*'),root+'/artifact/')

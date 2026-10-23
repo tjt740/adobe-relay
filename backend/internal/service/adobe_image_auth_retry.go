@@ -109,7 +109,7 @@ func (c *adobeAuthRetryClient) GenerateImage(ctx context.Context, in adobe.Gener
 	var op *adobe.OperationError
 	// Only a definitive authentication rejection before job acceptance permits
 	// another submission. Never replay a poll/download/unknown outcome or batch.
-	if result != nil || !errors.As(err, &op) || op.Stage != "submit" || op.JobID != "" {
+	if result != nil || !errors.As(err, &op) || op.Stage != "submit" || op.JobID != "" || !op.SubmissionRejected {
 		c.rejected(ctx, in.Token)
 		return result, err
 	}
