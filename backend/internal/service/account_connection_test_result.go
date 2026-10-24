@@ -107,6 +107,7 @@ func (s *AccountTestService) recordConnectionTestResult(ctx context.Context, acc
 			check, _ := account.Extra["okad_connection_test"].(map[string]any)
 			if repo, ok := s.accountRepo.(OkadConnectionTestRepository); ok && check["gated"] == true && check["key"] == OkadConnectionTestKey(account) {
 				job := OkadConnectionTestJob{AccountID: account.ID, Key: OkadConnectionTestKey(account), ProxyID: account.ProxyID, Manual: true}
+				job.StartedAt, _ = ctx.Value(accountTestStartedAtKey{}).(time.Time)
 				if account.Proxy != nil {
 					job.ProxyUpdatedAt = &account.Proxy.UpdatedAt
 				}
