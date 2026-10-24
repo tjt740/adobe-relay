@@ -34,6 +34,11 @@ class PreservationTests(unittest.TestCase):
   self.assertLess(s.index("run_step('canonical-recreate'"),s.index("run_step('retired-writer-migration'"))
   self.assertLess(s.index("run_step('retired-writer-migration'"),s.index("for step in ['route-canonical'"))
   self.assertIn('--keep-canary-on-failure',s)
+ def test_prepared_schema_baseline_is_compared_without_overwrite(self):
+  s=(ROOT/'pre-schema.py').read_text()
+  self.assertIn("if baseline.exists():",s)
+  self.assertIn("assert json.loads(baseline.read_text())==installed",s)
+  self.assertIn("else:\n a.save('installed-migrations-before.json',installed)",s)
  def test_recheck_proves_old_exit_and_exact_migrations(self):
   s=(ROOT/'migration-recheck.py').read_text()
   self.assertLess(s.index("assert row['Image']!=a.OLD_IMAGE"),s.index('p=subprocess.run(cmd'))
