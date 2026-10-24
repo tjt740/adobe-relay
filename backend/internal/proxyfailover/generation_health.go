@@ -33,12 +33,12 @@ func testRouteAvailable(p proxy, opts TestRouteOptions, now time.Time) bool {
 		(!opts.RequireClash || p.sourceID != "") && !slices.Contains(opts.ExcludeSources, routeSource(p))
 }
 
-// HEAD reachability remains independent. An open generation circuit can only
-// close on a newer real success, and after cooldown admits one test lease.
+// HEAD reachability remains independent. Generation timeouts impose a bounded
+// cooldown; ordinary traffic becomes eligible again when that time expires.
 func loadGenerationHealth(ctx context.Context, q queryer, ps map[int64]proxy) error {
 	rows, err := q.QueryContext(ctx, `SELECT p.id,
  EXISTS(SELECT 1 FROM adobe_route_exclusions e WHERE e.proxy_id=p.id),
- EXISTS(SELECT 1 FROM adobe_route_health h WHERE h.proxy_id=p.id AND h.proxy_updated_at=p.updated_at AND h.retry_after IS NOT NULL),
+ EXISTS(SELECT 1 FROM adobe_route_health h WHERE h.proxy_id=p.id AND h.proxy_updated_at=p.updated_at AND h.retry_after>NOW()),
  (SELECT max(h.retry_after) FROM adobe_route_health h WHERE h.proxy_id=p.id AND h.proxy_updated_at=p.updated_at),
  EXISTS(SELECT 1 FROM adobe_route_health h WHERE h.proxy_id=p.id AND h.proxy_updated_at=p.updated_at AND h.success_started_at>NOW()-INTERVAL '30 minutes' AND (h.failed_at IS NULL OR h.success_started_at>h.failed_at))
  FROM proxies p`)
@@ -70,7 +70,7 @@ func (m *Manager) RouteReady(ctx context.Context, id int64, expected *time.Time)
 	err := m.db.QueryRowContext(ctx, `SELECT deleted_at IS NULL AND status='active' AND (expires_at IS NULL OR expires_at>NOW())
  AND ($2::timestamptz IS NULL OR updated_at=$2)
  AND NOT EXISTS(SELECT 1 FROM adobe_route_exclusions e WHERE e.proxy_id=p.id)
- AND NOT EXISTS(SELECT 1 FROM adobe_route_health h WHERE h.proxy_id=p.id AND h.proxy_updated_at=p.updated_at AND h.retry_after IS NOT NULL)
+ AND NOT EXISTS(SELECT 1 FROM adobe_route_health h WHERE h.proxy_id=p.id AND h.proxy_updated_at=p.updated_at AND h.retry_after>NOW())
  FROM proxies p WHERE id=$1`, id, expected).Scan(&ready)
 	if err == sql.ErrNoRows {
 		return "", false, nil

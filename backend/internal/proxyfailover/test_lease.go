@@ -25,23 +25,10 @@ func credentialHashSQL(alias string) string {
 	return "encode(sha256(convert_to(jsonb_build_array(COALESCE(" + alias + "credentials->>'cookie',''),COALESCE(" + alias + "credentials->>'api_key',''))::text,'UTF8')),'hex')"
 }
 
-// Refresh408Metadata publishes derived state for account lists/details. The
-// tables remain authoritative; existing extra fields and operator flags survive.
-// id=0 refreshes all affected accounts during the regular maintenance round.
+// Remove retired scheduling metadata; health observations remain independent.
 func Refresh408Metadata(ctx context.Context, tx *sql.Tx, id int64) error {
-	_, err := tx.ExecContext(ctx, `WITH state AS (
- SELECT a.id,CASE WHEN EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=a.id)
- OR EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=a.id)
- THEN jsonb_build_object('managed',a.extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb AND EXISTS(SELECT 1 FROM proxy_auto_allocation WHERE enabled),'state',CASE WHEN a.extra->'manual_proxy_enabled'='true'::jsonb THEN 'manual' WHEN EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=a.id AND l.expires_at>NOW())
- THEN 'testing' ELSE 'quarantined' END,'models',COALESCE((SELECT jsonb_agg(scope ORDER BY scope) FROM adobe_proxy_408_blocks b WHERE b.account_id=a.id),'[]'::jsonb))
- ELSE NULL::jsonb END AS value FROM accounts a WHERE a.deleted_at IS NULL AND a.platform='adobe'
- AND ($1::bigint=0 OR a.id=$1)
- AND (a.extra ? 'adobe_proxy_408' OR EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=a.id)
- OR EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=a.id))
-), changed AS (UPDATE accounts a SET extra=CASE WHEN s.value IS NULL THEN a.extra-'adobe_proxy_408'
- ELSE COALESCE(a.extra,'{}'::jsonb)||jsonb_build_object('adobe_proxy_408',s.value) END,updated_at=NOW()
- FROM state s WHERE a.id=s.id AND a.extra->'adobe_proxy_408' IS DISTINCT FROM s.value RETURNING a.id)
- INSERT INTO scheduler_outbox(event_type,payload) SELECT 'account_bulk_changed',jsonb_build_object('account_ids',jsonb_agg(id)) FROM changed HAVING count(*)>0`, id)
+	_, err := tx.ExecContext(ctx, `UPDATE accounts SET extra=extra-'adobe_proxy_408',updated_at=NOW()
+ WHERE ($1::bigint=0 OR id=$1) AND extra ? 'adobe_proxy_408'`, id)
 	return err
 }
 
@@ -56,60 +43,6 @@ func lockTestRouting(ctx context.Context, tx *sql.Tx) (AllocationPolicy, error) 
 	}
 	err := tx.QueryRowContext(ctx, `SELECT enabled,revision FROM proxy_auto_allocation WHERE id=1 FOR SHARE`).Scan(&policy.Enabled, &policy.Revision)
 	return policy, err
-}
-
-// Remove expired or invalid ownership before freeing routing. A crash never
-// automatically replays a generation or promotes an unacknowledged test.
-func quarantine408(ctx context.Context, tx *sql.Tx) error {
-	if _, err := tx.ExecContext(ctx, `DELETE FROM adobe_proxy_test_leases l WHERE expires_at<=NOW() OR NOT EXISTS(
- SELECT 1 FROM accounts a JOIN proxies p ON p.id=l.proxy_id WHERE a.id=l.account_id AND a.deleted_at IS NULL
- AND a.extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb
- AND a.proxy_id=l.proxy_id AND `+credentialHashSQL("a.")+`=l.credential_hash
- AND p.updated_at=l.proxy_updated_at AND p.deleted_at IS NULL AND p.status='active'
- AND (p.expires_at IS NULL OR p.expires_at>NOW()))`); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO adobe_proxy_408_holds(account_id,resume_schedulable)
-	SELECT a.id,COALESCE(a.schedulable,false) OR COALESCE(a.proxy_auto_paused AND a.error_message=$1,false) FROM accounts a WHERE a.deleted_at IS NULL AND a.platform='adobe'
- AND a.extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb
- AND (EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=a.id)
- OR EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=a.id))
- AND NOT EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=a.id)
- ON CONFLICT(account_id) DO UPDATE SET resume_schedulable=adobe_proxy_408_holds.resume_schedulable OR EXCLUDED.resume_schedulable`, allocationWaitingMessage); err != nil {
-		return err
-	}
-	rows, err := tx.QueryContext(ctx, `WITH previous AS MATERIALIZED (
- SELECT a.id,a.proxy_id FROM accounts a WHERE a.deleted_at IS NULL AND a.platform='adobe'
- AND a.extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb
- AND EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=a.id)
- AND NOT EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=a.id)
- AND (a.proxy_id IS NOT NULL OR a.schedulable)
-), updated AS (UPDATE accounts a SET proxy_id=NULL,proxy_fallback_origin_id=NULL,schedulable=false,updated_at=NOW()
- FROM previous p WHERE a.id=p.id RETURNING a.id), events AS (
- INSERT INTO proxy_failover_events(account_id,from_proxy_id,to_proxy_id,created_at)
- SELECT p.id,p.proxy_id,0,clock_timestamp() FROM previous p JOIN updated u ON u.id=p.id WHERE p.proxy_id IS NOT NULL)
- SELECT id FROM updated`)
-	if err != nil {
-		return err
-	}
-	ids := []int64{}
-	for rows.Next() {
-		var id int64
-		if err = rows.Scan(&id); err != nil {
-			rows.Close()
-			return err
-		}
-		ids = append(ids, id)
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return err
-	}
-	if err = allocationOutbox(ctx, tx, ids); err != nil {
-		return err
-	}
-	return Refresh408Metadata(ctx, tx, 0)
 }
 
 func (m *Manager) AcquireTestProxy(ctx context.Context, id int64, scope string) (*TestLease, error) {
@@ -132,12 +65,6 @@ func (m *Manager) AcquireTestProxy(ctx context.Context, id int64, scope string) 
 	if manual {
 		return nil, nil
 	}
-	var blocked bool
-	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM adobe_proxy_408_blocks WHERE account_id=$1)
- OR EXISTS(SELECT 1 FROM adobe_proxy_408_holds WHERE account_id=$1)`, id).Scan(&blocked)
-	if err != nil {
-		return nil, err
-	}
 	opts, _ := ctx.Value(testRouteOptionsKey{}).(TestRouteOptions)
 	// Existing healthy bindings keep their affinity. A review or unusable route
 	// borrows under the same ownership/capacity and operator-state protections.
@@ -147,15 +74,7 @@ func (m *Manager) AcquireTestProxy(ctx context.Context, id int64, scope string) 
 	}
 	var currentID int64
 	var originalResume bool
-	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(proxy_id,0),COALESCE(schedulable,false) OR COALESCE(proxy_auto_paused AND error_message=$2,false) FROM accounts WHERE id=$1`, id, allocationWaitingMessage).Scan(&currentID, &originalResume); err != nil {
-		return nil, err
-	}
-	if !blocked && len(opts.ExcludeSources) == 0 && (currentID == 0 || psInitial[currentID].available(time.Now())) {
-		return nil, nil
-	}
-
-	// Reconcile regular business demand first; this also expires abandoned leases.
-	if err = m.allocate(ctx, tx, policy, false); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(proxy_id,0),COALESCE(schedulable,false) OR COALESCE(proxy_auto_paused AND error_message=$2,false) OR COALESCE(extra->'okad_connection_test'->'gated'='true'::jsonb AND extra->'okad_connection_test'->'resume'='true'::jsonb,false) FROM accounts WHERE id=$1`, id, allocationWaitingMessage).Scan(&currentID, &originalResume); err != nil {
 		return nil, err
 	}
 	var busy bool
@@ -164,6 +83,14 @@ func (m *Manager) AcquireTestProxy(ctx context.Context, id int64, scope string) 
 	}
 	if busy {
 		return nil, ErrTestBusy
+	}
+	if len(opts.ExcludeSources) == 0 && currentID != 0 && psInitial[currentID].available(time.Now()) {
+		return nil, nil
+	}
+
+	// Reconcile regular business demand before borrowing shared capacity.
+	if err = m.allocate(ctx, tx, policy, false); err != nil {
+		return nil, err
 	}
 	var eligible bool
 	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM accounts WHERE id=$1 AND platform='adobe' AND deleted_at IS NULL
@@ -188,9 +115,9 @@ func (m *Manager) AcquireTestProxy(ctx context.Context, id int64, scope string) 
 	used := map[int64]int{}
 	victims := map[int64]int64{}
 	for _, a := range accounts {
-		if a.Current != 0 {
+		if a.Current != 0 && a.ID != id {
 			used[a.Current]++
-			if !a.ManualProxy && a.BindingOnly && !a.VerificationPriority && !a.Quarantined408 && !a.TestLease {
+			if !a.ManualProxy && a.BindingOnly && !a.VerificationPriority && !a.TestLease {
 				victims[a.Current] = a.ID
 			}
 		}
@@ -232,20 +159,12 @@ func (m *Manager) AcquireTestProxy(ctx context.Context, id int64, scope string) 
 			return nil, err
 		}
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO adobe_proxy_408_holds(account_id,resume_schedulable)
- SELECT id,$2::boolean FROM accounts WHERE id=$1
- ON CONFLICT(account_id) DO NOTHING`, id, originalResume); err != nil {
-		return nil, err
-	}
 	random := make([]byte, 16)
 	if _, err = rand.Read(random); err != nil {
 		return nil, err
 	}
 	owner := hex.EncodeToString(random)
-	var returnSchedulable *bool
-	if !blocked {
-		returnSchedulable = &originalResume
-	}
+	returnSchedulable := originalResume
 	if _, err = tx.ExecContext(ctx, `INSERT INTO adobe_proxy_test_leases(account_id,owner,proxy_id,proxy_updated_at,credential_hash,scope,expires_at,return_schedulable)
  SELECT a.id,$2,$3,$4,`+credentialHashSQL("a.")+`,$5,NOW()+INTERVAL '5 minutes',$6::boolean FROM accounts a WHERE a.id=$1`, id, owner, best, ps[best].UpdatedAt, scope, returnSchedulable); err != nil {
 		return nil, err
@@ -275,7 +194,9 @@ func (m *Manager) AcquireTestProxy(ctx context.Context, id int64, scope string) 
 	return &TestLease{AccountID: id, Owner: owner, SourceID: routeSource(ps[best])}, nil
 }
 
-func (m *Manager) FinishTestProxy(ctx context.Context, lease TestLease, success, allowResume bool) error {
+// Returning an owned temporary pause is independent of AutoRecover: it never
+// enables an account that was already stopped or clears another failure.
+func (m *Manager) FinishTestProxy(ctx context.Context, lease TestLease, success, _ bool) error {
 	tx, err := m.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -305,8 +226,7 @@ func (m *Manager) FinishTestProxy(ctx context.Context, lease TestLease, success,
  AND a.extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb
  AND a.proxy_id=$2 AND `+credentialHashSQL("a.")+`=$3 AND p.updated_at=$4 AND p.deleted_at IS NULL AND p.status='active'
  AND (p.expires_at IS NULL OR p.expires_at>NOW())),
- NOT EXISTS(SELECT 1 FROM adobe_proxy_408_blocks WHERE account_id=$1)
- AND EXISTS(SELECT 1 FROM adobe_account_health WHERE account_id=$1 AND scope=$5 AND success_started_at>=$6
+ EXISTS(SELECT 1 FROM adobe_account_health WHERE account_id=$1 AND scope=$5 AND success_started_at>=$6
  AND (failed_at IS NULL OR success_started_at>failed_at))`, lease.AccountID, pid, hash, proxyUpdated, scope, acquired).Scan(&current, &proved)
 	if err != nil {
 		return err
@@ -329,28 +249,15 @@ func (m *Manager) FinishTestProxy(ctx context.Context, lease TestLease, success,
 			// The test has reconciled this route. Retaining allocator pause
 			// ownership would let a later round bypass a disabled recovery policy.
 			_, err = tx.ExecContext(ctx, `UPDATE accounts SET proxy_auto_paused=false,updated_at=NOW() WHERE id=$1 AND proxy_auto_paused`, lease.AccountID)
-			if err == nil && allowResume {
-				_, err = tx.ExecContext(ctx, `UPDATE accounts a SET schedulable=true,updated_at=NOW()
- WHERE a.id=$1 AND a.status='active' AND COALESCE(a.error_message,'')='' AND NOT a.proxy_auto_paused
- AND (a.expires_at IS NULL OR a.expires_at>NOW()) AND a.extra->'okad_manual_pause' IS DISTINCT FROM 'true'::jsonb
- AND (a.extra->'okad_connection_test'->>'gated' IS DISTINCT FROM 'true' OR a.extra->'okad_connection_test'->>'state'='success')
- AND (a.extra->'okad_connection_test'->>'require_verification' IS DISTINCT FROM 'true' OR a.extra->'okad'->>'verification'='verified')
- AND (a.rate_limit_reset_at IS NULL OR a.rate_limit_reset_at<=NOW()) AND (a.overload_until IS NULL OR a.overload_until<=NOW())
- AND (a.temp_unschedulable_until IS NULL OR a.temp_unschedulable_until<=NOW())
- AND (EXISTS(SELECT 1 FROM adobe_proxy_408_holds h WHERE h.account_id=a.id AND h.resume_schedulable)
- OR (a.extra->'okad_connection_test'->>'gated'='true' AND a.extra->'okad_connection_test'->>'resume'='true'))`, lease.AccountID)
-			}
 		}
 		if err != nil {
 			return err
 		}
 		if returnSchedulable.Valid && returnSchedulable.Bool {
-			// Undo only a pause owned by a non-408 review. Cooldown timestamps
-			// remain intact: a 429 still waits its normal 15 seconds. New 408,
-			// credentials, verification gates and operator pauses never bypass it.
+			// Return only eligibility taken by this lease, even on timeout, failure
+			// or expiry. Cooldowns and independent credential/operator gates remain.
 			_, err = tx.ExecContext(ctx, `UPDATE accounts a SET schedulable=true,updated_at=NOW()
- WHERE a.id=$1 AND NOT EXISTS(SELECT 1 FROM adobe_proxy_408_blocks WHERE account_id=a.id)
- AND a.status='active' AND COALESCE(a.error_message,'')='' AND NOT a.proxy_auto_paused
+ WHERE a.id=$1 AND a.status='active' AND COALESCE(a.error_message,'')='' AND NOT a.proxy_auto_paused
  AND (a.expires_at IS NULL OR a.expires_at>NOW()) AND a.extra->'okad_manual_pause' IS DISTINCT FROM 'true'::jsonb
  AND (a.extra->'okad_connection_test'->>'gated' IS DISTINCT FROM 'true' OR a.extra->'okad_connection_test'->>'state'='success')
  AND (a.extra->'okad_connection_test'->>'require_verification' IS DISTINCT FROM 'true' OR a.extra->'okad'->>'verification'='verified')`, lease.AccountID)
@@ -364,17 +271,6 @@ func (m *Manager) FinishTestProxy(ctx context.Context, lease TestLease, success,
 	}
 	if _, err = tx.ExecContext(ctx, `DELETE FROM adobe_proxy_test_leases WHERE account_id=$1 AND owner=$2`, lease.AccountID, lease.Owner); err != nil {
 		return err
-	}
-	if keep {
-		if _, err = tx.ExecContext(ctx, `DELETE FROM adobe_proxy_408_holds WHERE account_id=$1`, lease.AccountID); err != nil {
-			return err
-		}
-	}
-	if returnSchedulable.Valid {
-		if _, err = tx.ExecContext(ctx, `DELETE FROM adobe_proxy_408_holds h WHERE account_id=$1
- AND NOT EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=h.account_id)`, lease.AccountID); err != nil {
-			return err
-		}
 	}
 	if err = Refresh408Metadata(ctx, tx, lease.AccountID); err != nil {
 		return err

@@ -72,7 +72,7 @@ type proxy struct {
 }
 
 func (p proxy) available(now time.Time) bool {
-	return !p.generationBlocked && !p.excluded && p.networkAvailable(now)
+	return !p.retryAfter.After(now) && !p.excluded && p.networkAvailable(now)
 }
 func (p proxy) networkAvailable(now time.Time) bool {
 	return !p.sourceBlocked && !p.Deleted && p.Status == "active" && (!p.ExpiresAt.Valid || p.ExpiresAt.Time.After(now))

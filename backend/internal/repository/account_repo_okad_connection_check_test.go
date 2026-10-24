@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/require"
@@ -71,6 +72,54 @@ func TestOkadConnectionTestQueuePostgres(t *testing.T) {
 	require.True(t, success)
 }
 
+func TestOkadManualTimeoutUsesActualTestStart(t *testing.T) {
+	for _, tc := range []struct {
+		name, mutation        string
+		noStart, automatic    bool
+		clearGate, scheduling bool
+	}{
+		{"manual check without queue start", "", false, false, true, true},
+		{"stale result", `UPDATE accounts SET extra=jsonb_set(extra,'{last_check_at}',to_jsonb(NOW()-INTERVAL '1 hour'))`, false, false, false, false},
+		{"test predates queue", `UPDATE accounts SET extra=jsonb_set(extra,'{okad_connection_test,queued_at}',to_jsonb(NOW()))`, false, false, false, false},
+		{"no actual start", "", true, false, false, false},
+		{"automatic job cannot use manual bound", "", false, true, false, false},
+		{"operator pause", `UPDATE accounts SET extra=extra||'{"okad_manual_pause":true}'`, false, false, true, false},
+		{"already stopped before test", `UPDATE accounts SET extra=jsonb_set(extra,'{okad_connection_test,resume}','false')`, false, false, true, false},
+		{"quota blocked", `UPDATE accounts SET extra=jsonb_set(extra,'{okad,verification}','"quota_blocked"')`, false, false, false, false},
+		{"quota with verification disabled", `UPDATE accounts SET extra=jsonb_set(jsonb_set(extra,'{okad,verification}','"quota_blocked"'),'{okad_connection_test,require_verification}','false')`, false, false, false, false},
+		{"401 result", `UPDATE accounts SET extra=jsonb_set(extra,'{last_check_status_code}','401')`, false, false, false, false},
+		{"new auth error", `UPDATE accounts SET error_message='Authentication failed (401): fresh rejection'`, false, false, false, false},
+		{"new Cookie", `UPDATE accounts SET credentials=jsonb_set(credentials,'{cookie}','"replacement"')`, false, false, false, false},
+		{"new route", `UPDATE accounts SET proxy_id=8`, false, false, false, false},
+		{"inactive", `UPDATE accounts SET status='inactive'`, false, false, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := newOkadRecoveryPostgres(t)
+			_, err := db.Exec(`INSERT INTO accounts(id,platform,type,status,error_message,schedulable,proxy_id,credentials,extra)
+ VALUES(1,'adobe','oauth','error','Okad credentials pending connection test',false,7,'{"cookie":"fixture"}',
+ jsonb_build_object('last_check_status_code',408,'last_check_success',false,'last_check_at',NOW()-INTERVAL '1 minute',
+ 'okad',jsonb_build_object('verification','verified'), 'okad_connection_test',jsonb_build_object('gated',true,'state','running','resume',true,
+ 'require_verification',true,'queued_at',NOW()-INTERVAL '10 minutes','key',encode(sha256(convert_to('fixture','UTF8')),'hex'))))`)
+			require.NoError(t, err)
+			if tc.mutation != "" {
+				_, err = db.Exec(tc.mutation)
+				require.NoError(t, err)
+			}
+			proxy := int64(7)
+			a := &service.Account{Credentials: map[string]any{"cookie": "fixture"}}
+			job := service.OkadConnectionTestJob{AccountID: 1, Key: service.OkadConnectionTestKey(a), ProxyID: &proxy, Manual: !tc.automatic}
+			if !tc.noStart {
+				job.StartedAt = time.Now().Add(-2 * time.Minute)
+			}
+			require.NoError(t, (&accountRepository{sql: db}).FinishOkadConnectionTest(context.Background(), job, "failed"))
+			var sched, gated bool
+			require.NoError(t, db.QueryRow(`SELECT schedulable,(extra->'okad_connection_test'->>'gated')::bool FROM accounts WHERE id=1`).Scan(&sched, &gated))
+			require.Equal(t, tc.scheduling, sched)
+			require.Equal(t, !tc.clearGate, gated)
+		})
+	}
+}
+
 func TestOkadConnectionTestQueuePostgresConcurrentClaims(t *testing.T) {
 	db := newOkadRecoveryPostgres(t)
 	repo := &accountRepository{sql: db}
@@ -116,24 +165,63 @@ func TestOkadConnectionTestQueuePostgresConcurrentClaims(t *testing.T) {
 	require.Len(t, seen, 200)
 }
 
-func TestOkad408QueueCanClaimUnboundAccountWithoutBypassingOtherModelBlock(t *testing.T) {
+func TestOkad408HistoryDoesNotBlockSuccessfulQueueCompletion(t *testing.T) {
 	db := newOkadRecoveryPostgres(t)
-	_, err := db.Exec(`INSERT INTO accounts(id,platform,type,status,schedulable,credentials,extra) VALUES(1,'adobe','oauth','active',true,'{"cookie":"fixture"}','{}');
+	_, err := db.Exec(`INSERT INTO accounts(id,platform,type,status,schedulable,credentials,extra,proxy_id) VALUES(1,'adobe','oauth','active',true,'{"cookie":"fixture"}','{}',7);
  INSERT INTO adobe_proxy_408_blocks VALUES(1,'another-model',NOW()-INTERVAL '1 day')`)
 	require.NoError(t, err)
 	r := &accountRepository{sql: db}
 	a := &service.Account{ID: 1, Status: service.StatusActive, Schedulable: true, Credentials: map[string]any{"cookie": "fixture"}}
 	require.NoError(t, r.QueueOkadConnectionTest(context.Background(), a, service.OkadConnectionTestKey(a), false))
-	_, err = db.Exec(`UPDATE proxy_auto_allocation SET enabled=true`)
-	require.NoError(t, err)
 	job, err := r.ClaimOkadConnectionTest(context.Background())
 	require.NoError(t, err)
 	require.NotNil(t, job)
-	require.Nil(t, job.ProxyID)
 	require.NoError(t, r.FinishOkadConnectionTest(context.Background(), *job, "success"))
 	var sched bool
-	var status string
-	require.NoError(t, db.QueryRow(`SELECT status,schedulable FROM accounts WHERE id=1`).Scan(&status, &sched))
-	require.Equal(t, service.StatusError, status)
-	require.False(t, sched)
+	require.NoError(t, db.QueryRow(`SELECT schedulable FROM accounts WHERE id=1`).Scan(&sched))
+	require.True(t, sched)
+}
+
+func TestOkadTimeoutReturnsQueuePauseWithoutSuccess(t *testing.T) {
+	for _, tc := range []struct {
+		name                    string
+		code                    int
+		verified, paused, stale bool
+	}{
+		{"408 verified", 408, true, false, false}, {"408 manual pause", 408, true, true, false},
+		{"408 unverified identity", 408, false, false, false}, {"401 still gated", 401, true, false, false},
+		{"stale timeout record", 408, true, false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := newOkadRecoveryPostgres(t)
+			_, err := db.Exec(`INSERT INTO accounts(id,platform,type,status,schedulable,credentials,extra,proxy_id) VALUES(1,'adobe','oauth','active',true,'{"cookie":"fixture"}',jsonb_build_object('okad_manual_pause',$1::boolean,'okad',jsonb_build_object('verification',CASE WHEN $2 THEN 'verified' ELSE 'pending' END)),7)`, tc.paused, tc.verified)
+			require.NoError(t, err)
+			r := &accountRepository{sql: db}
+			a := &service.Account{ID: 1, Status: service.StatusActive, Schedulable: true, Credentials: map[string]any{"cookie": "fixture"}}
+			require.NoError(t, r.QueueOkadConnectionTest(context.Background(), a, service.OkadConnectionTestKey(a), true))
+			if !tc.verified {
+				_, err = db.Exec(`UPDATE accounts SET extra=jsonb_set(extra,'{okad,verification}','"verified"')`)
+				require.NoError(t, err)
+			}
+			job, err := r.ClaimOkadConnectionTest(context.Background())
+			require.NoError(t, err)
+			require.NotNil(t, job)
+			if !tc.verified {
+				_, err = db.Exec(`UPDATE accounts SET extra=jsonb_set(extra,'{okad,verification}','"pending"')`)
+				require.NoError(t, err)
+			}
+			_, err = db.Exec(`UPDATE accounts SET extra=extra||jsonb_build_object('last_check_success',false,'last_check_status_code',$1::integer,'last_check_at',CASE WHEN $2 THEN NOW()-INTERVAL '1 hour' ELSE clock_timestamp() END)`, tc.code, tc.stale)
+			require.NoError(t, err)
+			require.NoError(t, r.FinishOkadConnectionTest(context.Background(), *job, "failed"))
+			var sched, gated bool
+			var code int
+			var state string
+			require.NoError(t, db.QueryRow(`SELECT schedulable,(extra->'okad_connection_test'->>'gated')::bool,(extra->>'last_check_status_code')::int,extra->'okad_connection_test'->>'state' FROM accounts WHERE id=1`).Scan(&sched, &gated, &code, &state))
+			release := tc.code == 408 && tc.verified && !tc.stale
+			require.Equal(t, release && !tc.paused, sched)
+			require.Equal(t, !release, gated)
+			require.Equal(t, tc.code, code)
+			require.Equal(t, "failed", state)
+		})
+	}
 }

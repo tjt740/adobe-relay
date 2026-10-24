@@ -15,6 +15,7 @@ type okadCheckRepo struct {
 	*connectionTestResultRepo
 	queued   []string
 	finished []string
+	jobs     []OkadConnectionTestJob
 }
 
 func (r *okadCheckRepo) QueueOkadConnectionTest(_ context.Context, _ *Account, key string, verified bool) error {
@@ -24,9 +25,23 @@ func (r *okadCheckRepo) QueueOkadConnectionTest(_ context.Context, _ *Account, k
 func (r *okadCheckRepo) ClaimOkadConnectionTest(context.Context) (*OkadConnectionTestJob, error) {
 	return nil, nil
 }
-func (r *okadCheckRepo) FinishOkadConnectionTest(_ context.Context, _ OkadConnectionTestJob, state string) error {
+func (r *okadCheckRepo) FinishOkadConnectionTest(_ context.Context, job OkadConnectionTestJob, state string) error {
 	r.finished = append(r.finished, state)
+	r.jobs = append(r.jobs, job)
 	return nil
+}
+
+func TestOkadManualCompletionCarriesActualStart(t *testing.T) {
+	a := adobeTestConnAccount(map[string]any{"cookie": "fixture"})
+	a.Extra = map[string]any{"okad_connection_test": map[string]any{"gated": true, "key": OkadConnectionTestKey(a)}}
+	r := &okadCheckRepo{connectionTestResultRepo: &connectionTestResultRepo{okadRecoveryRepo: &okadRecoveryRepo{accounts: map[int64]*Account{a.ID: a}}}}
+	started := time.Now().Add(-time.Minute)
+	ctx := context.WithValue(context.Background(), accountTestStartedAtKey{}, started)
+	(&AccountTestService{accountRepo: r}).recordConnectionTestResult(ctx, a, adobe.NewUpstreamTemporaryError("busy", 408, adobe.ErrorTypeStatus))
+	require.Len(t, r.jobs, 1)
+	require.True(t, r.jobs[0].Manual)
+	require.Equal(t, started, r.jobs[0].StartedAt)
+	require.Equal(t, []string{"failed"}, r.finished)
 }
 
 func TestOkadAutomaticConnectionTestUsesAccountTestAndRecordsFailure(t *testing.T) {

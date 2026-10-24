@@ -4,11 +4,10 @@ import AccountHealthEvidence from '../AccountHealthEvidence.vue'
 import type { Account } from '@/types'
 
 describe('Account health evidence', () => {
-  it('shows every model still blocking a regular proxy binding', () => {
-    const wrapper = mount(AccountHealthEvidence, { props: { account: { platform: 'adobe', extra: { adobe_proxy_408: { managed: true, state: 'quarantined', models: ['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst'] } } } as Account } })
-    expect(wrapper.text()).toContain('待恢复，不占常规代理')
-    expect(wrapper.text()).toContain('gpt-image-2.5-flare、gpt-image-2.5-sunburst')
-    expect(wrapper.text()).toContain('实际出图成功且所有 408 恢复后')
+  it('does not present retired 408 metadata as a scheduling restriction', () => {
+    const wrapper = mount(AccountHealthEvidence, { props: { account: { platform: 'adobe', extra: { adobe_proxy_408: { managed: true, state: 'quarantined', models: ['gpt-image-2.5-flare'] } } } as Account } })
+    expect(wrapper.text()).not.toContain('不占常规代理')
+    expect(wrapper.text()).not.toContain('实际出图成功且所有 408 恢复后')
   })
   it('does not call a received Cookie healthy before its test succeeds', () => {
     const wrapper = mount(AccountHealthEvidence, { props: { account: { platform: 'adobe', extra: { okad_connection_test: { state: 'pending' } } } as Account } })

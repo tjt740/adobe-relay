@@ -24,12 +24,7 @@
             <p class="mt-1 text-2xl font-semibold tabular-nums">{{ stat.value }}</p>
           </div>
         </div>
-        <div v-if="view.quarantined_408_accounts !== undefined" class="rounded-lg bg-sky-50 p-3 text-sm leading-relaxed text-sky-800 dark:bg-sky-900/20 dark:text-sky-300" data-testid="quarantine-408">
-          <p class="font-medium">{{ t('admin.proxies.allocation.quarantineSummary', { count: view.quarantined_408_accounts, testing: view.temporary_test_bindings ?? 0 }) }}</p>
-          <p class="mt-1">{{ t('admin.proxies.allocation.quarantineHint') }}</p>
-          <p class="mt-1">{{ t('admin.proxies.allocation.quarantineTestHint') }}</p>
-          <p v-if="view.enabled && view.pending_408_release" class="mt-1" data-testid="pending-408-release">{{ t('admin.proxies.allocation.pending408Release', { count: view.pending_408_release }) }}</p>
-        </div>
+        <p class="text-sm leading-relaxed text-gray-500" data-testid="timeout-scheduling-hint">{{ t('admin.proxies.allocation.timeoutSchedulingHint') }}</p>
         <p class="text-sm leading-relaxed text-gray-500" data-testid="capacity-hint">{{ t('admin.proxies.allocation.capacityHint') }}</p>
         <p v-if="otherBindingAccounts" class="text-sm text-gray-500" data-testid="binding-only-hint">
           {{ t('admin.proxies.allocation.bindingOnlyHint', { count: otherBindingAccounts }) }}

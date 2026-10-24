@@ -18,6 +18,9 @@ type OkadConnectionTestJob struct {
 	ProxyID        *int64
 	ProxyUpdatedAt *time.Time
 	Manual         bool
+	// A manual test does not claim the background queue's started_at. Carry its
+	// actual request start so an older timeout cannot finish a newer queue.
+	StartedAt time.Time
 }
 
 const OkadConnectionTestPending = "Okad credentials pending connection test"

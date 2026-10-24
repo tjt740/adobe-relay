@@ -1,5 +1,5 @@
 <template>
-  <div v-if="state || recovery || check || proxy408?.managed" class="flex max-w-[230px] flex-col gap-1 text-[11px]" data-testid="okad-integration-status">
+  <div v-if="state || recovery || check" class="flex max-w-[230px] flex-col gap-1 text-[11px]" data-testid="okad-integration-status">
     <span class="rounded bg-blue-50 px-2 py-1 text-blue-700 dark:bg-blue-950 dark:text-blue-200" :title="detail">{{ label }}</span>
     <span v-if="state?.version" class="text-gray-500">Cookie v{{ state.version }} · {{ state.source_key }}</span>
     <span v-if="recovery?.next_check_at" class="text-gray-500">下次检查 {{ new Date(String(recovery.next_check_at)).toLocaleTimeString() }}</span>
@@ -9,12 +9,9 @@
 </template>
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
 import apiClient from '@/api/client'
 import type { Account } from '@/types'
 const props = defineProps<{ account: Account }>()
-const { t } = useI18n()
-const proxy408 = computed(() => props.account.extra?.adobe_proxy_408 as { managed?: boolean; state?: string } | undefined)
 const busy = ref(false)
 const message = ref('')
 const state = computed(() => props.account.extra?.okad as Record<string, unknown> | undefined)
@@ -30,7 +27,6 @@ const reasons: Record<string, string> = {
   login_failed: '自动登录未完成', rate_limited: '登录服务限流', protocol: '联动版本不兼容'
 }
 const label = computed(() => {
-  if (proxy408.value?.managed) return t(proxy408.value.state === 'testing' ? 'admin.proxies.allocation.account408Testing' : 'admin.proxies.allocation.account408Waiting')
   const phase = String(check.value?.state || '')
   if (phase === 'pending') return 'Cookie 已同步，等待接口检测'
   if (phase === 'running') return check.value?.resume === false ? '正在检测，保留原暂停状态' : '正在检测，验证通过后恢复调度'
@@ -44,7 +40,7 @@ const label = computed(() => {
   const code = String(recovery.value?.code || state.value?.verification || '')
   return reasons[code] || '查看联动详情'
 })
-const detail = computed(() => proxy408.value?.managed ? t('admin.proxies.allocation.account408Hint') : String(check.value ? label.value : state.value?.message || label.value))
+const detail = computed(() => String(check.value ? label.value : state.value?.message || label.value))
 async function verify() {
   busy.value = true
   try {

@@ -48,7 +48,7 @@ func TestAdobeRouteReviewSkipsExhaustedAndDistinctSourceSiblings(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, state.Sources[0].ID, source)
 	require.False(t, ready)
-	first, err := m.AcquireTestProxy(ctx, 10, "model-a")
+	first, err := m.AcquireTestProxy(WithTestRouteOptions(ctx, TestRouteOptions{ExcludeSources: []string{"proxy:force-review"}}), 10, "model-a")
 	require.NoError(t, err)
 	require.NotNil(t, first)
 	require.NotEqual(t, state.Sources[0].ID, first.SourceID, "exhausted feeds cost no Adobe submissions")
@@ -63,7 +63,7 @@ func TestAdobeRouteReviewSkipsExhaustedAndDistinctSourceSiblings(t *testing.T) {
 	assertRouting(t, db, 10, 0, false)
 }
 
-func TestAdobeGenerationCircuitNeedsIndependentAccountsAndRealProof(t *testing.T) {
+func TestAdobeGenerationCircuitExpiresWithoutSuccessfulTest(t *testing.T) {
 	db, m := quarantinedFixture(t)
 	ctx := context.Background()
 	var revision time.Time
@@ -110,19 +110,17 @@ func TestAdobeGenerationCircuitNeedsIndependentAccountsAndRealProof(t *testing.T
  INSERT INTO accounts(id,status,schedulable,credentials,extra) VALUES(11,'error',false,'{"cookie":"second"}','{}');
  INSERT INTO adobe_proxy_408_blocks(account_id,scope,failed_at) VALUES(11,'model-a',NOW())`)
 	require.NoError(t, err)
-	first, err := m.AcquireTestProxy(ctx, 10, "model-a")
-	require.NoError(t, err)
-	require.NotNil(t, first)
-	_, err = m.AcquireTestProxy(ctx, 11, "model-a")
-	require.ErrorIs(t, err, ErrNoTestProxy, "only one half-open test across processes")
-	now = time.Now()
-	record(10, "model-a", true, now, now)
-	proveLease(t, db, 10, "model-a")
-	require.NoError(t, m.FinishTestProxy(ctx, *first, true, false))
 	_, ready, err = m.RouteReady(ctx, 1, &revision)
 	require.NoError(t, err)
-	require.True(t, ready)
-	assertRouting(t, db, 10, 1, false)
+	require.True(t, ready, "ordinary generation resumes after the bounded cooldown without test proof")
+	ps, err = loadProxies(ctx, db)
+	require.NoError(t, err)
+	require.True(t, ps[1].available(time.Now()))
+	require.NoError(t, m.check(ctx))
+	var blocked bool
+	require.NoError(t, db.QueryRow(`SELECT retry_after IS NOT NULL FROM adobe_route_health WHERE proxy_id=1 AND scope='model-a'`).Scan(&blocked))
+	require.True(t, blocked, "timeout evidence remains stored even though the cooldown expired")
+
 }
 
 func testSourceID(raw string) string {

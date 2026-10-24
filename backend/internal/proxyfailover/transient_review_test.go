@@ -16,7 +16,7 @@ func TestTransientSourceReviewDoesNotInvent408Quarantine(t *testing.T) {
 		{"expired review returns its own pause", false, false, true, false},
 		{"successful transient review only returns its original eligibility", false, false, false, true},
 		{"operator pause remains paused", true, false, false, false},
-		{"actual new 408 remains quarantined", false, true, false, false},
+		{"new 408 returns original eligibility", false, true, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db := testDB(t)
@@ -57,11 +57,11 @@ func TestTransientSourceReviewDoesNotInvent408Quarantine(t *testing.T) {
 				require.NoError(t, db.QueryRow(`SELECT COALESCE(proxy_id,0) FROM accounts WHERE id=10`).Scan(&expectedProxy))
 				require.NotZero(t, expectedProxy)
 			}
-			assertRouting(t, db, 10, expectedProxy, !tc.paused && !tc.new408)
+			assertRouting(t, db, 10, expectedProxy, !tc.paused)
 			var quarantined, manual bool
 			var cooldown time.Time
 			require.NoError(t, db.QueryRow(`SELECT EXISTS(SELECT 1 FROM adobe_proxy_408_holds WHERE account_id=10),extra->'okad_manual_pause'='true'::jsonb,temp_unschedulable_until FROM accounts WHERE id=10`).Scan(&quarantined, &manual, &cooldown))
-			require.Equal(t, tc.new408, quarantined)
+			require.False(t, quarantined)
 			require.Equal(t, tc.paused, manual)
 			require.WithinDuration(t, until, cooldown, time.Millisecond)
 		})

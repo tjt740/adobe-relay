@@ -41,7 +41,7 @@ func TestAdobeSuccessfulTestRecoveryPostgres(t *testing.T) {
 				"cookie":              `UPDATE accounts SET credentials=jsonb_set(credentials,'{cookie}','"new"')`,
 				"proxy":               `UPDATE accounts SET proxy_id=8`,
 				"proxy_edit":          `UPDATE proxies SET updated_at=NOW()+INTERVAL '1 second' WHERE id=7`,
-				"new_failure":         `INSERT INTO adobe_account_health(account_id,scope,failed_at,status_code) VALUES(1,'another-model',NOW(),408)`,
+				"new_failure":         `INSERT INTO adobe_account_health(account_id,scope,failed_at,status_code) VALUES(1,'another-model',NOW(),401)`,
 				"old_408_other_model": `INSERT INTO adobe_proxy_408_blocks VALUES(1,'another-model',NOW()-INTERVAL '1 day')`,
 				"new_cooldown":        `UPDATE accounts SET temp_unschedulable_until=NOW()+INTERVAL '2 days'`,
 				"identity_pending":    `UPDATE accounts SET extra=extra||'{"okad_connection_test":{"require_verification":true},"okad":{"verification":"pending"}}'`,
@@ -52,7 +52,7 @@ func TestAdobeSuccessfulTestRecoveryPostgres(t *testing.T) {
 			}
 			applied, err := (&accountRepository{sql: db}).RecoverAdobeAfterSuccessfulTestIfCurrent(context.Background(), a, started)
 			require.NoError(t, err)
-			expected := mutation == "" || mutation == "already_paused" || mutation == "allocator_paused"
+			expected := mutation == "" || mutation == "already_paused" || mutation == "allocator_paused" || mutation == "old_408_other_model"
 			require.Equal(t, expected, applied)
 			var status, cookie string
 			var schedulable bool
