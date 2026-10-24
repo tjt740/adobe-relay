@@ -15,7 +15,6 @@ export const changelogPreviews = [
 // Prepared release notes have no deployment date and are not rendered as shipped.
 // Move the entry into dailyUpdates on its actual Asia/Shanghai deployment date.
 export const pendingDailyUpdates: readonly Omit<DailyUpdate, 'date'>[] = [
-  { id: 'adobe408TimeoutScheduling', type: 'fixed', sections: ['reason', 'behavior', 'existing', 'legacy', 'protection', 'validation', 'boundary'] },
 ]
 
 export const dailyOverviews: Readonly<Record<string, string>> = {
@@ -27,6 +26,7 @@ export const dailyOverviews: Readonly<Record<string, string>> = {
 
 // Use the actual release date in Asia/Shanghai; multiple releases share one day.
 export const dailyUpdates: readonly DailyUpdate[] = [
+  { date: '2026-10-24', id: 'adobe408TimeoutScheduling', type: 'fixed', sections: ['reason', 'behavior', 'existing', 'legacy', 'protection', 'validation', 'boundary'] },
   { date: '2026-10-24', id: 'clashBackgroundTests', type: 'improved', sections: ['reason', 'progress', 'protection', 'validation', 'boundary'] },
   { date: '2026-10-23', id: 'manualAccountIP', type: 'added', sections: ['reason', 'control', 'routing', 'protection', 'validation', 'boundary'] },
   { date: '2026-10-23', id: 'adobeRouteReview', type: 'fixed', sections: ["reason", "balance", "review", "circuit", "safety", "protection", "validation", "boundary"] },
