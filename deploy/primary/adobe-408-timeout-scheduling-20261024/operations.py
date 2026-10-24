@@ -1,7 +1,7 @@
 """Fixed-scope primary release operations using the original deployment guards."""
 import base64,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['prepare','start','status','verify','archive']
+assert phase in ['prepare','start','resume-preflight','status','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-408-timeout-scheduling-20261024'
 options=['-i',str(pathlib.Path.home()/'.ssh/deploy_key'),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -39,6 +39,31 @@ assert json.loads((r/'image-loaded.json').read_text())['sha']=='{sha}'
 assert not (r/'progress.json').exists(), 'Already started; inspect existing evidence'
 subprocess.run(['systemd-run','--unit=adobe-408-timeout-release-20261024','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/driver.log','--property=StandardError=append:{root}/driver.log','/usr/bin/python3',str(r/'driver.py')],check=True)
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
+""")
+elif phase=='resume-preflight':
+ remote(f"""import fcntl,importlib.util,json,pathlib,subprocess
+r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
+p=json.loads((r/'progress.json').read_text())
+assert p['state']=='attention_required' and '/pre-schema.py' in p['error']
+assert not any((r/name).exists() for name in ['rolling-prepared.json','rolling-route-canary.json','premigration-backup.json','after.json'])
+spec=importlib.util.spec_from_file_location('audit',r/'audit.py');a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
+assert a.inspect(a.APP)['Id']==json.loads((r/'before.json').read_text())['containers'][a.APP]['id']
+assert a.inspect(a.APP)['Config']['Image']==a.OLD_IMAGE
+assert a.sql("SELECT count(*) FROM schema_migrations WHERE filename='254_adobe_408_timeout_scheduling.sql'")=='0'
+assert subprocess.run(['docker','inspect','adobe-relay-memory-canary'],capture_output=True).returncode!=0
+assert not subprocess.check_output(['docker','exec','adobe-relay-redis-1','redis-cli','--raw','GET','concurrency:rolling_deployment'],text=True).strip()
+""")
+ copy([pathlib.Path(__file__).parent/'pre-schema.py'])
+ remote(f"""import fcntl,json,pathlib,subprocess
+r=pathlib.Path('{root}');held=[]
+for path in ['/opt/adobe-relay/shared/.adobe-deploy.lock',str(r/'driver.lock')]:
+ f=open(path,'a');fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB);held.append(f)
+p=json.loads((r/'progress.json').read_text());assert p['state']=='attention_required' and '/pre-schema.py' in p['error']
+assert not (r/'progress.failed-preflight.json').exists()
+(r/'progress.json').rename(r/'progress.failed-preflight.json')
+for f in held:f.close()
+subprocess.run(['systemd-run','--unit=adobe-408-timeout-release-20261024','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/driver.log','--property=StandardError=append:{root}/driver.log','/usr/bin/python3',str(r/'driver.py')],check=True)
+print(json.dumps({{'resumed_before_traffic_change':True}}))
 """)
 elif phase=='verify':
  copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','account-state.py']])

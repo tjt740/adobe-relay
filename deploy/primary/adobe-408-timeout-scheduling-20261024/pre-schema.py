@@ -18,7 +18,11 @@ with (backup/'database.dump').open('rb') as f:subprocess.run(['docker','exec','-
 with (backup/'app-data.tar.gz').open('wb') as f:subprocess.run(['docker','exec',a.APP,'tar','-C','/app','-czf','-','data'],stdout=f,check=True,timeout=300)
 (backup/'previous-image').write_text(a.OLD_IMAGE+'\n')
 installed=json.loads(a.sql("SELECT json_object_agg(filename,checksum) FROM schema_migrations"))
-a.save('installed-migrations-before.json',installed)
+baseline=ROOT/'installed-migrations-before.json'
+if baseline.exists():
+ assert json.loads(baseline.read_text())==installed,'Installed migrations changed since preparation'
+else:
+ a.save('installed-migrations-before.json',installed)
 contracts={}
 for name,query in {
  'groups':"SELECT md5(coalesce(jsonb_agg(to_jsonb(g)-'updated_at'-'i18n' ORDER BY id)::text,'')) FROM groups g",
