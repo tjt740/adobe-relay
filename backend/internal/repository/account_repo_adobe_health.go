@@ -24,8 +24,7 @@ func adobeHealthMatchingScopes(ctx context.Context, tx *sql.Tx, id int64, scope 
 	if resolveErr != nil {
 		return matching, nil
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT scope FROM adobe_account_health WHERE account_id=$1
- UNION SELECT scope FROM adobe_proxy_408_blocks WHERE account_id=$1`, id)
+	rows, err := tx.QueryContext(ctx, `SELECT scope FROM adobe_account_health WHERE account_id=$1`, id)
 	if err != nil {
 		return nil, err
 	}
@@ -114,10 +113,7 @@ func (r *accountRepository) RecordAdobeHealth(ctx context.Context, a *service.Ac
 	if err != nil {
 		return err
 	}
-	if o.Success {
-		_, err = tx.ExecContext(ctx, `DELETE FROM adobe_proxy_408_blocks b WHERE account_id=$1 AND scope=ANY($2) AND failed_at<$3
- AND NOT EXISTS(SELECT 1 FROM adobe_account_health h WHERE h.account_id=b.account_id AND h.scope=b.scope AND h.failed_at>=$3)`, a.ID, pq.Array(matchingScopes), o.StartedAt)
-	} else if o.Code == 408 {
+	if !o.Success && o.Code == 408 {
 		// A delayed old alias must not recreate an incident after a newer
 		// successful request already proved that same physical model healthy.
 		_, err = tx.ExecContext(ctx, `WITH proof AS (
@@ -130,31 +126,6 @@ func (r *accountRepository) RecordAdobeHealth(ctx context.Context, a *service.Ac
 		if err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO adobe_proxy_408_blocks(account_id,scope,failed_at)
- SELECT $1,$2,$3 WHERE EXISTS(SELECT 1 FROM adobe_account_health WHERE account_id=$1 AND scope=$2
- AND failed_at=$3 AND (success_started_at IS NULL OR success_started_at<=failed_at))
- ON CONFLICT(account_id,scope) DO UPDATE SET failed_at=EXCLUDED.failed_at WHERE adobe_proxy_408_blocks.failed_at<EXCLUDED.failed_at`, a.ID, o.Scope, o.CheckedAt)
-		if err == nil {
-			_, err = tx.ExecContext(ctx, `INSERT INTO adobe_proxy_408_holds(account_id,resume_schedulable)
- SELECT a.id,COALESCE(a.schedulable,false) OR COALESCE(a.proxy_auto_paused AND a.error_message='自动代理分配：等待可用节点（每个节点最多 3 个账号）',false) FROM accounts a WHERE a.id=$1
- AND a.extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb
- AND EXISTS(SELECT 1 FROM proxy_auto_allocation WHERE enabled)
- AND EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=a.id)
- ON CONFLICT(account_id) DO UPDATE SET resume_schedulable=adobe_proxy_408_holds.resume_schedulable OR EXCLUDED.resume_schedulable`, a.ID)
-		}
-		if err == nil {
-			_, err = tx.ExecContext(ctx, `WITH changed AS (UPDATE accounts SET schedulable=false,updated_at=NOW() WHERE id=$1 AND schedulable
- AND extra->'manual_proxy_enabled' IS DISTINCT FROM 'true'::jsonb
- AND EXISTS(SELECT 1 FROM proxy_auto_allocation WHERE enabled)
- AND EXISTS(SELECT 1 FROM adobe_proxy_408_holds WHERE account_id=$1) RETURNING id)
- INSERT INTO scheduler_outbox(event_type,account_id,payload) SELECT 'account_changed',id,NULL FROM changed`, a.ID)
-		}
-	}
-	if err != nil {
-		return err
-	}
-	if err = proxyfailover.Refresh408Metadata(ctx, tx, a.ID); err != nil {
-		return err
 	}
 	raw, err := json.Marshal(o)
 	if err != nil {

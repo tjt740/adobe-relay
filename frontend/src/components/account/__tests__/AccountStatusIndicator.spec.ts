@@ -66,12 +66,12 @@ function makeAccount(overrides: Partial<Account>): Account {
 }
 
 describe('AccountStatusIndicator', () => {
-  it('keeps the 408 quarantine visible alongside a successful result on another model', () => {
+  it('ignores retired 408 quarantine metadata when showing the latest result', () => {
     const wrapper = mount(AccountStatusIndicator, { props: { account: makeAccount({ platform: 'adobe', extra: {
       adobe_proxy_408: { managed: true, state: 'quarantined', models: ['gpt-image-2.5-flare'] },
       adobe_health: { latest: { success: true, code: 200, source: 'test', scope: 'gpt-image-2', checked_at: '2026-10-22T08:00:00Z' } }
     } }) }, global: { stubs: { Icon: true } } })
-    expect(wrapper.get('[data-testid="account-408-quarantine"]').text()).toContain('account408Waiting')
+    expect(wrapper.find('[data-testid="account-408-quarantine"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="account-last-check"]').text()).toContain('bulkTest.passed')
   })
   it('shows one successful Adobe check without stale error or historical pending badges', () => {

@@ -43,13 +43,7 @@ export default {
     // Proxies
     proxies: {
       allocation: {
-        "account408Waiting": "408 awaiting recovery · no regular proxy",
-        "account408Testing": "408 recovery check · temporary proxy",
-        "account408Hint": "Select the model that returned 408 in the account test. A real generation must succeed and all other 408 failures must recover before the binding becomes permanent. Failure or cancellation releases the temporary proxy. Cookie and credit checks do not clear model 408 failures.",
-        "quarantineSummary": "408 awaiting recovery (not testing): {count}; temporary tests: {testing}.",
-        "quarantineHint": "With automatic allocation enabled, unresolved 408 accounts hold no regular proxy. A check temporarily borrows a healthy proxy. The binding becomes permanent only after real generation on the affected model succeeds and no other 408 remains. Failure or cancellation releases it; abandoned tests also expire.",
-        "quarantineTestHint": "Checks come from manual actions, existing schedules or new-cookie checks. This feature does not repeatedly generate images to clear 408. Cookie updates, credit checks and success on another model cannot clear the original model’s 408. Manual pauses, expiry and other restrictions still follow the existing process.",
-        "pending408Release": "Previous bindings for {count} of these accounts will be released in the next allocation round.",
+        "timeoutSchedulingHint": "408 is recorded as a timeout. It does not indefinitely disable an account or require a successful test before scheduling resumes. Manual pauses, credential checks, quota, node capacity and bounded cooldowns still apply.",
         "waitingBreakdown": "Priority queue: {business} business accounts and {verification} pending verification; other waiting accounts: {other}.",
         "rulesTitle": "Connection checks, switching and disabling",
         "capacityHint": "Free slots can be assigned immediately. Slots that can be freed are occupied by other accounts and are released when priority accounts need them. Zero free slots does not always prevent assignment.",

@@ -5,11 +5,11 @@ import type { Account } from '@/types'
 vi.mock('@/api/client', () => ({ default: { post: vi.fn() } }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 describe('Okad credential validation status', () => {
-  it('explains quarantine instead of claiming a permanent proxy is pending', () => {
+  it('ignores legacy quarantine when showing the actual credential state', () => {
     const account = { id: 1, platform: 'adobe', extra: { okad: { verification: 'proxy_pending' }, adobe_proxy_408: { managed: true, state: 'quarantined' } } } as unknown as Account
     const wrapper = mount(Status, { props: { account } })
-    expect(wrapper.text()).toContain('admin.proxies.allocation.account408Waiting')
-    expect(wrapper.text()).not.toContain('等待代理就绪')
+    expect(wrapper.text()).not.toContain('account408Waiting')
+    expect(wrapper.text()).toContain('等待代理就绪')
   })
   it.each([
     ['pending','error',false,undefined,'等待接口检测'],

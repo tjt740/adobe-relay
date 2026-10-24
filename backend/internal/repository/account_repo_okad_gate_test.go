@@ -113,11 +113,11 @@ func TestOkadCookieGatePostgresFailureAndManualRetry(t *testing.T) {
 			require.NoError(t, repo.FinishOkadConnectionTest(ctx, *job, "failed"))
 			var sched bool
 			require.NoError(t, db.QueryRow(`SELECT schedulable FROM accounts WHERE id=1`).Scan(&sched))
-			require.False(t, sched)
+			require.Equal(t, code == 408, sched, "only timeouts return the queue-owned pause without success")
 			next, err := repo.ClaimOkadConnectionTest(ctx)
 			require.NoError(t, err)
 			require.Nil(t, next)
-			// An explicit successful full retest can release the same quarantined Cookie.
+			// An explicit successful full retest can release non-timeout failures.
 			job.Manual = true
 			require.NoError(t, repo.FinishOkadConnectionTest(ctx, *job, "success"))
 			require.NoError(t, db.QueryRow(`SELECT schedulable FROM accounts WHERE id=1`).Scan(&sched))

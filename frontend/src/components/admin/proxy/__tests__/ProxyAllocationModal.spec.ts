@@ -35,16 +35,12 @@ describe('Continuous proxy allocation', () => {
     expect(w.text()).not.toContain('NaN')
   })
 
-  it('keeps quarantined 408 accounts and temporary tests separate from the regular queue', async () => {
+  it('explains timeout scheduling without reviving a legacy quarantine response', async () => {
     vi.mocked(getProxyAllocation).mockResolvedValue({ ...initial(), enabled: true, waiting: 0, quarantined_408_accounts: 673, temporary_test_bindings: 3, pending_408_release: 2 })
     const w = await panel()
-    const hint = w.get('[data-testid="quarantine-408"]').text()
-    expect(hint).toContain('"count":673')
-    expect(hint).toContain('"testing":3')
-    expect(hint).toContain('admin.proxies.allocation.quarantineHint')
-    expect(hint).toContain('admin.proxies.allocation.quarantineTestHint')
-    expect(w.get('[data-testid="pending-408-release"]').text()).toContain('"count":2')
-    expect(w.text()).not.toContain('admin.proxies.allocation.waitingHint')
+    expect(w.find('[data-testid="quarantine-408"]').exists()).toBe(false)
+    expect(w.find('[data-testid="pending-408-release"]').exists()).toBe(false)
+    expect(w.get('[data-testid="timeout-scheduling-hint"]').text()).toContain('admin.proxies.allocation.timeoutSchedulingHint')
     expect(saveProxyAllocation).not.toHaveBeenCalled()
   })
 

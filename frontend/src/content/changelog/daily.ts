@@ -15,6 +15,7 @@ export const changelogPreviews = [
 // Prepared release notes have no deployment date and are not rendered as shipped.
 // Move the entry into dailyUpdates on its actual Asia/Shanghai deployment date.
 export const pendingDailyUpdates: readonly Omit<DailyUpdate, 'date'>[] = [
+  { id: 'adobe408TimeoutScheduling', type: 'fixed', sections: ['reason', 'behavior', 'existing', 'protection', 'validation', 'boundary'] },
 ]
 
 export const dailyOverviews: Readonly<Record<string, string>> = {

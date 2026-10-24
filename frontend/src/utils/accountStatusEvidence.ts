@@ -75,12 +75,6 @@ export function accountStatusRecords(account: Account): StatusRecord[] {
   const health = object(extra.adobe_health)
   const latest = object(health.latest)
   const records: StatusRecord[] = []
-  const proxy408 = object(extra.adobe_proxy_408)
-  if (proxy408.managed === true) {
-    records.push({ title: '408 账号代理安排', result: proxy408.state === 'testing' ? '临时代理检测中' : '待恢复，不占常规代理',
-      fields: [field('待恢复模型', Array.isArray(proxy408.models) && proxy408.models.length ? proxy408.models.map(model => text(model) || '未记录模型').join('、') : '等待完整检测确认')],
-      note: '请检测出现 408 的对应模型。实际出图成功且所有 408 恢复后才保留正式代理；失败或取消释放临时代理。更新 Cookie 或验证额度不能清除模型的 408。' })
-  }
   if (Object.keys(latest).length) records.push(observation('最近请求记录', latest))
   const failure = object(health.last_failure)
   if (health.pending === true && Object.keys(failure).length && (latest.success === true || failure.checked_at !== latest.checked_at)) {

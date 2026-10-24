@@ -43,13 +43,7 @@ export default {
     // Proxies Management
     proxies: {
       allocation: {
-        "account408Waiting": "408 待恢复 · 不占常规代理",
-        "account408Testing": "408 恢复检测中 · 临时代理",
-        "account408Hint": "在账号检测中选择出现 408 的模型。实际出图成功且其他 408 均恢复后，才保留正式绑定；失败或取消释放临时代理。验证 Cookie 或额度不会清除模型的 408。",
-        "quarantineSummary": "408 待恢复（未在检测）：{count} 个；临时检测中：{testing} 个。",
-        "quarantineHint": "开启自动分配时，未恢复的 408 账号不占常规代理。开始检测时临时借用健康代理；对应模型实际出图成功、且没有其他未恢复的 408 后，才保留正式绑定。失败或取消就释放，检测中断也会自动收回临时名额。",
-        "quarantineTestHint": "检测由手动操作、已有检测计划或新 Cookie 检查触发，不会为清除 408 自动反复出图。只更新 Cookie、验证额度或测通其他模型不能清除原模型的 408；人工停用、过期和其他限制仍需按原流程处理。",
-        "pending408Release": "其中 {count} 个账号的原绑定将在下一轮后台分配时释放。",
+        "timeoutSchedulingHint": "408 按超时记录，不会持续停用账号或要求检测成功后才恢复调度。人工暂停、凭据校验、额度、节点容量和短期冷却仍按各自规则处理。",
         "waitingBreakdown": "优先等待：{business} 个业务账号、{verification} 个待验证账号；其他等待：{other} 个。",
         "rulesTitle": "查看检测、切换和关闭规则",
         "capacityHint": "“空闲名额”可以直接分配；“可让出名额”正被其他账号占用，优先账号需要时会自动腾出。因此空闲为 0，也可能继续分配。",

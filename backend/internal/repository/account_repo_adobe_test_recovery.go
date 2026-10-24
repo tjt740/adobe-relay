@@ -33,7 +33,6 @@ func (r *accountRepository) RecoverAdobeAfterSuccessfulTestIfCurrent(ctx context
  AND a.temp_unschedulable_until IS NOT DISTINCT FROM $11::timestamptz
  AND COALESCE(a.temp_unschedulable_reason,'')=$12
  AND NOT EXISTS(SELECT 1 FROM adobe_account_health h WHERE h.account_id=a.id AND h.failed_at>=$13)
- AND NOT EXISTS(SELECT 1 FROM adobe_proxy_408_blocks b WHERE b.account_id=a.id)
  AND a.status IN ('active','error')
  AND (a.status='active' OR a.error_message IN ('Clash 订阅节点已移除，请重新选择代理并恢复账号调度',
  '自动代理分配：等待可用节点（每个节点最多 3 个账号）',$15,$16)
