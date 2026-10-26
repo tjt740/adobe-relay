@@ -29,6 +29,15 @@ export default {
       }
     },
     "updates": {
+      cookieRecoveryRetries: {
+        title: 'Two fallback retries for expired Cookie recovery',
+        body: 'Confirmed expired Cookies automatically call Okad, with two retries after the first failure and at most three logins. Recovery uses the default profile of the Adobe login session.',
+        sections: {
+          retry: { title: 'Three attempts, five minutes between failures', body: 'Requests and background checks share durable attempt counts. Restarts, Cookie updates and duplicate requests do not reset them. Historical Cookie failure messages are recognized. Cooldown rejections spend no attempt; when no deadline is provided, the next check is in five minutes rather than fifteen. Accounts at the former two-attempt limit retain their count and receive one final opportunity.' },
+          profile: { title: 'Use the default profile during recovery', body: 'Automatic recovery ignores personal or organization preferences and does not force a profile switch. Manual logins keep the saved choice. The Cookie, token and current identity remain consistent.' },
+          protection: { title: 'Preserve account and integration safeguards', body: 'Manual pauses, disabled or expired accounts, entitlement and quota failures do not trigger logins. Multiple-token mailbox routing, existing Cookies, account IDs, Sub2 links and concurrency deduplication remain in place. Successful recovery still requires credential and connection checks.' },
+        },
+      },
       adobeAutomaticTestFlare: {
         title: 'Flare by default for Cookie delivery and automatic tests',
         body: 'Extend the bulk-test default to connection tests after Cookie delivery, background tests without an explicit model, and single-account tests: GPT Image 2.5 Flare.',

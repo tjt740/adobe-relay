@@ -43,7 +43,7 @@ func newOkadRecoveryPostgres(t *testing.T) *sql.DB {
  CREATE TABLE scheduler_outbox(event_type text,account_id bigint,group_id bigint,payload jsonb,dedup_key text);
  CREATE UNIQUE INDEX idx_scheduler_outbox_pending_dedup_key ON scheduler_outbox(dedup_key) WHERE dedup_key IS NOT NULL;`)
 	require.NoError(t, err)
-	for _, name := range []string{"241_account_proxy_failover.sql", "242_proxy_auto_allocation.sql", "243_proxy_auto_allocation_all_accounts.sql", "244_proxy_auto_allocation_allocator_bypass.sql", "245_adobe_cookie_recovery_attempts.sql", "246_adobe_recovery_deferred_attempt.sql", "247_adobe_account_test_errors.sql"} {
+	for _, name := range []string{"241_account_proxy_failover.sql", "242_proxy_auto_allocation.sql", "243_proxy_auto_allocation_all_accounts.sql", "244_proxy_auto_allocation_allocator_bypass.sql", "245_adobe_cookie_recovery_attempts.sql", "246_adobe_recovery_deferred_attempt.sql", "247_adobe_account_test_errors.sql", "255_adobe_cookie_recovery_three_attempts.sql"} {
 		migration, err := os.ReadFile("../../migrations/" + name)
 		require.NoError(t, err)
 		_, err = db.Exec(string(migration))

@@ -1,0 +1,26 @@
+{
+  "backend/internal/repository/account_repo_okad_attempts_test.go": {
+    "before": "a4e56ca09bdfd1310d2d6f412be45af2623da0a49f9cfbe302cf4bcae0166665",
+    "candidate": "363abe700aeb249502002fbae2c69f0b67fc85bde1fba70f84a0806b3345905f"
+  },
+  "backend/internal/repository/account_repo_okad_postgres_test.go": {
+    "before": "6982ba40b25cfba30ee36b357d490de6c02be066d1b9828418adcffc919ed30f",
+    "candidate": "36ac9405661982f1ca469cf00704e89f1e6a47451193de733bac03794a3772aa"
+  },
+  "backend/internal/service/okad_cookie_recovery.go": {
+    "before": "1b45c7a152db294938feb268a6a343757896ff9184c45ce16d03ad8a95286d82",
+    "candidate": "ff04ec8fae234ceeeb17d434dcf848242dcfb7107b3a8850166763e4a1e79e11"
+  },
+  "backend/internal/service/okad_cookie_recovery_test.go": {
+    "before": "3e6afc220396c7004101f6125e47b9f66f3220030f7d725a6583787a2a4874a7",
+    "candidate": "03d3fe3d3993c2f1722d1b91da9791fc28f78d63b5c1b94e39933061a6b5ecf4"
+  },
+  "backend/internal/service/okad_managed_recovery.go": {
+    "before": "18f523c69abe8356204b3e57a624ed4e5be4f2fe043db23fc47e424a5a89f13d",
+    "candidate": "e2697d376e4ea3b955c31c5390b82d38566358be16de6cf0e428eb4897400b6c"
+  },
+  "backend/migrations/255_adobe_cookie_recovery_three_attempts.sql": {
+    "before": null,
+    "candidate": "7a29ad94c1738a4463f9ce3723fcc393b54f516527441ee1dbe5396271277158"
+  }
+}
