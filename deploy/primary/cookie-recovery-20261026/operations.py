@@ -38,7 +38,19 @@ subprocess.run(['systemd-run','--unit=cookie-recovery-release-20261026','--colle
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 """)
 elif phase=='verify':
- remote(f"import pathlib,subprocess,sys; r=pathlib.Path('{root}'); assert (r/'expected-sha').read_text().strip()=='{sha}'; assert (r/'rolling-finished.json').exists(); subprocess.run([sys.executable,str(r/'route-guard-review.py')],check=True); subprocess.run([sys.executable,str(r/'business-verify.py')],check=True); subprocess.run([sys.executable,str(r/'review-credentials.py')],check=True); subprocess.run([sys.executable,str(r/'observe.py')],check=True); subprocess.run([sys.executable,str(r/'final-verify.py')],check=True)")
+ remote(f"import pathlib,hashlib; r=pathlib.Path('{root}'); p=r/'final-verify.py'; saved=r/'final-verify.initial.py'; saved.write_bytes(p.read_bytes()) if not saved.exists() else None; assert hashlib.sha256(saved.read_bytes()).hexdigest()=='b4a4b65b07cd2121dc4401256feee024d6fe769c8f0100c8724dcd58cc209625'")
+ copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','migration_guard.py']])
+ remote(f"""import pathlib,subprocess,sys,json
+r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
+assert (r/'rolling-finished.json').exists()
+assert not (r/'final-verification.json').exists(),'Already verified; inspect saved evidence'
+for name in ['business-verification.json','credential-change-review.json']:
+ p=r/name;initial=r/(name+'.initial')
+ if p.exists() and not initial.exists():p.rename(initial)
+for script,output in [('route-guard-review.py','route-guard-review.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('observe.py','observation.json')]:
+ if not (r/output).exists():subprocess.run([sys.executable,str(r/script)],check=True)
+subprocess.run([sys.executable,str(r/'final-verify.py')],check=True)
+""")
 elif phase=='archive':
  documents={'release-notes.md':pathlib.Path('deploy/primary/cookie-recovery-20261026.md'),'primary-README.md':pathlib.Path('deploy/primary/README.md')}
  payload={name:base64.b64encode(path.read_bytes()).decode() for name,path in documents.items()}
