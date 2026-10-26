@@ -166,9 +166,7 @@ func AdobeHealthReason(reason string) (string, string) {
 
 func adobeHealthTestModel(a *Account, model string) string {
 	if strings.TrimSpace(model) == "" {
-		if ids := adobe.ImageModelIDs(); len(ids) > 0 {
-			model = ids[0]
-		}
+		model = adobe.DefaultTestModel
 	}
 	mapped := a.GetMappedModel(model)
 	if resolved, err := adobe.ResolveImage(adobe.ImageRequest{ModelID: mapped}); err == nil {

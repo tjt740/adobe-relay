@@ -119,6 +119,26 @@ describe('AccountTestModal', () => {
     vi.restoreAllMocks()
   })
 
+  it.each([
+    { chosen: undefined, expected: 'gpt-image-2.5-flare' },
+    { chosen: 'gpt-image-2', expected: 'gpt-image-2' },
+    { chosen: 'gpt-image-2.5-sunburst', expected: 'gpt-image-2.5-sunburst' }
+  ])('Adobe defaults to Flare and respects the chosen model $expected', async ({ chosen, expected }) => {
+    getAvailableModels.mockResolvedValue([
+      { id: 'gpt-image-2', display_name: 'GPT Image 2' },
+      { id: 'gpt-image-2.5-flare', display_name: 'GPT Image 2.5 Flare' },
+      { id: 'gpt-image-2.5-sunburst', display_name: 'GPT Image 2.5 Sunburst' }
+    ])
+    const wrapper = mountModal({ id: 42, name: 'Adobe', platform: 'adobe', type: 'oauth', status: 'active' })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    if (chosen) (wrapper.vm as any).selectedModelId = chosen
+    await (wrapper.vm as any).startTest()
+    await flushPromises()
+    expect(JSON.parse((global.fetch as any).mock.calls[0][1].body).model_id).toBe(expected)
+    wrapper.unmount()
+  })
+
   it('gemini 图片模型测试会携带提示词并渲染图片预览', async () => {
     const wrapper = mountModal()
     await wrapper.setProps({ show: true })

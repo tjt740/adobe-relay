@@ -105,9 +105,7 @@ func (s *AccountTestService) testAdobeAccountConnection(
 	if isAdobeRelayAccount(account) {
 		testModel := strings.TrimSpace(modelID)
 		if testModel == "" {
-			if ids := adobe.ImageModelIDs(); len(ids) > 0 {
-				testModel = ids[0]
-			}
+			testModel = adobe.DefaultTestModel
 		}
 		testModel = account.GetMappedModel(testModel)
 		return s.testOpenAIImageAPIKey(c, c.Request.Context(), account, testModel, resolveAdobeTestPrompt(prompt))
@@ -122,12 +120,7 @@ func (s *AccountTestService) testAdobeAccountConnection(
 
 	requestedModel := strings.TrimSpace(modelID)
 	if requestedModel == "" {
-		if ids := adobe.ImageModelIDs(); len(ids) > 0 {
-			requestedModel = ids[0]
-		}
-	}
-	if requestedModel == "" {
-		return s.sendErrorAndEnd(c, "No Adobe image model available to test")
+		requestedModel = adobe.DefaultTestModel
 	}
 
 	upstreamModelID := account.GetMappedModel(requestedModel)

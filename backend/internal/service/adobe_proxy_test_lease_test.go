@@ -109,6 +109,7 @@ func TestAdobeProxyLeaseAutomaticWorkerBorrowsOnceAndFinishesJobBeforeRelease(t 
 	s := &AccountTestService{accountRepo: r}
 	s.runOkadConnectionTest(context.Background(), r, OkadConnectionTestJob{AccountID: a.ID, Key: OkadConnectionTestKey(a)})
 	require.Len(t, r.scopes, 1, "the nested account test must reuse the worker's lease")
+	require.Equal(t, []string{"firefly-gpt-image-2-5-flare"}, r.scopes)
 	require.Equal(t, []bool{true}, r.finishedLease)
 	require.Equal(t, []string{"success"}, r.finished)
 	require.Equal(t, []string{"acquire", "health", "recovery", "job_finish", "release"}, r.events)

@@ -780,9 +780,10 @@ const loadAvailableModels = async () => {
       : models
     // Default selection by platform
     if (availableModels.value.length > 0) {
-      // Adobe 后端已按 adobe.ImageModelIDs() 的展示序返回，第一个就是主推模型；
-      // 去找 sonnet 对纯图像渠道毫无意义。
-      if (props.account.platform === 'gemini' || props.account.platform === 'adobe') {
+      // Adobe test defaults are independent of catalog order and account aliases.
+      if (props.account.platform === 'adobe') {
+        selectedModelId.value = availableModels.value.find((model) => model.id === 'gpt-image-2.5-flare')?.id || availableModels.value[0].id
+      } else if (props.account.platform === 'gemini') {
         selectedModelId.value = availableModels.value[0].id
       } else {
         // Try to select Sonnet as default, otherwise use first model

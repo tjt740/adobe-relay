@@ -3,6 +3,7 @@
 package service
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -102,15 +103,57 @@ func TestTestAccountConnectionAdobeSurfacesUpstreamModelVersion(t *testing.T) {
 	require.Contains(t, body, "firefly-gpt-image-2-5-flare")
 }
 
-// 模型留空时取 ImageModelIDs 的第一项（与前端默认选中一致）。
-func TestTestAccountConnectionAdobeDefaultsToFirstModel(t *testing.T) {
-	api := &adobeFakeTransport{}
-	client := adobeSubmitPollDownload(t, api, []byte("X"))
-	withStubbedAdobeTestClient(t, client)
+func TestTestAccountConnectionAdobeDefaultsToFlare(t *testing.T) {
+	for _, model := range []string{"", "  "} {
+		t.Run(fmt.Sprintf("model=%q", model), func(t *testing.T) {
+			api := &adobeFakeTransport{}
+			withStubbedAdobeTestClient(t, adobeSubmitPollDownload(t, api, []byte("X")))
+			a := adobeTestConnAccount(nil)
+			rec, err := runAdobeTestConn(t, a, model, "")
+			require.NoError(t, err)
+			require.Contains(t, rec.Body.String(), `"model":"gpt-image-2.5-flare"`)
+			bodies := adobeSubmitBodies(t, api)
+			require.Len(t, bodies, 1)
+			require.Equal(t, "gpt-image-2.5-flare", bodies[0]["modelVersion"])
+			require.Equal(t, "firefly-gpt-image-2-5-flare", adobeHealthTestModel(a, model))
+		})
+	}
+}
 
-	rec, err := runAdobeTestConn(t, adobeTestConnAccount(nil), "", "")
+func TestAdobeBackgroundTestDefaultAndExplicitModels(t *testing.T) {
+	for _, tc := range []struct{ model, version string }{
+		{"", "gpt-image-2.5-flare"},
+		{"gpt-image-2", "2"},
+		{"gpt-image-2.5-sunburst", "gpt-image-2.5-prism"},
+	} {
+		t.Run(tc.version, func(t *testing.T) {
+			api := &adobeFakeTransport{}
+			withStubbedAdobeTestClient(t, adobeSubmitPollDownload(t, api, []byte("X")))
+			a := adobeTestConnAccount(nil)
+			svc := &AccountTestService{accountRepo: &mockAccountRepoForGemini{accountsByID: map[int64]*Account{a.ID: a}}}
+			result, err := svc.RunTestBackground(context.Background(), a.ID, tc.model)
+			require.NoError(t, err)
+			require.Equal(t, "success", result.Status)
+			bodies := adobeSubmitBodies(t, api)
+			require.Len(t, bodies, 1)
+			require.Equal(t, tc.version, bodies[0]["modelVersion"])
+		})
+	}
+}
+
+func TestAdobeDefaultTestRespectsAccountMapping(t *testing.T) {
+	api := &adobeFakeTransport{}
+	withStubbedAdobeTestClient(t, adobeSubmitPollDownload(t, api, []byte("X")))
+	a := adobeTestConnAccount(map[string]any{
+		"access_token":  "adobe-access-token",
+		"model_mapping": map[string]any{"gpt-image-2.5-flare": "firefly-gpt-image-2-5-prism"},
+	})
+	_, err := runAdobeTestConn(t, a, "", "")
 	require.NoError(t, err)
-	require.Contains(t, rec.Body.String(), `"model":"`+adobe.ImageModelIDs()[0]+`"`)
+	bodies := adobeSubmitBodies(t, api)
+	require.Len(t, bodies, 1)
+	require.Equal(t, "gpt-image-2.5-prism", bodies[0]["modelVersion"])
+	require.Equal(t, "firefly-gpt-image-2-5-prism", adobeHealthTestModel(a, ""))
 }
 
 func TestTestAccountConnectionAdobeForwardsARPSessionID(t *testing.T) {
