@@ -628,7 +628,12 @@ export default {
       },
       bulkTest: {
         title: 'Bulk Account Test',
-        hint: 'Run Test Connection with each account’s default model, up to 3 accounts at a time. Tests make real upstream requests and use quota; Adobe accounts generate a test image.',
+        hint: 'Choose a model and click Start testing, up to 3 accounts at a time. Tests make real upstream requests and use quota; Adobe accounts generate a test image.',
+        start: 'Start testing',
+        defaultModel: 'Each account’s default model',
+        modelHint: 'Models are listed for the first selected account. The chosen model applies to every account in this batch; choose one they all support. Adobe model lists default to GPT Image 2.5 Flare. The model is locked once testing starts.',
+        modelLoadFailed: 'Could not load models. Please retry.',
+        retryModels: 'Reload models',
         progress: 'Completed {done} / {total}',
         summary: 'Passed {success} · Failed {failed} · Stopped {cancelled}',
         result: 'Test result',
