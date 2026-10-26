@@ -27,6 +27,7 @@ export const dailyOverviews: Readonly<Record<string, string>> = {
 
 // Use the actual release date in Asia/Shanghai; multiple releases share one day.
 export const dailyUpdates: readonly DailyUpdate[] = [
+  { date: '2026-10-26', id: 'adobeAutomaticTestFlare', type: 'fixed', sections: ['reason', 'default', 'consistency', 'protection', 'validation', 'boundary'] },
   { date: '2026-10-26', id: 'bulkAccountTestModels', type: 'improved', sections: ['reason', 'selection', 'progress', 'validation', 'boundary'] },
   { date: '2026-10-24', id: 'adobe408TimeoutScheduling', type: 'fixed', sections: ['reason', 'behavior', 'existing', 'legacy', 'protection', 'validation', 'boundary'] },
   { date: '2026-10-24', id: 'clashBackgroundTests', type: 'improved', sections: ['reason', 'progress', 'protection', 'validation', 'boundary'] },

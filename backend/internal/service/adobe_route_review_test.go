@@ -145,5 +145,11 @@ func TestAdobeRouteReviewAutomaticJobCompletesBeforeFinalLeaseRelease(t *testing
 	require.Equal(t, []string{"success"}, r.finished)
 	require.Equal(t, []bool{false, true}, r.finishedLease)
 	require.Equal(t, []string{"job_finish", "release"}, r.events[len(r.events)-2:])
+	for _, body := range adobeSubmitBodies(t, api) {
+		require.Equal(t, "gpt-image-2.5-flare", body["modelVersion"])
+	}
+	for _, observation := range r.observations {
+		require.Equal(t, "firefly-gpt-image-2-5-flare", observation.Scope)
+	}
 	require.Empty(t, r.attempts, "review cannot reserve any extra Okad login")
 }

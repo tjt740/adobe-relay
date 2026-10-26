@@ -18,7 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
-      bulkAccountTestModels: { title: 'Choose a bulk test model, with GPT Image 2.5 Flare by default', body: 'Account management now lets you choose a model before bulk testing. Each batch keeps its selected model, the three-request concurrency limit, background progress and stop controls. A model catalog does not prove upstream recovery; real requests still record their actual results.' },
+      bulkAccountTestModels: { title: 'Bulk model selection and Flare defaults for Cookie and automatic tests', body: 'Today adds bulk model selection and extends the Flare default to Cookie delivery and background tests without an explicit model. Batch model snapshots, concurrency, progress, explicit choices and queue protection remain. A catalog does not prove upstream recovery; real requests record their actual outcomes.' },
       clashBackgroundTests: {"title": "Resume ordinary scheduling after 408 and keep node tests in background", "body": "Remove indefinite scheduling holds caused by 408 and safely release owned historical check gates, preserving operator pauses, quota and route protection. Imported-node tests continue after closing the dialog, with progress and individual results retained."},
       adobeRouteReview: {"title": "Check subscription traffic and review Adobe routes across sources", "body": "Today adds manual IP settings per account, visible source traffic, bounded three-source review, generation cooldown and safe submission handling. Existing features, operator pauses and configuration remain protected; network reachability and account credits are not generation proof."},
       proxyVerificationPriority: { title: 'Prioritize business capacity and lend proxies for 408 checks', body: 'Today fixes verification accounts waiting despite reclaimable capacity. Business demand comes first, followed by eligible pending verification. Unresolved 408 accounts release regular proxies and borrow one only for checks, keeping a binding after successful recovery. Today’s v0.2.17 upgrade and independent subscription management remain, with existing configuration and manual-pause rules preserved.' },
@@ -29,6 +29,18 @@ export default {
       }
     },
     "updates": {
+      adobeAutomaticTestFlare: {
+        title: 'Flare by default for Cookie delivery and automatic tests',
+        body: 'Extend the bulk-test default to connection tests after Cookie delivery, background tests without an explicit model, and single-account tests: GPT Image 2.5 Flare.',
+        sections: {
+          reason: { title: 'Fix the remaining Image 2 backend default', body: 'The first release today added the bulk-dialog model picker. Cookie delivery queues and background tests still passed an empty model to the backend, which selected GPT Image 2 as the first catalog entry. They therefore did not inherit the bulk default.' },
+          default: { title: 'Use one default across unspecified-model tests', body: 'Adobe tests now have a dedicated GPT Image 2.5 Flare default shared by ordinary Cookie delivery queues, bounded cross-source review, background tests and test API requests without a model. The single-account dialog selects Flare when the account catalog includes it, otherwise retaining the available account choices.' },
+          consistency: { title: 'Keep submission and health records aligned', body: 'The actual submission, test lease scope, per-model health and route review resolve the same default model, so a Flare test is not recorded against Image 2. Account model mappings still apply. Catalog ordering and defaults for customer business requests remain unchanged.' },
+          protection: { title: 'Keep explicit models and existing queue rules', body: 'Image 2, Sunburst and other explicitly selected models remain unchanged, including models saved in existing plans. Cookie and proxy ownership, manual pauses, 408 scheduling, quota and verification gates stay in place. No bulk enqueue or extra login is added, and accepted or uncertain generation is not replayed to change models.' },
+          validation: { title: 'Validation scope', body: 'Isolated tests check real submission parameters for empty and whitespace models, Cookie delivery queues, bounded cross-source review, explicit background models, custom account mappings and test lease scopes. Frontend regressions cover the Flare default and explicit selection. Mock upstream results do not prove production generation or upstream recovery.' },
+          boundary: { title: 'When the default takes effect', body: 'Once the new version takes over, pending tests without an explicit model use Flare. Tests already started on the old version finish naturally, and historical Image 2 results remain. Availability still depends on account entitlement, mapping, routing and the actual upstream response; a new default does not clear errors for other models or force recovery.' }
+        }
+      },
       bulkAccountTestModels: {
         title: 'Choose a model for bulk account tests',
         body: 'Choose a model before starting a bulk account test. Adobe defaults to GPT Image 2.5 Flare.',

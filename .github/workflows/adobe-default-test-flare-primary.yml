@@ -1,0 +1,80 @@
+name: Guarded Adobe automatic Flare test primary release
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        type: choice
+        options: [prepare, start, status, verify, archive]
+        required: true
+        default: status
+      application_sha:
+        type: string
+        required: true
+      build_run:
+        type: string
+        required: true
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: adobe-relay-production
+  cancel-in-progress: false
+jobs:
+  operate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify exact checked application source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APP_SHA: ${{ inputs.application_sha }}
+          BUILD_RUN: ${{ inputs.build_run }}
+        run: |
+          set -euo pipefail
+          [[ "$APP_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$BUILD_RUN" =~ ^[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN" > /tmp/ci-run.json
+          python3 - "$APP_SHA" /tmp/ci-run.json <<'PY'
+          import json,sys
+          r=json.load(open(sys.argv[2]))
+          assert r['head_sha']==sys.argv[1] and r['conclusion']=='success' and r['status']=='completed'
+          assert r['path']=='.github/workflows/deploy-adobe-relay.yml'
+          PY
+          git diff --exit-code "$APP_SHA" -- backend frontend Dockerfile deploy/docker-entrypoint.sh docs/legal .github/workflows/deploy-adobe-relay.yml
+          python3 deploy/primary/adobe-default-test-flare-20261026/source_guard.py "$APP_SHA"
+      - name: Validate guarded release helpers
+        run: python3 -m unittest discover -s deploy/primary/adobe-default-test-flare-20261026 -p 'test_*.py'
+      - uses: actions/download-artifact@v4
+        if: inputs.phase == 'prepare'
+        with:
+          name: release-images
+          path: release-artifact
+          run-id: ${{ inputs.build_run }}
+          github-token: ${{ github.token }}
+      - name: Operate guarded primary release
+        env:
+          SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
+          APP_SHA: ${{ inputs.application_sha }}
+          BUILD_RUN: ${{ inputs.build_run }}
+          PHASE: ${{ inputs.phase }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          python3 deploy/primary/adobe-default-test-flare-20261026/operations.py "$PHASE" "$APP_SHA" "$BUILD_RUN"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: primary-release-evidence
+          path: primary-release-evidence/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Remove runner SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

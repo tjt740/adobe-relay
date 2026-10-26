@@ -1,0 +1,30 @@
+{
+  "backend/internal/pkg/adobe/models.go": {
+    "before": "916821824ec138d552df07c86dee06d80426e907ceae6df9c9bbee13b44705ec",
+    "candidate": "588f2ecee62544af2ac7e1c96e05fd49c4d039de3de03f7a792ccf5c721eab79"
+  },
+  "backend/internal/service/account_test_adobe.go": {
+    "before": "b54941681554f554e541929f187fc8f446c07b713b960372f89c948869b2d35f",
+    "candidate": "fd6e373016b6caf93b51cfb0d18ff438a67dfef676181508fab52881a9391975"
+  },
+  "backend/internal/service/account_test_adobe_test.go": {
+    "before": "cbb1199fb97f2ba282bc8557b77ba300ad643775474b513f9760cfe34cbbb3bf",
+    "candidate": "c859bcf74583d43ffd514de7e25419e3d0924135f14504ebd3c52134cd4c1028"
+  },
+  "backend/internal/service/adobe_account_health.go": {
+    "before": "e2d83c23a2b4e3ab5cb1d19292186de7fc04c6f5b62b3d2a3cb3d4c9a0b8bcff",
+    "candidate": "2bb875150c2ce83035ebec8da75349b9c1d0c5c94b0490455d23d68e5f5bf83c"
+  },
+  "backend/internal/service/adobe_proxy_test_lease_test.go": {
+    "before": "22bc4beb2a62a6480e441b066f0724fbabb8eaa6473dd9b32dbf41a198fdd738",
+    "candidate": "50cc43b6d131a8c7bccd21d22b41d2000caf6c7780786802c46b968f00fc06f3"
+  },
+  "backend/internal/service/adobe_route_review_test.go": {
+    "before": "bec9140cbaf9d0b9eb237bd200c87e9a12431c262f9e06058b4f651fa131354e",
+    "candidate": "df54581cac46e450971fcf99a508a146e3648f5b438a4d8cf50a5a2d8c5da191"
+  },
+  "backend/internal/service/okad_connection_check_test.go": {
+    "before": "78ef830db00a2a601326e77dbc6042243044d9adb18d6f58463aee2eff8a5599",
+    "candidate": "d749bd176d95cf1ca3f854a56e8f06ca3c36c24bc8eff2f2e3d44476de631fa5"
+  }
+}

@@ -1,5 +1,9 @@
 package adobe
 
+// DefaultTestModel is the shared fallback for Adobe connection tests only.
+// Keep it independent of model catalog ordering and business request defaults.
+const DefaultTestModel = "gpt-image-2.5-flare"
+
 // Model 是对外暴露的模型条目，形状与其它平台的模型目录一致（见 internal/pkg/kiro）。
 type Model struct {
 	ID          string `json:"id"`

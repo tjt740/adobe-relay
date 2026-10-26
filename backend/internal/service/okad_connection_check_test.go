@@ -75,6 +75,9 @@ func TestOkadAutomaticConnectionTestRecordsSuccessfulGeneration(t *testing.T) {
 	require.Equal(t, []int{200}, repo.codes)
 	require.Equal(t, []bool{true}, repo.successes)
 	require.Equal(t, []string{"success"}, repo.finished)
+	bodies := adobeSubmitBodies(t, api)
+	require.Len(t, bodies, 1)
+	require.Equal(t, "gpt-image-2.5-flare", bodies[0]["modelVersion"])
 	require.Empty(t, repo.alertCodes)
 	require.Empty(t, repo.attempts)
 }
