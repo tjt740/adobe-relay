@@ -29,6 +29,14 @@ export default {
       }
     },
     "updates": {
+      cookieRecoveryRevert: {
+        title: 'Revert the recent Cookie recovery changes',
+        body: 'Restore the previous Cookie recovery, retry and login-profile behavior while retaining multiple Supply tokens.',
+        sections: {
+          scope: { title: 'Restore the previous behavior', body: 'Revert the increased retry limit, cooldown changes and default-profile override during automatic recovery. The existing behavior is restored without adding another automatic login flow.' },
+          preservation: { title: 'Keep current business data', body: 'Accounts, Cookies, tokens, Sub2 links, manual pauses, selected proxies and configuration are retained. Existing recovery counts are not reset and no old database snapshot is restored. Independent token saving, tests, email routing and hourly checks remain available.' },
+        },
+      },
       cookieRecoveryRetries: {
         title: 'Two fallback retries for expired Cookie recovery',
         body: 'Confirmed expired Cookies automatically call Okad, with two retries after the first failure and at most three logins. Recovery uses the default profile of the Adobe login session.',

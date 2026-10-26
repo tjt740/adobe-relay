@@ -29,6 +29,14 @@ export default {
       }
     },
     "updates": {
+      cookieRecoveryRevert: {
+        title: '撤回本次 Cookie 自动恢复调整',
+        body: '恢复调整前的 Cookie 恢复、重试和登录配置选择逻辑，保留多个 Supply Token 功能。',
+        sections: {
+          scope: { title: '恢复原有处理方式', body: '撤回本次增加的重试上限、冷却期限调整及自动重登默认配置覆盖。此前已有的处理规则恢复；未增加新的自动登录流程。' },
+          preservation: { title: '保留当前业务数据', body: '现有账号、Cookie、Token、Sub2 关联、人工暂停、手动代理和配置保持。已有恢复次数记录不清零，数据库不恢复旧快照；多 Token 独立保存、测试、邮箱匹配和每小时检测继续保留。' },
+        },
+      },
       cookieRecoveryRetries: {
         title: 'Cookie 失效后自动重登增加两次兜底重试',
         body: '确认 Cookie 失效后自动调用 Okad，首次失败后再重试两次，共最多三次登录。自动重登沿用 Adobe 登录会话的默认配置。',

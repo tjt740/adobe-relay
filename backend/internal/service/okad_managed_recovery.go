@@ -96,12 +96,7 @@ func (c *OkadCookieRefreshClient) RefreshManaged(ctx context.Context, a *Account
 		}
 		if result["state"] == "failed" {
 			code, _ := result["code"].(string)
-			retry, _ := toInt64(result["retry_after"])
-			var next time.Time
-			if retry > 0 {
-				next = time.Unix(retry, 0)
-			}
-			return &OkadRecoveryError{Code: code, RetryAfter: next}
+			return &OkadRecoveryError{Code: code}
 		}
 		timer := time.NewTimer(2 * time.Second)
 		select {
@@ -131,28 +126,10 @@ func (s *OkadCookieRecovery) recordManagedState(ctx context.Context, a *Account,
 		code = "internal"
 	}
 	wait := time.Minute
-	if code == "needs_manual" || code == "not_registered" || code == "missing_mail" || code == "ambiguous" {
+	if code == "login_cooldown" || code == "needs_manual" || code == "not_registered" || code == "missing_mail" || code == "ambiguous" {
 		wait = 15 * time.Minute
 	}
 	save, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
-	next := time.Now().Add(wait)
-	if code == "login_cooldown" {
-		next = okadCooldownNext(typed, time.Now())
-	}
-	_ = repo.RecordOkadRecoveryState(save, a, code, next)
-}
-
-// The reservation and account scanner must use the same cooldown deadline.
-// Managed legacy jobs omit RetryAfter; retry in five minutes without spending
-// a login attempt, instead of silently holding the account for fifteen minutes.
-func okadCooldownNext(err *OkadRecoveryError, now time.Time) time.Time {
-	next := err.RetryAfter
-	if next.IsZero() || next.After(now.Add(time.Hour)) {
-		return now.Add(AdobeCookieRecoveryRetryDelay)
-	}
-	if next.Before(now.Add(time.Minute)) {
-		return now.Add(time.Minute)
-	}
-	return next
+	_ = repo.RecordOkadRecoveryState(save, a, code, time.Now().Add(wait))
 }
