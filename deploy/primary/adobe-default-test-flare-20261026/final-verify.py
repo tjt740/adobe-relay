@@ -34,11 +34,14 @@ browser_file=ROOT/'live-browser-verification.json'
 browser=json.loads(browser_file.read_text()) if browser_file.exists() else {'case_count':0,'attempted_writes':[],'runtime_errors':[],'limitation':'Live authenticated browser verification unavailable; asset and API checks only'}
 assert not browser['attempted_writes'] and not browser['runtime_errors']
 observation=json.loads((ROOT/'observation.json').read_text());assert len(observation['samples'])==13
-business=json.loads((ROOT/'business-verification.json').read_text())
+business=json.loads((ROOT/'business-verification-reviewed.json').read_text())
 credentials=json.loads((ROOT/'credential-change-review.json').read_text())
-assert not business['missing_ids'] and business['manual_pause_preserved'] and business['manual_proxy_modes_preserved'] and all(c['proxy_chain_matches'] for c in business['changes'])
+from deletion_guard import validate
+import runpy
+deletions=validate(business,runpy.run_path(str(ROOT/'review-deletions.py'))['collect'](a),json.loads((ROOT/'reviewed-deletion-scope.json').read_text()))
+assert business['manual_pause_preserved'] and business['manual_proxy_modes_preserved'] and all(c['proxy_chain_matches'] for c in business['changes'])
 assert all(c['version_advanced'] and c['issuer_compatible'] and c['source_key_compatible'] for c in credentials['cookie_changed_accounts'])
-summary={'backup_accounts':business['before_count'],'checked_accounts':business['current_count'],'manual_pauses_preserved':True,'manual_proxy_modes_preserved':True,'proxy_bindings_changed_with_event_chain':sum('proxy_id' in c['fields'] for c in business['changes']),'cookie_rotations_with_version_advance':len(credentials['cookie_changed_accounts']),'token_fields_only_changes':len(credentials['token_fields_only_accounts'])}
+summary={'backup_accounts':business['before_count'],'reviewed_admin_deleted_accounts':len(deletions['reviewed_deleted_ids']),'deletion_audit_ids':deletions['audit_ids'],'checked_accounts':business['current_count'],'manual_pauses_preserved':True,'manual_proxy_modes_preserved':True,'proxy_bindings_changed_with_event_chain':sum('proxy_id' in c['fields'] for c in business['changes']),'cookie_rotations_with_version_advance':len(credentials['cookie_changed_accounts']),'token_fields_only_changes':len(credentials['token_fields_only_accounts'])}
 installed=json.loads(a.sql("SELECT json_object_agg(filename,checksum) FROM schema_migrations"))
 expected=json.loads((ROOT/'installed-migrations-before.json').read_text())
 assert installed==expected,'Migration set or old checksum changed'

@@ -3,7 +3,7 @@ import datetime,hashlib,importlib.util,json,re,subprocess
 from pathlib import Path
 ROOT=Path('/opt/adobe-relay/releases/adobe-default-test-flare-20261026')
 spec=importlib.util.spec_from_file_location('audit',ROOT/'audit.py');a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
-review=json.loads((ROOT/'business-verification.json').read_text());ids=[c['id'] for c in review['changes'] if 'cookie' in c['credential_keys_changed']]
+review=json.loads((ROOT/('business-verification-reviewed.json' if (ROOT/'business-verification-reviewed.json').exists() else 'business-verification.json')).read_text());ids=[c['id'] for c in review['changes'] if 'cookie' in c['credential_keys_changed']]
 dump=Path(review['cutover_backup'])/'database.dump'
 raw=subprocess.check_output(['docker','exec','-i','adobe-relay-postgres-1','pg_restore','--data-only','--table=accounts','-f','-'],input=dump.read_bytes(),timeout=90).decode()
 escapes={'b':'\b','f':'\f','n':'\n','r':'\r','t':'\t','v':'\v','\\':'\\'}
