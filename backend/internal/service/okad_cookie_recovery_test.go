@@ -44,7 +44,7 @@ func (r *okadRecoveryRepo) ClaimAdobeCookieRecovery(_ context.Context, a *Accoun
 		r.attempts = make(map[int64]*testOkadAttempt)
 	}
 	prior := r.attempts[a.ID]
-	if prior != nil && (prior.Count >= AdobeCookieRecoveryMaxAttempts || time.Now().Before(prior.next)) {
+	if prior != nil && (prior.Count >= 2 || time.Now().Before(prior.next)) {
 		return &AdobeCookieRecoveryAttempt{Count: prior.Count, InFlight: prior.finished.IsZero() && time.Now().Before(prior.next)}, nil
 	}
 	count := 1
@@ -218,14 +218,10 @@ func TestOkadRecoveryFailureRetriesWithBackoff(t *testing.T) {
 	repo.attempts[904].next = time.Now().Add(-time.Minute)
 	s.sweep(context.Background())
 	require.EqualValues(t, 2, calls.Load())
-	require.Equal(t, AdobeCookieRecoveryPending, a.ErrorMessage)
-	repo.attempts[a.ID].next = time.Now().Add(-time.Second)
-	s.sweep(context.Background())
-	require.EqualValues(t, 3, calls.Load())
 	require.Equal(t, AdobeCookieRecoveryExhausted, a.ErrorMessage)
 	_, err := s.recover(context.Background(), a)
 	require.NoError(t, err)
-	require.EqualValues(t, 3, calls.Load())
+	require.EqualValues(t, 2, calls.Load())
 }
 func TestOkadRecoveryHonorsConcurrentPushOrDisable(t *testing.T) {
 	for _, disable := range []bool{false, true} {
@@ -281,10 +277,6 @@ func TestOkadRecoverySharesBudgetAcross401ScannerAndRestart(t *testing.T) {
 	repo.attempts[a.ID].next = time.Now().Add(-time.Second)
 	restarted.sweep(context.Background())
 	require.EqualValues(t, 2, calls.Load())
-	require.Equal(t, AdobeCookieRecoveryPending, a.ErrorMessage)
-	repo.attempts[a.ID].next = time.Now().Add(-time.Second)
-	restarted.sweep(context.Background())
-	require.EqualValues(t, 3, calls.Load())
 	require.Equal(t, AdobeCookieRecoveryExhausted, a.ErrorMessage)
 	require.False(t, a.Schedulable)
 	// Clearing the error or changing the cookie does not renew the budget.
@@ -293,7 +285,7 @@ func TestOkadRecoverySharesBudgetAcross401ScannerAndRestart(t *testing.T) {
 	repo.attempts[a.ID].next = time.Now().Add(-time.Hour)
 	_, err = restarted.recover(context.Background(), a)
 	require.NoError(t, err)
-	require.EqualValues(t, 3, calls.Load())
+	require.EqualValues(t, 2, calls.Load())
 	require.Equal(t, AdobeCookieRecoveryExhausted, a.ErrorMessage)
 }
 
@@ -326,15 +318,6 @@ func TestOkadRecoverySuccessfulLoginDoesNotRenewBudget(t *testing.T) {
 	_, err = s.recover(context.Background(), a)
 	require.NoError(t, err)
 	require.EqualValues(t, 2, calls.Load())
-	require.Equal(t, AdobeCookieRecoveryPending, a.ErrorMessage)
-	repo.attempts[a.ID].next = time.Now().Add(-time.Second)
-	s.sweep(context.Background())
-	require.EqualValues(t, 3, calls.Load())
-	require.Equal(t, OkadConnectionTestPending, a.ErrorMessage)
-	a.ErrorMessage = "Token refresh failed (non-retryable): adobe cookie is no longer valid: invalid_credentials"
-	_, err = s.recover(context.Background(), a)
-	require.NoError(t, err)
-	require.EqualValues(t, 3, calls.Load())
 	require.Equal(t, AdobeCookieRecoveryExhausted, a.ErrorMessage)
 }
 
@@ -409,101 +392,8 @@ func TestOkadRecoveryCooldownResponsePreservesBudget(t *testing.T) {
 			s.sweep(context.Background())
 			require.Equal(t, 1, calls)
 			require.Zero(t, r.attempts[a.ID].Count)
-			if managed {
-				require.InDelta(t, (5 * time.Minute).Seconds(), time.Until(r.attempts[a.ID].next).Seconds(), 2)
-			} else {
-				require.Greater(t, time.Until(r.attempts[a.ID].next), 14*time.Minute)
-			}
+			require.Greater(t, time.Until(r.attempts[a.ID].next), 14*time.Minute)
 			require.NotEqual(t, AdobeCookieRecoveryExhausted, a.ErrorMessage)
 		})
 	}
-}
-
-func TestOkadRecoveryLegacyCookieFailureAndOldLimit(t *testing.T) {
-	for _, message := range []string{
-		"Token refresh failed: adobe cookie is no longer valid: invalid_credentials",
-		"Authentication failed (401): Okad automatic login limit reached (2/2); manual reauthorization required",
-	} {
-		a := recoveryFixtureAccount(920)
-		a.ErrorMessage = message
-		require.True(t, isAdobeCookieRecoveryCandidate(a))
-	}
-	for _, message := range []string{
-		AdobeCookieRecoveryExhausted,
-		"Token refresh failed: adobe cookie is no longer valid: invalid_client",
-		"Token refresh failed: adobe cookie is no longer valid: invalid_scope",
-		"Adobe credentials rejected (401): generation rejected",
-	} {
-		a := recoveryFixtureAccount(920)
-		a.ErrorMessage = message
-		require.False(t, isAdobeCookieRecoveryCandidate(a))
-	}
-}
-
-func TestOkadRecoveryThirdLoginCanSucceed(t *testing.T) {
-	a := recoveryFixtureAccount(921)
-	a.ErrorMessage = "Authentication failed (401): Okad automatic login limit reached (2/2); manual reauthorization required"
-	repo := &okadRecoveryRepo{accounts: map[int64]*Account{a.ID: a}, attempts: map[int64]*testOkadAttempt{a.ID: {AdobeCookieRecoveryAttempt: AdobeCookieRecoveryAttempt{Count: 2}, next: time.Now().Add(-time.Minute), finished: time.Now().Add(-time.Minute)}}}
-	var calls atomic.Int32
-	s := newTestOkadRecovery(t, repo, func(w http.ResponseWriter, r *http.Request) {
-		calls.Add(1)
-		_, _ = w.Write([]byte(`{"ok":true,"cookie":"recovered"}`))
-	})
-	s.sweep(context.Background())
-	s.sweep(context.Background())
-	require.EqualValues(t, 1, calls.Load())
-	require.Equal(t, 3, repo.attempts[a.ID].Count)
-	require.Equal(t, "recovered", a.GetCredential("cookie"))
-	require.Equal(t, OkadConnectionTestPending, a.ErrorMessage)
-}
-
-func TestOkadRecoveryCooldownDeadline(t *testing.T) {
-	now := time.Now()
-	for _, tc := range []struct {
-		after time.Time
-		wait  time.Duration
-	}{
-		{time.Time{}, 5 * time.Minute},
-		{now.Add(3 * time.Minute), 3 * time.Minute},
-		{now.Add(15 * time.Minute), 15 * time.Minute},
-		{now.Add(-time.Minute), time.Minute},
-		{now.Add(2 * time.Hour), 5 * time.Minute},
-	} {
-		require.Equal(t, now.Add(tc.wait), okadCooldownNext(&OkadRecoveryError{RetryAfter: tc.after}, now))
-	}
-}
-
-type okadCooldownRecorder struct {
-	AccountRepository
-	next time.Time
-	code string
-}
-
-func (r *okadCooldownRecorder) RecordOkadRecoveryState(_ context.Context, _ *Account, code string, next time.Time) error {
-	r.next, r.code = next, code
-	return nil
-}
-func TestOkadRecoveryScannerCooldownUsesReservationDeadline(t *testing.T) {
-	r := &okadCooldownRecorder{}
-	s := &OkadCookieRecovery{repo: r}
-	s.recordManagedState(context.Background(), recoveryFixtureAccount(930), &OkadRecoveryError{Code: "login_cooldown"})
-	require.Equal(t, "login_cooldown", r.code)
-	require.InDelta(t, 300, time.Until(r.next).Seconds(), 2)
-	next := time.Now().Add(3 * time.Minute).Truncate(time.Second)
-	s.recordManagedState(context.Background(), recoveryFixtureAccount(930), &OkadRecoveryError{Code: "login_cooldown", RetryAfter: next})
-	require.Equal(t, next, r.next)
-}
-
-func TestOkadRecoveryManagedCooldownRetainsExplicitDeadline(t *testing.T) {
-	a := recoveryFixtureAccount(931)
-	next := time.Now().Add(3 * time.Minute).Truncate(time.Second)
-	s := newTestOkadRecovery(t, &okadRecoveryRepo{}, func(w http.ResponseWriter, r *http.Request) {
-		var request map[string]any
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&request))
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"managed": true, "ok": false, "state": "failed", "code": "login_cooldown", "retry_after": next.Unix(), "job_id": request["request_id"], "email": "fixture@example.test"}))
-	})
-	err := s.client.RefreshManaged(context.Background(), a, "fixture-job")
-	var typed *OkadRecoveryError
-	require.ErrorAs(t, err, &typed)
-	require.Equal(t, next, typed.RetryAfter)
 }

@@ -26,11 +26,11 @@ type AdobeCookieRecoveryRepository interface {
 }
 
 const (
-	AdobeCookieRecoveryMaxAttempts  = 3
+	AdobeCookieRecoveryMaxAttempts  = 2
 	AdobeCookieRecoveryRetryDelay   = 5 * time.Minute
 	AdobeCookieRecoveryHealthyDelay = 15 * time.Minute
 	AdobeCookieRecoveryPending      = "Authentication failed (401): Okad recovery pending"
-	AdobeCookieRecoveryExhausted    = "Authentication failed (401): Okad automatic login limit reached (3/3); manual reauthorization required"
+	AdobeCookieRecoveryExhausted    = "Authentication failed (401): Okad automatic login limit reached (2/2); manual reauthorization required"
 )
 
 // A durable reservation is shared by every caller and process. Cookie rotation
@@ -75,7 +75,7 @@ func isAdobeCookieRecoveryCandidate(a *Account) bool {
 			}
 		}
 	}
-	msg := strings.ToLower(strings.TrimSpace(a.ErrorMessage))
+	msg := strings.ToLower(a.ErrorMessage)
 	// Historical generic 401 rows can contain a non-auth Adobe reason.
 	for _, marker := range []string{"taste_exhausted", "quota exhausted", "credits exhausted", "model_not_entitled", "user_not_entitled", "not entitled"} {
 		if strings.Contains(msg, marker) {
@@ -88,11 +88,7 @@ func isAdobeCookieRecoveryCandidate(a *Account) bool {
 	if strings.HasPrefix(msg, "oauth 401 (no refresh_token):") || strings.HasPrefix(msg, "authentication failed (401):") {
 		return true
 	}
-	// Older deployments omitted the non-retryable label. Both forms are
-	// explicit IMS Cookie failures; a generic test/model 401 is insufficient.
-	deadCookie := strings.HasPrefix(msg, "token refresh failed (non-retryable): adobe cookie is no longer valid") ||
-		strings.HasPrefix(msg, "token refresh failed: adobe cookie is no longer valid")
-	return deadCookie &&
+	return strings.HasPrefix(msg, "token refresh failed (non-retryable): adobe cookie is no longer valid") &&
 		!strings.Contains(msg, "invalid_client") && !strings.Contains(msg, "invalid_scope")
 }
 
@@ -327,7 +323,7 @@ func (s *OkadCookieRecovery) sweep(ctx context.Context) {
 }
 
 // A confirmed cooldown rejection performed no login and must not consume the
-// three-attempt budget. Retain a durable row to prevent immediate re-reservation.
+// two-attempt budget. Retain a durable row to prevent immediate re-reservation.
 func (s *OkadCookieRecovery) postponeCooldown(ctx context.Context, a *Account, attemptID string, err error) bool {
 	var typed *OkadRecoveryError
 	if !errors.As(err, &typed) || typed.Code != "login_cooldown" {
@@ -339,7 +335,11 @@ func (s *OkadCookieRecovery) postponeCooldown(ctx context.Context, a *Account, a
 	if !ok {
 		return false
 	}
-	next := okadCooldownNext(typed, time.Now())
+	now := time.Now()
+	next := typed.RetryAfter
+	if next.Before(now.Add(time.Minute)) || next.After(now.Add(time.Hour)) {
+		next = now.Add(15 * time.Minute)
+	}
 	save, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	if err := repo.PostponeAdobeCookieRecovery(save, a.ID, attemptID, next); err != nil {
