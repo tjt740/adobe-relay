@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 BASE = 'bd6fa18d5d641b4cfdfafc0352f01bb61202ac54'
-ALLOWED = {'backend/internal/service/okad_cookie_recovery.go', 'backend/internal/repository/account_repo_okad_attempts_test.go', 'backend/migrations/255_adobe_cookie_recovery_three_attempts.sql', 'backend/internal/service/okad_cookie_recovery_test.go', 'backend/internal/repository/account_repo_okad_postgres_test.go'}
+ALLOWED = {'backend/internal/service/okad_managed_recovery.go', 'backend/internal/service/okad_cookie_recovery.go', 'backend/migrations/255_adobe_cookie_recovery_three_attempts.sql', 'backend/internal/repository/account_repo_okad_postgres_test.go', 'backend/internal/service/okad_cookie_recovery_test.go', 'backend/internal/repository/account_repo_okad_attempts_test.go'}
 
 
 def validate(changed, before, candidate, manifest):

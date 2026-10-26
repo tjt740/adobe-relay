@@ -327,7 +327,7 @@ func (s *OkadCookieRecovery) sweep(ctx context.Context) {
 }
 
 // A confirmed cooldown rejection performed no login and must not consume the
-// two-attempt budget. Retain a durable row to prevent immediate re-reservation.
+// three-attempt budget. Retain a durable row to prevent immediate re-reservation.
 func (s *OkadCookieRecovery) postponeCooldown(ctx context.Context, a *Account, attemptID string, err error) bool {
 	var typed *OkadRecoveryError
 	if !errors.As(err, &typed) || typed.Code != "login_cooldown" {
@@ -339,11 +339,7 @@ func (s *OkadCookieRecovery) postponeCooldown(ctx context.Context, a *Account, a
 	if !ok {
 		return false
 	}
-	now := time.Now()
-	next := typed.RetryAfter
-	if next.Before(now.Add(time.Minute)) || next.After(now.Add(time.Hour)) {
-		next = now.Add(15 * time.Minute)
-	}
+	next := okadCooldownNext(typed, time.Now())
 	save, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	if err := repo.PostponeAdobeCookieRecovery(save, a.ID, attemptID, next); err != nil {

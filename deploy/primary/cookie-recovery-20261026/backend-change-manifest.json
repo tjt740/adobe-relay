@@ -9,11 +9,15 @@
   },
   "backend/internal/service/okad_cookie_recovery.go": {
     "before": "1b45c7a152db294938feb268a6a343757896ff9184c45ce16d03ad8a95286d82",
-    "candidate": "060fb297c01f5a218cb18314dbcccc7bd7413b51690e554eb03ee1afe25b39cf"
+    "candidate": "ff04ec8fae234ceeeb17d434dcf848242dcfb7107b3a8850166763e4a1e79e11"
   },
   "backend/internal/service/okad_cookie_recovery_test.go": {
     "before": "3e6afc220396c7004101f6125e47b9f66f3220030f7d725a6583787a2a4874a7",
-    "candidate": "d19645161c0e483bd7ae4a89c434fc6badc589f0b3c3e2f8584eeb8ee09e8c02"
+    "candidate": "03d3fe3d3993c2f1722d1b91da9791fc28f78d63b5c1b94e39933061a6b5ecf4"
+  },
+  "backend/internal/service/okad_managed_recovery.go": {
+    "before": "18f523c69abe8356204b3e57a624ed4e5be4f2fe043db23fc47e424a5a89f13d",
+    "candidate": "e2697d376e4ea3b955c31c5390b82d38566358be16de6cf0e428eb4897400b6c"
   },
   "backend/migrations/255_adobe_cookie_recovery_three_attempts.sql": {
     "before": null,
