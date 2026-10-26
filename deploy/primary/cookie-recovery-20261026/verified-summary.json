@@ -1,0 +1,26 @@
+{
+  "application_sha": "f62d70935c5c17ad0bb316d725805b71751bab9a",
+  "verified_at": "2026-10-26T07:40:48.019873+00:00",
+  "business_preservation": {
+    "backup_accounts": 30,
+    "checked_accounts": 30,
+    "manual_pauses_preserved": true,
+    "manual_proxy_modes_preserved": true,
+    "proxy_bindings_changed_with_event_chain": 6,
+    "cookie_rotations_with_version_advance": 17,
+    "token_fields_only_changes": 0
+  },
+  "preserved": {
+    "other_containers": true,
+    "configuration": true,
+    "resources_and_go": true,
+    "environment": true,
+    "okad_settings": true,
+    "sub2_settings_including_smtp": true,
+    "clash_nodes_bindings_and_configuration": true,
+    "alert_rules": true
+  },
+  "new_retry_migration_verified": true,
+  "passive_sample_count": 13,
+  "cutover_backup": "/opt/adobe-relay/backups/20261026T072508Z-f62d70935c5c17ad0bb316d725805b71751bab9a"
+}
