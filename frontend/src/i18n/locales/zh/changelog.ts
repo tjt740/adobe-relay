@@ -29,6 +29,15 @@ export default {
       }
     },
     "updates": {
+      cookieRecoveryRetries: {
+        title: 'Cookie 失效后自动重登增加两次兜底重试',
+        body: '确认 Cookie 失效后自动调用 Okad，首次失败后再重试两次，共最多三次登录。自动重登沿用 Adobe 登录会话的默认配置。',
+        sections: {
+          retry: { title: '最多三次，失败间隔五分钟', body: '请求与后台检测共用持久次数记录，重启、更新 Cookie 或重复请求不会重置次数。兼容历史 Cookie 失效提示；原先到达两次上限的账号保留记录，只增加最后一次机会。' },
+          profile: { title: '自动重登使用默认配置', body: '自动恢复不继承个人或组织优先设置，不强制切换资料；手动登录仍使用保存的选择。新 Cookie 与 Token、当前身份保持一致。' },
+          protection: { title: '保留账号与联动保护', body: '人工暂停、停用、账号到期、权益或额度不足不会触发重登。多 Token 邮箱路由、原 Cookie、账号 ID、Sub2 关联和并发去重继续生效；成功后仍验证凭据与连通性。' },
+        },
+      },
       adobeAutomaticTestFlare: {
         title: 'Cookie 推送与自动检测默认使用 Flare',
         body: '补齐批量检测以外的默认模型：Cookie 推送后的连通性检测、未指定模型的后台检测和单账号测试默认使用 GPT Image 2.5 Flare。',
