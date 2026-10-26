@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 
 ROOT = Path('/opt/adobe-relay/releases/adobe-default-test-flare-20261026')
 spec = importlib.util.spec_from_file_location('audit', ROOT / 'audit.py')
@@ -76,7 +77,14 @@ result = {
     'manual_proxy_modes_preserved': all(old[i]['manual_proxy_enabled'] == current[i]['manual_proxy_enabled'] for i in old if i in current),
     'changes': changes, 'restored_old_business_data': False,
 }
-a.save('business-verification.json', result)
+reviewed = '--reviewed' in sys.argv
+if reviewed:
+    from deletion_guard import validate
+    import runpy
+    evidence = runpy.run_path(str(ROOT/'review-deletions.py'))['collect'](a)
+    result['reviewed_admin_deletions'] = validate(result, evidence, json.loads((ROOT/'reviewed-deletion-scope.json').read_text()))
+    a.save('deletion-evidence-reviewed.json', evidence)
+a.save('business-verification-reviewed.json' if reviewed else 'business-verification.json', result)
 print(json.dumps(result, ensure_ascii=False))
-assert not result['missing_ids'] and result['manual_pause_preserved'] and result['manual_proxy_modes_preserved'], 'Review account changes; never restore a stale database'
+assert (reviewed or not result['missing_ids']) and result['manual_pause_preserved'] and result['manual_proxy_modes_preserved'], 'Review account changes; never restore a stale database'
 assert all(item['proxy_chain_matches'] for item in changes), 'Review unmatched live proxy changes'

@@ -15,7 +15,7 @@ SHA = 'a' * 40
 
 class OperationTests(TestCase):
     def test_all_remote_phases_generate_valid_python_and_use_the_dedicated_release(self):
-        for phase in ['prepare', 'start', 'status', 'verify', 'archive']:
+        for phase in ['prepare', 'start', 'status', 'deletions', 'verify', 'archive']:
             with self.subTest(phase=phase), tempfile.TemporaryDirectory() as directory:
                 previous = Path.cwd()
                 try:

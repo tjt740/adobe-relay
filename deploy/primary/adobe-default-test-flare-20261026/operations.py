@@ -1,7 +1,7 @@
 """Fixed-scope primary release operations using the original deployment guards."""
 import base64,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['prepare','start','status','verify','archive']
+assert phase in ['prepare','start','status','deletions','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-default-test-flare-20261026'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -37,14 +37,18 @@ assert not (r/'progress.json').exists(), 'Already started; inspect existing evid
 subprocess.run(['systemd-run','--unit=adobe-default-test-flare-release-20261026','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/driver.log','--property=StandardError=append:{root}/driver.log','/usr/bin/python3',str(r/'driver.py')],check=True)
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 """)
+elif phase=='deletions':
+ copy([pathlib.Path(__file__).parent/'review-deletions.py'])
+ remote(f"import pathlib,subprocess,sys; r=pathlib.Path('{root}'); subprocess.run([sys.executable,str(r/'review-deletions.py')],check=True)")
 elif phase=='verify':
  remote(f"import pathlib,hashlib; r=pathlib.Path('{root}'); p=r/'final-verify.original.py'; p.write_bytes((r/'final-verify.py').read_bytes()) if not p.exists() else None; assert hashlib.sha256(p.read_bytes()).hexdigest()=='ec2cf3fd4ce1d88af4a4123303c29c2f9c9dbf4a96cf63e7d0d3466de52ad093'")
- copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','route_guard.py']])
+ remote(f"import pathlib; r=pathlib.Path('{root}'); [(r/(name+'.initial.py')).write_bytes((r/(name+'.py')).read_bytes()) for name in ['business-verify','review-credentials'] if not (r/(name+'.initial.py')).exists()]")
+ copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','route_guard.py','business-verify.py','review-credentials.py','review-deletions.py','deletion_guard.py','reviewed-deletion-scope.json']])
  remote(f"""import json,pathlib,subprocess,sys
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
 assert (r/'rolling-finished.json').exists()
-for script,output in [('observe.py','observation.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('final-verify.py','final-verification.json')]:
- if not (r/output).exists():subprocess.run([sys.executable,str(r/script)],check=True)
+for script,output in [('observe.py','observation.json'),('business-verify.py','business-verification-reviewed.json'),('review-credentials.py','credential-change-review.json'),('final-verify.py','final-verification.json')]:
+ if not (r/output).exists():subprocess.run([sys.executable,str(r/script)]+(['--reviewed'] if script=='business-verify.py' else []),check=True)
 subprocess.run([sys.executable,str(r/'audit.py'),'check-rollback'],check=True)
 print((r/'final-verification.json').read_text())
 """)
