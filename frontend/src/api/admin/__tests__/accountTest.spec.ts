@@ -17,6 +17,12 @@ const response = (chunks: string[], status = 200) => {
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('account connection test stream', () => {
+  it.each(['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst', 'gpt-image-2'])('sends the selected model %s to the test endpoint', async modelId => {
+    const fetchMock = vi.fn().mockResolvedValue(response(['data: {"type":"test_complete","success":true}\n']))
+    vi.stubGlobal('fetch', fetchMock)
+    await testAccountConnection(42, new AbortController().signal, { modelId })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ model_id: modelId, prompt: '', mode: 'default' })
+  })
   it('uses the existing authenticated test endpoint and waits for explicit success across chunks', async () => {
     const fetchMock = vi.fn().mockResolvedValue(response(['data: {"type":"test_', 'complete","success":true}\r', '\n\r\n']))
     vi.stubGlobal('fetch', fetchMock)
@@ -49,7 +55,7 @@ describe('account connection test stream', () => {
     vi.stubGlobal('fetch', vi.fn((_url, options) => new Promise((_resolve, reject) => {
       options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
     })))
-    const result = testAccountConnection(1, new AbortController().signal, 100)
+    const result = testAccountConnection(1, new AbortController().signal, { timeoutMs: 100 })
     await vi.advanceTimersByTimeAsync(100)
     expect(await result).toEqual({ success: false, statusCode: 408 })
   })

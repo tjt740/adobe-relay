@@ -14,8 +14,9 @@ export class AccountTestSessionExpired extends Error {}
 export async function testAccountConnection(
   accountID: number,
   signal: AbortSignal,
-  timeoutMs = 180_000
+  options: { modelId?: string; timeoutMs?: number } = {}
 ): Promise<AccountConnectionTestResult> {
+  const { modelId = '', timeoutMs = 180_000 } = options
   const controller = new AbortController()
   const abort = () => controller.abort()
   signal.addEventListener('abort', abort, { once: true })
@@ -31,7 +32,7 @@ export async function testAccountConnection(
         'Content-Type': 'application/json',
         [ADMIN_UI_REQUEST_HEADER]: '1'
       },
-      body: JSON.stringify({ model_id: '', prompt: '', mode: 'default' }),
+      body: JSON.stringify({ model_id: modelId, prompt: '', mode: 'default' }),
       signal: controller.signal
     })
     // These are admin-session errors, not an upstream account's SSE result.

@@ -758,7 +758,12 @@ export default {
       },
       bulkTest: {
         title: '批量检测账号',
-        hint: '使用各账号的默认模型调用「测试连接」，每次最多同时检测 3 个账号。检测会真实调用上游并消耗相应额度；Adobe 账号会生成测试图。',
+        hint: '选择模型后点击「开始检测」，每次最多同时检测 3 个账号。检测会真实调用上游并消耗相应额度；Adobe 账号会生成测试图。',
+        start: '开始检测',
+        defaultModel: '各账号默认模型',
+        modelHint: '模型列表来自首个所选账号，所选模型用于本批全部账号；请选用这些账号共同支持的模型。Adobe 模型列表默认选择 GPT Image 2.5 Flare，运行后不可更改。',
+        modelLoadFailed: '模型列表加载失败，请重试。',
+        retryModels: '重新加载',
         progress: '已完成 {done} / {total}',
         summary: '通过 {success} · 失败 {failed} · 已停止 {cancelled}',
         result: '检测结果',
