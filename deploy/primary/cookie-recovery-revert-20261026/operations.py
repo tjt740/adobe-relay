@@ -9,6 +9,7 @@ target='root@173.234.15.150'
 def remote(script):return subprocess.run(['ssh',*options,target,'python3 -'],input=script,text=True,check=True,timeout=900)
 def copy(paths,dest=root+'/'):subprocess.run(['scp',*options,*map(str,paths),target+':'+dest],check=True,timeout=240)
 if phase=='prepare':
+ remote("import json,pathlib,subprocess; p=pathlib.Path('/opt/adobe-team-cookie/.local/cookie-recovery-revert-20261026'); d=json.loads(subprocess.check_output(['docker','inspect','adobe-team-cookie-app-1'],text=True))[0]; print(json.dumps({'okad_image':d['Config']['Image'],'rollback_complete':(p/'okad-after.json').exists()})); print((p/'rollback.log').read_text()[-1800:] if (p/'rollback.log').exists() and not (p/'okad-after.json').exists() else ''); assert d['Config']['Image']=='adobe-team-cookie:79382b0f79d559575956e023dc9f52fbf07dbfde' and (p/'okad-after.json').exists(), 'Wait for the guarded Okad code reversion'")
  archive=pathlib.Path('release-artifact/release-images.tar.gz');digest=hashlib.sha256(archive.read_bytes()).hexdigest()
  assert pathlib.Path(str(archive)+'.sha256').read_text().split()==[digest,archive.name]
  proof=pathlib.Path('release-artifact/ci-proof.json');proof.write_text(json.dumps({'application_sha':sha,'workflow_run':int(build),'conclusion':'success','archive_sha256':digest}))
