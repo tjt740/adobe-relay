@@ -39,6 +39,8 @@ subprocess.run(['systemd-run','--unit=cookie-recovery-release-20261026','--colle
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 """)
 elif phase=='verify':
+ remote(f"import pathlib,hashlib; r=pathlib.Path('{root}'); p=r/'business-verify.py'; b=r/'business-verify.initial.py'; b.write_bytes(p.read_bytes()) if not b.exists() else None; assert hashlib.sha256(b.read_bytes()).hexdigest()=='ae7d0d4b640828a61cf3681469d1abe15ab34c31117785d58a2e866955db130e'")
+ copy([pathlib.Path(__file__).parent/name for name in ['business-verify.py','backup_guard.py']])
  remote(f"""import pathlib,subprocess,sys
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
 assert (r/'rolling-finished.json').exists()
