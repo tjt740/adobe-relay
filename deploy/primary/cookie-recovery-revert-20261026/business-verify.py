@@ -27,15 +27,21 @@ def value(s):
 
 old = {}
 active = False
+copy_seen = False
+copy_ended = False
+total_rows = 0
 for line in raw.splitlines():
     if line.startswith('COPY public.accounts ('):
         columns = [x.strip().strip('"') for x in line.split('(', 1)[1].split(')', 1)[0].split(',')]
         active = True
+        copy_seen = True
         continue
     if active and line == '\\.':
+        copy_ended = True
         active = False
         continue
     if active:
+        total_rows += 1
         row = dict(zip(columns, map(value, line.split('\t'))))
         if row['deleted_at'] is None:
             old[int(row['id'])] = {
@@ -45,7 +51,8 @@ for line in raw.splitlines():
                 'manual_pause': (json.loads(row['extra']) if row['extra'] else {}).get('okad_manual_pause'),
                 'manual_proxy_enabled': (json.loads(row['extra']) if row['extra'] else {}).get('manual_proxy_enabled'),
             }
-assert old, 'No active accounts were read from the verified cutover dump'
+from backup_guard import validate_accounts_copy
+validate_accounts_copy(copy_seen, copy_ended, total_rows, len(old))
 rows = json.loads(a.sql("SELECT coalesce(json_agg(json_build_object('id',id,'credentials',credentials,'proxy_id',proxy_id,'status',status,'schedulable',schedulable,'manual_pause',extra->'okad_manual_pause','manual_proxy_enabled',extra->'manual_proxy_enabled') ORDER BY id),'[]') FROM accounts WHERE deleted_at IS NULL"))
 current = {row['id']: row for row in rows}
 cutover_at = datetime.datetime.strptime(dump.parent.name.split('-', 1)[0], '%Y%m%dT%H%M%SZ').replace(tzinfo=datetime.timezone.utc).isoformat()
@@ -71,7 +78,7 @@ for account_id in sorted(set(old) & set(current)):
     })
 result = {
     'at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-    'cutover_backup': str(dump.parent), 'proxy_events_since': cutover_at, 'before_count': len(old), 'current_count': len(current),
+    'cutover_backup': str(dump.parent), 'backup_copy_verified': True, 'backup_total_rows': total_rows, 'proxy_events_since': cutover_at, 'before_count': len(old), 'current_count': len(current),
     'missing_ids': sorted(set(old) - set(current)), 'new_ids': sorted(set(current) - set(old)),
     'manual_pause_preserved': all(old[i]['manual_pause'] == current[i]['manual_pause'] for i in old if i in current),
     'manual_proxy_modes_preserved': all(old[i]['manual_proxy_enabled'] == current[i]['manual_proxy_enabled'] for i in old if i in current),

@@ -39,6 +39,8 @@ subprocess.run(['systemd-run','--unit=cookie-recovery-release-20261026','--colle
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 """)
 elif phase=='verify':
+ remote(f"import pathlib,hashlib; r=pathlib.Path('{root}'); p=r/'business-verify.py'; b=r/'business-verify.initial.py'; b.write_bytes(p.read_bytes()) if not b.exists() else None; assert hashlib.sha256(b.read_bytes()).hexdigest()=='ae7d0d4b640828a61cf3681469d1abe15ab34c31117785d58a2e866955db130e'")
+ copy([pathlib.Path(__file__).parent/name for name in ['business-verify.py','backup_guard.py']])
  remote(f"""import pathlib,subprocess,sys
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
 assert (r/'rolling-finished.json').exists()
@@ -57,14 +59,18 @@ assert a.inspect(a.APP)['Config']['Image']=='adobe-relay:{sha}'
 core=json.loads((r/'final-verification.json').read_text())
 assert core['application_sha']=='{sha}'
 checks=a.check_preserved(json.loads((r/'before.json').read_text()),a.snapshot())
-assert not (r/'release-completion.json').exists(),'Already archived; inspect evidence'
+previous=r/'release-completion.json'
+if previous.exists():
+ saved=json.loads(previous.read_text());assert saved['application_sha']=='{sha}' and saved['core_verified_at']==core['at']
+ initial=r/'release-completion.initial.json'
+ if not initial.exists():initial.write_bytes(previous.read_bytes())
 files={{}}
 for name,value in {payload!r}.items():
  data=base64.b64decode(value);assert b'PENDING' not in data
  path=r/name;path.write_bytes(data);path.chmod(0o600);files[name]=a.digest(data)
  if name=='primary-README.md':pathlib.Path('/opt/adobe-relay/deploy/primary/README.md').write_bytes(data)
 out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'adobe_requests':False,'mail_sent':False}}
-a.save('release-completion.json',out);print(json.dumps(out))
+(r/'release-completion.json').write_text(json.dumps(out,ensure_ascii=False,indent=2));print(json.dumps(out))
 """)
 else:
  evidence=pathlib.Path('primary-release-evidence');evidence.mkdir(exist_ok=True)

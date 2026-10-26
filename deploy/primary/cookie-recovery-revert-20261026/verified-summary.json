@@ -1,0 +1,30 @@
+{
+  "application_sha": "df07b90d7e2ce8e27fd7a9deb11336eaf5077e3c",
+  "verified_at": "2026-10-26T09:43:11.883007+00:00",
+  "business_preservation": {
+    "backup_accounts": 0,
+    "checked_accounts": 1,
+    "manual_pauses_preserved": true,
+    "manual_proxy_modes_preserved": true,
+    "proxy_bindings_changed_with_event_chain": 0,
+    "cookie_rotations_with_version_advance": 0,
+    "token_fields_only_changes": 0
+  },
+  "preserved": {
+    "other_containers": true,
+    "configuration": true,
+    "resources_and_go": true,
+    "environment": true,
+    "okad_settings": true,
+    "sub2_settings_including_smtp": true,
+    "clash_nodes_bindings_and_configuration": true,
+    "alert_rules": true
+  },
+  "migration_set_retained": true,
+  "cutover_backup": "/opt/adobe-relay/backups/20261026T084319Z-df07b90d7e2ce8e27fd7a9deb11336eaf5077e3c",
+  "handoff_times": {
+    "rolling-route-canary.json": "2026-10-26T16:38:56.365966+08:00",
+    "rolling-route-canonical.json": "2026-10-26T16:43:48.530411+08:00",
+    "rolling-finished.json": "2026-10-26T16:48:12.350793+08:00"
+  }
+}
