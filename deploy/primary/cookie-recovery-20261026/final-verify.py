@@ -42,8 +42,8 @@ assert all(c['version_advanced'] and c['issuer_compatible'] and c['source_key_co
 summary={'backup_accounts':business['before_count'],'checked_accounts':business['current_count'],'manual_pauses_preserved':True,'manual_proxy_modes_preserved':True,'proxy_bindings_changed_with_event_chain':sum('proxy_id' in c['fields'] for c in business['changes']),'cookie_rotations_with_version_advance':len(credentials['cookie_changed_accounts']),'token_fields_only_changes':len(credentials['token_fields_only_accounts'])}
 installed=json.loads(a.sql("SELECT json_object_agg(filename,checksum) FROM schema_migrations"))
 expected=json.loads((ROOT/'installed-migrations-before.json').read_text())
-expected['255_adobe_cookie_recovery_three_attempts.sql']='7a29ad94c1738a4463f9ce3723fcc393b54f516527441ee1dbe5396271277158'
-assert installed==expected,'Migration set or old checksum changed'
+from migration_guard import validate_migrations
+validate_migrations(installed, expected)
 assert any(name.startswith('254_') for name in installed),'Missing deployed 408 migration'
 retired=json.loads(a.sql("SELECT json_build_object('holds',(SELECT count(*) FROM adobe_proxy_408_holds),'blocks',(SELECT count(*) FROM adobe_proxy_408_blocks),'flags',(SELECT count(*) FROM accounts WHERE extra ? 'adobe_proxy_408'))"))
 assert all(value==0 for value in retired.values()),'Retired 408 scheduling gates reappeared'
