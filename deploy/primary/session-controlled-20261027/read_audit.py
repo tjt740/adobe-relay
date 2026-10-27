@@ -35,23 +35,36 @@ def others():
 
 
 
-import collections
-out={'at':now(),'selected':rows(),'running_diagnostics':[x for x in subprocess.check_output(['docker','ps','--format','{{.Names}}'],text=True).splitlines() if x.startswith('adobe-three-arm-')]}
-for name in ['trial-started.json','trial-finished.json','trial-process-results.json','restored.json','watchdog-extension.json','refresh-phase-started.json','production-login-exit-comparison.json','final-preservation-check.json']:
+before={a['id']:a for a in json.loads((ROOT/'before.json').read_text())};current={a['id']:a for a in rows()}
+keys=['status','schedulable','concurrency','manual_pause','manual_proxy','proxy_id','version','verification','test','error','cookie_hash','runtime_cookie_hash','token_hash']
+differences={i:{k:{'before':before[i].get(k),'after':current.get(i,{}).get(k)} for k in keys if before[i].get(k)!=current.get(i,{}).get(k)} for i in IDS}
+others_before={a['id']:a for a in json.loads((ROOT/'other-accounts-before.json').read_text())};others_after={a['id']:a for a in others()}
+other_differences={i:{k:{'before':others_before.get(i,{}).get(k),'after':others_after.get(i,{}).get(k)} for k in ['config_hash','cookie_hash'] if others_before.get(i,{}).get(k)!=others_after.get(i,{}).get(k)} for i in set(others_before)|set(others_after)}
+other_differences={i:d for i,d in other_differences.items() if d}
+settings_equal=sql("SELECT json_build_object('key',key,'hash',md5(value)) FROM settings ORDER BY key")==json.loads((ROOT/'settings-before.json').read_text())
+containers=[]
+for name in ['adobe-relay-app-1','adobe-team-cookie-app-1']:
+ d=json.loads(subprocess.check_output(['docker','inspect',name],text=True))[0]
+ containers.append({'name':name,'image':d['Config']['Image'],'started_at':d['State']['StartedAt'],'restarts':d['RestartCount'],'memory_limit':d['HostConfig']['Memory'],'cpu_shares':d['HostConfig']['CpuShares']})
+running=[n for n in subprocess.check_output(['docker','ps','--format','{{.Names}}'],text=True).splitlines() if n.startswith('adobe-three-arm-')]
+out={'at':now(),'selected_differences':differences,'other_accounts_before':len(others_before),'other_accounts_after':len(others_after),'other_account_differences':other_differences,'settings_equal':settings_equal,'private_tmpfs_exists':pathlib.Path('/dev/shm/adobe-three-arm-20261027-private.json').exists(),'diagnostic_containers':running,'production_containers':containers}
+for name in ['restored.json','trial-finished.json']:
  if (ROOT/name).exists():out[name]=json.loads((ROOT/name).read_text())
-for name in ['sdk-trial.jsonl','control/web-trial.jsonl','refresh-trial.jsonl']:
+save('final-preservation-check.json',out);print(json.dumps(out,ensure_ascii=False))
+
+for name in ['auth-results.json','idle-validation.json','trial-started.json','trial-process-results.json','production-login-exit-comparison.json','refresh-phase-started.json']:
+ if (ROOT/name).exists():print(json.dumps({'at':now(),'evidence_file':name,'document':json.loads((ROOT/name).read_text())},ensure_ascii=False))
+for name in ['sdk-trial.jsonl','control/web-trial.jsonl','refresh-trial.jsonl','controller.jsonl']:
+ if not (ROOT/name).exists():continue
  records=[]
- if (ROOT/name).exists():
-  for line in (ROOT/name).read_text().splitlines():
-   try:records.append(json.loads(line))
-   except ValueError:pass
- counts=collections.Counter((str(r.get('account_id')),r.get('event'),str(r.get('status',''))) for r in records)
- important=[r for r in records if r.get('event') not in ['http_start','http_finish'] or (r.get('status') or 0)>=400 or 'generate' in (r.get('path') or '')]
- starts=[r for r in records if r.get('event')=='http_start']
- fingerprints=list({(r.get('account_id'),r.get('token_sha256'),r.get('arp_sha256'),r.get('user_agent')) for r in starts})
- out[name]={'count':len(records),'counts':[{'account_id':k[0],'event':k[1],'status':k[2],'count':v} for k,v in counts.items()],'important':important[-100:],'fingerprints':fingerprints,'http_start_sample':starts[:6]}
-for name in ['trial-controller-process.log','web-driver-process.log','sdk-trial-process.log','refresh-trial-process.log']:
- if (ROOT/name).exists():out[name]=(ROOT/name).read_text()[-1600:]
-out['natural_adobe_successes_during_trial']=sql("SELECT row_to_json(t) FROM (SELECT u.model,count(*) AS successes,count(DISTINCT u.account_id) AS accounts,min(u.created_at) AS first,max(u.created_at) AS last FROM usage_logs u JOIN accounts a ON a.id=u.account_id WHERE a.platform='adobe' AND u.created_at>='2026-10-27T11:43:04Z' AND u.account_id NOT IN (1739,1741,1743) GROUP BY u.model) t")
-out['natural_adobe_errors_during_trial']=sql("SELECT row_to_json(t) FROM (SELECT e.model,e.upstream_status_code,e.error_phase,count(*) AS errors,count(DISTINCT e.account_id) AS accounts FROM ops_error_logs e JOIN accounts a ON a.id=e.account_id WHERE a.platform='adobe' AND e.created_at>='2026-10-27T11:43:04Z' AND e.account_id NOT IN (1739,1741,1743) GROUP BY e.model,e.upstream_status_code,e.error_phase) t")
-print(json.dumps(out,ensure_ascii=False))
+ for line in (ROOT/name).read_text().splitlines():
+  try:records.append(json.loads(line))
+  except ValueError:pass
+ for offset in range(0,len(records),25):print(json.dumps({'at':now(),'evidence_file':name,'offset':offset,'records':records[offset:offset+25]},ensure_ascii=False))
+refresh=[]
+if (ROOT/'refresh-trial.jsonl').exists():
+ for line in (ROOT/'refresh-trial.jsonl').read_text().splitlines():
+  try:refresh.append(json.loads(line))
+  except ValueError:pass
+phase_done=any(e.get('event')=='phase_done' for e in refresh)
+print(json.dumps({'at':now(),'export_finished':True,'refresh_phase_done':phase_done,'diagnostic_containers':[n for n in subprocess.check_output(['docker','ps','--format','{{.Names}}'],text=True).splitlines() if n.startswith('adobe-three-arm-')]}))
