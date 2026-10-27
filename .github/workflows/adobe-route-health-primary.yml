@@ -1,68 +1,49 @@
-name: Scoped Adobe session concurrency comparison
+name: Read-only Adobe 401 investigation
 on:
   workflow_dispatch:
     inputs:
-      phase:
-        type: choice
-        options: [session-start, session-status, session-export, session-restore]
-        required: true
-        default: session-status
       application_sha:
-        type: string
-        required: true
-      build_run:
         type: string
         required: true
 permissions:
   contents: read
-  actions: read
 concurrency:
-  group: adobe-session-comparison-20261027
+  group: adobe-read-only-401-investigation-20261027
   cancel-in-progress: false
 jobs:
-  operate:
+  collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Verify exact production client and strict experiment scope
+      - name: Check unchanged application sources
         env:
           APP_SHA: ${{ inputs.application_sha }}
         run: |
           set -euo pipefail
           test "$APP_SHA" = df07b90d7e2ce8e27fd7a9deb11336eaf5077e3c
           git diff --exit-code "$APP_SHA" -- backend/internal backend/go.mod backend/go.sum frontend Dockerfile deploy/docker-entrypoint.sh
-          python3 -m py_compile deploy/primary/session-controlled-20261027/*.py
-      - uses: actions/setup-go@v6
-        if: inputs.phase == 'session-start'
-        with:
-          go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
-      - name: Verify isolated concurrency gates and build probe
-        if: inputs.phase == 'session-start'
-        working-directory: backend
-        run: |
-          go test -race ./cmd/sessionprobe -count=5
-          CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /tmp/session-probe ./cmd/sessionprobe
-      - name: Operate four-account experiment
+          python3 -m py_compile deploy/primary/session-controlled-20261027/read_audit.py
+      - name: Collect read-only sanitized incident evidence
         env:
           SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
-          PHASE: ${{ inputs.phase }}
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
-          python3 deploy/primary/session-controlled-20261027/operations.py "$PHASE"
+          mkdir -p incident-evidence
+          ssh -C -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 root@173.234.15.150 'python3 -' < deploy/primary/session-controlled-20261027/read_audit.py > incident-evidence/read-only-audit.json
+          python3 -c 'import json; d=json.load(open("incident-evidence/read-only-audit.json")); print({"collected_accounts":len(d["accounts"]),"finished_at":d["finished_at"]})'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: session-comparison-evidence
-          path: session-evidence/
+          name: adobe-401-read-only-evidence
+          path: incident-evidence/
           if-no-files-found: ignore
           retention-days: 7
       - name: Remove runner SSH key
