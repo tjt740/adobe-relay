@@ -52,4 +52,6 @@ for name in ['sdk-trial.jsonl','control/web-trial.jsonl']:
  out[name]={'count':len(records),'counts':[{'account_id':k[0],'event':k[1],'status':k[2],'count':v} for k,v in counts.items()],'important':important[-100:],'fingerprints':fingerprints,'http_start_sample':starts[:6]}
 for name in ['trial-controller-process.log','web-driver-process.log','sdk-trial-process.log']:
  if (ROOT/name).exists():out[name]=(ROOT/name).read_text()[-1600:]
+out['natural_adobe_successes_during_trial']=sql("SELECT row_to_json(t) FROM (SELECT u.model,count(*) AS successes,count(DISTINCT u.account_id) AS accounts,min(u.created_at) AS first,max(u.created_at) AS last FROM usage_logs u JOIN accounts a ON a.id=u.account_id WHERE a.platform='adobe' AND u.created_at>='2026-10-27T11:43:04Z' AND u.account_id NOT IN (1739,1741,1743) GROUP BY u.model) t")
+out['natural_adobe_errors_during_trial']=sql("SELECT row_to_json(t) FROM (SELECT e.model,e.upstream_status_code,e.error_phase,count(*) AS errors,count(DISTINCT e.account_id) AS accounts FROM ops_error_logs e JOIN accounts a ON a.id=e.account_id WHERE a.platform='adobe' AND e.created_at>='2026-10-27T11:43:04Z' AND e.account_id NOT IN (1739,1741,1743) GROUP BY e.model,e.upstream_status_code,e.error_phase) t")
 print(json.dumps(out,ensure_ascii=False))
