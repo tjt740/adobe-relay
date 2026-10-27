@@ -39,6 +39,7 @@ jobs:
           mkdir -p incident-evidence
           ssh -C -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 root@173.234.15.150 'python3 -' < deploy/primary/session-controlled-20261027/read_audit.py > incident-evidence/read-only-audit.json
           python3 -c 'import json; d=json.load(open("incident-evidence/read-only-audit.json")); print({"collected_accounts":len(d["accounts"]),"finished_at":d["finished_at"]})'
+          python3 -c 'import json; d=json.load(open("incident-evidence/read-only-audit.json")); print(json.dumps({"token_validation":d.get("token_validation"),"finished_at":d["finished_at"]}))'
       - uses: actions/upload-artifact@v4
         if: always()
         with:

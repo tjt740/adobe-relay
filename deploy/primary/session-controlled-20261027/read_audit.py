@@ -109,9 +109,9 @@ def check(a):
 with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
  print(json.dumps(list(pool.map(check,rows))))
 '''
-proc=subprocess.run(['docker','run','--rm','--network','adobe-relay_default','--memory','256m','--cpus','0.5','--read-only','--tmpfs','/tmp:rw,size=16m','--entrypoint','python','adobe-team-cookie:79382b0f79d559575956e023dc9f52fbf07dbfde','-c',code],input=json.dumps(probe),text=True,capture_output=True,timeout=25)
+proc=subprocess.run(['docker','run','--rm','-i','--network','adobe-relay_default','--memory','256m','--cpus','0.5','--read-only','--tmpfs','/tmp:rw,size=16m','--entrypoint','python','adobe-team-cookie:79382b0f79d559575956e023dc9f52fbf07dbfde','-c',code],input=json.dumps(probe),text=True,capture_output=True,timeout=25)
 if proc.returncode==0:OUT['token_validation']=json.loads(proc.stdout)
-else:OUT['token_validation_error']='validation process failed'
+else:OUT['token_validation_error']='validation process failed';OUT['token_validation_returncode']=proc.returncode
 source=r'''
 import pathlib,json,ast,hashlib
 base=pathlib.Path('/app/backend/app/services');result={}
