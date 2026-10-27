@@ -13,7 +13,7 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,17 +26,6 @@ jobs:
           test "$APP_SHA" = df07b90d7e2ce8e27fd7a9deb11336eaf5077e3c
           git diff --exit-code "$APP_SHA" -- backend/internal backend/cmd/server backend/go.mod backend/go.sum frontend Dockerfile deploy/docker-entrypoint.sh
           python3 -m py_compile deploy/primary/session-controlled-20261027/read_audit.py
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.27.2'
-          cache-dependency-path: backend/go.sum
-      - name: Build exact production backend with observation-only instrumentation
-        run: |
-          python3 deploy/primary/408-causal-20261028/instrument.py backend
-          cd backend
-          go test -tags=unit ./internal/pkg/adobe ./internal/service ./internal/repository -run 'TestAdobe.*(Token|Session|Refresh)|TestScheduler.*Cache|TestDiagnostic' -count=1
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-s -w -X main.Commit=df07b90d7e2ce8e27fd7a9deb11336eaf5077e3c-diag' -o /tmp/408-causal-sub2api ./cmd/server
-          sha256sum /tmp/408-causal-sub2api
       - name: Collect read-only sanitized incident evidence
         env:
           SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
@@ -48,8 +37,6 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
           mkdir -p incident-evidence
-          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 root@173.234.15.150 'install -m 700 -d /opt/adobe-relay/releases/408-causal-20261028'
-          scp -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 /tmp/408-causal-sub2api root@173.234.15.150:/opt/adobe-relay/releases/408-causal-20261028/sub2api
           ssh -C -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 root@173.234.15.150 'python3 -' < deploy/primary/session-controlled-20261027/read_audit.py > incident-evidence/read-only-audit.json
           cat incident-evidence/read-only-audit.json
       - uses: actions/upload-artifact@v4
