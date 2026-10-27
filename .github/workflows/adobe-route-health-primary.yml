@@ -8,7 +8,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: adobe-three-arm-20261027
+  group: adobe408-read-only-20261028
   cancel-in-progress: false
 jobs:
   collect:
