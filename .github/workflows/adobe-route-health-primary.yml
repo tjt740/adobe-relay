@@ -24,7 +24,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$APP_SHA" = df07b90d7e2ce8e27fd7a9deb11336eaf5077e3c
-          git diff --exit-code "$APP_SHA" -- backend/internal backend/go.mod backend/go.sum frontend Dockerfile deploy/docker-entrypoint.sh
+          git diff --exit-code "$APP_SHA" -- backend/internal backend/cmd/server backend/go.mod backend/go.sum frontend Dockerfile deploy/docker-entrypoint.sh
           python3 -m py_compile deploy/primary/session-controlled-20261027/read_audit.py
       - name: Collect read-only sanitized incident evidence
         env:
