@@ -1,33 +1,17 @@
-import pathlib,json,datetime,subprocess,sys
-ROOT=pathlib.Path('/opt/adobe-relay/releases/crawford-full-chain-20261028-r2')
-def emit(kind,data):print(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'kind':kind,'data':data},ensure_ascii=False))
-for n in ['prepared.json','prepare-error.json','cleaned.json','login-started.json','login-result.json','trial-started.json','trial-finished.json','trial-error.json','first-auth-failure.json','latest-state.json']:
- if (ROOT/n).exists():emit(n,json.loads((ROOT/n).read_text()))
-for n in ['controller.jsonl','events.jsonl']:
- if (ROOT/n).exists():
-  a=[]
-  for l in (ROOT/n).read_text().splitlines():
-   try:a.append(json.loads(l))
-   except:pass
-  from collections import Counter
-  emit(n,{'count':len(a),'events':dict(Counter(x.get('event') for x in a)),'http_statuses':dict(Counter(str(x.get('status')) for x in a if x.get('event')=='http_finish')),'tail':a[-8:]})
-if (ROOT/'prepared.json').exists() and not (ROOT/'cleaned.json').exists():
- sys.path.insert(0,str(ROOT));from replica import clone,crows,selected,command
- emit('isolation_check',crows("SELECT json_build_object('other_accounts_with_credentials',count(*) FILTER(WHERE id<>1738 AND credentials<>'{}'::jsonb),'other_schedulable',count(*) FILTER(WHERE id<>1738 AND schedulable),'target',count(*) FILTER(WHERE id=1738)) FROM accounts"))
- emit('selected',selected())
- emit('migrations',crows("SELECT json_build_object('count',count(*),'digest',md5(string_agg(filename||checksum,',' ORDER BY filename))) FROM schema_migrations"))
+import pathlib,sys,json,re,datetime
+ROOT=pathlib.Path('/opt/adobe-relay/releases/crawford-full-chain-20261028-r2');sys.path.insert(0,str(ROOT));from replica import *
+def safe(s):
+ s=re.sub(r'https?://[^\s<>"\x27]+','[url]',str(s));s=re.sub(r'eyJ[\w-]+\.[\w-]+\.[\w-]+','[token]',s);s=re.sub(r'(?i)(bearer\s+|(?:token|cookie|password|authorization|secret)[\"\x27]?\s*[:=]\s*)[^\s,;}]+',r'\1[redacted]',s)
+ return s[:900]
+a=crows("SELECT json_build_object('at',created_at,'request_id',request_id,'model',model,'status',status_code,'upstream_status',upstream_status_code,'phase',error_phase,'message',error_message,'upstream_message',upstream_error_message) FROM ops_error_logs WHERE created_at>NOW()-INTERVAL '15 minutes' ORDER BY created_at DESC LIMIT 18")
+for x in a:
+ for k in ['message','upstream_message']:x[k]=safe(x[k])
+print(json.dumps({'at':now(),'kind':'request_errors','data':a},ensure_ascii=False));save('request-diagnosis.json',a)
+e=[]
+for l in (ROOT/'events.jsonl').read_text().splitlines():
  try:
-  import socket,urllib.request,urllib.parse,hashlib
-  row=crows("SELECT json_build_object('proxy',to_jsonb(p)) FROM accounts a JOIN proxies p ON p.id=a.proxy_id WHERE a.id=1738")[0]['proxy'];host=row['host']
-  try:socket.getaddrinfo(host,row['port'])
-  except socket.gaierror:host=command(['docker','exec','crawford-fullchain-app','getent','hosts',host]).split()[0]
-  auth=(urllib.parse.quote(row.get('username') or '',safe='')+':'+urllib.parse.quote(row.get('password') or '',safe='')+'@') if row.get('username') else ''
-  proxy=row['protocol']+'://'+auth+host+':'+str(row['port'])
-  opener=urllib.request.build_opener(urllib.request.ProxyHandler({'http':proxy,'https':proxy}))
-  with opener.open('https://api.ipify.org?format=json',timeout=15) as r:ip=json.load(r)['ip']
-  sample={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'proxy_id':row['id'],'ip_sha256':hashlib.sha256(ip.encode()).hexdigest()}
-  with (ROOT/'egress-samples.jsonl').open('a') as f:f.write(json.dumps(sample)+'\n')
-  emit('egress',sample)
- except Exception as e:emit('egress_check_unknown',{'error_class':type(e).__name__})
-
-emit('containers',subprocess.check_output(['docker','ps','-a','--filter','name=crawford-fullchain','--format','{{.Names}} {{.Status}}'],text=True).splitlines())
+  x=json.loads(l)
+  if x.get('event') in ['http_start','http_finish']:e.append(x)
+ except:pass
+print(json.dumps({'at':now(),'kind':'recent_http','data':e[-20:]},ensure_ascii=False))
+print(json.dumps({'at':now(),'kind':'current','data':selected()},ensure_ascii=False))
