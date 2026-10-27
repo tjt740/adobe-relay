@@ -20,7 +20,7 @@ def api(method,path,body=None,timeout=35):
      d=json.loads(line[6:]);result.append({k:d[k] for k in ['type','success','status_code'] if k in d})
    return result
   d=json.load(r);return {'code':d.get('code'),'success_ids':(d.get('data') or {}).get('success_ids')} if isinstance(d,dict) else {}
-def account_rows(private=False):
+def rows(private=False):
  q="SELECT json_build_object('id',a.id,'email',a.name,'status',a.status,'schedulable',a.schedulable,'concurrency',a.concurrency,'manual_pause',a.extra->'okad_manual_pause','manual_proxy',a.extra->'manual_proxy_enabled','proxy_id',a.proxy_id,'proxy_updated_at',p.updated_at,'proxy_status',p.status,'proxy_excluded',EXISTS(SELECT 1 FROM adobe_route_exclusions e WHERE e.proxy_id=a.proxy_id),'other_bindings',(SELECT count(*) FROM accounts b WHERE b.deleted_at IS NULL AND b.proxy_id=a.proxy_id AND b.id<>a.id),'active_lease',EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=a.id AND l.expires_at>NOW()),'version',a.extra->'okad'->'version','verification',a.extra->'okad'->'verification','test',a.extra->'okad_connection_test','error',a.error_message,'cookie_hash',md5(a.credentials->>'cookie'),'runtime_cookie_hash',md5(a.credentials->>'adobe_session_cookie'),'token_hash',md5(a.credentials->>'access_token'),'token',a.credentials->>'access_token','arp_session_id',a.credentials->>'arp_session_id','proxy',json_build_object('host',p.host,'port',p.port,'protocol',p.protocol,'username',p.username,'password',p.password)) FROM accounts a LEFT JOIN proxies p ON p.id=a.proxy_id WHERE a.deleted_at IS NULL AND a.id IN ("+','.join(map(str,IDS))+') ORDER BY a.id'
  data=sql(q)
  if not private:
@@ -32,53 +32,33 @@ def save(name,data):
 def others():
  return sql("SELECT json_build_object('id',id,'config_hash',md5(json_build_object('concurrency',concurrency,'priority',priority,'groups',(SELECT json_agg(group_id ORDER BY group_id) FROM account_groups WHERE account_id=accounts.id),'manual_pause',extra->'okad_manual_pause','manual_proxy',extra->'manual_proxy_enabled')::text),'cookie_hash',md5(credentials->>'cookie')) FROM accounts WHERE deleted_at IS NULL AND id NOT IN ("+','.join(map(str,IDS))+') ORDER BY id')
 
-before={a['id']:a for a in json.loads((ROOT/'before.json').read_text())};current={a['id']:a for a in account_rows()}
-keys=['status','schedulable','concurrency','manual_pause','manual_proxy','proxy_id','version','verification','test','error','cookie_hash','runtime_cookie_hash','token_hash']
-differences={i:{k:{'before':before[i].get(k),'after':current.get(i,{}).get(k)} for k in keys if before[i].get(k)!=current.get(i,{}).get(k)} for i in IDS}
-others_before={a['id']:a for a in json.loads((ROOT/'other-accounts-before.json').read_text())};others_after={a['id']:a for a in others()}
-other_differences={i:{k:{'before':others_before.get(i,{}).get(k),'after':others_after.get(i,{}).get(k)} for k in ['config_hash','cookie_hash'] if others_before.get(i,{}).get(k)!=others_after.get(i,{}).get(k)} for i in set(others_before)|set(others_after)}
-other_differences={i:d for i,d in other_differences.items() if d}
-settings_equal=sql("SELECT json_build_object('key',key,'hash',md5(value)) FROM settings ORDER BY key")==json.loads((ROOT/'settings-before.json').read_text())
-containers=[]
-for name in ['adobe-relay-app-1','adobe-team-cookie-app-1']:
- d=json.loads(subprocess.check_output(['docker','inspect',name],text=True))[0]
- containers.append({'name':name,'image':d['Config']['Image'],'started_at':d['State']['StartedAt'],'restarts':d['RestartCount'],'memory_limit':d['HostConfig']['Memory'],'cpu_shares':d['HostConfig']['CpuShares']})
-running=[n for n in subprocess.check_output(['docker','ps','--format','{{.Names}}'],text=True).splitlines() if n.startswith('adobe-flare-confirmed-')]
-out={'at':now(),'selected_differences':differences,'other_accounts_before':len(others_before),'other_accounts_after':len(others_after),'other_account_differences':other_differences,'settings_equal':settings_equal,'private_tmpfs_exists':bool(list(pathlib.Path('/dev/shm').glob('adobe-flare-confirmed-20261027-*.json'))),'diagnostic_containers':running,'production_containers':containers}
-for name in ['restored.json','finished.json']:
- if (ROOT/name).exists():out[name]=json.loads((ROOT/name).read_text())
-save('final-preservation-check.json',out);print(json.dumps(out,ensure_ascii=False))
 
-for f in sorted(ROOT.glob('*.jsonl')):
- rows=[]
- for l in f.read_text().splitlines():
-  try:rows.append(json.loads(l))
-  except ValueError:pass
- for start in range(0,len(rows),20):print(json.dumps({'at':now(),'evidence_file':f.name,'offset':start,'records':rows[start:start+20]},ensure_ascii=False))
-for f in sorted(ROOT.glob('auth-*.json')):
- print(json.dumps({'at':now(),'evidence_file':f.name,'document':json.loads(f.read_text())},ensure_ascii=False))
-for name in ['started.json','finished.json','native-started.json','native-ui-login-result.json','native-ui-continue-result.json']:
- f=ROOT/name
- if f.exists():print(json.dumps({'at':now(),'evidence_file':name,'document':json.loads(f.read_text())},ensure_ascii=False))
-print(json.dumps({'at':now(),'export_finished':True,'phase_done':(ROOT/'finished.json').exists()}))
-
-for n in ['member-budget-before.json','member-budget-after.json']:
- f=ROOT/n
- if f.exists():print(json.dumps({'at':now(),'evidence_file':n,'document':json.loads(f.read_text())},ensure_ascii=False))
-
-# Read the normal Adobe home sign-in entry without submitting any account identifier or credentials.
-assert (ROOT/'finished.json').exists() and (ROOT/'restored.json').exists()
-import hashlib
-helper=ROOT/'anonymous_home.py';helper.write_text("import json,sys,datetime\nfrom urllib.parse import urlparse\nfrom playwright.sync_api import sync_playwright\ncfg=json.load(sys.stdin)\ndef out(kind,**kw):print(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'anonymous_home_event':kind,**kw},ensure_ascii=False),flush=True)\nwith sync_playwright() as pw:\n p=cfg['proxy'];proxy={'server':p['protocol']+'://'+p['host']+':'+str(p['port'])}\n if p.get('username'):proxy.update(username=p['username'],password=p.get('password') or '')\n b=pw.chromium.launch(executable_path='/chrome/chrome-linux64/chrome',headless=True,proxy=proxy);c=b.new_context(locale='en-US',viewport={'width':1365,'height':950});page=c.new_page();page.set_default_timeout(10000)\n page.goto('https://www.adobe.com/home',wait_until='domcontentloaded',timeout=40000);page.wait_for_timeout(15000)\n out('before',host=urlparse(page.url).hostname,path=urlparse(page.url).path,accessibility=page.locator('body').aria_snapshot()[:6000])\n buttons=[]\n for role in ['button','link']:\n  for label in ['Sign in','Sign In']:\n   for x in page.get_by_role(role,name=label,exact=True).all():\n    if x.is_visible():buttons.append(x)\n if len(buttons)==1:\n  buttons[0].click();page.wait_for_timeout(20000)\n  for pp in c.pages:\n   for frame in pp.frames:\n    u=urlparse(frame.url)\n    if u.hostname and any(h in u.hostname for h in ['adobe.com','adobelogin.com']):\n     try:out('after_signin',host=u.hostname,path=u.path,accessibility=frame.locator('body').aria_snapshot(timeout=5000)[:6000])\n     except Exception as e:out('frame_unknown',host=u.hostname,error_class=type(e).__name__)\n else:out('no_unique_signin_control',count=len(buttons))\n b.close()\n");helper.chmod(0o600)
-account=next(a for a in account_rows(True) if a['id']==1815)
-assert account['proxy_id']==1547 and account['other_bindings']==0 and not account['active_lease']
-name='adobe-flare-home-anonymous'
-cmd=['docker','run','--rm','-i','--name',name,'--network','adobe-relay_default','--memory','2g','--cpus','1.5','--read-only','--tmpfs','/tmp:rw,size=256m','--tmpfs','/root/.config:rw,size=32m','--tmpfs','/root/.cache:rw,size=32m','--shm-size','256m','--mount',f'type=bind,src={ROOT},dst=/experiment,readonly','--mount','type=bind,src=/opt/adobe-relay/releases/three-arm-20261027/chrome,dst=/chrome,readonly','--entrypoint','python','adobe-team-cookie:79382b0f79d559575956e023dc9f52fbf07dbfde','/experiment/anonymous_home.py']
-try:
- r=subprocess.run(cmd,input=json.dumps({'proxy':account['proxy']}),text=True,capture_output=True,timeout=95)
- for line in r.stdout.splitlines():
-  if line.startswith('{"at":'):print(line)
- print(json.dumps({'at':now(),'anonymous_home_returncode':r.returncode}))
-finally:
- subprocess.run(['docker','stop','-t','5',name],capture_output=True,timeout=15)
-print(json.dumps({'at':now(),'anonymous_home_container_remaining':[n for n in subprocess.check_output(['docker','ps','--format','{{.Names}}'],text=True).splitlines() if n==name]}))
+# Read-only attribution of concurrent credential updates; no Adobe calls or account writes.
+check=json.loads((ROOT/'final-preservation-check.json').read_text())
+changed=sorted(int(i) for i in check['other_account_differences'])
+print(json.dumps({'at':now(),'kind':'scope','changed_ids':changed,'snapshot_at':check['at']}))
+if changed:
+ data=sql("SELECT json_build_object('id',id,'cookie_hash',md5(credentials->>'cookie'),'source_key',extra->'okad'->>'source_key','version',extra->'okad'->'version','received_at',extra->'okad'->'received_at','created_at',created_at,'updated_at',updated_at) FROM accounts WHERE id IN ("+','.join(map(str,changed))+') ORDER BY id')
+ c=sqlite3.connect('file:/opt/adobe-team-cookie/data/app.db?mode=ro',uri=True);c.row_factory=sqlite3.Row;c.execute('PRAGMA query_only=ON')
+ for a in data:
+  source=(a.get('source_key') or '').split(':')
+  if len(source)==2 and source[0]=='external' and source[1].isdigit():
+   m=c.execute('SELECT cookie,last_login_at,updated_at,sub2_links FROM external_members WHERE id=?',(int(source[1]),)).fetchone()
+   if m:
+    a['okad_cookie_matches']=hashlib.md5((m['cookie'] or '').encode()).hexdigest()==a['cookie_hash'];a['okad_last_login_at']=m['last_login_at'];a['okad_updated_at']=m['updated_at']
+    try:links=json.loads(m['sub2_links'] or '{}')
+    except Exception:links={}
+    a['link_shape']=list(links) if isinstance(links,dict) else type(links).__name__
+  print(json.dumps({'at':now(),'kind':'concurrent_sync_state','data':a},ensure_ascii=False))
+ c.close()
+# Management requests in the bounded trial window, with only non-secret routing / version fields.
+audit=sql("SELECT row_to_json(t) FROM (SELECT id,created_at,method,path,status_code,auth_method,request_id,request_body FROM audit_logs WHERE created_at>='2026-10-27T13:38:50Z' AND created_at<='2026-10-27T13:53:10Z' AND (path LIKE '%okad%' OR path LIKE '%accounts%') ORDER BY id LIMIT 700) t")
+for a in audit:
+ raw=a.pop('request_body',None)
+ try:b=json.loads(raw or '{}')
+ except Exception:b={}
+ if isinstance(b,dict):
+  a['body_fields']=list(b)
+  a['safe_body']={k:b[k] for k in ['account_ids','account_id','source_key','version','resume','schedulable'] if k in b}
+ print(json.dumps({'at':now(),'kind':'management_audit','data':a},ensure_ascii=False))
+print(json.dumps({'at':now(),'kind':'audit_complete','audit_rows':len(audit),'limit_reached':len(audit)==700}))
