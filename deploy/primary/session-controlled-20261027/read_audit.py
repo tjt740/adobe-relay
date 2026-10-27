@@ -54,7 +54,7 @@ OUT = {'started_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
 names=','.join("'"+e.lower()+"'" for e in TARGETS)
 query('proxy_events',"SELECT row_to_json(t) FROM (SELECT account_id,from_proxy_id,to_proxy_id,created_at FROM proxy_failover_events WHERE account_id IN (SELECT id FROM accounts WHERE deleted_at IS NULL AND lower(name) IN ("+names+")) AND created_at>='2026-10-27T14:30:00+08:00' ORDER BY created_at) t")
 query('test_errors',"SELECT row_to_json(t) FROM (SELECT account_id,created_at,status_code,left(reason,600) AS reason FROM adobe_account_test_errors WHERE account_id IN (SELECT id FROM accounts WHERE deleted_at IS NULL AND lower(name) IN ("+names+")) AND created_at>='2026-10-27T14:30:00+08:00' ORDER BY created_at) t")
-query('sub2_audit',"SELECT row_to_json(t) FROM (SELECT id,created_at,action,method,path,request_id,auth_method,status_code,jsonb_object_keys(CASE WHEN jsonb_typeof(request_body)='object' THEN request_body ELSE '{}'::jsonb END) AS body_key FROM audit_logs WHERE created_at>='2026-10-27T14:30:00+08:00' AND (path LIKE '%accounts%' OR path LIKE '%settings%') ORDER BY created_at DESC LIMIT 2000) t")
+query('sub2_audit',"SELECT row_to_json(t) FROM (SELECT id,created_at,action,method,path,request_id,auth_method,status_code,NULL AS body_key FROM audit_logs WHERE created_at>='2026-10-27T14:30:00+08:00' AND (path LIKE '%accounts%' OR path LIKE '%settings%') ORDER BY created_at DESC LIMIT 2000) t")
 db=sqlite3.connect('file:/opt/adobe-team-cookie/data/app.db?mode=ro',uri=True);db.execute('PRAGMA query_only=ON');db.row_factory=sqlite3.Row
 members=[]
 for e in TARGETS:
