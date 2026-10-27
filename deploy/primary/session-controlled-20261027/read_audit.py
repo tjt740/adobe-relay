@@ -35,23 +35,14 @@ def others():
 
 
 
-import collections
-out={'at':now(),'selected':rows(),'running_diagnostics':[x for x in subprocess.check_output(['docker','ps','--format','{{.Names}}'],text=True).splitlines() if x.startswith('adobe-three-arm-')]}
-for name in ['trial-started.json','trial-finished.json','trial-process-results.json','restored.json','watchdog-extension.json']:
- if (ROOT/name).exists():out[name]=json.loads((ROOT/name).read_text())
-for name in ['sdk-trial.jsonl','control/web-trial.jsonl']:
- records=[]
- if (ROOT/name).exists():
-  for line in (ROOT/name).read_text().splitlines():
-   try:records.append(json.loads(line))
-   except ValueError:pass
- counts=collections.Counter((str(r.get('account_id')),r.get('event'),str(r.get('status',''))) for r in records)
- important=[r for r in records if r.get('event') not in ['http_start','http_finish'] or (r.get('status') or 0)>=400 or 'generate' in (r.get('path') or '')]
- starts=[r for r in records if r.get('event')=='http_start']
- fingerprints=list({(r.get('account_id'),r.get('token_sha256'),r.get('arp_sha256'),r.get('user_agent')) for r in starts})
- out[name]={'count':len(records),'counts':[{'account_id':k[0],'event':k[1],'status':k[2],'count':v} for k,v in counts.items()],'important':important[-100:],'fingerprints':fingerprints,'http_start_sample':starts[:6]}
-for name in ['trial-controller-process.log','web-driver-process.log','sdk-trial-process.log']:
- if (ROOT/name).exists():out[name]=(ROOT/name).read_text()[-1600:]
-out['natural_adobe_successes_during_trial']=sql("SELECT row_to_json(t) FROM (SELECT u.model,count(*) AS successes,count(DISTINCT u.account_id) AS accounts,min(u.created_at) AS first,max(u.created_at) AS last FROM usage_logs u JOIN accounts a ON a.id=u.account_id WHERE a.platform='adobe' AND u.created_at>='2026-10-27T11:43:04Z' AND u.account_id NOT IN (1739,1741,1743) GROUP BY u.model) t")
-out['natural_adobe_errors_during_trial']=sql("SELECT row_to_json(t) FROM (SELECT e.model,e.upstream_status_code,e.error_phase,count(*) AS errors,count(DISTINCT e.account_id) AS accounts FROM ops_error_logs e JOIN accounts a ON a.id=e.account_id WHERE a.platform='adobe' AND e.created_at>='2026-10-27T11:43:04Z' AND e.account_id NOT IN (1739,1741,1743) GROUP BY e.model,e.upstream_status_code,e.error_phase) t")
-print(json.dumps(out,ensure_ascii=False))
+assert (ROOT/'trial-started.json').exists() and not (ROOT/'trial-finished.json').exists() and not (ROOT/'refresh-phase-started.json').exists()
+assert all(a['manual_pause'] and a['manual_proxy'] and not a['active_lease'] and not a['other_bindings'] for a in rows())
+source=json.loads(pathlib.Path('/dev/shm/adobe-three-arm-20261027-private.json').read_text())
+expected={1739:'638eac0873f490f664d2754e',1741:'5d07935e3793bebd4e4b9bf3',1743:'972635e7ddd58330611b023d'}
+cfg={'guard_dir':'/experiment','earliest':'2026-10-27T12:03:20Z','deadline':'2026-10-27T12:13:20Z','accounts':[{'id':a['account_id'],'token':a['record']['access_token'],'cookie':a['record']['cookie'],'proxy':a['proxy'],'expected_ip':expected[a['account_id']]} for a in source]}
+os.chmod(ROOT/'refreshprobe',0o700)
+cmd=['docker','run','--rm','-i','--name','adobe-three-arm-refresh-20261027','--network','adobe-relay_default','--user','0:0','--memory','512m','--cpus','1','--read-only','--tmpfs','/tmp:rw,size=32m','--mount',f'type=bind,src={ROOT},dst=/experiment,readonly','--entrypoint','/experiment/refreshprobe',EXPECTED]
+out=open(ROOT/'refresh-trial.jsonl','a');err=open(ROOT/'refresh-trial-process.log','a')
+p=subprocess.Popen(cmd,stdin=subprocess.PIPE,stdout=out,stderr=err,text=True,start_new_session=True);p.stdin.write(json.dumps(cfg));p.stdin.close()
+save('refresh-phase-started.json',{'at':now(),'pid':p.pid,'earliest':cfg['earliest'],'deadline':cfg['deadline'],'ids':IDS,'max_refresh_requests':4,'generation_requests':0,'raw_credential_files_added':0})
+print(json.dumps({'at':now(),'refresh_probe_scheduled':True,'state':json.loads((ROOT/'refresh-phase-started.json').read_text())}))
