@@ -1,12 +1,13 @@
-import json,pathlib,time,datetime
-r=pathlib.Path('/opt/adobe-relay/releases/three-arm-20261027');p=r/'control'
-assert (r/'isolated.json').exists(),'selected accounts not isolated'
-a=json.loads((r/'isolated.json').read_text())['accounts'];assert all(x['manual_pause'] is True and x['manual_proxy'] is True and not x['schedulable'] for x in a)
-f=p/'cmd-0001.json'
-if not f.exists():
- with f.open('x') as h:json.dump({'action':'click_role','role':'button','name':'Sign in'},h)
-end=time.monotonic()+16;receipt=p/'cmd-0001.receipt.json'
-while time.monotonic()<end:
- if receipt.exists() and json.loads(receipt.read_text()).get('state')!='started':break
- time.sleep(.5)
-print(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'receipt':json.loads(receipt.read_text()) if receipt.exists() else None,'state':json.loads((p/'web-state.json').read_text()) if (p/'web-state.json').exists() else None},ensure_ascii=False))
+import subprocess,json,datetime
+code=r'''
+import ast,pathlib,json
+p=pathlib.Path('/app/backend/app/api/routes/external_member.py');s=p.read_text();tree=ast.parse(s);out={}
+for n in tree.body:
+ if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and any(x in n.name for x in ['mail','message','otp']):out[n.name]=ast.get_source_segment(s,n)
+for name in ['external_mail_reader.py','external_mail.py','mail_reader.py']:
+ p=pathlib.Path('/app/backend/app/services')/name
+ if p.exists():out[name]=p.read_text()[:16000]
+print(json.dumps(out,ensure_ascii=False))
+'''
+r=subprocess.run(['docker','exec','adobe-team-cookie-app-1','python','-c',code],text=True,capture_output=True,timeout=20)
+print(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'sources':json.loads(r.stdout) if r.returncode==0 else None}))
