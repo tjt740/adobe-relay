@@ -38,6 +38,12 @@ jobs:
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
           mkdir -p incident-evidence
           ssh -C -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 root@173.234.15.150 'python3 -' < deploy/primary/session-controlled-20261027/read_audit.py > incident-evidence/read-only-audit.json
+          python3 - <<'PYOUT'
+          import json
+          d=json.load(open('incident-evidence/read-only-audit.json'))
+          c=[a for a in d['accounts'] if a['status']=='error' and not a['schedulable'] and a['manual_pause'] is not True and a['manual_proxy'] is not True and a['other_bindings']==0 and not a['active_lease'] and not a['proxy_excluded'] and (a['test'] or {}).get('state') not in ('running','pending','proxy_pending') and a['proxy_id']]
+          print(json.dumps({'at':d['at'],'runtimes':d['runtimes'],'containers':d['container_versions'],'images':d['docker_images'],'eligible':c[:8],'members':[m for m in d['members'] if m['email'] in {a['email'] for a in c[:8]}]},ensure_ascii=False))
+          PYOUT
       - uses: actions/upload-artifact@v4
         if: always()
         with:
