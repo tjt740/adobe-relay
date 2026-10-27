@@ -1,5 +1,5 @@
 import json,subprocess,pathlib,datetime,time,sqlite3,hashlib,urllib.request,urllib.error,urllib.parse,os,sys,traceback,signal,threading
-ROOT=pathlib.Path('/opt/adobe-relay/releases/native-followup-20261027');IDS=[1843, 1815];MEMBERS={1843: 2, 1815: 75};EXPECTED='adobe-relay:df07b90d7e2ce8e27fd7a9deb11336eaf5077e3c';os.umask(0o077)
+ROOT=pathlib.Path('/opt/adobe-relay/releases/native-followup-20261027');IDS=[1815];MEMBERS={1815: 75};EXPECTED='adobe-relay:df07b90d7e2ce8e27fd7a9deb11336eaf5077e3c';os.umask(0o077)
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def log(kind,**kw):
  with (ROOT/'controller.jsonl').open('a') as f:f.write(json.dumps({'at':now(),'event':kind,**kw},ensure_ascii=False)+'\n')
