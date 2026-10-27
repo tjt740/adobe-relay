@@ -1,16 +1,18 @@
-import json,pathlib,subprocess,sqlite3,datetime
+import pathlib,json,datetime,subprocess,collections
 ROOT=pathlib.Path('/opt/adobe-relay/releases/expanded-20261027')
-assert (ROOT/'native-started.json').exists() and not (ROOT/'finished.json').exists()
-assert not (ROOT/'native-ui-continue-started.json').exists(),'no duplicate native UI login'
-code='import json,sys,datetime,hashlib,time\nfrom urllib.parse import urlparse\nfrom playwright.sync_api import sync_playwright\ncfg=json.load(sys.stdin)\ndef now():return datetime.datetime.now(datetime.timezone.utc).isoformat()\ndef snapshot(ctx):\n out=[]\n for index,p in enumerate(ctx.pages):\n  if p.is_closed():continue\n  u=urlparse(p.url)\n  try:out.append({\'index\':index,\'url\':u.scheme+\'://\'+u.netloc+u.path,\'text\':p.locator(\'body\').inner_text(timeout=6000)[:6500],\'accessibility\':p.locator(\'body\').aria_snapshot(timeout=6000)[:10000]})\n  except Exception as e:out.append({\'index\':index,\'error_class\':type(e).__name__})\n return out\nwith sync_playwright() as pw:\n browser=pw.chromium.connect_over_cdp(\'http://127.0.0.1:9222\',timeout=12000);ctx=browser.contexts[0];original=ctx.pages[0]\n original.goto(\'https://account.adobe.com/\',wait_until=\'domcontentloaded\',timeout=45000);original.wait_for_timeout(7000)\n ip=original.evaluate("async()=>{const r=await fetch(\'https://api.ipify.org?format=json\');return (await r.json()).ip}")\n assert hashlib.sha256(ip.encode()).hexdigest()==cfg[\'expected_egress\'],\'egress_changed\'\n actions=[];email_done=False;password_done=False\n try:\n  for _ in range(6):\n   pages=[p for p in ctx.pages if not p.is_closed()];auth=[p for p in pages if any(s in (urlparse(p.url).hostname or \'\') for s in [\'adobelogin.com\',\'auth.services.adobe.com\'])]\n   p=auth[-1] if auth else pages[-1]\n   body=p.locator(\'body\').inner_text(timeout=8000)\n   if any(s in body.lower() for s in [\'captcha\',\'prove you\',\'verify you are human\',\'incorrect password\',\'password is incorrect\']):actions.append(\'human_challenge_or_rejected_password_stop\');break\n   emails=[e for e in p.locator(\'input[type="email"],input[id*="Email"]\').all() if e.is_visible()]\n   passwords=[e for e in p.locator(\'input[type="password"]\').all() if e.is_visible()]\n   if len(emails)==1 and not email_done:\n    emails[0].fill(cfg[\'email\']);email_done=True;actions.append(\'filled_selected_email\')\n    b=p.get_by_role(\'button\',name=\'Continue\',exact=True)\n    if b.count()==1 and b.is_visible() and b.is_enabled():b.click();actions.append(\'continued_email\');p.wait_for_timeout(5000);continue\n   if len(passwords)==1 and not password_done and cfg.get(\'password\'):\n    passwords[0].fill(cfg[\'password\']);password_done=True;actions.append(\'filled_saved_password\')\n    buttons=[p.get_by_role(\'button\',name=name,exact=True) for name in [\'Continue\',\'Sign in\']]\n    buttons=[b for b in buttons if b.count()==1 and b.is_visible() and b.is_enabled()]\n    if len(buttons)==1:buttons[0].click();actions.append(\'submitted_saved_password\');p.wait_for_timeout(6000);continue\n   if not auth:\n    buttons=[p.get_by_role(\'button\',name=\'Sign in\',exact=True)]\n    buttons=[b for b in buttons if b.count()==1 and b.is_visible() and b.is_enabled()]\n    if len(buttons)==1:buttons[0].click();actions.append(\'opened_signin\');p.wait_for_timeout(5000);continue\n   break\n except Exception as ex:actions.append(\'interaction_error_\'+type(ex).__name__)\n result={\'at\':now(),\'actions\':actions,\'pages\':snapshot(ctx),\'egress_matches\':True}\n print(json.dumps(result,ensure_ascii=False))\n'
-c=sqlite3.connect('file:/opt/adobe-team-cookie/data/app.db?mode=ro',uri=True);r=c.execute('SELECT email,adobe_password FROM external_members WHERE id=2').fetchone();c.close();assert r[0].lower()=='brianschmidtfy445921@outlook.com'
-ip=json.loads((ROOT/'auth-1843.json').read_text())['egress_sha256'];cfg={'email':r[0],'password':r[1],'expected_egress':ip}
-(ROOT/'native-ui-continue-started.json').write_text(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'account_id':1843}))
-r=subprocess.run(['docker','exec','-i','adobe-expanded-native-1843','python','-c',code],input=json.dumps(cfg),capture_output=True,text=True,timeout=90)
-results=[]
-for line in r.stdout.splitlines():
- if line.startswith('{'):
-  try:results.append(json.loads(line))
-  except ValueError:pass
-out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'returncode':r.returncode,'browser':results,'error_tail':r.stderr[-700:] if r.returncode else None}
-(ROOT/'native-ui-continue-result.json').write_text(json.dumps(out,ensure_ascii=False));print(json.dumps(out,ensure_ascii=False))
+def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
+for name in ['started.json','isolated.json','finished.json','restored.json','native-started.json','native-ui.json','native-ui-login-result.json']+[f'auth-{i}.json' for i in [1843,1815,1813,1833,1807,1817]]:
+ f=ROOT/name
+ if f.exists():print(json.dumps({'at':now(),'file':name,'document':json.loads(f.read_text())},ensure_ascii=False))
+for f in sorted(ROOT.glob('*.jsonl')):
+ rows=[]
+ for l in f.read_text().splitlines():
+  try:rows.append(json.loads(l))
+  except:pass
+ statuses=collections.Counter(str(x.get('status')) for x in rows if x.get('event')=='http_finish' and x.get('host')=='firefly-3p.ff.adobe.io')
+ keep=[r for r in rows if r.get('event') in ['fatal','stop','account_done','account_start','login_ready','login_failed','guard_stop','worker_failed','resolved_model','web_ready','job_finish']]
+ bad=[r for r in rows if r.get('status')==401 or r.get('valid') is False]
+ print(json.dumps({'at':now(),'file':f.name,'record_count':len(rows),'statuses':statuses,'events':keep[-12:],'bad':bad,'tail':rows[-3:]},ensure_ascii=False))
+for f in sorted(ROOT.glob('*stderr.log'))+[ROOT/'controller-process.log']:
+ if f.exists() and f.stat().st_size:print(json.dumps({'at':now(),'file':f.name,'log_tail':f.read_text()[-1800:]},ensure_ascii=False))
+print(json.dumps({'at':now(),'containers':[n for n in subprocess.check_output(['docker','ps','--format','{{.Names}}'],text=True).splitlines() if n.startswith('adobe-expanded-')]}))
