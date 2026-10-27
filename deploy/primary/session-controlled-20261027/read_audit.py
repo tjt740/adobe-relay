@@ -1,18 +1,23 @@
-import pathlib,json,datetime,subprocess,collections
-ROOT=pathlib.Path('/opt/adobe-relay/releases/expanded-20261027')
-def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
-for name in ['started.json','isolated.json','finished.json','restored.json','native-started.json','native-ui.json','native-ui-login-result.json']+[f'auth-{i}.json' for i in [1843,1815,1813,1833,1807,1817]]:
- f=ROOT/name
- if f.exists():print(json.dumps({'at':now(),'file':name,'document':json.loads(f.read_text())},ensure_ascii=False))
-for f in sorted(ROOT.glob('*.jsonl')):
- rows=[]
- for l in f.read_text().splitlines():
-  try:rows.append(json.loads(l))
-  except:pass
- statuses=collections.Counter(str(x.get('status')) for x in rows if x.get('event')=='http_finish' and x.get('host')=='firefly-3p.ff.adobe.io')
- keep=[r for r in rows if r.get('event') in ['fatal','stop','account_done','account_start','login_ready','login_failed','guard_stop','worker_failed','resolved_model','web_ready','job_finish']]
- bad=[r for r in rows if r.get('status')==401 or r.get('valid') is False]
- print(json.dumps({'at':now(),'file':f.name,'record_count':len(rows),'statuses':statuses,'events':keep[-12:],'bad':bad,'tail':rows[-3:]},ensure_ascii=False))
-for f in sorted(ROOT.glob('*stderr.log'))+[ROOT/'controller-process.log']:
- if f.exists() and f.stat().st_size:print(json.dumps({'at':now(),'file':f.name,'log_tail':f.read_text()[-1800:]},ensure_ascii=False))
-print(json.dumps({'at':now(),'containers':[n for n in subprocess.check_output(['docker','ps','--format','{{.Names}}'],text=True).splitlines() if n.startswith('adobe-expanded-')]}))
+import json,subprocess,datetime
+code='''import json,time
+from urllib.parse import urlparse
+from playwright.sync_api import sync_playwright
+with sync_playwright() as pw:
+ b=pw.chromium.connect_over_cdp('http://127.0.0.1:9222');ctx=b.contexts[0];p=ctx.pages[0]
+ if 'account.adobe.com' in p.url:
+  p.goto('https://firefly.adobe.com/generate/image',wait_until='domcontentloaded',timeout=45000);p.wait_for_timeout(22000)
+ body=p.locator('body').aria_snapshot()
+ if 'dialog "Sign in to Adobe Firefly"' not in body:
+  btn=p.get_by_role('button',name='Sign in',exact=True)
+  if btn.count()==1 and btn.is_visible():btn.click(timeout=12000);p.wait_for_timeout(8000)
+ out=[]
+ for pi,page in enumerate(ctx.pages):
+  for fi,f in enumerate(page.frames):
+   u=urlparse(f.url);item={'page_index':pi,'frame_index':fi,'url':u.scheme+'://'+u.netloc+u.path,'name':f.name}
+   try:item['text']=f.locator('body').inner_text(timeout=5000)[:6500];item['accessibility']=f.locator('body').aria_snapshot(timeout=5000)[:9000]
+   except Exception as e:item['error_class']=type(e).__name__
+   out.append(item)
+ print(json.dumps({'frames':out},ensure_ascii=False))
+'''
+r=subprocess.run(['docker','exec','adobe-expanded-native-1843','python','-c',code],capture_output=True,text=True,timeout=110)
+print(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'returncode':r.returncode,'browser':[json.loads(l) for l in r.stdout.splitlines() if l.startswith('{')],'error_tail':r.stderr[-700:] if r.returncode else None},ensure_ascii=False))
