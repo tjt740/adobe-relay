@@ -26,15 +26,6 @@ jobs:
           test "$APP_SHA" = df07b90d7e2ce8e27fd7a9deb11336eaf5077e3c
           git diff --exit-code "$APP_SHA" -- backend/internal backend/go.mod backend/go.sum frontend Dockerfile deploy/docker-entrypoint.sh
           python3 -m py_compile deploy/primary/session-controlled-20261027/read_audit.py
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.27.2'
-          cache-dependency-path: backend/go.sum
-      - name: Compile bounded refresh comparison with unchanged production SDK
-        working-directory: backend
-        run: |
-          go test ./cmd/refreshprobe
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /tmp/refreshprobe ./cmd/refreshprobe
       - name: Collect read-only sanitized incident evidence
         env:
           SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
@@ -46,7 +37,6 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
           mkdir -p incident-evidence
-          scp -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 /tmp/refreshprobe root@173.234.15.150:/opt/adobe-relay/releases/three-arm-20261027/refreshprobe
           ssh -C -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 root@173.234.15.150 'python3 -' < deploy/primary/session-controlled-20261027/read_audit.py > incident-evidence/read-only-audit.json
           cat incident-evidence/read-only-audit.json
       - uses: actions/upload-artifact@v4
