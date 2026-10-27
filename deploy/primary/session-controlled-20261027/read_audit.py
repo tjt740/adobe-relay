@@ -7,6 +7,8 @@ controller = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(controller)
 audit = {'at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
          'accounts': controller.rows(), 'other_accounts_current': controller.others()}
+audit['shared_node_accounts'] = controller.sql("SELECT json_build_object('id',id,'status',status,'schedulable',schedulable,'proxy_id',proxy_id,'manual_pause',extra->'okad_manual_pause','manual_proxy',extra->'manual_proxy_enabled','created_at',created_at,'updated_at',updated_at) FROM accounts WHERE deleted_at IS NULL AND proxy_id IN (1131,1466,1462,1468) ORDER BY id")
+audit['selected_proxy_events'] = controller.sql("SELECT row_to_json(e) FROM (SELECT account_id,from_proxy_id,to_proxy_id,created_at FROM proxy_failover_events WHERE created_at>='2026-10-27T03:23:38Z' AND (from_proxy_id IN (1131,1466,1462,1468) OR to_proxy_id IN (1131,1466,1462,1468)) ORDER BY created_at) e")
 containers = []
 for name in ['adobe-relay-app-1', 'adobe-team-cookie-app-1']:
     d = json.loads(subprocess.check_output(['docker', 'inspect', name], text=True))[0]
