@@ -1,15 +1,21 @@
-import json,pathlib,sqlite3,hashlib,base64,datetime
-ROOT=pathlib.Path('/opt/adobe-relay/releases/expanded-20261027');sel=json.loads((ROOT/'selected.json').read_text())
-def digest(v):return hashlib.sha256(str(v).encode()).hexdigest()
-def meta(token):
- try:
-  p=token.split('.')[1];c=json.loads(base64.urlsafe_b64decode(p+'='*(-len(p)%4)))
- except:return {'present':bool(token)}
- return {'token_sha256':digest(token),**{k:c.get(k) for k in ['client_id','account_type','created_at','expires_in','exp','iat']},**{k+'_sha256':digest(c.get(k,'')) for k in ['sid','user_id','aa_id','ownerOrg','as']}}
-c=sqlite3.connect('file:/opt/adobe-team-cookie/data/app.db?mode=ro',uri=True);c.row_factory=sqlite3.Row
-for a in sel:
- r=dict(c.execute('SELECT * FROM external_members WHERE id=?',(a['member_id'],)).fetchone());f=pathlib.Path('/dev/shm/adobe-expanded-20261027-'+str(a['id'])+'.json')
- private=json.loads(f.read_text()) if f.exists() else {};rec=private.get('record') or {}
- old=meta(r.get('access_token') or '');new=meta(rec.get('access_token') or '')
- out={'account_id':a['id'],'old':old,'new':new,'same_identity':old.get('user_id_sha256')==new.get('user_id_sha256'),'same_profile_type':old.get('account_type')==new.get('account_type'),'stored_profile':{k:r.get(k) for k in ['profile_preference','force_code_login','otp_mode','subscription_ok','subscription_status','credits_available','credits_total','last_login_at']},'new_record_keys':list(rec),'new_profile':{k:rec.get(k) for k in ['account_type','subscription_ok','subscription_status','credits_available','credits_total']}}
- print(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'comparison':out},ensure_ascii=False))
+import pathlib,json,subprocess,datetime
+ROOT=pathlib.Path('/opt/adobe-relay/releases/expanded-20261027');assert not (ROOT/'finished.json').exists();assert not (ROOT/'native-email-entered.json').exists()
+code='''import json
+from urllib.parse import urlparse
+from playwright.sync_api import sync_playwright
+with sync_playwright() as pw:
+ b=pw.chromium.connect_over_cdp('http://127.0.0.1:9222');ctx=b.contexts[0];p=ctx.pages[0];f=next(f for f in p.frames if 'auth-light.identity.adobe.com' in f.url)
+ f.get_by_role('textbox',name='Email address',exact=True).fill('BrianSchmidtfY445921@outlook.com')
+ f.get_by_role('button',name='Continue',exact=True).click();p.wait_for_timeout(5000)
+ out=[]
+ for pi,p in enumerate(ctx.pages):
+  for fi,f in enumerate(p.frames):
+   u=urlparse(f.url);x={'page_index':pi,'frame_index':fi,'url':u.scheme+'://'+u.netloc+u.path}
+   try:x['accessibility']=f.locator('body').aria_snapshot(timeout=4000)[:11000];x['text']=f.locator('body').inner_text(timeout=4000)[:6500]
+   except Exception as e:x['error_class']=type(e).__name__
+   out.append(x)
+ print(json.dumps({'frames':out},ensure_ascii=False))
+'''
+(ROOT/'native-email-entered.json').write_text(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat()}))
+r=subprocess.run(['docker','exec','adobe-expanded-native-1843','python','-c',code],capture_output=True,text=True,timeout=70)
+print(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'returncode':r.returncode,'browser':[json.loads(l) for l in r.stdout.splitlines() if l.startswith('{')],'error_tail':r.stderr[-600:] if r.returncode else None},ensure_ascii=False))
