@@ -352,7 +352,7 @@ func main() {
 	}
 	seen := map[int64]bool{}
 	for _, a := range cfg.Accounts {
-		if (a.ID != 1842 && a.ID != 1833 && a.ID != 1807 && a.ID != 1817) || seen[a.ID] || (a.Concurrency != 1 && a.Concurrency != 3) || a.Token == "" || a.Proxy == "" {
+		if (a.ID != 1813 && a.ID != 1833 && a.ID != 1807 && a.ID != 1817) || seen[a.ID] || (a.Concurrency != 1 && a.Concurrency != 3) || a.Token == "" || a.Proxy == "" {
 			os.Exit(4)
 		}
 		if a.IntervalSec != 0 && a.IntervalSec != 180 {
