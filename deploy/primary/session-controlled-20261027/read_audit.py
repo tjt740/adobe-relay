@@ -1,94 +1,22 @@
-import json,subprocess,pathlib,datetime,time,sqlite3,hashlib,urllib.request,urllib.error,urllib.parse,os,sys,traceback,signal,threading
-ROOT=pathlib.Path('/opt/adobe-relay/releases/crawford-login-egress-observe-20261027');IDS=[1738];MEMBERS={1738:1138};EXPECTED='adobe-relay:df07b90d7e2ce8e27fd7a9deb11336eaf5077e3c';os.umask(0o077)
-def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
-def log(kind,**kw):
- with (ROOT/'controller.jsonl').open('a') as f:f.write(json.dumps({'at':now(),'event':kind,**kw},ensure_ascii=False)+'\n')
-def sql(q,raw=False):
- r=subprocess.run(['docker','exec','-i','adobe-relay-postgres-1','psql','-U','sub2api','-d','sub2api','-Atq','-v','ON_ERROR_STOP=1'],input="BEGIN READ ONLY;SET LOCAL statement_timeout='8s';"+q+';COMMIT;',capture_output=True,text=True,timeout=15)
- if r.returncode:raise RuntimeError('database_read_failed')
- return r.stdout.strip() if raw else [json.loads(x) for x in r.stdout.splitlines() if x.startswith('{')]
-def api(method,path,body=None,timeout=35):
- assert path=='/api/v1/admin/accounts/bulk-update' or any(path==f'/api/v1/admin/accounts/{i}'+suffix for i in IDS for suffix in ('','/schedulable','/test'))
- if path.endswith('bulk-update'):assert set(body['account_ids'])<=set(IDS) and 'filters' not in body
- key=sql("SELECT value FROM settings WHERE key='admin_api_key'",True)
- req=urllib.request.Request('http://127.0.0.1:6666'+path,data=json.dumps(body).encode() if body is not None else None,headers={'x-api-key':key,'Content-Type':'application/json','X-Request-ID':'session-controlled-20261027'},method=method)
- with urllib.request.urlopen(req,timeout=timeout) as r:
-  if path.endswith('/test'):
-   result=[]
-   for line in r:
-    if line.startswith(b'data: '):
-     d=json.loads(line[6:]);result.append({k:d[k] for k in ['type','success','status_code'] if k in d})
-   return result
-  d=json.load(r);return {'code':d.get('code'),'success_ids':(d.get('data') or {}).get('success_ids')} if isinstance(d,dict) else {}
-def account_rows(private=False):
- q="SELECT json_build_object('id',a.id,'email',a.name,'status',a.status,'schedulable',a.schedulable,'concurrency',a.concurrency,'manual_pause',a.extra->'okad_manual_pause','manual_proxy',a.extra->'manual_proxy_enabled','proxy_id',a.proxy_id,'proxy_updated_at',p.updated_at,'proxy_status',p.status,'proxy_excluded',EXISTS(SELECT 1 FROM adobe_route_exclusions e WHERE e.proxy_id=a.proxy_id),'other_bindings',(SELECT count(*) FROM accounts b WHERE b.deleted_at IS NULL AND b.proxy_id=a.proxy_id AND b.id<>a.id),'active_lease',EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=a.id AND l.expires_at>NOW()),'version',a.extra->'okad'->'version','verification',a.extra->'okad'->'verification','test',a.extra->'okad_connection_test','error',a.error_message,'cookie_hash',md5(a.credentials->>'cookie'),'runtime_cookie_hash',md5(a.credentials->>'adobe_session_cookie'),'token_hash',md5(a.credentials->>'access_token'),'token',a.credentials->>'access_token','arp_session_id',a.credentials->>'arp_session_id','proxy',json_build_object('host',p.host,'port',p.port,'protocol',p.protocol,'username',p.username,'password',p.password)) FROM accounts a LEFT JOIN proxies p ON p.id=a.proxy_id WHERE a.deleted_at IS NULL AND a.id IN ("+','.join(map(str,IDS))+') ORDER BY a.id'
- data=sql(q)
- if not private:
-  for a in data:
-   for k in ['token','arp_session_id','proxy']:a.pop(k,None)
- return data
-def save(name,data):
- p=ROOT/name;tmp=ROOT/(name+'.tmp');tmp.write_text(json.dumps(data,ensure_ascii=False,indent=2));tmp.replace(p)
-def others():
- return sql("SELECT json_build_object('id',id,'config_hash',md5(json_build_object('concurrency',concurrency,'priority',priority,'groups',(SELECT json_agg(group_id ORDER BY group_id) FROM account_groups WHERE account_id=accounts.id),'manual_pause',extra->'okad_manual_pause','manual_proxy',extra->'manual_proxy_enabled')::text),'cookie_hash',md5(credentials->>'cookie')) FROM accounts WHERE deleted_at IS NULL AND id NOT IN ("+','.join(map(str,IDS))+') ORDER BY id')
+import json,datetime,subprocess,sqlite3,hashlib,pathlib,shutil
 
-deadline=time.monotonic()+55
-while not (ROOT/'finished.json').exists() and time.monotonic()<deadline:time.sleep(2)
-assert (ROOT/'finished.json').exists(),'experiment still active; do not call this a final audit'
-before={a['id']:a for a in json.loads((ROOT/'before.json').read_text())};current={a['id']:a for a in account_rows()}
-keys=['status','schedulable','concurrency','manual_pause','manual_proxy','proxy_id','version','verification','test','error','cookie_hash','runtime_cookie_hash','token_hash']
-differences={i:{k:{'before':before[i].get(k),'after':current.get(i,{}).get(k)} for k in keys if before[i].get(k)!=current.get(i,{}).get(k)} for i in IDS}
-others_before={a['id']:a for a in json.loads((ROOT/'other-accounts-before.json').read_text())};others_after={a['id']:a for a in others()}
-other_differences={i:{k:{'before':others_before.get(i,{}).get(k),'after':others_after.get(i,{}).get(k)} for k in ['config_hash','cookie_hash'] if others_before.get(i,{}).get(k)!=others_after.get(i,{}).get(k)} for i in set(others_before)|set(others_after)}
-other_differences={i:d for i,d in other_differences.items() if d}
-settings_equal=sql("SELECT json_build_object('key',key,'hash',md5(value)) FROM settings ORDER BY key")==json.loads((ROOT/'settings-before.json').read_text())
-containers=[]
-for name in ['adobe-relay-app-1','adobe-team-cookie-app-1']:
- d=json.loads(subprocess.check_output(['docker','inspect',name],text=True))[0]
- containers.append({'name':name,'image':d['Config']['Image'],'started_at':d['State']['StartedAt'],'restarts':d['RestartCount'],'memory_limit':d['HostConfig']['Memory'],'cpu_shares':d['HostConfig']['CpuShares']})
-running=[n for n in subprocess.check_output(['docker','ps','--format','{{.Names}}'],text=True).splitlines() if n.startswith('adobe-crawford-login-egress-observe-')]
-out={'at':now(),'selected_differences':differences,'other_accounts_before':len(others_before),'other_accounts_after':len(others_after),'other_account_differences':other_differences,'settings_equal':settings_equal,'private_tmpfs_exists':bool(list(pathlib.Path('/dev/shm').glob('adobe-crawford-login-egress-observe-20261027-*.json'))),'diagnostic_containers':running,'production_containers':containers}
-for name in ['restored.json','finished.json']:
- if (ROOT/name).exists():out[name]=json.loads((ROOT/name).read_text())
-save('final-preservation-check.json',out);print(json.dumps(out,ensure_ascii=False))
-
-for f in sorted(ROOT.glob('*.jsonl')):
- rows=[]
- for l in f.read_text().splitlines():
-  try:rows.append(json.loads(l))
-  except ValueError:pass
- for start in range(0,len(rows),20):print(json.dumps({'at':now(),'evidence_file':f.name,'offset':start,'records':rows[start:start+20]},ensure_ascii=False))
-for f in sorted(ROOT.glob('auth-*.json')):
- print(json.dumps({'at':now(),'evidence_file':f.name,'document':json.loads(f.read_text())},ensure_ascii=False))
-for name in ['started.json','finished.json','native-started.json','native-ui-login-result.json','native-ui-continue-result.json']:
- f=ROOT/name
- if f.exists():print(json.dumps({'at':now(),'evidence_file':name,'document':json.loads(f.read_text())},ensure_ascii=False))
-print(json.dumps({'at':now(),'export_finished':True,'phase_done':(ROOT/'finished.json').exists()}))
-
-for n in ['member-budget-before.json','member-budget-after.json']:
- f=ROOT/n
- if f.exists():print(json.dumps({'at':now(),'evidence_file':n,'document':json.loads(f.read_text())},ensure_ascii=False))
-
-db=sqlite3.connect('file:/opt/adobe-team-cookie/data/app.db?mode=ro',uri=True);db.execute('PRAGMA query_only=ON')
-settings=dict(db.execute("SELECT key,value FROM settings WHERE key IN ('proxy_enabled','proxy_url')"));db.close()
-print(json.dumps({'at':now(),'production_login_configuration':{'proxy_enabled':str(settings.get('proxy_enabled','false')).lower()=='true','proxy_config_empty':not bool(str(settings.get('proxy_url') or '').strip())}}))
-print(json.dumps({'at':now(),'followup_tmpfs_remaining':pathlib.Path('/dev/shm/adobe-crawford-followup-20261027-1738.json').exists()}))
-
-prior=pathlib.Path('/opt/adobe-relay/releases/crawford-login-egress-trace-20261027')
-for name in ['final-preservation-check.json','member-budget-before.json','member-budget-after.json']:
- f=prior/name
- if f.exists():print(json.dumps({'at':now(),'prior_trace_setup_evidence_file':name,'document':json.loads(f.read_text())},ensure_ascii=False))
-
-f=ROOT/'image-identity.json'
-if f.exists():print(json.dumps({'at':now(),'evidence_file':f.name,'document':json.loads(f.read_text())},ensure_ascii=False))
-prior=pathlib.Path('/opt/adobe-relay/releases/crawford-login-egress-final-20261027')
-for name in ['restored.json','finished.json','auth-1738.json','member-budget-before.json','member-budget-after.json','image-identity.json']:
- f=prior/name
- if f.exists():print(json.dumps({'at':now(),'prior_ip_preflight_evidence_file':name,'document':json.loads(f.read_text())},ensure_ascii=False))
-
-# Verify diagnostic image code is the same code currently used by production.
-code="import pathlib,json,hashlib; root=pathlib.Path('/app/backend/app/services'); print(json.dumps({n:hashlib.sha256((root/n).read_bytes()).hexdigest() for n in ['firefly.py','external_login.py','organization_cleanup.py','adobe_protocol/http_client.py']}))"
-a=subprocess.run(['docker','exec','adobe-team-cookie-app-1','python','-c',code],capture_output=True,text=True,timeout=20)
-b=subprocess.run(['docker','run','--rm','--network','none','--read-only','--memory','128m','--cpus','0.5','--entrypoint','python','adobe-team-cookie:79382b0f79d559575956e023dc9f52fbf07dbfde','-c',code],capture_output=True,text=True,timeout=25)
-assert a.returncode==0 and b.returncode==0,'source identity collection failed'
-print(json.dumps({'at':now(),'production_vs_diagnostic_login_source_equal':json.loads(a.stdout)==json.loads(b.stdout),'source_hashes':json.loads(a.stdout)},ensure_ascii=False))
+def emit(kind,data):print(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'kind':kind,'data':data},ensure_ascii=False))
+def sql(q):
+ r=subprocess.run(['docker','exec','-i','adobe-relay-postgres-1','psql','-U','sub2api','-d','sub2api','-Atq','-v','ON_ERROR_STOP=1'],input="BEGIN READ ONLY;SET LOCAL statement_timeout='12s';"+q+';COMMIT;',text=True,capture_output=True,timeout=20)
+ if r.returncode:raise RuntimeError('read query failed')
+ return [json.loads(x) for x in r.stdout.splitlines() if x.startswith('{')]
+for name in ['adobe-relay-app-1','adobe-team-cookie-app-1','adobe-relay-postgres-1','adobe-relay-redis-1']:
+ r=subprocess.run(['docker','inspect',name],text=True,capture_output=True,timeout=12)
+ if r.returncode:emit('container_missing',name);continue
+ d=json.loads(r.stdout)[0];env=dict(x.split('=',1) for x in d['Config'].get('Env',[]) if '=' in x)
+ emit('container',{'name':name,'image':d['Config']['Image'],'image_id':d['Image'],'started_at':d['State']['StartedAt'],'restarts':d['RestartCount'],'memory':d['HostConfig']['Memory'],'network_mode':d['HostConfig']['NetworkMode'],'mount_destinations':[x['Destination'] for x in d['Mounts']],'env_keys':sorted(env),'safe_env':{k:v for k,v in env.items() if k in ['RUN_MODE','SERVER_PORT','SERVER_HOST','DATABASE_HOST','DATABASE_PORT','DATABASE_DBNAME','REDIS_HOST','REDIS_PORT','REDIS_DB','GOMEMLIMIT','GOMAXPROCS','TZ']}})
+emit('selected_account',sql("SELECT json_build_object('id',a.id,'email',a.name,'status',a.status,'schedulable',a.schedulable,'concurrency',a.concurrency,'proxy_id',a.proxy_id,'manual_pause',a.extra->'okad_manual_pause','manual_proxy',a.extra->'manual_proxy_enabled','version',a.extra->'okad'->'version','source_cookie_hash',md5(a.credentials->>'cookie'),'runtime_cookie_hash',md5(a.credentials->>'adobe_session_cookie'),'token_hash',md5(a.credentials->>'access_token'),'credential_keys',(SELECT json_agg(k) FROM jsonb_object_keys(a.credentials) k),'test',a.extra->'okad_connection_test','error',a.error_message,'groups',(SELECT json_agg(group_id ORDER BY group_id) FROM account_groups WHERE account_id=a.id)) FROM accounts a WHERE a.id=1738 AND a.deleted_at IS NULL"))
+emit('schema',sql("SELECT json_build_object('table',table_name,'columns',json_agg(json_build_object('name',column_name,'type',data_type) ORDER BY ordinal_position)) FROM information_schema.columns WHERE table_schema='public' AND (table_name IN ('users','api_keys','groups','account_groups','accounts','settings','proxies','usage_logs','ops_error_logs','clash_subscription','adobe_cookie_recovery_attempts','adobe_proxy_test_leases') OR table_name LIKE '%migration%') GROUP BY table_name ORDER BY table_name"))
+emit('database_size',sql("SELECT json_build_object('bytes',pg_database_size(current_database()),'account_count',(SELECT count(*) FROM accounts WHERE deleted_at IS NULL),'proxy_count',(SELECT count(*) FROM proxies))"))
+emit('table_sizes',sql("SELECT json_build_object('table',relname,'estimated_rows',n_live_tup,'bytes',pg_total_relation_size(relid)) FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 15"))
+emit('runtime_settings',sql("SELECT json_build_object('key',key,'hash',md5(value),'value_kind',CASE WHEN value IN ('true','false','0','1') THEN value ELSE 'redacted' END) FROM settings WHERE key LIKE '%adobe%' OR key LIKE '%proxy%' OR key LIKE '%clash%' OR key LIKE '%okad%' ORDER BY key"))
+emit('usage_models',sql("SELECT row_to_json(t) FROM (SELECT model,upstream_model,image_size,count(*) requests,sum(image_count) images,min(created_at) first_at,max(created_at) last_at FROM usage_logs WHERE account_id=1738 AND created_at>'2026-10-27T00:00:00+08:00' GROUP BY model,upstream_model,image_size ORDER BY last_at DESC LIMIT 16) t"))
+emit('latest_errors',sql("SELECT json_build_object('at',created_at,'model',model,'status',status_code,'upstream_status',upstream_status_code,'phase',error_phase,'invalid_credentials',coalesce(upstream_error_message,'') LIKE '%invalid_credentials%','invalid_oauth_token',coalesce(upstream_error_message,'') LIKE '%ErrInvalidOauthToken%') FROM ops_error_logs WHERE account_id=1738 ORDER BY created_at DESC LIMIT 24"))
+c=sqlite3.connect('file:/opt/adobe-team-cookie/data/app.db?mode=ro',uri=True);c.row_factory=sqlite3.Row
+r=dict(c.execute('SELECT id,email,last_login_at,credits_available,credits_total,profile_preference,account_profile FROM external_members WHERE id=1138').fetchone());profile=json.loads(r.pop('account_profile') or '{}');r['profile_keys']=sorted(profile);r['profile_kind']=profile.get('current_kind');emit('okad_member',r);c.close()
+emit('resources',{'disk_free_bytes':shutil.disk_usage('/opt/adobe-relay').free,'meminfo':{k:v.strip() for k,v in (x.split(':',1) for x in pathlib.Path('/proc/meminfo').read_text().splitlines()) if k in ['MemAvailable','MemTotal','SwapFree']},'diagnostic_containers':[x for x in subprocess.check_output(['docker','ps','--format','{{.Names}}'],text=True).splitlines() if any(y in x for y in ['crawford','sessionprobe','three-arm'])]})
