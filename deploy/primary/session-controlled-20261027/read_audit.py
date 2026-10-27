@@ -103,13 +103,13 @@ def check(a):
   try:d=r.json()
   except Exception:d={}
   out['profile_http_status']=r.status_code;out['identity_matches']=str(d.get('email','')).lower()==a['email'].lower();out['profile_error']=d.get('error');out['profile_error_description']=d.get('error_description')
- except Exception as e:out['exception']=type(e).__name__
+ except Exception as e:out['exception']=type(e).__name__;out['curl_code']=getattr(e,'code',None)
  finally:s.close()
  out['finished_at']=datetime.datetime.now(datetime.timezone.utc).isoformat();return out
 with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
  print(json.dumps(list(pool.map(check,rows))))
 '''
-proc=subprocess.run(['docker','exec','-i','adobe-team-cookie-app-1','python','-c',code],input=json.dumps(probe),text=True,capture_output=True,timeout=25)
+proc=subprocess.run(['docker','run','--rm','--network','adobe-relay_default','--memory','256m','--cpus','0.5','--read-only','--tmpfs','/tmp:rw,size=16m','--entrypoint','python','adobe-team-cookie:79382b0f79d559575956e023dc9f52fbf07dbfde','-c',code],input=json.dumps(probe),text=True,capture_output=True,timeout=25)
 if proc.returncode==0:OUT['token_validation']=json.loads(proc.stdout)
 else:OUT['token_validation_error']='validation process failed'
 source=r'''
@@ -126,5 +126,6 @@ print(json.dumps(result))
 '''
 proc=subprocess.run(['docker','exec','adobe-team-cookie-app-1','python','-c',source],text=True,capture_output=True,timeout=10)
 if proc.returncode==0:OUT['source_review']=json.loads(proc.stdout)
+query('accounts',"SELECT json_build_object('id',id,'email',name,'status',status,'error',error_message,'schedulable',schedulable,'proxy_id',proxy_id) FROM accounts WHERE deleted_at IS NULL AND lower(name) IN ("+names+") ORDER BY id")
 OUT['finished_at']=datetime.datetime.now(datetime.timezone.utc).isoformat()
 print(json.dumps(OUT,ensure_ascii=False))
