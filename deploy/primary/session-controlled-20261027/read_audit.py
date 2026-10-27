@@ -35,7 +35,20 @@ def others():
 before={a['id']:a for a in json.loads((ROOT/'before.json').read_text())};current={a['id']:a for a in rows()}
 keys=['status','schedulable','concurrency','manual_pause','manual_proxy','proxy_id','version','verification','test','error','cookie_hash','runtime_cookie_hash','token_hash']
 differences={i:{k:{'before':before[i].get(k),'after':current.get(i,{}).get(k)} for k in keys if before[i].get(k)!=current.get(i,{}).get(k)} for i in IDS}
-others_
+others_before={a['id']:a for a in json.loads((ROOT/'other-accounts-before.json').read_text())};others_after={a['id']:a for a in others()}
+other_differences={i:{k:{'before':others_before.get(i,{}).get(k),'after':others_after.get(i,{}).get(k)} for k in ['config_hash','cookie_hash'] if others_before.get(i,{}).get(k)!=others_after.get(i,{}).get(k)} for i in set(others_before)|set(others_after)}
+other_differences={i:d for i,d in other_differences.items() if d}
+settings_equal=sql("SELECT json_build_object('key',key,'hash',md5(value)) FROM settings ORDER BY key")==json.loads((ROOT/'settings-before.json').read_text())
+containers=[]
+for name in ['adobe-relay-app-1','adobe-team-cookie-app-1']:
+ d=json.loads(subprocess.check_output(['docker','inspect',name],text=True))[0]
+ containers.append({'name':name,'image':d['Config']['Image'],'started_at':d['State']['StartedAt'],'restarts':d['RestartCount'],'memory_limit':d['HostConfig']['Memory'],'cpu_shares':d['HostConfig']['CpuShares']})
+running=[n for n in subprocess.check_output(['docker','ps','--format','{{.Names}}'],text=True).splitlines() if n.startswith('adobe-expanded-')]
+out={'at':now(),'selected_differences':differences,'other_accounts_before':len(others_before),'other_accounts_after':len(others_after),'other_account_differences':other_differences,'settings_equal':settings_equal,'private_tmpfs_exists':bool(list(pathlib.Path('/dev/shm').glob('adobe-expanded-20261027-*.json'))),'diagnostic_containers':running,'production_containers':containers}
+for name in ['restored.json','finished.json']:
+ if (ROOT/name).exists():out[name]=json.loads((ROOT/name).read_text())
+save('final-preservation-check.json',out);print(json.dumps(out,ensure_ascii=False))
+
 for f in sorted(ROOT.glob('*.jsonl')):
  rows=[]
  for l in f.read_text().splitlines():
