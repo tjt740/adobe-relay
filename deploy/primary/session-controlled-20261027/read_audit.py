@@ -29,18 +29,18 @@ try:
   x=data.get('proxies',{}).get('sub2api-node-'+str(ident),{});emit('running_mihomo_route',{'proxy_id':ident,'present':bool(x),'type':x.get('type'),'is_group':bool(x.get('all')),'selected_child_sha256':sha(x.get('now',''))})
 except Exception as ex:emit('running_mihomo_route_unknown',{'error_class':type(ex).__name__})
 start=time.monotonic()
-for sample in range(5):
- time.sleep(max(0,start+sample*30-time.monotonic()))
+for sample in range(10):
+ time.sleep(max(0,start+sample*6-time.monotonic()))
  for x in rows:
   p=x['proxy']
   if p.get('deleted_at') or p['status']!='active':continue
   try:
    host=resolve(p['host']);auth=(urllib.parse.quote(p.get('username') or '',safe='')+':'+urllib.parse.quote(p.get('password') or '',safe='')+'@') if p.get('username') else '';proxy=p['protocol']+'://'+auth+host+':'+str(p['port'])
    op=urllib.request.build_opener(urllib.request.ProxyHandler({'http':proxy,'https':proxy}))
-   for endpoint in ['https://api.ipify.org?format=json']+(['https://api64.ipify.org?format=json'] if sample in [0,4] else []):
+   for endpoint in ['https://api64.ipify.org?format=json']:
     try:
      with op.open(endpoint,timeout=12) as r:ip=json.load(r)['ip']
      emit('exit_sample',{'proxy_id':p['id'],'sample':sample,'probe_host':urllib.parse.urlsplit(endpoint).hostname,'ip_sha256':sha(ip),'address_family':ipaddress.ip_address(ip).version})
     except Exception as ex:emit('exit_unknown',{'proxy_id':p['id'],'sample':sample,'probe_host':urllib.parse.urlsplit(endpoint).hostname,'error_class':type(ex).__name__})
   except Exception as ex:emit('exit_unknown',{'proxy_id':p['id'],'sample':sample,'error_class':type(ex).__name__})
-emit('observer_complete',{'production_writes':False,'samples_per_active_route':5,'duration_seconds':round(time.monotonic()-start,1)})
+emit('observer_complete',{'production_writes':False,'samples_per_active_route':10,'duration_seconds':round(time.monotonic()-start,1)})
