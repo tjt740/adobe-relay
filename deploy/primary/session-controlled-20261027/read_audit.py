@@ -49,87 +49,69 @@ def cookie_metadata(cookie):
     count=collections.Counter(n for n,v in pairs)
     return {'hash':digest(cookie),'names':list(count),'duplicates':{n:c for n,c in count.items() if c>1},'sessions':{n:digest(v) for n,v in pairs if re.search('sid|session|auth',n,re.I)}}
 
-names=','.join("'"+e.lower().replace("'","''")+"'" for e in TARGETS)
-for n in ['adobe-relay-app-1','adobe-team-cookie-app-1']:
-    d=json.loads(subprocess.check_output(['docker','inspect',n],text=True))[0]
-    OUT.setdefault('containers',[]).append({'name':n,'image':d['Config']['Image'],'started_at':d['State']['StartedAt'],'restarts':d['RestartCount'],'workdir':d['Config']['WorkingDir'],'log':d['HostConfig']['LogConfig']})
-assert OUT['containers'][0]['image']=='adobe-relay:df07b90d7e2ce8e27fd7a9deb11336eaf5077e3c'
-rows=sql("SELECT json_build_object('id',id,'email',name,'created_at',created_at,'updated_at',updated_at,'status',status,'schedulable',schedulable,'concurrency',concurrency,'proxy_id',proxy_id,'error',error_message,'credentials',credentials,'okad',extra->'okad','manual_pause',extra->'okad_manual_pause','test',extra->'okad_connection_test') FROM accounts WHERE deleted_at IS NULL AND lower(name) IN ("+names+") ORDER BY id")
-OUT['accounts']=[]
-for r in rows:
-    raw=r.pop('credentials') or {}
-    r['credential_keys']=list(raw)
-    r['token']=token_metadata(raw.get('access_token'))
-    r['source_cookie']=cookie_metadata(raw.get('cookie'))
-    r['runtime_cookie']=cookie_metadata(raw.get('adobe_session_cookie'))
-    r['runtime_source_hash']=raw.get('adobe_session_cookie_source_hash')
-    r['expires_at']=raw.get('expires_at')
-    OUT['accounts'].append(r)
-ids=','.join(str(r['id']) for r in rows)
-db=sqlite3.connect('file:/opt/adobe-team-cookie/data/app.db?mode=ro',uri=True)
-db.execute('PRAGMA query_only=ON');db.row_factory=sqlite3.Row
-tables=[r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")]
-OUT['sqlite_schema']={t:[r[1] for r in db.execute('PRAGMA table_info('+t+')')] for t in tables}
+# Executed after shared read-only utility definitions and TARGETS.
+OUT = {'started_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+names=','.join("'"+e.lower()+"'" for e in TARGETS)
+query('proxy_events',"SELECT row_to_json(t) FROM (SELECT account_id,from_proxy_id,to_proxy_id,created_at FROM proxy_failover_events WHERE account_id IN (SELECT id FROM accounts WHERE deleted_at IS NULL AND lower(name) IN ("+names+")) AND created_at>='2026-10-27T14:30:00+08:00' ORDER BY created_at) t")
+query('test_errors',"SELECT row_to_json(t) FROM (SELECT account_id,created_at,status_code,left(reason,600) AS reason FROM adobe_account_test_errors WHERE account_id IN (SELECT id FROM accounts WHERE deleted_at IS NULL AND lower(name) IN ("+names+")) AND created_at>='2026-10-27T14:30:00+08:00' ORDER BY created_at) t")
+query('sub2_audit',"SELECT row_to_json(t) FROM (SELECT id,created_at,action,method,path,request_id,auth_method,status_code,jsonb_object_keys(CASE WHEN jsonb_typeof(request_body)='object' THEN request_body ELSE '{}'::jsonb END) AS body_key FROM audit_logs WHERE created_at>='2026-10-27T14:30:00+08:00' AND (path LIKE '%accounts%' OR path LIKE '%settings%') ORDER BY created_at DESC LIMIT 2000) t")
+db=sqlite3.connect('file:/opt/adobe-team-cookie/data/app.db?mode=ro',uri=True);db.execute('PRAGMA query_only=ON');db.row_factory=sqlite3.Row
 members=[]
 for e in TARGETS:
-    m=db.execute('SELECT * FROM external_members WHERE lower(email)=?',(e.lower(),)).fetchone()
-    if not m:continue
-    m=dict(m)
-    safe={k:m[k] for k in ['id','email','last_login_at','created_at','updated_at','expires_at','login_status','subscription_ok','subscription_status','credits_available','credits_total','profile_preference','force_code_login','otp_mode','group_id'] if k in m}
-    safe['token']=token_metadata(m.get('access_token'))
-    safe['cookie']=cookie_metadata(m.get('cookie'))
-    profile=m.get('account_profile')
-    try:profile=json.loads(profile) if isinstance(profile,str) else profile
-    except Exception:profile={}
-    if isinstance(profile,dict):
-        safe['profile_keys']=list(profile)
-        safe['profile_hashes']={k:digest(profile[k]) for k in profile if re.search('org|id|profile|type',k,re.I)}
-    members.append(safe)
-OUT['okad_members']=members
-if 'integration_recovery_jobs' in tables:
-    cols=OUT['sqlite_schema']['integration_recovery_jobs']
-    fields=[k for k in ['id','email','source_key','state','code','created_at','updated_at','automatic'] if k in cols]
-    jobs=[]
-    for e in TARGETS:
-        jobs += [dict(r) for r in db.execute('SELECT '+','.join(fields)+' FROM integration_recovery_jobs WHERE lower(email)=? AND created_at>=? ORDER BY created_at',(e.lower(),1793030400))]
-    OUT['recovery_jobs']=jobs
+    for table in ['external_members','adobe_members']:
+        recs=db.execute('SELECT * FROM '+table+' WHERE lower(email)=?',(e.lower(),)).fetchall()
+        for rec in recs:
+            m=dict(rec);safe={k:m[k] for k in ['id','admin_id','email','status','registered','is_admin','is_imported','created_at','updated_at','last_login_at','login_status','subscription_status','subscription_ok','profile_preference','expires_at','sub2_pushed_at','exported_at','export_count','credits_available','credits_total'] if k in m}
+            safe['table']=table;safe['token']=token_metadata(m.get('access_token'));safe['cookie']=cookie_metadata(m.get('cookie'))
+            try:profile=json.loads(m.get('account_profile') or '{}')
+            except Exception:profile={}
+            if isinstance(profile,dict):
+                safe['profile']={k:profile.get(k) for k in ['current_kind','account_type','requested_preference','fallback_reason','fetched_at','profiles_complete','personal_organizations_complete']}
+                safe['profile']['current_org_hash']=digest(profile.get('current_org_id'))
+                clean=profile.get('organization_cleanup')
+                safe['cleanup_keys']=list(clean) if isinstance(clean,dict) else None
+                if isinstance(clean,dict):safe['cleanup_scalar']={k:v for k,v in clean.items() if isinstance(v,(bool,int,float))}
+                safe['profiles_summary']=[{k:p.get(k) for k in ['kind','type','account_type','is_default','is_current']} for p in profile.get('profiles',[]) if isinstance(p,dict)]
+            members.append(safe)
+OUT['member_profiles']=members
+OUT['admin_accounts']=[{'id':r['id'],'email':r['email'],'is_valid':r['is_valid'],'has_org':r['has_org'],'org_hash':digest(r['org_id']),'last_checked_at':r['last_checked_at'],'last_login_at':r['last_login_at'],'updated_at':r['updated_at'],'member_count':r['member_count']} for r in db.execute('SELECT * FROM adobe_accounts')]
+OUT['integration_deliveries']=[{k:r[k] for k in ['source_key','site_id','version','account_id','state','attempts','next_at','lease_until','updated_at']} for r in db.execute('SELECT * FROM integration_deliveries WHERE updated_at>=? ORDER BY updated_at',(1793082600,))]
+job_rows=[dict(r) for r in db.execute('SELECT id,type,status,target,success,fail,created_at,finished_at,meta_json,extra_json,logs_json FROM job_records WHERE created_at>=? ORDER BY created_at',(1793082600,))]
+OUT['okad_jobs']=[]
+for job in job_rows:
+    safe={k:job[k] for k in ['id','type','status','success','fail','created_at','finished_at']}
+    safe['target_hash']=digest(job['target'])
+    for col in ['meta_json','extra_json']:
+        try:v=json.loads(job[col] or '{}')
+        except Exception:v={}
+        safe[col+'_keys']=list(v) if isinstance(v,dict) else []
+        if isinstance(v,dict):safe[col+'_scalars']={k:z for k,z in v.items() if isinstance(z,(bool,int,float))}
+    text=job['logs_json'] or ''
+    safe['log_markers']={word:len(re.findall(word,text,re.I)) for word in ['invalid_credentials','invalid_token','401013','logout','revoke','profile','proxy','自动登录','冷却']}
+    OUT['okad_jobs'].append(safe)
+OUT['setting_keys']=[r['key'] for r in db.execute('SELECT key FROM settings')]
 db.close()
-
-query('postgres_schema',"SELECT json_build_object('table',table_name,'columns',json_agg(column_name ORDER BY ordinal_position)) FROM information_schema.columns WHERE table_schema='public' AND (table_name IN ('proxy_failover_events','audit_logs','scheduler_outbox') OR table_name LIKE '%okad%') GROUP BY table_name")
-query('proxy_events',"SELECT row_to_json(t) FROM (SELECT account_id,from_proxy_id,to_proxy_id,created_at,reason FROM proxy_failover_events WHERE account_id IN ("+ids+") AND created_at>='2026-10-27T00:00:00+08:00' ORDER BY created_at) t")
-query('current_usage',"SELECT row_to_json(t) FROM (SELECT account_id,count(*) AS count,min(created_at) AS first_success,max(created_at) AS last_success FROM usage_logs WHERE account_id IN ("+ids+") AND created_at>='2026-10-27T00:00:00+08:00' GROUP BY account_id) t")
-query('error_detail_shape',"SELECT row_to_json(t) FROM (SELECT account_id,created_at,status_code,upstream_status_code,jsonb_typeof(upstream_errors) AS upstream_errors_type,CASE WHEN jsonb_typeof(upstream_errors)='array' THEN jsonb_array_length(upstream_errors) END AS upstream_error_count,CASE WHEN jsonb_typeof(upstream_errors)='array' AND jsonb_array_length(upstream_errors)>0 THEN (SELECT json_agg(k) FROM jsonb_object_keys(upstream_errors->0) k) END AS first_error_keys FROM ops_error_logs WHERE account_id IN ("+ids+") AND created_at>='2026-10-27T14:30:00+08:00' ORDER BY created_at DESC LIMIT 8) t")
-
-sessions=[]
-byemail={m['email'].lower():m for m in members}
-for a in rows:
-    m=byemail.get(a['email'].lower())
-    if m and m.get('last_login_at'):
-        stamp=m['last_login_at'].replace(' ','T')+'Z'
-        sessions.append('('+str(a['id'])+",'"+stamp+"'::timestamptz)")
-if sessions:
-    cte='WITH sessions(account_id,login_at) AS (VALUES '+','.join(sessions)+'), boundary AS (SELECT s.*, (SELECT min(e.created_at) FROM ops_error_logs e WHERE e.account_id=s.account_id AND e.created_at>=s.login_at AND (e.status_code=401 OR e.upstream_status_code=401)) AS first_401 FROM sessions s) '
-    query('latest_login_windows',cte+"SELECT row_to_json(t) FROM (SELECT b.*, (SELECT max(u.created_at) FROM usage_logs u WHERE u.account_id=b.account_id AND u.created_at>=b.login_at AND u.created_at<COALESCE(b.first_401,NOW())) AS last_success_before_401,(SELECT count(*) FROM usage_logs u WHERE u.account_id=b.account_id AND u.created_at>=b.login_at AND u.created_at<COALESCE(b.first_401,NOW())) AS successes_before_401,(SELECT count(*) FROM ops_error_logs e WHERE e.account_id=b.account_id AND e.created_at>=b.login_at AND e.created_at<COALESCE(b.first_401,NOW()) AND (e.status_code IN (408,429) OR e.upstream_status_code IN (408,429))) AS failed_408_429_before_401,(SELECT count(*) FROM proxy_failover_events e WHERE e.account_id=b.account_id AND e.created_at>=b.login_at AND e.created_at<COALESCE(b.first_401,NOW())) AS proxy_changes_before_401 FROM boundary b) t")
-    query('recent_session_errors',cte+"SELECT row_to_json(t) FROM (SELECT e.account_id,e.created_at,e.status_code,e.upstream_status_code,e.model,left(e.upstream_error_message,500) AS upstream_message,jsonb_path_query_array(e.upstream_errors,'$[*].status_code') AS attempt_status_codes FROM boundary b JOIN ops_error_logs e ON e.account_id=b.account_id WHERE b.first_401 IS NOT NULL AND e.created_at>=GREATEST(b.login_at,b.first_401-interval '2 minutes') AND e.created_at<=b.first_401 ORDER BY e.account_id,e.created_at) t")
-
-# Only structured log fields; never emit message bodies or credentials.
-for name,label in [('adobe-relay-app-1','sub2_logs'),('adobe-team-cookie-app-1','okad_logs')]:
-    proc=subprocess.run(['docker','logs','--timestamps','--since','2026-10-27T06:30:00Z','--tail','120000',name],text=True,capture_output=True,timeout=20)
-    lines=(proc.stdout+proc.stderr).splitlines()
-    out=[]
-    for line in lines:
-        at=line.split()[0] if line.split() else ''
-        pos=line.find('{')
-        if pos<0:continue
-        try:d=json.loads(line[pos:])
-        except ValueError:continue
-        match=re.search(r'/accounts/(\d+)(?:/|$)',d.get('path',''))
-        aid=d.get('account_id',int(match[1]) if match else None)
-        if aid not in {r['id'] for r in rows}:continue
-        safe={k:d[k] for k in ['account_id','request_id','path','method','status_code','stage','attempt','version','proxy_id','upstream_http_status','stage_attempts','stage_elapsed_ms','processing_ms','latency_ms','model','result'] if k in d}
-        safe['at']=at
-        safe['event_names']=re.findall(r'(?:adobe_|okad_)[a-z_]+',line[:pos])
-        out.append(safe)
-    OUT[label]={'scanned':len(lines),'first_at':lines[0].split()[0] if lines else None,'last_at':lines[-1].split()[0] if lines else None,'events':out,'returncode':proc.returncode}
+source_code=r'''
+import json,pathlib,hashlib,re,ast
+base=pathlib.Path('/app/backend/app/services')
+result={'paths':[],'matches':[],'snippets':{}}
+for p in base.rglob('*.py'):
+ text=p.read_text(errors='replace');relative=str(p.relative_to(base))
+ if any(word in relative for word in ['firefly','integration','external','admin_auth','protocol/client','protocol/admin']):
+  result['paths'].append({'path':relative,'sha256':hashlib.sha256(text.encode()).hexdigest()})
+ for no,line in enumerate(text.splitlines(),1):
+  words=re.findall(r'revoke|signout|logout|invalidate_token',line,re.I)
+  if words and 'imap' not in relative and 'mail' not in relative:result['matches'].append({'path':relative,'line':no,'keywords':words})
+ if relative in ['firefly.py','adobe_protocol/admin.py','adobe_protocol/client.py','reliable_integration.py']:
+  try:tree=ast.parse(text)
+  except Exception:continue
+  for n in ast.walk(tree):
+   if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and any(word in n.name for word in ['acquire_firefly','session_cookie','new_session','login_cooldown','claim_login','release_login','organization_cleanup']):
+    result['snippets'][relative+':'+n.name]='\n'.join(text.splitlines()[n.lineno-1:n.end_lineno])
+print(json.dumps(result))
+'''
+proc=subprocess.run(['docker','exec','-i','adobe-team-cookie-app-1','python','-c',source_code],text=True,capture_output=True,timeout=15)
+if proc.returncode==0:OUT['actual_okad_source']=json.loads(proc.stdout)
+else:OUT['actual_okad_source_error']='source inspection failed'
 OUT['finished_at']=datetime.datetime.now(datetime.timezone.utc).isoformat()
 print(json.dumps(OUT,ensure_ascii=False))
