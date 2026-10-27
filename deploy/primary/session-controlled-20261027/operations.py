@@ -32,6 +32,8 @@ if (p/'execution.log').exists():print(json.dumps({'execution_log':(p/'execution.
 """.replace('ROOT',repr(ROOT))
  output=remote(code);print(output);pathlib.Path('session-evidence').mkdir(exist_ok=True);pathlib.Path('session-evidence/status.jsonl').write_text(output)
  if PHASE=='session-export':
+  audit=remote(pathlib.Path('deploy/primary/session-controlled-20261027/read_audit.py').read_text())
+  pathlib.Path('session-evidence/read-only-audit.json').write_text(audit)
   # Only sanitized result files; tokens live exclusively in process memory/stdin.
   for pattern in ['*.json','*.jsonl','*.log']:
    subprocess.run(['scp','-i',os.path.expanduser('~/.ssh/deploy_key'),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes',HOST+':'+ROOT+'/'+pattern,'session-evidence/'],check=True,timeout=180)
