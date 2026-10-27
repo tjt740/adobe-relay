@@ -1,4 +1,38 @@
-import subprocess,json,datetime
-code='import json,time,datetime,urllib.parse\nfrom playwright.sync_api import sync_playwright\ndef urlclean(u):\n p=urllib.parse.urlparse(u);return p.scheme+\'://\'+p.netloc+p.path\nwith sync_playwright() as pw:\n browser=pw.chromium.connect_over_cdp(\'http://127.0.0.1:9222\',timeout=10000)\n pages=[p for c in browser.contexts for p in c.pages]\n page=next(p for p in pages if p.url.startswith(\'https://firefly.adobe.com/\'))\n page.goto(\'https://account.adobe.com/\',wait_until=\'domcontentloaded\',timeout=60000)\n page.wait_for_timeout(4000)\n fields=page.locator(\'input\').evaluate_all(\'(els)=>els.filter(e=>e.getBoundingClientRect().width>0).map(e=>({id:e.id,type:e.type,name:e.name,placeholder:e.placeholder,aria:e.getAttribute("aria-label")}))\')\n candidates=[f for f in fields if f[\'id\'] and (f[\'type\']==\'email\' or \'email\' in (f[\'id\']+\' \'+str(f.get(\'placeholder\') or \'\')+\' \'+str(f.get(\'aria\') or \'\')).lower())]\n if len(candidates)==1:\n  page.locator(\'[id=\'+json.dumps(candidates[0][\'id\'])+\']\').fill(\'AshleyChambers2212@outlook.com\',timeout=10000)\n  button=page.get_by_role(\'button\',name=\'Continue\',exact=True)\n  if button.count()==1 and button.is_visible():button.click(timeout=10000)\n  page.wait_for_timeout(6000)\n\n result=[]\n for c in browser.contexts:\n  for p in c.pages:\n   if p.is_closed():continue\n   try:\n    body=p.locator(\'body\').inner_text(timeout=6000)[:14000]\n    controls=p.locator(\'button,input,textarea,select,[role="combobox"],[role="textbox"]\').evaluate_all(\'(els)=>els.map(e=>({tag:e.tagName,role:e.getAttribute("role"),type:e.type,id:e.id,name:e.getAttribute("name"),text:e.innerText?.slice(0,140),placeholder:e.getAttribute("placeholder"),aria:e.getAttribute("aria-label")}))\')\n    result.append({\'url\':urlclean(p.url),\'title\':p.title(),\'text\':body,\'controls\':controls})\n   except Exception as e:result.append({\'url\':urlclean(p.url),\'error_class\':type(e).__name__})\n print(json.dumps({\'pages\':result},ensure_ascii=False))\n'
-r=subprocess.run(['docker','exec','adobe-three-arm-web-20261027','python','-c',code],capture_output=True,text=True,timeout=95)
-print(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'returncode':r.returncode,'browser':json.loads(r.stdout) if r.returncode==0 else None,'error_class':'browser_command_failed' if r.returncode else None,'error_tail':r.stderr[-650:] if r.returncode else None},ensure_ascii=False))
+import json,subprocess,pathlib,datetime,time,sqlite3,hashlib,urllib.request,urllib.error,urllib.parse,os,sys,traceback,signal,threading
+ROOT=pathlib.Path('/opt/adobe-relay/releases/three-arm-20261027');IDS=[1739,1741,1743];MEMBERS={1742:247,1744:245,1749:240,1758:231};EXPECTED='adobe-relay:df07b90d7e2ce8e27fd7a9deb11336eaf5077e3c';os.umask(0o077)
+def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
+def log(kind,**kw):
+ with (ROOT/'controller.jsonl').open('a') as f:f.write(json.dumps({'at':now(),'event':kind,**kw},ensure_ascii=False)+'\n')
+def sql(q,raw=False):
+ r=subprocess.run(['docker','exec','-i','adobe-relay-postgres-1','psql','-U','sub2api','-d','sub2api','-Atq','-v','ON_ERROR_STOP=1'],input="BEGIN READ ONLY;SET LOCAL statement_timeout='8s';"+q+';COMMIT;',capture_output=True,text=True,timeout=15)
+ if r.returncode:raise RuntimeError('database_read_failed')
+ return r.stdout.strip() if raw else [json.loads(x) for x in r.stdout.splitlines() if x.startswith('{')]
+def api(method,path,body=None,timeout=35):
+ assert path=='/api/v1/admin/accounts/bulk-update' or any(path==f'/api/v1/admin/accounts/{i}'+suffix for i in IDS for suffix in ('','/schedulable','/test'))
+ if path.endswith('bulk-update'):assert set(body['account_ids'])<=set(IDS) and 'filters' not in body
+ key=sql("SELECT value FROM settings WHERE key='admin_api_key'",True)
+ req=urllib.request.Request('http://127.0.0.1:6666'+path,data=json.dumps(body).encode() if body is not None else None,headers={'x-api-key':key,'Content-Type':'application/json','X-Request-ID':'session-controlled-20261027'},method=method)
+ with urllib.request.urlopen(req,timeout=timeout) as r:
+  if path.endswith('/test'):
+   result=[]
+   for line in r:
+    if line.startswith(b'data: '):
+     d=json.loads(line[6:]);result.append({k:d[k] for k in ['type','success','status_code'] if k in d})
+   return result
+  d=json.load(r);return {'code':d.get('code'),'success_ids':(d.get('data') or {}).get('success_ids')} if isinstance(d,dict) else {}
+def rows(private=False):
+ q="SELECT json_build_object('id',a.id,'email',a.name,'status',a.status,'schedulable',a.schedulable,'concurrency',a.concurrency,'manual_pause',a.extra->'okad_manual_pause','manual_proxy',a.extra->'manual_proxy_enabled','proxy_id',a.proxy_id,'proxy_updated_at',p.updated_at,'proxy_status',p.status,'proxy_excluded',EXISTS(SELECT 1 FROM adobe_route_exclusions e WHERE e.proxy_id=a.proxy_id),'other_bindings',(SELECT count(*) FROM accounts b WHERE b.deleted_at IS NULL AND b.proxy_id=a.proxy_id AND b.id<>a.id),'active_lease',EXISTS(SELECT 1 FROM adobe_proxy_test_leases l WHERE l.account_id=a.id AND l.expires_at>NOW()),'version',a.extra->'okad'->'version','verification',a.extra->'okad'->'verification','test',a.extra->'okad_connection_test','error',a.error_message,'cookie_hash',md5(a.credentials->>'cookie'),'runtime_cookie_hash',md5(a.credentials->>'adobe_session_cookie'),'token_hash',md5(a.credentials->>'access_token'),'token',a.credentials->>'access_token','arp_session_id',a.credentials->>'arp_session_id','proxy',json_build_object('host',p.host,'port',p.port,'protocol',p.protocol,'username',p.username,'password',p.password)) FROM accounts a LEFT JOIN proxies p ON p.id=a.proxy_id WHERE a.deleted_at IS NULL AND a.id IN ("+','.join(map(str,IDS))+') ORDER BY a.id'
+ data=sql(q)
+ if not private:
+  for a in data:
+   for k in ['token','arp_session_id','proxy']:a.pop(k,None)
+ return data
+def save(name,data):
+ p=ROOT/name;tmp=ROOT/(name+'.tmp');tmp.write_text(json.dumps(data,ensure_ascii=False,indent=2));tmp.replace(p)
+def others():
+ return sql("SELECT json_build_object('id',id,'config_hash',md5(json_build_object('concurrency',concurrency,'priority',priority,'groups',(SELECT json_agg(group_id ORDER BY group_id) FROM account_groups WHERE account_id=accounts.id),'manual_pause',extra->'okad_manual_pause','manual_proxy',extra->'manual_proxy_enabled')::text),'cookie_hash',md5(credentials->>'cookie')) FROM accounts WHERE deleted_at IS NULL AND id NOT IN ("+','.join(map(str,IDS))+') ORDER BY id')
+
+
+code="\nimport json,sys,hashlib,urllib.parse,concurrent.futures,time\nfrom curl_cffi import requests\nrows=json.load(sys.stdin)\ndef one(a):\n p=a['proxy'];auth=(urllib.parse.quote(p.get('username') or '',safe='')+':'+urllib.parse.quote(p.get('password') or '',safe='')+'@') if p.get('username') else '';url=p['protocol']+'://'+auth+p['host']+':'+str(p['port'])\n s=requests.Session(proxies={'http':url,'https':url},impersonate='chrome',verify=True,timeout=10)\n result={'account_id':a['id'],'proxy_id':a['proxy_id'],'hashes':[]}\n try:\n  for _ in range(2):\n   r=s.get('https://api.ipify.org?format=json');result['hashes'].append(hashlib.sha256(r.json()['ip'].encode()).hexdigest()[:24]);time.sleep(2)\n  result['stable']=len(set(result['hashes']))==1\n except Exception as e:result['error']=type(e).__name__\n return result\nwith concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:print(json.dumps(list(ex.map(one,rows))))\n"
+r=subprocess.run(['docker','run','--rm','-i','--network','adobe-relay_default','--memory','256m','--cpus','0.5','--read-only','--tmpfs','/tmp:rw,size=16m','--entrypoint','python','adobe-team-cookie:79382b0f79d559575956e023dc9f52fbf07dbfde','-c',code],input=json.dumps([{'id':a['id'],'proxy_id':a['proxy_id'],'proxy':a['proxy']} for a in rows(True)]),text=True,capture_output=True,timeout=40)
+print(json.dumps({'at':now(),'egress':json.loads(r.stdout) if r.returncode==0 else None,'returncode':r.returncode}))
