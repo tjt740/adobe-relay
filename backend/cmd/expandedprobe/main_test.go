@@ -8,7 +8,7 @@ import (
 )
 
 func TestGateHonorsRequestedConcurrencyAndBudget(t *testing.T) {
-	for _, n := range []int{1, 3} {
+	for _, n := range []int{1, 3, 8} {
 		g := &gate{max: 12, deadline: time.Now().Add(time.Second)}
 		var wg sync.WaitGroup
 		for w := 0; w < n; w++ {
