@@ -33,32 +33,22 @@ def others():
  return sql("SELECT json_build_object('id',id,'config_hash',md5(json_build_object('concurrency',concurrency,'priority',priority,'groups',(SELECT json_agg(group_id ORDER BY group_id) FROM account_groups WHERE account_id=accounts.id),'manual_pause',extra->'okad_manual_pause','manual_proxy',extra->'manual_proxy_enabled')::text),'cookie_hash',md5(credentials->>'cookie')) FROM accounts WHERE deleted_at IS NULL AND id NOT IN ("+','.join(map(str,IDS))+') ORDER BY id')
 
 
-# Read-only attribution of concurrent credential updates; no Adobe calls or account writes.
-check=json.loads((ROOT/'final-preservation-check.json').read_text())
-changed=sorted(int(i) for i in check['other_account_differences'])
-print(json.dumps({'at':now(),'kind':'scope','changed_ids':changed,'snapshot_at':check['at']}))
-if changed:
- data=sql("SELECT json_build_object('id',id,'cookie_hash',md5(credentials->>'cookie'),'source_key',extra->'okad'->>'source_key','version',extra->'okad'->'version','received_at',extra->'okad'->'received_at','created_at',created_at,'updated_at',updated_at) FROM accounts WHERE id IN ("+','.join(map(str,changed))+') ORDER BY id')
- c=sqlite3.connect('file:/opt/adobe-team-cookie/data/app.db?mode=ro',uri=True);c.row_factory=sqlite3.Row;c.execute('PRAGMA query_only=ON')
- for a in data:
-  source=(a.get('source_key') or '').split(':')
-  if len(source)==2 and source[0]=='external' and source[1].isdigit():
-   m=c.execute('SELECT cookie,last_login_at,updated_at,sub2_links FROM external_members WHERE id=?',(int(source[1]),)).fetchone()
-   if m:
-    a['okad_cookie_matches']=hashlib.md5((m['cookie'] or '').encode()).hexdigest()==a['cookie_hash'];a['okad_last_login_at']=m['last_login_at'];a['okad_updated_at']=m['updated_at']
-    try:links=json.loads(m['sub2_links'] or '{}')
-    except Exception:links={}
-    a['link_shape']=list(links) if isinstance(links,dict) else type(links).__name__
-  print(json.dumps({'at':now(),'kind':'concurrent_sync_state','data':a},ensure_ascii=False))
- c.close()
-# Management requests in the bounded trial window, with only non-secret routing / version fields.
-audit=sql("SELECT row_to_json(t) FROM (SELECT id,created_at,method,path,status_code,auth_method,request_id,request_body FROM audit_logs WHERE created_at>='2026-10-27T13:38:50Z' AND created_at<='2026-10-27T13:53:10Z' AND (path LIKE '%okad%' OR path LIKE '%accounts%') ORDER BY id LIMIT 700) t")
-for a in audit:
- raw=a.pop('request_body',None)
- try:b=json.loads(raw or '{}')
- except Exception:b={}
- if isinstance(b,dict):
-  a['body_fields']=list(b)
-  a['safe_body']={k:b[k] for k in ['account_ids','account_id','source_key','version','resume','schedulable'] if k in b}
- print(json.dumps({'at':now(),'kind':'management_audit','data':a},ensure_ascii=False))
-print(json.dumps({'at':now(),'kind':'audit_complete','audit_rows':len(audit),'limit_reached':len(audit)==700}))
+name='crawfordheather6275@hotmail.com'
+a=sql("SELECT json_build_object('id',id,'email',name,'status',status,'schedulable',schedulable,'concurrency',concurrency,'proxy_id',proxy_id,'manual_pause',extra->'okad_manual_pause','manual_proxy',extra->'manual_proxy_enabled','version',extra->'okad'->'version','source_key',extra->'okad'->>'source_key','test',extra->'okad_connection_test','error',error_message) FROM accounts WHERE deleted_at IS NULL AND lower(name)='"+name+"'")
+assert len(a)==1
+IDS[:]=[a[0]['id']]
+current=rows()[0]
+print(json.dumps({'at':now(),'kind':'crawford_current','data':current},ensure_ascii=False))
+c=sqlite3.connect('file:/opt/adobe-team-cookie/data/app.db?mode=ro',uri=True);c.row_factory=sqlite3.Row;c.execute('PRAGMA query_only=ON')
+m=c.execute('SELECT id,email,last_login_at,login_status,profile_preference,credits_available,credits_total,credits_error,account_profile FROM external_members WHERE lower(email)=?',(name,)).fetchone();assert m
+m=dict(m)
+try:profile=json.loads(m.pop('account_profile') or '{}')
+except Exception:profile={}
+m['profile_keys']=list(profile) if isinstance(profile,dict) else []
+m['profile_safe']={k:v for k,v in profile.items() if k in ['current_kind','account_type','requested_preference','fallback','fallback_used','profiles_complete']} if isinstance(profile,dict) else {}
+print(json.dumps({'at':now(),'kind':'crawford_member','data':m},ensure_ascii=False));c.close()
+for kind,q in [
+ ('crawford_usage',"SELECT row_to_json(t) FROM (SELECT created_at,model,requested_model,upstream_model,image_count,image_size,duration_ms FROM usage_logs WHERE account_id="+str(IDS[0])+" AND created_at>='2026-10-27T00:00:00+08:00' ORDER BY created_at DESC LIMIT 20) t"),
+ ('crawford_errors',"SELECT row_to_json(t) FROM (SELECT created_at,model,status_code,upstream_status_code,error_phase,left(error_message,220) AS error,left(upstream_error_message,220) AS upstream FROM ops_error_logs WHERE account_id="+str(IDS[0])+" AND created_at>='2026-10-27T00:00:00+08:00' ORDER BY created_at DESC LIMIT 20) t")]:
+ data=sql(q)
+ for off in range(0,len(data),10):print(json.dumps({'at':now(),'kind':kind,'offset':off,'data':data[off:off+10]},ensure_ascii=False))
