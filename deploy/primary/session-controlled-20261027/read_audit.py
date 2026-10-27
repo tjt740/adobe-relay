@@ -6,10 +6,15 @@ def sql(q):
  if r.returncode:raise RuntimeError('read query failed')
  return [json.loads(x) for x in r.stdout.splitlines() if x.startswith('{')]
 
-emit('tables',sql("SELECT json_build_object('table',table_name) FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name"))
-emit('usage_samples',sql("SELECT to_jsonb(t)-'user_agent'-'ip_address' FROM (SELECT * FROM usage_logs WHERE account_id=1738 ORDER BY created_at DESC LIMIT 8) t"))
-emit('settings_keys',sql("SELECT json_build_object('key',key,'hash',md5(value),'len',length(value)) FROM settings ORDER BY key"))
-emit('configs',sql("SELECT json_build_object('table',table_name,'columns',json_agg(column_name ORDER BY ordinal_position)) FROM information_schema.columns WHERE table_schema='public' AND (table_name LIKE '%proxy%' OR table_name LIKE '%okad%' OR table_name LIKE '%setting%' OR table_name LIKE '%adobe%' OR table_name LIKE '%subscription%') GROUP BY table_name ORDER BY table_name"))
-emit('account_extra',sql("SELECT json_build_object('extra',extra,'model_mapping',credentials->'model_mapping') FROM accounts WHERE id=1738"))
-d=json.loads(subprocess.check_output(['docker','inspect','adobe-relay-app-1'],text=True))[0]
-emit('app_runtime',{'entrypoint':d['Config']['Entrypoint'],'cmd':d['Config']['Cmd'],'workingdir':d['Config']['WorkingDir'],'mounts':[{'source':x['Source'],'dest':x['Destination']} for x in d['Mounts']]})
+import importlib.util
+emit('yaml_available',bool(importlib.util.find_spec('yaml')))
+files=list(pathlib.Path('/opt/adobe-relay/shared/data').glob('*'));emit('data_files',[x.name for x in files if x.is_file()])
+import yaml
+f=pathlib.Path('/opt/adobe-relay/shared/data/config.yaml');d=yaml.safe_load(f.read_text());sensitive=('secret','password','key','token','url','host','email','dsn','endpoint','bucket','access')
+def safe(v):
+ if not isinstance(v,dict):return v
+ return {k:('[redacted]' if any(w in k.lower() for w in sensitive) else safe(x)) for k,x in v.items()}
+emit('config',safe(d))
+emit('routing_config',sql("SELECT json_build_object('table','proxy_auto_allocation','value',to_jsonb(t)) FROM proxy_auto_allocation t UNION ALL SELECT json_build_object('table','account_proxy_failover','value',to_jsonb(t)) FROM account_proxy_failover t WHERE account_id=1738"))
+emit('policy',sql("SELECT json_build_object('key',to_jsonb(k)-'key','user',to_jsonb(u)-'password_hash'-'totp_secret_encrypted'-'email'-'wechat','group',to_jsonb(g)) FROM api_keys k JOIN users u ON u.id=k.user_id JOIN groups g ON g.id=k.group_id WHERE k.id=62"))
+emit('timeline',sql("SELECT json_build_object('at',created_at,'start',created_at-duration_ms*interval '1 millisecond','duration_ms',duration_ms,'endpoint',inbound_endpoint,'model',model,'input_size',image_input_size,'output_size',image_output_size,'size_source',image_size_source) FROM usage_logs WHERE account_id=1738 AND created_at BETWEEN '2026-10-27T18:14:00+08:00' AND '2026-10-27T18:18:00+08:00' ORDER BY created_at"))
