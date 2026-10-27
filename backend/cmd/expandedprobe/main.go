@@ -347,12 +347,12 @@ func main() {
 	if json.NewDecoder(os.Stdin).Decode(&cfg) != nil {
 		os.Exit(2)
 	}
-	if len(cfg.Accounts) != 1 || cfg.MaxJobs != 6 || cfg.DurationSec != 1200 || cfg.Model != "gpt-image-2.5-sunburst" {
+	if len(cfg.Accounts) != 1 || cfg.MaxJobs != 1 || cfg.DurationSec != 180 || cfg.Model != "gpt-image-2.5-flare" {
 		os.Exit(3)
 	}
 	seen := map[int64]bool{}
 	for _, a := range cfg.Accounts {
-		if (a.ID != 1813 && a.ID != 1833 && a.ID != 1807 && a.ID != 1817) || seen[a.ID] || (a.Concurrency != 1 && a.Concurrency != 3) || a.Token == "" || a.Proxy == "" {
+		if (a.ID != 1815 && a.ID != 1817) || seen[a.ID] || a.Concurrency != 1 || a.Token == "" || a.Proxy == "" {
 			os.Exit(4)
 		}
 		if a.IntervalSec != 0 && a.IntervalSec != 180 {
