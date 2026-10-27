@@ -19,5 +19,11 @@ def sql(q):
  r=subprocess.run(['docker','exec','-i','adobe-relay-postgres-1','psql','-U','sub2api','-d','sub2api','-Atq','-v','ON_ERROR_STOP=1'],input="BEGIN READ ONLY;SET LOCAL statement_timeout='8s';"+q+';COMMIT;',capture_output=True,text=True,timeout=15)
  assert r.returncode==0
  return [json.loads(l) for l in r.stdout.splitlines() if l.startswith('{')]
-queries={'first_errors_after_login':"SELECT row_to_json(t) FROM (SELECT created_at,model,status_code,upstream_status_code,error_phase,left(upstream_error_message,260) AS upstream FROM ops_error_logs WHERE account_id=1738 AND created_at>='2026-10-27T18:14:01+08:00' AND (status_code=401 OR upstream_status_code=401) ORDER BY created_at LIMIT 8) t"}
+
+queries={
+ 'first_errors_after_login':"SELECT row_to_json(t) FROM (SELECT created_at,model,status_code,upstream_status_code,error_phase,left(upstream_error_message,260) AS upstream FROM ops_error_logs WHERE account_id=1738 AND created_at>='2026-10-27T18:14:01+08:00' AND (status_code=401 OR upstream_status_code=401) ORDER BY created_at LIMIT 8) t",
+ 'proxy_events':"SELECT row_to_json(t) FROM (SELECT created_at,from_proxy_id,to_proxy_id FROM proxy_failover_events WHERE account_id=1738 AND created_at>='2026-10-27T18:00:00+08:00' ORDER BY created_at LIMIT 50) t",
+ 'pre_failure_window':"SELECT json_build_object('first_at',min(created_at),'last_at',max(created_at),'rows',count(*),'status_code',status_code,'upstream_status_code',upstream_status_code,'error_phase',error_phase) FROM ops_error_logs WHERE account_id=1738 AND created_at>='2026-10-27T18:14:01+08:00' AND created_at<'2026-10-27T18:17:33.235153+08:00' GROUP BY status_code,upstream_status_code,error_phase",
+ 'window_usage':"SELECT json_build_object('images',sum(image_count),'positive_usage_rows',count(*),'first_success',min(created_at),'last_success',max(created_at)) FROM usage_logs WHERE account_id=1738 AND created_at>='2026-10-27T18:14:01+08:00' AND image_count>0"
+}
 for name,q in queries.items():emit(history=name,records=sql(q))
