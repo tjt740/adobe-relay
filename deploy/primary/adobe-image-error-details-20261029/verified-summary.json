@@ -1,0 +1,79 @@
+{
+  "at": "2026-10-28T20:28:14.657047+00:00",
+  "application_sha": "66d9734be3d67baa4fa47cb2df505f0bb7f31193",
+  "preserved": {
+    "other_containers": true,
+    "configuration": true,
+    "resources_and_go": true,
+    "environment": true,
+    "okad_settings": true,
+    "sub2_settings_including_smtp": true,
+    "clash_nodes_bindings_and_configuration": true,
+    "alert_rules": true,
+    "retired_route_matches_current_baseline": true
+  },
+  "business_preservation": {
+    "backup_accounts": 514,
+    "checked_accounts": 514,
+    "manual_pauses_preserved": true,
+    "manual_proxy_modes_preserved": true,
+    "proxy_bindings_changed_with_event_chain": 0,
+    "cookie_rotations_with_version_advance": 0,
+    "token_fields_only_changes": 0
+  },
+  "migration_checksums_preserved": true,
+  "migration_set_retained": true,
+  "retired_408_gates_empty": true,
+  "live_browser_cases": 0,
+  "browser_limitation": "Live authenticated browser verification unavailable; asset and API checks only",
+  "passive_sample_count": 13,
+  "excluded_1290": {
+    "excluded": false,
+    "status": null,
+    "bindings": 0,
+    "leases": 0
+  },
+  "active_adobe_probes": false,
+  "test_mail_sent": false,
+  "feature_pr": 130,
+  "main_merge": "df69cbdd96d5e9c3f0e5c0714a0328df8171f1ac",
+  "build_run": 40758174046,
+  "prepare_run": 40760113068,
+  "start_run": 40760747601,
+  "initial_verify_run": 40762371318,
+  "verify_run": 40763511085,
+  "migration_count": 327,
+  "error_contract": {
+    "at": "2026-10-28T20:28:13.269555+00:00",
+    "application_sha": "66d9734be3d67baa4fa47cb2df505f0bb7f31193",
+    "passed": true,
+    "api_key_id": 8,
+    "group_id": 2,
+    "http_status": 400,
+    "error": {
+      "code": "invalid_n",
+      "message": "n must be greater than 0",
+      "param": "n",
+      "request_id": "image-error-release-997469e6b72f42b6858075e2dbc72c05",
+      "source": "request",
+      "stage": "validation",
+      "type": "invalid_request_error"
+    },
+    "generation_requests": 0,
+    "usage_rows": 0,
+    "selected_accounts": 0,
+    "entry_denials": [],
+    "credentials_in_output": false
+  },
+  "verification_helper_repair": {
+    "at": "2026-10-28T20:27:43.181673+00:00",
+    "before_sha256": "1f0d175dde0a4415770b338c18029111d9752a7cc558a3be64f2d03d709f1120",
+    "after_sha256": "9a449a925fc31e8ffc5b4339093f76e79a0cbfde9a374b8f6d8d947b9068a268",
+    "reason": "Fix aggregate ORDER BY and correlate returned request ID; verification only",
+    "application_or_configuration_changed": false
+  },
+  "rollback_guard": {
+    "passed": true,
+    "mutated": false
+  }
+}
