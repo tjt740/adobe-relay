@@ -37,8 +37,16 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
           mkdir -p incident-evidence
-          ssh -C -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 root@173.234.15.150 'python3 - source_check' < deploy/primary/adobe-web-contract-20261028/read_audit.py > incident-evidence/read-only-audit.json
-          cat incident-evidence/read-only-audit.json
+          ssh -C -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 root@173.234.15.150 'python3 - generate3' < deploy/primary/adobe-web-contract-20261028/read_audit.py > incident-evidence/read-only-audit.json
+          python3 - <<'PYOUT'
+          import json
+          d=json.load(open('incident-evidence/read-only-audit.json'))
+          if isinstance(d.get('result'),dict):
+              r=d['result']
+              keep=['account_id','proxy_id','step','error_class','error_step','error_frames','jobs','actual_web_request','main_payload_for_matched_inputs','payload_difference_keys','onboarding_dismissed','frame_urls','native_tokens','same_browser_auth_contract_comparison','identity_verification','credential_selection']
+              d['result']={k:r[k] for k in keep if k in r}
+          print(json.dumps(d,ensure_ascii=False))
+          PYOUT
       - uses: actions/upload-artifact@v4
         if: always()
         with:
