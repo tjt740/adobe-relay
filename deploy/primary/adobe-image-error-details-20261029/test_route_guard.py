@@ -1,8 +1,16 @@
 from unittest import TestCase
-from route_guard import validate_excluded_route
+from route_guard import validate_excluded_route, validate_subscription_exclusion
 
 
 class ExcludedRouteTests(TestCase):
+    def test_retired_subscription_is_not_recreated(self):
+        self.assertTrue(validate_subscription_exclusion([{'id':'current','proxy_ids':[9],'blocked_proxy_ids':[]}])['not_in_current_subscriptions'])
+
+    def test_a_present_excluded_node_must_still_be_blocked(self):
+        with self.assertRaises(AssertionError):
+            validate_subscription_exclusion([{'id':'current','proxy_ids':[1290],'blocked_proxy_ids':[]}])
+        self.assertEqual(validate_subscription_exclusion([{'id':'current','proxy_ids':[1290],'blocked_proxy_ids':[1290]}])['source_ids'],['current'])
+
     def review(self, status):
         return {'proxy_id': 1290, 'read_only': True, 'backup_excluded': True, 'backup_status': status}
 

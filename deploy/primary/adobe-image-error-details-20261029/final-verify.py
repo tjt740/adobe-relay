@@ -1,7 +1,7 @@
 """Read-only release verification after temporary routing and container cleanup."""
 import datetime,hashlib,importlib.util,json,re,subprocess,urllib.request
 from pathlib import Path
-from route_guard import validate_excluded_route
+from route_guard import validate_excluded_route, validate_subscription_exclusion
 ROOT=Path('/opt/adobe-relay/releases/adobe-image-error-details-20261029')
 spec=importlib.util.spec_from_file_location('audit',ROOT/'audit.py');a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
 sha=(ROOT/'expected-sha').read_text().strip()
@@ -52,8 +52,7 @@ key=a.sql("SELECT value FROM settings WHERE key='admin_api_key'")
 req=urllib.request.Request('http://127.0.0.1:6666/api/v1/admin/proxies/clash/health',headers={'x-api-key':key})
 with urllib.request.urlopen(req,timeout=20) as response:health=json.load(response)['data']
 assert len(health['sources'])>=3
-source1290=next(s for s in health['sources'] if 1290 in s['proxy_ids'])
-assert source1290['id']=='6dcfb89fdc6d6eef04362357' and 1290 in source1290['blocked_proxy_ids']
+subscription_exclusion=validate_subscription_exclusion(health['sources'])
 for source in health['sources']:
  assert all(k in source for k in ['traffic_known','remaining_bytes','total_bytes','traffic_observed_at','expires_at','generation_blocked','proxy_ids','blocked_proxy_ids'])
  if source['traffic_known']:assert 0<=source['remaining_bytes']<=source['total_bytes']
@@ -63,7 +62,7 @@ review=json.loads((ROOT/'route-guard-review.json').read_text())
 assert review['cutover_backup']==json.loads((ROOT/'after.json').read_text())['backup']
 route_checks=validate_excluded_route(review,exclusion)
 assert a.inspect(a.APP)['RestartCount']==0 and not a.inspect(a.APP)['State']['OOMKilled']
-health_proof={'sources':health['sources'],'excluded_1290':exclusion,'cutover_route_checks':route_checks,'active_adobe_requests':False,'http_writes':False}
+health_proof={'sources':health['sources'],'subscription_exclusion':subscription_exclusion,'excluded_1290':exclusion,'cutover_route_checks':route_checks,'active_adobe_requests':False,'http_writes':False}
 a.save('route-api-verification.json',health_proof)
 
 contract=json.loads((ROOT/'error-contract-verification.json').read_text());assert contract['passed'] and contract['generation_requests']==0

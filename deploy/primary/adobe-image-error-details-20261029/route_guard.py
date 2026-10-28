@@ -1,4 +1,12 @@
 """Keep the excluded route's actual pre-release state and Adobe protections."""
+def validate_subscription_exclusion(sources):
+    # A retired node need not remain in the user's current subscription list.
+    # The complete subscription contract is separately hash-checked by audit.py.
+    matches = [source for source in sources if 1290 in source['proxy_ids']]
+    assert all(1290 in source['blocked_proxy_ids'] for source in matches), 'Excluded node became usable in a current source'
+    return {'source_ids': [source['id'] for source in matches], 'not_in_current_subscriptions': not matches}
+
+
 def validate_excluded_route(review, current):
     assert review['proxy_id'] == 1290 and review['read_only']
     assert review['backup_excluded'] is True, 'Cutover backup must already contain the exclusion'

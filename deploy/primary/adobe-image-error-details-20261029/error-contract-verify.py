@@ -15,7 +15,7 @@ spec.loader.exec_module(a)
 assert (ROOT / 'rolling-finished.json').exists()
 sha = (ROOT / 'expected-sha').read_text().strip()
 assert a.inspect(a.APP)['Config']['Image'] == 'adobe-relay:' + sha
-keys = json.loads(a.sql("SELECT coalesce(json_agg(json_build_object('id',k.id,'key',k.key,'group_id',k.group_id)),'[]') FROM api_keys k JOIN groups g ON g.id=k.group_id JOIN users u ON u.id=k.user_id WHERE k.deleted_at IS NULL AND k.status='active' AND g.deleted_at IS NULL AND g.status='active' AND g.platform='adobe' AND u.deleted_at IS NULL AND u.status='active' ORDER BY k.id"))
+keys = json.loads(a.sql("SELECT coalesce(json_agg(json_build_object('id',k.id,'key',k.key,'group_id',k.group_id)),'[]') FROM api_keys k JOIN groups g ON g.id=k.group_id JOIN users u ON u.id=k.user_id WHERE k.deleted_at IS NULL AND k.status='active' AND (k.expires_at IS NULL OR k.expires_at>now()) AND (k.quota<=0 OR k.quota_used<k.quota) AND g.deleted_at IS NULL AND g.status='active' AND g.platform='adobe' AND u.deleted_at IS NULL AND u.status='active' ORDER BY k.last_used_at DESC NULLS LAST,k.id"))
 assert keys, 'No existing Adobe key for pre-admission error verification; do not create one'
 proofs = []
 for key in keys[:5]:
