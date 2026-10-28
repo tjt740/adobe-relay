@@ -167,11 +167,49 @@ def source_check():
     return {'at':now(),'phase':'source_check','result':result,'containers_unchanged':before['containers']==after['containers'],
         'private_credentials_removed':not private.exists()}
 
+def final_audit():
+    import collections
+    state=preflight()
+    rows=sql("""SELECT json_build_object('id',id,'source',credentials->>'cookie',
+      'runtime',credentials->>'adobe_session_cookie','runtime_source_hash',credentials->>'adobe_session_cookie_source_hash')
+      FROM accounts WHERE deleted_at IS NULL AND id IN (1738,1892) ORDER BY id;
+      SELECT json_build_object('kind','arp_inventory','accounts',count(*),
+      'saved_arp',count(*) FILTER(WHERE coalesce(credentials->>'arp_session_id','')<>''))
+      FROM accounts WHERE deleted_at IS NULL AND platform='adobe';""")
+    cookie_shapes=[]
+    for row in rows:
+        if row.get('kind'):continue
+        out={'id':row['id']}
+        for key in ['source','runtime']:
+            raw=row.get(key) or ''
+            names=[p.strip().split('=',1)[0] for p in raw.split(';') if '=' in p]
+            counts=collections.Counter(names)
+            out[key]={'present':bool(raw),'cookie_pairs':len(names),'duplicate_names':sum(c-1 for c in counts.values() if c>1),
+                'sha256':hashlib.sha256(raw.encode()).hexdigest()}
+        out['runtime_matches_source']=row.get('runtime_source_hash')==out['source']['sha256']
+        cookie_shapes.append(out)
+    code="""import ast,importlib.util,json,pathlib
+p=pathlib.Path(importlib.util.find_spec('app.services.firefly').origin)
+t=ast.parse(p.read_text());out={}
+for n in t.body:
+ if isinstance(n,ast.Assign):
+  for target in n.targets:
+   if isinstance(target,ast.Name) and target.id in ['CLIO_CLIENT_ID','FIREFLY_SCOPE','IMS_VALIDATE_URL']:
+    try:out[target.id]=ast.literal_eval(n.value)
+    except Exception:pass
+print(json.dumps(out))
+"""
+    try:live_okad=json.loads(command(['docker','exec','adobe-team-cookie-app-1','python','-c',code]))
+    except Exception as e:live_okad={'error_class':type(e).__name__}
+    return {'at':now(),'phase':'final_audit','state':state,'cookie_shapes':cookie_shapes,
+        'arp_inventory':[r for r in rows if r.get('kind')],'live_okad_identity':live_okad,
+        'private_directories_present':[str(p) for p in [PRIVATE,pathlib.Path('/dev/shm/adobe-web-contract-generation-20261028'),pathlib.Path('/dev/shm/adobe-web-contract-source-20261028')] if p.exists()]}
+
 def main():
     ROOT.mkdir(mode=0o700, exist_ok=True)
     phase = sys.argv[1] if len(sys.argv)>1 else 'preflight'
-    assert phase in ['preflight','capture','generate','generate2','generate3','generate4','source_check']
-    result = {'preflight':preflight,'capture':capture,'generate':generate,'generate2':generate,'generate3':generate,'generate4':generate,'source_check':source_check}[phase]()
+    assert phase in ['preflight','capture','generate','generate2','generate3','generate4','source_check','final_audit']
+    result = {'preflight':preflight,'capture':capture,'generate':generate,'generate2':generate,'generate3':generate,'generate4':generate,'source_check':source_check,'final_audit':final_audit}[phase]()
     save(phase + '.json', result)
     print(json.dumps(result, ensure_ascii=False))
 
