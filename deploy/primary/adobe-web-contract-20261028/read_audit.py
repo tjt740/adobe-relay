@@ -136,11 +136,41 @@ def generate():
     return {'at':now(),'phase':phase,'result':result,'containers_unchanged':before['containers']==after['containers'],
         'private_credentials_removed':not gen_private.exists() and not PRIVATE.exists()}
 
+def source_check():
+    assert not (ROOT/'source-check-done.json').exists(), 'do not replay source Cookie check'
+    before=preflight()
+    private=pathlib.Path('/dev/shm/adobe-web-contract-source-20261028')
+    assert not private.exists()
+    private.mkdir(mode=0o700)
+    a=sql("""SELECT json_build_object('id',a.id,'email',a.name,'credentials',a.credentials,
+      'proxy_id',a.proxy_id,'proxy',CASE WHEN p.id IS NULL THEN NULL ELSE json_build_object('host',p.host,
+      'port',p.port,'protocol',p.protocol,'username',p.username,'password',p.password) END)
+      FROM accounts a LEFT JOIN proxies p ON p.id=a.proxy_id WHERE a.deleted_at IS NULL AND a.id=1738""")[0]
+    cfg={'id':a['id'],'email':a['email'],'proxy_id':a['proxy_id'],'proxy':a['proxy'],
+        'cookie':a['credentials'].get('cookie') or '', 'expected_token':a['credentials'].get('access_token') or ''}
+    name='adobe-web-contract-source-1738'
+    args=['docker','run','--rm','-i','--name',name,'--network','adobe-relay_default','--memory','3g','--cpus','2',
+        '--read-only','--tmpfs','/root/.config:rw,size=32m','--tmpfs','/root/.cache:rw,size=32m','--tmpfs','/tmp:rw,size=768m','--shm-size','256m',
+        '--mount','type=bind,src='+str(CHROME.parent.parent)+',dst=/chrome,readonly',
+        '--mount','type=bind,src='+str(private)+',dst=/private','--entrypoint','python',WEB_IMAGE,'-c',BROWSER_SOURCE]
+    try:
+        result=json.loads(command(args,json.dumps(cfg),timeout=240))
+    except Exception as e:
+        result={'account_id':a['id'],'error_class':type(e).__name__}
+    finally:
+        subprocess.run(['docker','rm','-f',name],capture_output=True,timeout=20)
+        shutil.rmtree(private,ignore_errors=True)
+    result['credential_selection']='original_source_cookie_only'
+    save('source-check-done.json',{'at':now(),'result':result,'production_writes':0})
+    after=preflight()
+    return {'at':now(),'phase':'source_check','result':result,'containers_unchanged':before['containers']==after['containers'],
+        'private_credentials_removed':not private.exists()}
+
 def main():
     ROOT.mkdir(mode=0o700, exist_ok=True)
     phase = sys.argv[1] if len(sys.argv)>1 else 'preflight'
-    assert phase in ['preflight','capture','generate','generate2']
-    result = {'preflight':preflight,'capture':capture,'generate':generate,'generate2':generate}[phase]()
+    assert phase in ['preflight','capture','generate','generate2','source_check']
+    result = {'preflight':preflight,'capture':capture,'generate':generate,'generate2':generate,'source_check':source_check}[phase]()
     save(phase + '.json', result)
     print(json.dumps(result, ensure_ascii=False))
 
