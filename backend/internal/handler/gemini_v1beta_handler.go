@@ -1035,15 +1035,17 @@ func googlePlatformError(c *gin.Context, status int, message string) {
 
 // googleErrorWithType 以 Google 错误格式回写错误，并向 ops 登记错误类型与错误码（Google 错误体没有 type 字段），
 // 与 Claude / OpenAI 格式错误同口径分类；errType 为空时不登记。
-func googleErrorWithType(c *gin.Context, status int, errType, code, message string) {
+func googleErrorWithType(c *gin.Context, status int, errType, code, message string, details ...any) {
 	service.SetOpsLocalErrorType(c, errType, code)
-	c.JSON(status, gin.H{
-		"error": gin.H{
-			"code":    status,
-			"message": message,
-			"status":  googleapi.HTTPStatusToGoogleStatus(status),
-		},
-	})
+	body := gin.H{
+		"code":    status,
+		"message": message,
+		"status":  googleapi.HTTPStatusToGoogleStatus(status),
+	}
+	if len(details) > 0 {
+		body["details"] = details
+	}
+	c.JSON(status, gin.H{"error": body})
 }
 
 // googleClientErrorType 返回客户端请求类 4xx 状态码对应的 ops 错误类型；其余状态码返回空串。

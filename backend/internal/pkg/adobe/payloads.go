@@ -58,7 +58,6 @@ func gptImageDetailLevelFromQuality(qualityLevel string, max int) int {
 	}
 }
 
-
 // seedNow 生成提交用的随机种子（复刻上游前端的取值方式）。
 func seedNow() int { return int(timeNow().Unix() % 999999) }
 
@@ -185,8 +184,8 @@ func buildGPTImage25Payloads(opts ImagePayloadOptions) ([]map[string]any, error)
 // SizePixels 必须由 catalog 层的 NearestSize 挑好——payload 层不该有第二个像素决策。
 func buildSizeEnumPayloads(opts ImagePayloadOptions) ([]map[string]any, error) {
 	if opts.SizePixels.Width <= 0 || opts.SizePixels.Height <= 0 {
-		return nil, NewRequestError(
-			fmt.Sprintf("enum-size family %q requires SizePixels", opts.UpstreamModelID))
+		return nil, NewInternalError(
+			fmt.Sprintf("enum-size family %q requires SizePixels", opts.UpstreamModelID), "image_payload_invalid")
 	}
 	base := map[string]any{
 		"modelId":            opts.UpstreamModelID,

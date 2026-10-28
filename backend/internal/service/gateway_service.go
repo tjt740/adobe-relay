@@ -714,6 +714,12 @@ type UpstreamFailoverError struct {
 	NextAccountAction        NextAccountAction
 	ClientStatusCode         int
 	ClientMessage            string
+	// Additive public diagnostics; never used to authorize another submission.
+	ClientErrorCode      string
+	ClientErrorParam     string
+	ClientErrorStage     string
+	ClientErrorSource    string
+	ClientUpstreamStatus int
 }
 
 func (e *UpstreamFailoverError) Error() string {

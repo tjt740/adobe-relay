@@ -261,11 +261,20 @@ func decodeAdobeDataURL(rawURL string) (*adobeInputImage, error) {
 // 策略拒绝与网络失败对外只给固定文案；大小、格式等本地校验错误不含内部信息，原样透出。
 func adobeInputImageRequestError(err error) *adobe.RequestError {
 	reqErr := adobe.NewRequestError(err.Error())
+	reqErr.Code, reqErr.Param, reqErr.Source = "invalid_input_image", "images", "request"
 	switch {
 	case errors.Is(err, errAdobeInputImageBlocked):
+		reqErr.Code = "input_image_url_not_allowed"
 		reqErr.UserMessage = adobeInputImageBlockedUserMessage
 	case errors.Is(err, errAdobeInputImageFetchFailed):
+		reqErr.Code, reqErr.Source, reqErr.ClientStatusCode = "input_image_fetch_failed", "upstream", http.StatusBadGateway
 		reqErr.UserMessage = adobeInputImageFetchUserMessage
+		var networkErr net.Error
+		if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &networkErr) && networkErr.Timeout()) {
+			reqErr.Code, reqErr.ClientStatusCode = "input_image_fetch_timeout", http.StatusGatewayTimeout
+		}
+	case strings.HasPrefix(err.Error(), "input image exceeds"):
+		reqErr.Code = "input_image_too_large"
 	}
 	return reqErr
 }

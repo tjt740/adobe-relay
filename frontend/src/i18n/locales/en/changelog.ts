@@ -29,6 +29,19 @@ export default {
       }
     },
     "updates": {
+      adobeImageErrorDetails: {
+        title: 'Specific image request errors and failure reasons',
+        body: 'Pending release: add explicit error codes, affected parameters, failure stages and request correlation to Adobe image errors, separating parameter rejection from upstream processing failures.',
+        sections: {
+          reason: { title: 'Separate failures previously grouped under HTTP 400', body: 'Some dependency failures, failed jobs and incomplete upstream responses previously returned 400, while fixed messages hid useful validation rules. Clients could not reliably decide whether to change parameters or investigate the upstream service.' },
+          classification: { title: 'Classify status and cause independently', body: 'Confirmed parameter rejections remain 400. Upstream dependency failures, missing task or image URLs and failed generation jobs return 502. Network failures and timeouts fetching input images return 502 and 504 respectively. Local processing faults are separated from parameter errors; existing authentication, quota, entitlement and content safety policies remain.' },
+          details: { title: 'Expose codes, parameters and failure stages', body: 'Return a stable code, a confirmed param when available, and the validation, prepare, input_fetch, upload, submit, poll or download stage, plus the source, available original upstream status and gateway request ID. Recognized dimension errors explain the applicable size rule. Unknown errors do not guess a parameter. OpenAI errors retain their envelope; Gemini adds details within its existing Google format.' },
+          privacy: { title: 'Extract specific reasons through controlled rules', body: 'Only confirmed rules, controlled codes and necessary numeric values are exposed, never raw provider payloads. Cookies, tokens, signed image URLs and internal addresses remain hidden. Administrative diagnostics retain redacted evidence with additional searchable code, parameter and source fields.' },
+          protection: { title: 'Status changes do not authorize new generation attempts', body: 'A 502 or 504 response does not authorize another generation. Existing duplicate submission protection remains for accepted jobs, poll or download failures and unknown submission outcomes. Same-job GET retries, proven pre-acceptance submission budgets, account settings, manual pauses, proxies, concurrency, resources and alerts remain unchanged.' },
+          validation: { title: 'Validation scope', body: 'Isolated regressions cover size rejection, 424, incomplete upload and generation responses, failed jobs, download failures, local parameters and input image network errors, bilingual notes, protocol compatibility and redaction. They count generation POSTs and check that accepted or uncertain requests are not resubmitted. Mocked upstream tests do not prove production generation or provider recovery.' },
+          boundary: { title: 'Release and diagnostic boundaries', body: 'This is a pending entry without a shipped date. Assign its actual Beijing release date when deployed. Error classification does not rewrite historical requests, and matching timestamps or status codes cannot establish the cause of a screenshot; correlate complete evidence using the request ID.' },
+        },
+      },
       cookieRecoveryRevert: {
         title: 'Revert the recent Cookie recovery changes',
         body: 'Restore the previous Cookie recovery, retry and login-profile behavior while retaining multiple Supply tokens.',

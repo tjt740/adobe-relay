@@ -137,7 +137,7 @@ func (t *impersonateTransport) ensureClient() (tlsclient.HttpClient, error) {
 	t.once.Do(func() {
 		profile, ok := profiles.MappedTLSClients[t.identity.TLSProfile]
 		if !ok {
-			t.initEr = NewRequestError(fmt.Sprintf("unknown tls-client profile: %s", t.identity.TLSProfile))
+			t.initEr = NewInternalError(fmt.Sprintf("unknown tls-client profile: %s", t.identity.TLSProfile), "image_transport_configuration_invalid")
 			return
 		}
 		var jar fhttp.CookieJar
@@ -198,7 +198,7 @@ func (t *impersonateTransport) Do(ctx context.Context, req *Request) (*Response,
 	}
 	httpReq, err := fhttp.NewRequestWithContext(ctx, req.Method, req.URL, body)
 	if err != nil {
-		return nil, NewRequestError(fmt.Sprintf("build request: %v", err))
+		return nil, NewInternalError(fmt.Sprintf("build request: %v", err), "image_request_construction_failed")
 	}
 	applyHeaderOrder(httpReq, req.Headers, req.HeaderOrder)
 
@@ -315,7 +315,7 @@ func (t *plainTransport) ensureClient() (*http.Client, error) {
 			parsed, err := url.Parse(t.proxyURL)
 			if err != nil {
 				// 不回显原串：代理 URL 里常带 user:pass。
-				t.initEr = NewRequestError("invalid proxy url")
+				t.initEr = NewInternalError("invalid proxy url", "image_transport_configuration_invalid")
 				return
 			}
 			transport.Proxy = http.ProxyURL(parsed)
@@ -368,7 +368,7 @@ func (t *plainTransport) Do(ctx context.Context, req *Request) (*Response, error
 	}
 	httpReq, err := http.NewRequestWithContext(ctx, req.Method, req.URL, body)
 	if err != nil {
-		return nil, NewRequestError(fmt.Sprintf("build request: %v", err))
+		return nil, NewInternalError(fmt.Sprintf("build request: %v", err), "image_request_construction_failed")
 	}
 	for name, value := range req.Headers {
 		httpReq.Header.Set(name, value)
@@ -376,14 +376,14 @@ func (t *plainTransport) Do(ctx context.Context, req *Request) (*Response, error
 
 	if t.resolveGuard {
 		if err := checkResolvedPublicHost(ctx, httpReq.URL.Hostname()); err != nil {
-			return nil, NewRequestError("media download destination is not allowed")
+			return nil, NewResponseError("media download destination is not allowed", "upstream_image_url_not_allowed", "The upstream image destination was rejected by the gateway safety policy.")
 		}
 	}
 
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		if errors.Is(err, ErrBlockedDestination) {
-			return nil, NewRequestError("media download destination is not allowed")
+			return nil, NewResponseError("media download destination is not allowed", "upstream_image_url_not_allowed", "The upstream image destination was rejected by the gateway safety policy.")
 		}
 		return nil, classifyTransportError(err, t.proxyURL != "")
 	}
@@ -433,7 +433,7 @@ func readLimitedBody(body io.Reader, limit int64) ([]byte, error) {
 // classifyReadError 区分「响应体超限」（终态）与读体时的网络错误（可重试）。
 func classifyReadError(err error, viaProxy bool) error {
 	if errors.Is(err, errBodyTooLarge) {
-		return NewRequestError(err.Error())
+		return NewResponseError(err.Error(), "upstream_response_too_large", "The upstream image response exceeds the gateway response limit.")
 	}
 	return classifyTransportError(err, viaProxy)
 }

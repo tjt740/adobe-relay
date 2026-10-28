@@ -51,6 +51,12 @@ type adobeFailure struct {
 // 侧的动作：给客户端什么状态码、要不要冷却账号。
 func classifyAdobeError(err error) (out adobeFailure) {
 	defer func() {
+		if out.Failover != nil {
+			d := adobe.DescribeError(err)
+			out.Failover.ClientErrorCode, out.Failover.ClientErrorParam = d.Code, d.Param
+			out.Failover.ClientErrorStage, out.Failover.ClientErrorSource = d.Stage, d.Source
+			out.Failover.ClientUpstreamStatus = d.UpstreamStatus
+		}
 		var operation *adobe.OperationError
 		var batch *adobeImageBatchError
 		accepted := errors.As(err, &batch) || (errors.As(err, &operation) && (operation.Stage == "poll" || operation.Stage == "download" || operation.JobID != "" || (operation.Stage == "submit" && !adobe.CanRetrySubmission(err))))
@@ -154,17 +160,22 @@ func classifyAdobeError(err error) (out adobeFailure) {
 		}
 	}
 
-	// 终态：请求本身有问题（比例不支持、内容被拒、模型未知等），换号也救不了。
+	// 终态保留停止提交；参数错误、上游协议故障与内部错误分别呈现。
 	var requestErr *adobe.RequestError
 	if errors.As(err, &requestErr) {
+		clientStatus := statusOrDefault(requestErr.ClientStatusCode, http.StatusBadRequest)
+		reason, scope := adobeFailureRequest, GatewayFailureScopeRequest
+		if clientStatus >= 500 {
+			reason, scope = adobeFailureUpstream, GatewayFailureScopeProvider
+		}
 		return adobeFailure{
 			Failover: &UpstreamFailoverError{
-				StatusCode:        statusOrDefault(requestErr.StatusCode, http.StatusBadRequest),
-				ClientStatusCode:  http.StatusBadRequest,
+				StatusCode:        statusOrDefault(requestErr.StatusCode, clientStatus),
+				ClientStatusCode:  clientStatus,
 				ClientMessage:     requestErr.User(),
 				Stage:             GatewayFailureStageInference,
-				Scope:             GatewayFailureScopeRequest,
-				Reason:            adobeFailureRequest,
+				Scope:             scope,
+				Reason:            reason,
 				NextAccountAction: NextAccountStop,
 			},
 		}
