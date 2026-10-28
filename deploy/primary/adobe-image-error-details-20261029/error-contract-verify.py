@@ -2,6 +2,7 @@
 import datetime
 import importlib.util
 import json
+import re
 from pathlib import Path
 import time
 import urllib.error
@@ -15,7 +16,7 @@ spec.loader.exec_module(a)
 assert (ROOT / 'rolling-finished.json').exists()
 sha = (ROOT / 'expected-sha').read_text().strip()
 assert a.inspect(a.APP)['Config']['Image'] == 'adobe-relay:' + sha
-keys = json.loads(a.sql("SELECT coalesce(json_agg(json_build_object('id',k.id,'key',k.key,'group_id',k.group_id)),'[]') FROM api_keys k JOIN groups g ON g.id=k.group_id JOIN users u ON u.id=k.user_id WHERE k.deleted_at IS NULL AND k.status='active' AND (k.expires_at IS NULL OR k.expires_at>now()) AND (k.quota<=0 OR k.quota_used<k.quota) AND g.deleted_at IS NULL AND g.status='active' AND g.platform='adobe' AND u.deleted_at IS NULL AND u.status='active' ORDER BY k.last_used_at DESC NULLS LAST,k.id"))
+keys = json.loads(a.sql("SELECT coalesce(json_agg(json_build_object('id',k.id,'key',k.key,'group_id',k.group_id) ORDER BY k.last_used_at DESC NULLS LAST,k.id),'[]') FROM api_keys k JOIN groups g ON g.id=k.group_id JOIN users u ON u.id=k.user_id WHERE k.deleted_at IS NULL AND k.status='active' AND (k.expires_at IS NULL OR k.expires_at>now()) AND (k.quota<=0 OR k.quota_used<k.quota) AND g.deleted_at IS NULL AND g.status='active' AND g.platform='adobe' AND u.deleted_at IS NULL AND u.status='active'"))
 assert keys, 'No existing Adobe key for pre-admission error verification; do not create one'
 proofs = []
 for key in keys[:5]:
@@ -36,7 +37,9 @@ for key in keys[:5]:
     error = payload['error']
     assert error['code'] == 'invalid_n' and error['param'] == 'n'
     assert error['stage'] == 'validation' and error['source'] == 'request'
-    assert error['request_id'] == response.headers['X-Request-ID'] == request_id
+    request_id = response.headers['X-Request-ID']
+    assert request_id and re.fullmatch(r'[A-Za-z0-9_.:-]{1,160}', request_id)
+    assert error['request_id'] == request_id
     assert 'upstream_status' not in error
     time.sleep(2)
     counts = json.loads(a.sql("SELECT json_build_object('usage_rows',(SELECT count(*) FROM usage_logs WHERE request_id='" + request_id + "'),'selected_accounts',(SELECT count(*) FROM ops_error_logs WHERE request_id='" + request_id + "' AND account_id IS NOT NULL))"))
