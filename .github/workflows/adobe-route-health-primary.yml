@@ -37,7 +37,7 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
           mkdir -p incident-evidence
-          ssh -C -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 root@173.234.15.150 'python3 - generate' < deploy/primary/adobe-web-contract-20261028/read_audit.py > incident-evidence/read-only-audit.json
+          ssh -C -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 root@173.234.15.150 'python3 - generate2' < deploy/primary/adobe-web-contract-20261028/read_audit.py > incident-evidence/read-only-audit.json
           cat incident-evidence/read-only-audit.json
       - uses: actions/upload-artifact@v4
         if: always()
