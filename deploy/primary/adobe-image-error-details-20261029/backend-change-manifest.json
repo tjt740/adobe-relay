@@ -1,0 +1,90 @@
+{
+  "backend/internal/handler/adobe_images.go": {
+    "before": "f64ac3947f51fb227b8aebfdf7d38b49e66833563d5d9157bca557833e77f082",
+    "candidate": "9d4ff4a5bcb14fcf0679e3d32b9c21cbe105b0c7db45e10e9ddbafa8a3976af3"
+  },
+  "backend/internal/handler/adobe_images_error_details_test.go": {
+    "before": null,
+    "candidate": "877081417f2d72d8dacf3875572bbceba3e7084b8b959d8e6f2fc66d01d31b48"
+  },
+  "backend/internal/handler/gemini_v1beta_handler.go": {
+    "before": "961b969ff81ba1941ea4570ce25abc5905daeeb26b7f1a966b6a21d711eb3362",
+    "candidate": "713715c0ceb9e1fef2617e65d87fc75fc2c1c756a930eda2203a206243e0ec67"
+  },
+  "backend/internal/pkg/adobe/catalog.go": {
+    "before": "f07fc14ea107a50e7d01c22b7317a1e1a6961aa9413ab58728c24548b1ae917b",
+    "candidate": "c8f2843a17bbcfbfeab966521cb3383c354ed8dcdb11144d3fd4a044d6513dff"
+  },
+  "backend/internal/pkg/adobe/client.go": {
+    "before": "4897bfddcefa509360748f9d7c3fd7f5ae50f9e963dcdab22b96b2fd0bdc7d72",
+    "candidate": "e13d1a3d30661bb86041694799c305be98a30b867f77be69b43ef0f52b2e9994"
+  },
+  "backend/internal/pkg/adobe/diagnostics.go": {
+    "before": "929dd96a348e13b39ac7452414834ee7fea7188f428c8ae6157df059a9b094d6",
+    "candidate": "418e498710d1de7c6e2f137871f35a6355486541c3392e7be837529c12d50bfa"
+  },
+  "backend/internal/pkg/adobe/errors.go": {
+    "before": "4400fa00cac019bc601c54f66b826825872f201c5246481817dea3c3c2d9ffbb",
+    "candidate": "8ee12600e5e85c36ae2051b1d1bc092841cd26200e3b88da839e6cd915a5d1cf"
+  },
+  "backend/internal/pkg/adobe/payloads.go": {
+    "before": "92331639fc16c3cb411a21579592ebb045819dbb47641b548ecbb5ca714ca8f4",
+    "candidate": "93c8d7dfeb68b8ed47f464008c6f840ead7fb751b46d2422a8ec28e63a94fbba"
+  },
+  "backend/internal/pkg/adobe/public_errors.go": {
+    "before": null,
+    "candidate": "d1eec04a1ab42d9f82834bc688646c824dca84ab6aac94cdea94ba60483618f7"
+  },
+  "backend/internal/pkg/adobe/public_errors_test.go": {
+    "before": null,
+    "candidate": "f709a3bdae83fe288dd0b8a5fc13d8f7dd12de23cfeac3e198a9ac50d81c104a"
+  },
+  "backend/internal/pkg/adobe/transport.go": {
+    "before": "173d05416a018dc2d9a1508a1323712bdc14d7f139d1af5fbc10b144ce0bf94f",
+    "candidate": "e3e2e6bf8224c717224fdc17c0f4ea7c7abdfcee1c97b63412db50f64913822e"
+  },
+  "backend/internal/service/adobe_error_classifier.go": {
+    "before": "2bd93bbd3429c6e8b171f73d7dd6376287fdc4454e1bf87c69870dde1486c59e",
+    "candidate": "0fcd7a7771dcecaee7dfa5b9bbff20bd117fb5af55e2821475f0901a670623d5"
+  },
+  "backend/internal/service/adobe_image_diagnostics.go": {
+    "before": "228834eebbdbb86c1b9bf299c07a52df03d61aaa6770c3d3486010411087c1ff",
+    "candidate": "578be267fb96da696a79978caa1d9a186c3d4c07ed8a1f648ee10544d3e62deb"
+  },
+  "backend/internal/service/adobe_image_input.go": {
+    "before": "2156057186e6bbb1c7c5d660628d6b834ba128fdec8e7d49af75a8ad9c8a8fc3",
+    "candidate": "3b43199bd5065b73f452db94adfc0d301fde9201dde42b921abebcb4a243fb05"
+  },
+  "backend/internal/service/adobe_image_output.go": {
+    "before": "7b218b6c85b7d42db6bfb64546dc9f07a7b5fd5a29283ccdb2ee311f6c78e5d8",
+    "candidate": "6876ad890274592811a8403157140ab1fd769bd383ed344dbd073dd646952588"
+  },
+  "backend/internal/service/adobe_image_service.go": {
+    "before": "4c5b9cdfb998169379ba3779f7adfd85c19889f54354e61371baff2047228589",
+    "candidate": "69d22a06aeb2972cbf62fe57c033abfe4395d11fb316a837918c9f63176f4f56"
+  },
+  "backend/internal/service/adobe_public_errors_test.go": {
+    "before": null,
+    "candidate": "17fdaae1a0e7b5c9acef3b6bd4f36a98e62e40e987f099acf8153e7f5524d247"
+  },
+  "backend/internal/service/gateway_service.go": {
+    "before": "ef1259dddd70958863a814ca538cc81baf943b38cfd729b1b673ada58093537a",
+    "candidate": "0967a0986ee813f1de9d61420df65060180b7143fb38e84d050ba60761a93cb5"
+  },
+  "frontend/src/content/changelog/daily.ts": {
+    "before": "2ec3cc8c9536e2b240a9d42106c95909631f82d248552a4c59c717ec5808390e",
+    "candidate": "8a775d44477ea52a2acdae75c52d77bf154f2b68b5480a2e10415246a30e62a4"
+  },
+  "frontend/src/i18n/__tests__/dailyChangelog.spec.ts": {
+    "before": "0831289b97f018815e291470a6217d949741aaa93a716a2442127db56503d2e6",
+    "candidate": "9498dd94d098f6e90f6d382a05845c0efde7ffd9490f3fa5ce8556fc6448d4f7"
+  },
+  "frontend/src/i18n/locales/en/changelog.ts": {
+    "before": "4234a184097494708a096e616d1060ec602395ea7f23b49fc946a78733e0f130",
+    "candidate": "b434105df2198ca640495288be4119c31b9019264fa08cf477fe3f5cde519c99"
+  },
+  "frontend/src/i18n/locales/zh/changelog.ts": {
+    "before": "993997663db3872d0f8a4f4eadbb0b44f5f9eea7210056dbc90ad94693a44a93",
+    "candidate": "0b7cc3a3e9831facf9416ef9de70b676fa8539347f52606af94acb7071874006"
+  }
+}
