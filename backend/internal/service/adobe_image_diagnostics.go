@@ -50,7 +50,11 @@ func RecordAdobeImageFailure(c *gin.Context, account *Account, model string, err
 		downloadFallback = op.DownloadFallback
 	}
 	proxyID, proxyName := opsUpstreamProxyAttribution(account)
+	public := adobe.DescribeError(err)
+	status = public.UpstreamStatus
+	stage = public.Stage
 	detail, _ := json.Marshal(map[string]any{
+		"code": public.Code, "param": public.Param, "source": public.Source,
 		"stage": stage, "error_type": errorType, "upstream_http_status": status,
 		"stage_attempts": attempts, "stage_elapsed_ms": elapsedMS, "job_id": jobID,
 		"upstream_request_id": requestID, "message": message,

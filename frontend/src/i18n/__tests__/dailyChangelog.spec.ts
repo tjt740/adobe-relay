@@ -14,6 +14,17 @@ vi.mock('vue-i18n', () => ({ useI18n: () => ({
 }) }))
 
 describe('Daily changelog', () => {
+  it('records image error details on its Beijing release date with complete notes', () => {
+    const note = dailyUpdates.find(item => item.id === 'adobeImageErrorDetails')
+    expect(note).toBeDefined()
+    expect(note!.date).toBe('2026-10-29')
+    expect(pendingDailyUpdates.some(item => item.id === note!.id)).toBe(false)
+    expect(dailyOverviews[note!.date]).toBe(note!.id)
+    const wrapper = mount(DailyChangelog)
+    expect(wrapper.find('[data-release-date="2026-10-29"] [data-update-id="adobeImageErrorDetails"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('includes the proxy fix on its Beijing release date with complete bilingual notes', () => {
     const item = dailyUpdates.find(update => update.id === 'proxyVerificationPriority')!
     expect(item).toBeDefined()

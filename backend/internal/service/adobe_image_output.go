@@ -30,16 +30,16 @@ func adobeImageRequestCount(n int) int {
 func validateAdobeImageParams(req *OpenAIImagesRequest) (int, string, error) {
 	n := adobeImageRequestCount(req.N)
 	if n > adobeMaxBatchCount {
-		return 0, "", adobe.NewRequestError(
-			fmt.Sprintf("adobe channel n must be between 1 and %d, got n=%d", adobeMaxBatchCount, n))
+		return 0, "", adobe.NewParameterError(
+			fmt.Sprintf("adobe channel n must be between 1 and %d, got n=%d", adobeMaxBatchCount, n), "invalid_n", "n")
 	}
 	format, err := normalizeAdobeOutputFormat(req.OutputFormat)
 	if err != nil {
 		return 0, "", err
 	}
 	if format == adobeOutputFormatJPEG && strings.EqualFold(strings.TrimSpace(req.Background), "transparent") {
-		return 0, "", adobe.NewRequestError(
-			"adobe channel does not support output_format=jpeg with background=transparent")
+		return 0, "", adobe.NewParameterError(
+			"adobe channel does not support output_format=jpeg with background=transparent", "incompatible_image_background", "background")
 	}
 	return n, format, nil
 }
@@ -53,8 +53,8 @@ func normalizeAdobeOutputFormat(raw string) (string, error) {
 	case adobeOutputFormatJPEG, "jpg":
 		return adobeOutputFormatJPEG, nil
 	default:
-		return "", adobe.NewRequestError(
-			fmt.Sprintf("adobe channel does not support output_format=%q", strings.TrimSpace(raw)))
+		return "", adobe.NewParameterError(
+			fmt.Sprintf("adobe channel does not support output_format=%q", strings.TrimSpace(raw)), "unsupported_output_format", "output_format")
 	}
 }
 

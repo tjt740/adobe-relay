@@ -15,8 +15,8 @@ const (
 	ErrorTypeNetwork    = "network"    // 其它网络层错误
 )
 
-// RequestError 是 Firefly 直连的基础错误类型，同时也是「终态错误」的语义：
-// 请求本身有问题（4xx 校验失败、内容拒绝、模型不支持等），换账号重试无用。
+// RequestError 是 Firefly 直连的基础终态错误。参数拒绝、上游协议异常和
+// 本地内部错误都可能要求停止提交；终态本身不代表故障来自调用方。
 //
 // AuthError / QuotaExhaustedError / NotEntitledError / UpstreamTemporaryError /
 // ContentRejectedError 内嵌本类型并实现 Unwrap，因此 errors.As(err, &*RequestError)
@@ -29,6 +29,11 @@ type RequestError struct {
 	ErrorType string
 	// UserMessage 是可直接展示给终端用户的文案；为空时回落到 Message。
 	UserMessage string
+	// Presentation metadata must never control submission/retry budgets.
+	Code             string
+	Param            string
+	Source           string
+	ClientStatusCode int
 }
 
 func (e *RequestError) Error() string { return e.Message }

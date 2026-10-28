@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -1023,19 +1024,59 @@ func adobeImagesFailoverError(c *gin.Context, failover *service.UpstreamFailover
 	if message == "" {
 		message = "Upstream request failed"
 	}
-	adobeImagesError(c, status, string(failover.Reason), message)
+	details := &adobe.PublicErrorDetails{Code: failover.ClientErrorCode, Param: failover.ClientErrorParam,
+		Stage: failover.ClientErrorStage, Source: failover.ClientErrorSource, UpstreamStatus: failover.ClientUpstreamStatus}
+	adobeImagesErrorWithDetails(c, status, string(failover.Reason), message, details, !failover.ShouldRetryNextAccount())
 }
 
 // adobeImagesError 渲染 OpenAI 形状的错误体——images 端点的客户端按 OpenAI 协议解析。
 func adobeImagesError(c *gin.Context, status int, errType, message string) {
+	var details *adobe.PublicErrorDetails
+	if status == http.StatusBadRequest && errType == "invalid_request_error" {
+		d := adobe.ValidationDetails(message)
+		details = &d
+	}
+	adobeImagesErrorWithDetails(c, status, errType, message, details)
+}
+
+func adobeImagesErrorWithDetails(c *gin.Context, status int, errType, message string, details *adobe.PublicErrorDetails, stopRetry ...bool) {
 	if service.IsResponseCommitted(c) {
 		return
 	}
+	fields := gin.H{}
+	if len(stopRetry) > 0 && stopRetry[0] {
+		// Keep terminal semantics visible to clients despite a more accurate 5xx.
+		// This advisory does not replace the server's existing submission guards.
+		c.Header("x-should-retry", "false")
+		fields["retryable"], fields["resubmit_allowed"] = false, false
+	}
+	if details != nil && details.Code != "" {
+		fields["code"], fields["stage"], fields["source"] = details.Code, details.Stage, details.Source
+		if details.Param != "" {
+			fields["param"] = details.Param
+		}
+		if details.UpstreamStatus > 0 {
+			fields["upstream_status"] = details.UpstreamStatus
+		}
+	}
+	if id := c.Writer.Header().Get("X-Request-ID"); id != "" {
+		fields["request_id"] = id
+	}
 	if adobeImagesWritesGemini(c) {
-		googleError(c, status, message)
+		if details == nil || details.Code == "" {
+			googleError(c, status, message)
+		} else {
+			metadata := map[string]string{}
+			for key, value := range fields {
+				metadata[key] = fmt.Sprint(value)
+			}
+			googleErrorWithType(c, status, googleClientErrorType(status), details.Code, message,
+				gin.H{"@type": "type.googleapis.com/google.rpc.ErrorInfo", "reason": details.Code, "domain": "adobe", "metadata": metadata})
+		}
 		return
 	}
-	c.JSON(status, gin.H{"error": gin.H{"type": errType, "message": message}})
+	fields["type"], fields["message"] = errType, message
+	c.JSON(status, gin.H{"error": fields})
 }
 
 // Use the same channel and account mapping as the upstream attempt.

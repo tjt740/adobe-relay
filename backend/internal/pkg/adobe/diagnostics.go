@@ -18,6 +18,7 @@ type OperationError struct {
 	ElapsedMS          int64
 	DownloadFallback   bool
 	SubmissionRejected bool
+	HTTPStatus         int
 	Err                error
 }
 
@@ -44,7 +45,11 @@ func operationError(err error, stage string, started time.Time, attempts int, re
 			break
 		}
 	}
-	return &OperationError{Stage: stage, UpstreamRequestID: id, JobID: diagnosticJobID(jobURL), SubmissionRejected: stage == "submit" && rejectedSubmission(resp),
+	status := 0
+	if resp != nil {
+		status = resp.StatusCode
+	}
+	return &OperationError{Stage: stage, HTTPStatus: status, UpstreamRequestID: id, JobID: diagnosticJobID(jobURL), SubmissionRejected: stage == "submit" && rejectedSubmission(resp),
 		Attempts: attempts, ElapsedMS: time.Since(started).Milliseconds(), Err: err}
 }
 

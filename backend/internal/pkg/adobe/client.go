@@ -188,16 +188,20 @@ func (c *Client) uploadHeaders(token, mimeType string) (map[string]string, []str
 }
 
 // UploadImage 上传一张参考图，返回 Adobe 侧的 image id（供 payload 的 referenceBlobs 引用）。
-func (c *Client) UploadImage(ctx context.Context, token string, image []byte, mimeType string) (string, error) {
+func (c *Client) UploadImage(ctx context.Context, token string, image []byte, mimeType string) (imageID string, retErr error) {
+	started := time.Now()
+	var resp *Response
+	defer func() { retErr = operationError(retErr, "upload", started, 1, resp, "") }()
 	if len(image) == 0 {
-		return "", NewRequestError("image is empty")
+		return "", NewParameterError("image is empty", "invalid_input_image", "image")
 	}
 	if strings.TrimSpace(mimeType) == "" {
 		mimeType = "image/jpeg"
 	}
 
 	headers, order := c.uploadHeaders(token, mimeType)
-	resp, err := c.transport.Do(ctx, &Request{
+	var err error
+	resp, err = c.transport.Do(ctx, &Request{
 		Method:      http.MethodPost,
 		URL:         ImageUploadURL,
 		Headers:     headers,
@@ -219,7 +223,7 @@ func (c *Client) UploadImage(ctx context.Context, token string, image []byte, mi
 	}
 	if err := json.Unmarshal(resp.Body, &payload); err != nil || len(payload.Images) == 0 ||
 		strings.TrimSpace(payload.Images[0].ID) == "" {
-		return "", NewRequestError("upload image succeeded but no image id returned")
+		return "", NewResponseError("upload image succeeded but no image id returned", "upstream_invalid_response", "Adobe accepted the image upload but did not return an image ID.")
 	}
 	return payload.Images[0].ID, nil
 }
@@ -296,7 +300,7 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) (r
 	for _, payload := range candidates {
 		body, err := marshalPayloadJSON(payload)
 		if err != nil {
-			return nil, NewRequestError(fmt.Sprintf("marshal image payload: %v", err))
+			return nil, NewInternalError(fmt.Sprintf("marshal image payload: %v", err), "image_payload_encoding_failed")
 		}
 		submitResp, err = c.postSubmit(ctx, ImageSubmitURL, headers, order, body)
 		if submitResp != nil {
@@ -313,7 +317,7 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) (r
 		}
 	}
 	if submitResp == nil {
-		return nil, NewRequestError("submit failed: no response")
+		return nil, NewResponseError("submit failed: no response", "upstream_invalid_response", "Adobe did not return a submission response.")
 	}
 	// 错误信息与内容拒绝判断只看最后这次响应自己的 body：状态码与 body 必须来自同一次提交。
 	if err := c.errorForSubmit(submitResp, "submit"); err != nil {
@@ -507,8 +511,7 @@ func (c *Client) poll(ctx context.Context, params pollParams) (result *GenerateR
 				return nil, NewContentRejectedError(message, resp.StatusCode,
 					"Image content was rejected by the upstream safety filter")
 			}
-			jobErr := NewRequestError(message)
-			jobErr.UserMessage = fmt.Sprintf("Adobe %s generation failed", params.label)
+			jobErr := NewResponseError(message, "upstream_generation_failed", fmt.Sprintf("Adobe %s generation failed", params.label))
 			return nil, jobErr
 		}
 
@@ -615,7 +618,14 @@ func (c *Client) downloadMeasured(ctx context.Context, mediaURL string, maxBytes
 			} else if resp.StatusCode == 408 || resp.StatusCode == 429 || resp.StatusCode >= 500 {
 				err = NewUpstreamTemporaryError(fmt.Sprintf("media download failed: HTTP %d", resp.StatusCode), resp.StatusCode, ErrorTypeStatus)
 			} else {
-				err = &RequestError{Message: fmt.Sprintf("media download failed: HTTP %d", resp.StatusCode), StatusCode: resp.StatusCode, ErrorType: ErrorTypeStatus}
+				failure := publicHTTPError(resp.StatusCode, "", fmt.Sprintf("media download failed: HTTP %d", resp.StatusCode))
+				// This is a GET for an already generated output, not an invalid input upload.
+				failure.ClientStatusCode, failure.Param = http.StatusBadGateway, ""
+				if resp.StatusCode != 404 && resp.StatusCode != 410 {
+					failure.Code = "upstream_image_download_failed"
+				}
+				failure.UserMessage = fmt.Sprintf("The generated image could not be downloaded (upstream HTTP %d).", resp.StatusCode)
+				err = failure
 			}
 		}
 		var temporary *UpstreamTemporaryError
@@ -748,12 +758,7 @@ func classifyAdobeHTTPError(status int, body, message string) error {
 	if IsRetryableStatus(status) {
 		return NewUpstreamTemporaryError(message, status, ErrorTypeStatus)
 	}
-	// 上游 4xx 体可能含内部字段：原文只留在 Message（日志），对外给固定文案。
-	requestErr := NewRequestError(message)
-	requestErr.StatusCode = status
-	requestErr.ErrorType = ErrorTypeStatus
-	requestErr.UserMessage = fmt.Sprintf("Adobe rejected the request (HTTP %d)", status)
-	return requestErr
+	return publicHTTPError(status, body, message)
 }
 
 // authOrQuotaError 区分「配额耗尽」「权益不足」「token 失效」：三者共用 401/403，
@@ -796,7 +801,7 @@ func pollURLFromSubmit(resp *Response, label string) (string, error) {
 	}
 	pollURL := ExtractResultLink(resp.Headers, submitData)
 	if pollURL == "" {
-		return "", NewRequestError(label + " succeeded but no poll url returned")
+		return "", NewResponseError(label+" succeeded but no poll url returned", "upstream_invalid_response", "Adobe accepted the request but did not return a task URL.")
 	}
 	return pollURL, nil
 }
@@ -809,15 +814,15 @@ func presignedURL(latest map[string]any, outputKey string) (string, bool, error)
 	}
 	first, ok := outputs[0].(map[string]any)
 	if !ok {
-		return "", false, NewRequestError("job finished with malformed outputs")
+		return "", false, NewResponseError("job finished with malformed outputs", "upstream_invalid_response", "Adobe returned malformed image output.")
 	}
 	media, ok := first[outputKey].(map[string]any)
 	if !ok {
-		return "", false, NewRequestError(fmt.Sprintf("job finished without %s url", outputKey))
+		return "", false, NewResponseError(fmt.Sprintf("job finished without %s url", outputKey), "upstream_invalid_response", "Adobe completed the task but did not return an image URL.")
 	}
 	link, ok := media["presignedUrl"].(string)
 	if !ok || strings.TrimSpace(link) == "" {
-		return "", false, NewRequestError(fmt.Sprintf("job finished without %s url", outputKey))
+		return "", false, NewResponseError(fmt.Sprintf("job finished without %s url", outputKey), "upstream_invalid_response", "Adobe completed the task but did not return an image URL.")
 	}
 	return link, true, nil
 }

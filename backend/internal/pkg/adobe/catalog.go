@@ -518,13 +518,13 @@ func ResolveImage(req ImageRequest) (ImageModelConf, error) {
 
 	familyID, ok := PickImageFamily(modelID)
 	if !ok {
-		return ImageModelConf{}, NewRequestError(fmt.Sprintf("unknown firefly image model: %q", req.ModelID))
+		return ImageModelConf{}, NewParameterError(fmt.Sprintf("unknown firefly image model: %q", req.ModelID), "unsupported_image_model", "model")
 	}
 
 	// 必须先拿到 spec：各族支持的比例集不同，NearestRatio 要拿它当候选集。
 	spec, ok := imageFamilySpecByID(familyID)
 	if !ok {
-		return ImageModelConf{}, NewRequestError(fmt.Sprintf("unknown firefly image family: %q", familyID))
+		return ImageModelConf{}, NewParameterError(fmt.Sprintf("unknown firefly image family: %q", familyID), "unsupported_image_model", "model")
 	}
 
 	// 非 ratio 路径：直接产出族级 conf。
@@ -549,15 +549,15 @@ func ResolveImage(req ImageRequest) (ImageModelConf, error) {
 	// 指定了该族不支持的比例」而触发——那种情况必须报错，不能悄悄换成最接近的。
 	suffix, ok := spec.ratioSuffixes[ratio]
 	if !ok {
-		return ImageModelConf{}, NewRequestError(
-			fmt.Sprintf("unsupported aspect ratio %q for firefly model %q", ratio, familyID))
+		return ImageModelConf{}, NewParameterError(
+			fmt.Sprintf("unsupported aspect ratio %q for firefly model %q", ratio, familyID), "unsupported_aspect_ratio", "aspect_ratio")
 	}
 
 	composed := fmt.Sprintf("%s-%s-%s", familyID, strings.ToLower(string(resolution)), suffix)
 	conf, ok := imageModelCatalog[composed]
 	if !ok {
-		return ImageModelConf{}, NewRequestError(
-			fmt.Sprintf("unsupported resolution %q for firefly model %q", resolution, familyID))
+		return ImageModelConf{}, NewParameterError(
+			fmt.Sprintf("unsupported resolution %q for firefly model %q", resolution, familyID), "unsupported_image_resolution", "size")
 	}
 	return conf, nil
 }
@@ -581,8 +581,8 @@ func resolveNonRatioFamily(spec imageFamilySpec, req ImageRequest) (ImageModelCo
 	// or silently resize the image the caller requested.
 	if spec.upstreamModelVersion == "gpt-image-2.5-flare" &&
 		(pixels.Width > 3840 || pixels.Height > 3840 || pixels.Width*pixels.Height > 8294400) {
-		return ImageModelConf{}, NewRequestError(fmt.Sprintf(
-			"Invalid size %s for gpt-image-2.5-flare: longest edge must not exceed 3840 pixels and total pixels must not exceed 8294400. Use 3840x2160 for landscape 4K or 2048x2048 for a square image.", pixels.String()))
+		return ImageModelConf{}, NewParameterError(fmt.Sprintf(
+			"Invalid size %s for gpt-image-2.5-flare: longest edge must not exceed 3840 pixels and total pixels must not exceed 8294400. Use 3840x2160 for landscape 4K or 2048x2048 for a square image.", pixels.String()), "image_size_exceeds_model_limit", "size")
 	}
 
 	// 计费档位必须跟实际发给上游的像素走，而不是客户端写的 size：enum 家族会被 NearestSize

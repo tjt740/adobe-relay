@@ -112,9 +112,9 @@ func (call *AdobeImageCall) inputImages(ctx context.Context, client *http.Client
 		for _, rawURL := range call.Request.InputImageURLs {
 			image, err := fetchAdobeInputImage(ctx, client, rawURL)
 			if err != nil {
-				// 取图失败是请求本身的问题，换账号也救不了。
+				// 取图失败不因换 Adobe 账号而修复，保持停止提交。
 				// 详细原因只进 Message（日志）；对外文案固定，避免把内网连通性等细节回显给调用方。
-				call.inputsErr = adobeInputImageRequestError(err)
+				call.inputsErr = &adobe.OperationError{Stage: "input_fetch", Err: adobeInputImageRequestError(err)}
 				return
 			}
 			images = append(images, image)
@@ -146,10 +146,10 @@ func (s *AdobeImageService) GenerateCall(
 		req = call.Request
 	}
 	if account == nil {
-		return nil, adobe.NewRequestError("adobe account is required")
+		return nil, adobe.NewInternalError("adobe account is required", "image_gateway_not_initialized")
 	}
 	if req == nil {
-		return nil, adobe.NewRequestError("images request is required")
+		return nil, adobe.NewInternalError("images request is required", "image_gateway_not_initialized")
 	}
 	if strings.TrimSpace(token) == "" {
 		return nil, adobe.NewAuthError("adobe access token is empty", http.StatusUnauthorized)
@@ -345,11 +345,11 @@ func (s *AdobeImageService) uploadSourceImages(
 // by the client or as a fallback when storage is disabled/unavailable.
 func (s *AdobeImageService) buildResponseBody(ctx context.Context, requestID string, images [][]byte, quality, responseFormat string, timings *AdobeImageTimings, meta adobeImageResponseMetadata) ([]byte, error) {
 	if len(images) == 0 {
-		return nil, adobe.NewRequestError("adobe returned an empty image")
+		return nil, adobe.NewResponseError("adobe returned an empty image", "upstream_empty_image", "Adobe returned an empty image.")
 	}
 	for _, image := range images {
 		if len(image) == 0 {
-			return nil, adobe.NewRequestError("adobe returned an empty image")
+			return nil, adobe.NewResponseError("adobe returned an empty image", "upstream_empty_image", "Adobe returned an empty image.")
 		}
 	}
 	var urls []string
@@ -400,7 +400,7 @@ func (s *AdobeImageService) buildResponseBody(ctx context.Context, requestID str
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, adobe.NewRequestError(fmt.Sprintf("encode images response: %v", err))
+		return nil, adobe.NewInternalError(fmt.Sprintf("encode images response: %v", err), "image_response_encoding_failed")
 	}
 
 	return body, nil

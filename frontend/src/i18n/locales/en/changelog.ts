@@ -18,6 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      adobeImageErrorDetails: { title: 'Specific image errors with safe submission protection', body: 'Today’s update separates Adobe parameter rejections, dependency failures, failed jobs and image fetch errors, adding codes, parameters, failure stages and request IDs. Existing settings and submission budgets remain. Accepted jobs and uncertain outcomes must not be resubmitted, and diagnostic details remain redacted.' },
       bulkAccountTestModels: { title: 'Bulk model selection and Flare defaults for Cookie and automatic tests', body: 'Today adds bulk model selection and extends the Flare default to Cookie delivery and background tests without an explicit model. Batch model snapshots, concurrency, progress, explicit choices and queue protection remain. A catalog does not prove upstream recovery; real requests record their actual outcomes.' },
       clashBackgroundTests: {"title": "Resume ordinary scheduling after 408 and keep node tests in background", "body": "Remove indefinite scheduling holds caused by 408 and safely release owned historical check gates, preserving operator pauses, quota and route protection. Imported-node tests continue after closing the dialog, with progress and individual results retained."},
       adobeRouteReview: {"title": "Check subscription traffic and review Adobe routes across sources", "body": "Today adds manual IP settings per account, visible source traffic, bounded three-source review, generation cooldown and safe submission handling. Existing features, operator pauses and configuration remain protected; network reachability and account credits are not generation proof."},
@@ -29,6 +30,19 @@ export default {
       }
     },
     "updates": {
+      adobeImageErrorDetails: {
+        title: 'Specific image request errors and failure reasons',
+        body: 'Add explicit error codes, affected parameters, failure stages and request correlation to Adobe image errors, separating parameter rejection from upstream processing failures.',
+        sections: {
+          reason: { title: 'Separate failures previously grouped under HTTP 400', body: 'Some dependency failures, failed jobs and incomplete upstream responses previously returned 400, while fixed messages hid useful validation rules. Clients could not reliably decide whether to change parameters or investigate the upstream service.' },
+          classification: { title: 'Classify status and cause independently', body: 'Confirmed parameter rejections remain 400. Upstream dependency failures, missing task or image URLs and failed generation jobs return 502. Network failures and timeouts fetching input images return 502 and 504 respectively. Local processing faults are separated from parameter errors; existing authentication, quota, entitlement and content safety policies remain.' },
+          details: { title: 'Expose codes, parameters and failure stages', body: 'Return a stable code, a confirmed param when available, and the validation, prepare, input_fetch, upload, submit, poll or download stage, plus the source, available original upstream status and gateway request ID. Recognized dimension errors explain the applicable size rule. Unknown errors do not guess a parameter. OpenAI errors retain their envelope; Gemini adds details within its existing Google format.' },
+          privacy: { title: 'Extract specific reasons through controlled rules', body: 'Only confirmed rules, controlled codes and necessary numeric values are exposed, never raw provider payloads. Cookies, tokens, signed image URLs and internal addresses remain hidden. Administrative diagnostics retain redacted evidence with additional searchable code, parameter and source fields.' },
+          protection: { title: 'Status changes do not authorize new generation attempts', body: 'A 502 or 504 response does not authorize another generation. Existing duplicate submission protection remains for accepted jobs, poll or download failures and unknown submission outcomes. Same-job GET retries, proven pre-acceptance submission budgets, account settings, manual pauses, proxies, concurrency, resources and alerts remain unchanged.' },
+          validation: { title: 'Validation scope', body: 'Isolated regressions cover size rejection, 424, incomplete upload and generation responses, failed jobs, download failures, local parameters and input image network errors, bilingual notes, protocol compatibility and redaction. They count generation POSTs and check that accepted or uncertain requests are not resubmitted. Mocked upstream tests do not prove production generation or provider recovery.' },
+          boundary: { title: 'Applicability and diagnostic boundaries', body: 'Requests handled by the new version receive detailed errors; historical errors are not rewritten. Native Adobe requests use this classification while relay accounts retain their existing protocol handling. Matching timestamps or status codes cannot establish the cause of a screenshot; correlate complete evidence using the request ID. Clients must honor terminal no-retry markers, which do not replace existing server submission protection.' },
+        },
+      },
       cookieRecoveryRevert: {
         title: 'Revert the recent Cookie recovery changes',
         body: 'Restore the previous Cookie recovery, retry and login-profile behavior while retaining multiple Supply tokens.',
