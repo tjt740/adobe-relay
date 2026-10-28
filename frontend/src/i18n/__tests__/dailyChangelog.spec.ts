@@ -14,13 +14,14 @@ vi.mock('vue-i18n', () => ({ useI18n: () => ({
 }) }))
 
 describe('Daily changelog', () => {
-  it('keeps image error details pending until an actual deployment date exists', () => {
-    const note = pendingDailyUpdates.find(item => item.id === 'adobeImageErrorDetails')
+  it('records image error details on its Beijing release date with complete notes', () => {
+    const note = dailyUpdates.find(item => item.id === 'adobeImageErrorDetails')
     expect(note).toBeDefined()
-    expect('date' in note!).toBe(false)
-    expect(dailyUpdates.some(item => item.id === note!.id)).toBe(false)
+    expect(note!.date).toBe('2026-10-29')
+    expect(pendingDailyUpdates.some(item => item.id === note!.id)).toBe(false)
+    expect(dailyOverviews[note!.date]).toBe(note!.id)
     const wrapper = mount(DailyChangelog)
-    expect(wrapper.find('[data-update-id="adobeImageErrorDetails"]').exists()).toBe(false)
+    expect(wrapper.find('[data-release-date="2026-10-29"] [data-update-id="adobeImageErrorDetails"]').exists()).toBe(true)
     wrapper.unmount()
   })
 
