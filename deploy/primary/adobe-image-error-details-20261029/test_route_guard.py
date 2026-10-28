@@ -3,6 +3,14 @@ from route_guard import validate_excluded_route, validate_subscription_exclusion
 
 
 class ExcludedRouteTests(TestCase):
+    def test_preserves_a_node_already_deleted_before_release(self):
+        review={'proxy_id':1290,'read_only':True,'backup_proxy_exists':False,'backup_status':None,'backup_excluded':False}
+        current={'excluded':False,'status':None,'bindings':0,'leases':0}
+        self.assertTrue(validate_excluded_route(review,current)['retired_proxy_absence_preserved'])
+        for patch in [{'status':'active'},{'excluded':True},{'bindings':1},{'leases':1}]:
+            with self.subTest(patch=patch),self.assertRaises(AssertionError):
+                validate_excluded_route(review,{**current,**patch})
+
     def test_retired_subscription_is_not_recreated(self):
         self.assertTrue(validate_subscription_exclusion([{'id':'current','proxy_ids':[9],'blocked_proxy_ids':[]}])['not_in_current_subscriptions'])
 

@@ -24,10 +24,10 @@ def backup_rows(table):
             rows.append(dict(zip(columns, line.split('\t'))))
     return rows
 
-proxy = next(row for row in backup_rows('proxies') if row['id'] == '1290')
+proxy = next((row for row in backup_rows('proxies') if row['id'] == '1290'), None)
 excluded_before = any(row['proxy_id'] == '1290' for row in backup_rows('adobe_route_exclusions'))
 current = json.loads(a.sql("SELECT json_build_object('excluded',EXISTS(SELECT 1 FROM adobe_route_exclusions WHERE proxy_id=1290),'status',(SELECT status FROM proxies WHERE id=1290),'bindings',(SELECT count(*) FROM accounts WHERE deleted_at IS NULL AND proxy_id=1290),'leases',(SELECT count(*) FROM adobe_proxy_test_leases WHERE proxy_id=1290))"))
-out = {'at': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'cutover_backup': str(backup), 'proxy_id': 1290, 'backup_status': proxy['status'], 'backup_excluded': excluded_before, 'current': current, 'read_only': True, 'restored_old_data': False}
+out = {'at': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'cutover_backup': str(backup), 'proxy_id': 1290, 'backup_proxy_exists': proxy is not None, 'backup_status': proxy['status'] if proxy else None, 'backup_excluded': excluded_before, 'current': current, 'read_only': True, 'restored_old_data': False}
 if not (ROOT / 'route-guard-review.json').exists():
     a.save('route-guard-review.json', out)
 print(json.dumps(out))

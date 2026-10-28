@@ -9,6 +9,10 @@ def validate_subscription_exclusion(sources):
 
 def validate_excluded_route(review, current):
     assert review['proxy_id'] == 1290 and review['read_only']
+    if review.get('backup_proxy_exists') is False:
+        assert review['backup_status'] is None and review['backup_excluded'] is False
+        assert current == {'excluded': False, 'status': None, 'bindings': 0, 'leases': 0}, 'Do not recreate a retired node or introduce bindings'
+        return {'retired_proxy_absence_preserved': True, 'no_bindings_or_test_leases': True}
     assert review['backup_excluded'] is True, 'Cutover backup must already contain the exclusion'
     assert review['backup_status'] in ('active', 'inactive')
     expected = {'excluded': True, 'status': review['backup_status'], 'bindings': 0, 'leases': 0}

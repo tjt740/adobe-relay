@@ -71,6 +71,7 @@ def snapshot():
     out['clash_contract_hash'] = sql("SELECT md5(jsonb_build_object('url',document->'url','revision',document->'revision','nodes',(SELECT coalesce(jsonb_agg(n-'source_id'-'original_name' ORDER BY ord),'[]') FROM jsonb_array_elements(document->'nodes') WITH ORDINALITY AS e(n,ord)))::text) FROM clash_subscription WHERE id=1")
     out['rules_hash'] = sql("SELECT md5(coalesce(jsonb_agg(to_jsonb(r)-'updated_at'-'last_triggered_at' ORDER BY id)::text,'')) FROM ops_alert_rules r")
     out['manual_proxy_account_ids'] = json.loads(sql("SELECT coalesce(json_agg(id ORDER BY id),'[]') FROM accounts WHERE deleted_at IS NULL AND extra->'manual_proxy_enabled'='true'::jsonb"))
+    out['excluded_route_state'] = json.loads(sql("SELECT json_build_object('excluded',EXISTS(SELECT 1 FROM adobe_route_exclusions WHERE proxy_id=1290),'status',(SELECT status FROM proxies WHERE id=1290),'bindings',(SELECT count(*) FROM accounts WHERE deleted_at IS NULL AND proxy_id=1290),'leases',(SELECT count(*) FROM adobe_proxy_test_leases WHERE proxy_id=1290))"))
     out['account_state'] = json.loads(sql("SELECT coalesce(json_agg(json_build_object('id',id,'credentials_hash',md5(credentials::text),'proxy_id',proxy_id,'status',status,'schedulable',schedulable,'manual_pause',extra->>'okad_manual_pause') ORDER BY id),'[]') FROM accounts WHERE deleted_at IS NULL"))
     return out
 
@@ -114,6 +115,7 @@ def check_preserved(before, current):
         'sub2_settings_including_smtp': current['settings_hashes'] == expected_settings,
         'clash_nodes_bindings_and_configuration': current['clash_contract_hash'] == before['clash_contract_hash'],
         'alert_rules': current['rules_hash'] == before['rules_hash'],
+        'retired_route_matches_current_baseline': current.get('excluded_route_state') == before.get('excluded_route_state'),
     }
     assert all(checks.values()), 'Protected state changed; review without restoring old data: ' + json.dumps(checks)
     return checks
