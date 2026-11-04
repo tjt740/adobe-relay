@@ -74,5 +74,11 @@
   "cutover_backup": "/opt/adobe-relay/backups/20261104T141629Z-07427dee06811fb9cf51f1b07e4f782f3076fe38",
   "canary_routed_at": "2026-11-04T14:11:25.904832+00:00",
   "canonical_routed_at": "2026-11-04T14:17:16.567422+00:00",
-  "baseline_okad_image": "adobe-team-cookie:e8938b4a20425a83556c4f9d14adaffa0b437904"
+  "baseline_okad_image": "adobe-team-cookie:e8938b4a20425a83556c4f9d14adaffa0b437904",
+  "archive_initial_run": 41848604961,
+  "rollback_guard": {
+    "passed": true,
+    "mutated": false
+  },
+  "archive_image_id": "sha256:cd2ec69fd5031a6e501044180918a1a8edae4af790b3725f1ef9d24cf820a11a"
 }
