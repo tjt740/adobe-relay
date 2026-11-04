@@ -69,7 +69,9 @@ spec=importlib.util.spec_from_file_location('audit',r/'audit.py');a=importlib.ut
 assert a.inspect(a.APP)['Config']['Image']=='adobe-relay:{sha}'
 core=json.loads((r/'final-verification.json').read_text())
 assert core['application_sha']=='{sha}'
-checks=a.check_preserved(json.loads((r/'before.json').read_text()),a.snapshot())
+before=json.loads((r/'before.json').read_text());current=a.snapshot()
+checks=a.check_preserved(before,current)
+a.validate_rollback(before,current,'{sha}',a.inspect(a.ROLLBACK_IMAGE)['Id'])
 previous=r/'release-completion.json'
 if previous.exists():
  saved=json.loads(previous.read_text());assert saved['application_sha']=='{sha}' and saved['core_verified_at']==core['at']
@@ -80,7 +82,7 @@ for name,value in {payload!r}.items():
  data=base64.b64decode(value);assert b'PENDING' not in data
  path=r/name;path.write_bytes(data);path.chmod(0o600);files[name]=a.digest(data)
  if name=='primary-README.md':pathlib.Path('/opt/adobe-relay/deploy/primary/README.md').write_bytes(data)
-out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'adobe_requests':False,'mail_sent':False}}
+out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'adobe_requests':False,'mail_sent':False}}
 (r/'release-completion.json').write_text(json.dumps(out,ensure_ascii=False,indent=2));print(json.dumps(out))
 """)
 else:
