@@ -9,7 +9,7 @@
   },
   "backend/internal/clash/node_count_test.go": {
     "before": null,
-    "candidate": "b1e23db7991bb6df47746c9567d2aee36b35d17b82157b3e018e9e814b44cbc8"
+    "candidate": "2ffc2055f5bd4572c5203a37c51149258f1212a6aae9cd14dfd41d636f99da73"
   },
   "backend/internal/clash/source_health.go": {
     "before": "292dfd120a56196e66737e2a6a35df7a01bd51f3a455dca1d6da6f1fc63bf6be",

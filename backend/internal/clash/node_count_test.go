@@ -75,6 +75,7 @@ CREATE TABLE accounts(id BIGSERIAL PRIMARY KEY,proxy_id bigint,proxy_fallback_or
 CREATE TABLE scheduler_outbox(event_type text,payload jsonb);`)
 	require.NoError(t, err)
 	const count = 520
+	// Keep the simulated listener range below Linux ephemeral client ports.
 	var allFail atomic.Bool
 	body := largeYAMLSubscription(count)
 	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -106,6 +107,7 @@ CREATE TABLE scheduler_outbox(event_type text,payload jsonb);`)
 			}
 			listener, e := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(entry.Port))
 			if e != nil {
+				t.Errorf("bind simulated listener %d: %v", entry.Port, e)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -130,12 +132,12 @@ CREATE TABLE scheduler_outbox(event_type text,payload jsonb);`)
 		}
 	}()
 	m := NewManager(db)
-	m.controller, m.secret, m.host, m.portStart = controller.URL, "test-only", "127.0.0.1", 32500
+	m.controller, m.secret, m.host, m.portStart = controller.URL, "test-only", "127.0.0.1", 26000
 	m.fetchClient = feed.Client()
 	urls := feed.URL + "/good\n" + feed.URL + "/bad"
 	previous := State{URL: urls, Revision: 1, Nodes: []Node{
-		{Name: "订阅2 · Retained", ProxyID: 1, Port: 32500, Password: "keep-enabled", Enabled: true, Config: map[string]any{"name": "订阅2 · Retained", "type": "http", "server": "example.com", "port": 80}},
-		{Name: "订阅2 · Disabled", ProxyID: 2, Port: 32501, Password: "keep-disabled", Enabled: false, Config: map[string]any{"name": "订阅2 · Disabled", "type": "http", "server": "example.com", "port": 80}},
+		{Name: "订阅2 · Retained", ProxyID: 1, Port: 26000, Password: "keep-enabled", Enabled: true, Config: map[string]any{"name": "订阅2 · Retained", "type": "http", "server": "example.com", "port": 80}},
+		{Name: "订阅2 · Disabled", ProxyID: 2, Port: 26001, Password: "keep-disabled", Enabled: false, Config: map[string]any{"name": "订阅2 · Disabled", "type": "http", "server": "example.com", "port": 80}},
 	}}
 	normalizeSources(&previous)
 	raw, err := json.Marshal(previous)
@@ -170,7 +172,7 @@ INSERT INTO accounts(proxy_id,status,schedulable,extra) VALUES(1,'active',false,
 		ports[node.Port] = true
 		if node.ProxyID == 1 {
 			require.Equal(t, "keep-enabled", node.Password)
-			require.Equal(t, 32500, node.Port)
+			require.Equal(t, 26000, node.Port)
 		}
 	}
 	var boundID int64
