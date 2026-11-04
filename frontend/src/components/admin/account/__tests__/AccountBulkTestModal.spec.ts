@@ -28,6 +28,90 @@ beforeEach(() => {
 })
 
 describe('bulk account tests', () => {
+  it.each([1, 3, 15])('uses %i workers and fills each freed slot without exceeding the selection', async concurrency => {
+    const finish = new Map<number, (result: { success: boolean }) => void>()
+    testConnection.mockImplementation(id => new Promise(resolve => finish.set(id, resolve)))
+    const ids = Array.from({ length: 18 }, (_, i) => i + 1)
+    const wrapper = mountModal([...ids, 1])
+    await wrapper.setProps({ show: true, runId: 1 })
+    await flushPromises()
+    const select = wrapper.get('#bulk-test-concurrency')
+    expect((select.element as HTMLSelectElement).value).toBe('3')
+    expect(select.findAll('option').map(option => option.attributes('value'))).toEqual(Array.from({ length: 15 }, (_, i) => String(i + 1)))
+    await select.setValue(String(concurrency))
+    await wrapper.get('[data-testid="bulk-test-start"]').trigger('click')
+    expect(testConnection).toHaveBeenCalledTimes(concurrency)
+    expect(select.attributes('disabled')).toBeDefined()
+    wrapper.findAllComponents({ name: 'Select' })[1].vm.$emit('update:modelValue', 1)
+    await wrapper.setProps({ show: false })
+    expect(wrapper.get('[data-testid="bulk-test-background-concurrency"]').exists()).toBe(true)
+    for (const id of ids) {
+      expect(finish.has(id)).toBe(true)
+      finish.get(id)!({ success: true })
+      await flushPromises()
+      expect(testConnection).toHaveBeenCalledTimes(Math.min(concurrency + id, ids.length))
+    }
+    expect(new Set(testConnection.mock.calls.map(call => call[0])).size).toBe(ids.length)
+    await wrapper.setProps({ show: true })
+    expect((wrapper.get('#bulk-test-concurrency').element as HTMLSelectElement).value).toBe(String(concurrency))
+    expect(wrapper.emitted('completed')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it.each([0, 16, 2.5, '', 'bad', NaN, Infinity, null, true])('rejects an invalid concurrency value %s', async value => {
+    testConnection.mockResolvedValue({ success: true })
+    const wrapper = mountModal()
+    await wrapper.setProps({ show: true, runId: 1 })
+    await flushPromises()
+    wrapper.findAllComponents({ name: 'Select' })[1].vm.$emit('update:modelValue', value)
+    await flushPromises()
+    expect((wrapper.get('#bulk-test-concurrency').element as HTMLSelectElement).value).toBe('3')
+    wrapper.unmount()
+  })
+
+  it('limits fifteen workers to the unique targets and stops every in-flight request', async () => {
+    testConnection.mockImplementation((_id, signal: AbortSignal) => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+    }))
+    const wrapper = mountModal([1, 2, 1])
+    await wrapper.setProps({ show: true, runId: 1 })
+    await flushPromises()
+    await wrapper.get('#bulk-test-concurrency').setValue('15')
+    await wrapper.get('[data-testid="bulk-test-start"]').trigger('click')
+    expect(testConnection).toHaveBeenCalledTimes(2)
+    await wrapper.get('[data-testid="bulk-test-stop"]').trigger('click')
+    await flushPromises()
+    expect(testConnection.mock.calls.every(call => call[1].aborted)).toBe(true)
+    expect(wrapper.emitted('account-tested')).toBeUndefined()
+    await wrapper.setProps({ runId: 2 })
+    await flushPromises()
+    expect((wrapper.get('#bulk-test-concurrency').element as HTMLSelectElement).value).toBe('3')
+    wrapper.unmount()
+  })
+
+  it.each(['stop', 'session'])('stops a fifteen-worker batch with queued targets after %s', async reason => {
+    let failFirst!: (error: Error) => void
+    testConnection.mockImplementation((id, signal: AbortSignal) => new Promise((_resolve, reject) => {
+      if (id === 1) failFirst = reject
+      signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+    }))
+    const wrapper = mountModal(Array.from({ length: 18 }, (_, i) => i + 1))
+    await wrapper.setProps({ show: true, runId: 1 })
+    await flushPromises()
+    await wrapper.get('#bulk-test-concurrency').setValue('15')
+    await wrapper.get('[data-testid="bulk-test-start"]').trigger('click')
+    expect(testConnection).toHaveBeenCalledTimes(15)
+    if (reason === 'session') failFirst(new AccountTestSessionExpired())
+    else await wrapper.get('[data-testid="bulk-test-stop"]').trigger('click')
+    await flushPromises()
+    expect(testConnection).toHaveBeenCalledTimes(15)
+    expect(testConnection.mock.calls.every(call => call[1].aborted)).toBe(true)
+    expect(wrapper.get('[data-testid="bulk-test-row-18"]').text()).toContain('states.cancelled')
+    expect(wrapper.emitted('account-tested')).toBeUndefined()
+    expect(wrapper.emitted('completed')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
   it('prepares the selected accounts without testing and defaults to Flare before starting', async () => {
     testConnection.mockResolvedValue({ success: true })
     const wrapper = mountModal([1, 2])

@@ -231,9 +231,6 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 	if !m.configured() {
 		return View{}, errors.New("Clash 运行服务尚未配置，请按部署文档启动 Mihomo")
 	}
-	if len(req.Names) > maxNodes {
-		return View{}, errors.New("选择的节点过多")
-	}
 	snapshot, err := loadState(ctx, m.db, false)
 	if err != nil {
 		return View{}, err
@@ -333,9 +330,6 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 		} else {
 			retiredIDs = append(retiredIDs, n.ProxyID)
 		}
-	}
-	if len(fetched)+len(next.Nodes) > maxNodes {
-		return View{}, errors.New("保留停用节点后超过节点上限")
 	}
 	// Lock and detach affected accounts before changing proxies, matching the
 	// account -> failover policy -> proxy lock order used by automatic failover.

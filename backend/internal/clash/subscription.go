@@ -17,7 +17,6 @@ import (
 )
 
 const maxBody = 8 << 20
-const maxNodes = 512
 
 type Node struct {
 	OriginalName string         `json:"original_name,omitempty"`
@@ -208,9 +207,6 @@ func isSubscriptionMetadata(name string) bool {
 }
 
 func normalizeProxyConfigs(configs []map[string]any) ([]Node, error) {
-	if len(configs) > maxNodes {
-		return nil, fmt.Errorf("订阅最多支持 %d 个节点", maxNodes)
-	}
 	supported := map[string]bool{"ss": true, "ssr": true, "vmess": true, "vless": true, "trojan": true, "hysteria": true, "hysteria2": true, "tuic": true, "http": true, "socks5": true, "anytls": true}
 	seen := make(map[string]bool)
 	nodes := make([]Node, 0, len(configs))

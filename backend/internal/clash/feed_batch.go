@@ -123,9 +123,6 @@ func preserveFailedSources(previous State, nodes []Node, sources []Source) ([]No
 			retained[n.Name] = true
 		}
 	}
-	if len(nodes) > maxNodes {
-		return nil, nil, fmt.Errorf("包含保留节点后超过 %d 个节点，请减少本次导入的订阅", maxNodes)
-	}
 	used := map[string]bool{}
 	// Reserve existing names before assigning names to new nodes.
 	for i, n := range nodes {

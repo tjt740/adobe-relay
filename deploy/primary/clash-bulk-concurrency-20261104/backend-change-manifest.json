@@ -1,0 +1,54 @@
+{
+  "backend/internal/clash/feed_batch.go": {
+    "before": "757a89a191d87f07852376306b1f720f8b26032c8ad76219d6b8a42e7021d5c3",
+    "candidate": "d0fcc82ddca69d1d593bd93312a40952a51016ed4bdfdcb0b4426eb002281872"
+  },
+  "backend/internal/clash/manager.go": {
+    "before": "247c03c5cbaf5f00fc245f6ebbbf867f3d8ae7f6401a334c1e5aed27b0dcd3e6",
+    "candidate": "7a84552d14d83f558e96bcd738a9f868af877d3c246f5380d26d0696bbd1b83f"
+  },
+  "backend/internal/clash/node_count_test.go": {
+    "before": null,
+    "candidate": "2ffc2055f5bd4572c5203a37c51149258f1212a6aae9cd14dfd41d636f99da73"
+  },
+  "backend/internal/clash/source_health.go": {
+    "before": "292dfd120a56196e66737e2a6a35df7a01bd51f3a455dca1d6da6f1fc63bf6be",
+    "candidate": "183577d0cf8855f4f7abe5ea1546c6c3f0287e95177a5ed2c64a696334340048"
+  },
+  "backend/internal/clash/subscription.go": {
+    "before": "dd53bb252159cce8e67c1cb9df45c94228d9a89e17be17785778b4f6ceb87bed",
+    "candidate": "66db1d726971f3670b574c9b8042cb7fb3d21b86e5773e3e3d7cb1c845cd7cd5"
+  },
+  "frontend/src/components/admin/account/AccountBulkTestModal.vue": {
+    "before": "2211c68191c8f1287cb541a77acf3f0a83aa1cf5849738ecee1a97af15aefee1",
+    "candidate": "509a37aa088e8e7f7fd19f33e6316f76dcdca91e998c5c7091674ebf3df59eab"
+  },
+  "frontend/src/components/admin/account/__tests__/AccountBulkTestModal.spec.ts": {
+    "before": "d9aeafdddb77fa83054d5317988fd6cf1421fb348bf065fb67d72a4ab5ab9b4e",
+    "candidate": "63c48984d212a629f25204a35ddd90ffd3d63c077336fc3a1a0e5aca42cfebea"
+  },
+  "frontend/src/content/changelog/daily.ts": {
+    "before": "8a775d44477ea52a2acdae75c52d77bf154f2b68b5480a2e10415246a30e62a4",
+    "candidate": "6141051dffc067ee7f30dd34ae613a3f54b6974ee6aee04dcfc655544126c37d"
+  },
+  "frontend/src/i18n/__tests__/dailyChangelog.spec.ts": {
+    "before": "9498dd94d098f6e90f6d382a05845c0efde7ffd9490f3fa5ce8556fc6448d4f7",
+    "candidate": "e6548e8d9515be97e306f25868b99b54436b23ae4fd987fdcfcc3a2a4e2a35ed"
+  },
+  "frontend/src/i18n/locales/en/admin/accounts.ts": {
+    "before": "4530cbe615aea712fd255803850d2af70a1ed7511404a0a45e421654633c3ac5",
+    "candidate": "85fa3866d803268421bbd1eaf2a6c5efeb5538cd634e41b79d3ffeb6d27e1fb2"
+  },
+  "frontend/src/i18n/locales/en/changelog.ts": {
+    "before": "b434105df2198ca640495288be4119c31b9019264fa08cf477fe3f5cde519c99",
+    "candidate": "88806c3d9cd89f9348c563cc83817a7a2cf6cd6af6916e226b0b1eeee214d2b7"
+  },
+  "frontend/src/i18n/locales/zh/admin/accounts.ts": {
+    "before": "78626e8ac53e37253f52aded761574aa9749ee031b53cd2ebed1705ac2dc15c5",
+    "candidate": "e715ba991bb85fa562b7c3bf466248784a7c24e8a7cb2c274f90b824581edd63"
+  },
+  "frontend/src/i18n/locales/zh/changelog.ts": {
+    "before": "0b7cc3a3e9831facf9416ef9de70b676fa8539347f52606af94acb7071874006",
+    "candidate": "83faef1caece907ce55201a49568f9c9ccdd5f40b100b6e491a9397ebf71bce8"
+  }
+}

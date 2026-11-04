@@ -18,6 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      bulkTestConcurrency: { title: 'Choose bulk-test concurrency and remove the fixed subscription node cap', body: 'Bulk account tests now offer 1–15 simultaneous accounts, default 3, fixed for the batch with background progress. Subscription parsing, merging and import remove the 512-node cap. Upstream, proxy and resource constraints still apply, alongside download, port and existing business safeguards.' },
       adobeImageErrorDetails: { title: 'Specific image errors with safe submission protection', body: 'Today’s update separates Adobe parameter rejections, dependency failures, failed jobs and image fetch errors, adding codes, parameters, failure stages and request IDs. Existing settings and submission budgets remain. Accepted jobs and uncertain outcomes must not be resubmitted, and diagnostic details remain redacted.' },
       bulkAccountTestModels: { title: 'Bulk model selection and Flare defaults for Cookie and automatic tests', body: 'Today adds bulk model selection and extends the Flare default to Cookie delivery and background tests without an explicit model. Batch model snapshots, concurrency, progress, explicit choices and queue protection remain. A catalog does not prove upstream recovery; real requests record their actual outcomes.' },
       clashBackgroundTests: {"title": "Resume ordinary scheduling after 408 and keep node tests in background", "body": "Remove indefinite scheduling holds caused by 408 and safely release owned historical check gates, preserving operator pauses, quota and route protection. Imported-node tests continue after closing the dialog, with progress and individual results retained."},
@@ -30,6 +31,29 @@ export default {
       }
     },
     "updates": {
+      bulkTestConcurrency: {
+        title: 'Choose 1–15 simultaneous bulk account tests',
+        body: 'Choose the number of simultaneous account tests before starting, default 3, for sequential diagnosis or faster checks when capacity permits.',
+        sections: {
+          reason: { title: 'Match test speed to the task', body: 'Each page previously allowed at most three simultaneous account tests, with no way to reduce this to one or increase it to match available exits and upstream capacity. The new dropdown offers integers from 1 to 15 without duplicating tests for selected accounts.' },
+          selection: { title: 'Fix settings when the batch starts', body: 'Each new batch defaults to 3. Choose a model and concurrency before starting; both are then fixed. Actual concurrency cannot exceed the unique target count. Closing and reopening the dialog retains the same model, concurrency and results, and the background card displays batch concurrency.' },
+          queue: { title: 'Fill each freed slot', body: 'The queue uses the chosen concurrency and continues after individual failures. Stopping or an expired admin session prevents queued tests and aborts current client requests; leaving the page keeps existing cancellation behavior. An accepted upstream generation may continue, so stopping does not cancel its cost or justify resubmission.' },
+          risk: { title: 'Costs of higher concurrency', body: 'Tests make real upstream requests; Adobe generates test images. Higher concurrency concentrates quota use and increases potential 429, 408, proxy, image-transfer and memory pressure. Three accounts on one node do not provide three independent exits. Other pages, Cookie checks, scheduled tests and customer traffic can add to the load.' },
+          validation: { title: 'Validation scope', body: 'Isolated regression checks cover 1, 3 and 15 workers, slot refill, deduplication, small target sets, running locks, background display, reopening, new-batch defaults, invalid input, stopping and session expiry. Requests are simulated; this does not prove production fifteen-way generation, upstream recovery or peak throughput.' },
+          boundary: { title: 'Only the manual batch on this page', body: 'This is not a site-wide testing limit and does not change account business concurrency, the three-accounts-per-node capacity, automatic checks or scheduled tests. Model mappings, operator pauses, manual proxies, quota, subscription traffic and expiry, credentials and submission protections continue to apply. The default of 3 retains previous intensity; 15 does not guarantee five times the speed.' },
+        },
+      },
+      clashNodeCount: {
+        title: 'Remove the 512-node subscription limit',
+        body: 'Remove fixed node-count checks from parsing, merging, selection and failed-source preservation so larger pools can be previewed in full and imported as needed.',
+        sections: {
+          reason: { title: 'Valid merged subscriptions should not fail on count alone', body: 'The early implementation limited processing to 512 nodes. Combining valid feeds or retaining nodes from a temporarily unavailable source could therefore reject the entire operation. That threshold did not reflect download size, network concurrency or available ports.' },
+          behavior: { title: 'Parse, merge and select the full pool', body: 'Clash YAML and Base64 feeds no longer fail because they contain more than 512 nodes. Merged feeds can still be previewed, selected and imported. When a source fails temporarily, its enabled nodes remain available and its previously disabled nodes stay disabled.' },
+          protection: { title: 'Keep resource and business safeguards', body: 'Subscription URL text remains limited to 64 KiB, each feed response to 8 MiB, and shared fetching to four concurrent requests. Existing timeouts and request-size limits remain. Node validation, source identity, duplicate selection, revision conflicts, manual pauses, account bindings, credentials, subscription traffic and expiry checks follow their existing rules.' },
+          validation: { title: 'Validation scope', body: 'Local synthetic fixtures cover 1200-node YAML and Base64 parsing, merging three 400-node feeds, and previewing and importing 520 new nodes alongside failed-source nodes in isolated PostgreSQL. Checks cover disabled state, listener credentials, account bindings, manual pauses and no writes when every source fails. The simulated controller and TCP listeners do not establish real Mihomo forwarding or production upstream availability.' },
+          boundary: { title: 'Removing a count limit does not make resources unlimited', body: 'Preview and merging have no fixed node-count ceiling. Import still requires an available dedicated listener port per node. The existing allocation range remains at most 4096 ports from the configured start, never above port 65535. Retained nodes and old listeners reserved during replacement occupy ports. Port exhaustion and request-size limits still produce errors, and larger pools may take longer to load and apply.' },
+        },
+      },
       adobeImageErrorDetails: {
         title: 'Specific image request errors and failure reasons',
         body: 'Add explicit error codes, affected parameters, failure stages and request correlation to Adobe image errors, separating parameter rejection from upstream processing failures.',

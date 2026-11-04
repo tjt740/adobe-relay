@@ -628,7 +628,10 @@ export default {
       },
       bulkTest: {
         title: 'Bulk Account Test',
-        hint: 'Choose a model and click Start testing, up to 3 accounts at a time. Tests make real upstream requests and use quota; Adobe accounts generate a test image.',
+        hint: 'Choose a model and the number of simultaneous account tests, then click Start testing. Tests make real upstream requests and use quota; Adobe accounts generate a test image.',
+        concurrencyLabel: 'Simultaneous account tests',
+        concurrencyValue: 'Up to {count} accounts at a time',
+        concurrencyHint: 'Choose 1–15, default 3. The value is fixed once started and cannot exceed the selected account count in practice. Higher concurrency concentrates quota use and increases rate-limit, proxy and transfer pressure. This value controls only this batch on the current page.',
         start: 'Start testing',
         defaultModel: 'Each account’s default model',
         modelHint: 'Models are listed for the first selected account. The chosen model applies to every account in this batch; choose one they all support. Adobe model lists default to GPT Image 2.5 Flare. The model is locked once testing starts.',
