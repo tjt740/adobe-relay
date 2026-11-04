@@ -199,24 +199,15 @@ func fetchSubscriptionDetails(ctx context.Context, client *http.Client, raw stri
 		sources[i] = Source{ID: sourceID(u), Index: i + 1, URLHint: sourceHint(u), FetchError: "not_checked"}
 	}
 	total := 0
-	tooMany := false
 	fetchFeeds(batch, client, jobs, func(r feedResult) {
 		total += len(r.nodes)
-		if total > maxNodes {
-			tooMany = true
-			cancel()
-			return
-		}
 		sources[r.src.Index-1] = r.src
 		bySource[r.src.Index-1] = r.nodes
 	})
 	if err := ctx.Err(); err != nil {
 		return nil, nil, err
 	}
-	if tooMany {
-		return nil, nil, fmt.Errorf("合并后的订阅节点超过 %d 个", maxNodes)
-	}
-	all := []Node{}
+	all := make([]Node, 0, total)
 	for i, nodes := range bySource {
 		if len(urls) > 1 {
 			for j := range nodes {

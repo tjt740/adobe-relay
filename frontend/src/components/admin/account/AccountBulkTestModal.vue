@@ -19,6 +19,19 @@
           <button type="button" data-testid="bulk-test-retry-models" class="btn btn-secondary btn-sm" @click="loadModels">{{ t('admin.accounts.bulkTest.retryModels') }}</button>
         </div>
       </div>
+      <div class="space-y-2">
+        <label for="bulk-test-concurrency" class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.accounts.bulkTest.concurrencyLabel') }}</label>
+        <Select
+          id="bulk-test-concurrency"
+          :model-value="selectedConcurrency"
+          :options="concurrencyOptions"
+          :disabled="started"
+          :searchable="false"
+          :aria-label="t('admin.accounts.bulkTest.concurrencyLabel')"
+          @update:model-value="setConcurrency"
+        />
+        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.bulkTest.concurrencyHint') }}</p>
+      </div>
       <p v-if="sessionExpired" class="text-sm text-red-600" role="alert">{{ t('admin.accounts.bulkTest.sessionExpired') }}</p>
       <div class="flex flex-wrap items-center justify-between gap-2 text-sm" aria-live="polite">
         <span class="inline-flex items-center gap-2 font-medium" data-testid="bulk-test-progress">
@@ -78,6 +91,7 @@
         </button>
       </div>
       <p class="break-all text-xs text-gray-500 dark:text-gray-400" data-testid="bulk-test-background-model">{{ activeModelLabel }}</p>
+      <p class="text-xs text-gray-500 dark:text-gray-400" data-testid="bulk-test-background-concurrency">{{ t('admin.accounts.bulkTest.concurrencyValue', { count: activeConcurrency }) }}</p>
       <AccountTestProgress :completed="completed" :total="rows.length" :running="running" :label="t('admin.accounts.bulkTest.title')" />
       <div class="flex items-center justify-between gap-2 text-xs">
         <span class="text-gray-500 dark:text-gray-400">{{ t('admin.accounts.bulkTest.progress', { done: completed, total: rows.length }) }} · {{ percentage }}%</span>
@@ -120,6 +134,16 @@ const rows = ref<TestRow[]>([])
 const started = ref(false)
 const selectedModelId = ref('')
 const activeModelId = ref('')
+const selectedConcurrency = ref(3)
+const activeConcurrency = ref(3)
+const concurrencyOptions = computed(() => Array.from({ length: 15 }, (_, index) => ({
+  value: index + 1, label: t('admin.accounts.bulkTest.concurrencyValue', { count: index + 1 })
+})))
+const setConcurrency = (value: unknown) => {
+  if (started.value) return
+  const count = typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN
+  selectedConcurrency.value = Number.isInteger(count) && count >= 1 && count <= 15 ? count : 3
+}
 const availableModels = ref<ClaudeModel[]>([])
 const loadingModels = ref(false)
 const modelLoadFailed = ref(false)
@@ -167,6 +191,8 @@ const prepare = () => {
   // Snapshot the selection when the batch dialog opens, before choosing a model.
   rows.value = [...new Map(props.targets.map(target => [target.id, target])).values()].map(target => ({ ...target, state: 'pending' }))
   started.value = false
+  selectedConcurrency.value = 3
+  activeConcurrency.value = 3
   sessionExpired.value = false
   backgroundDismissed.value = false
   void loadModels()
@@ -185,6 +211,8 @@ const start = async () => {
   started.value = true
   const modelId = selectedModelId.value
   activeModelId.value = modelId
+  const concurrency = selectedConcurrency.value
+  activeConcurrency.value = concurrency
   const run = ++generation
   const batch = new AbortController()
   controller = batch
@@ -220,7 +248,7 @@ const start = async () => {
     }
   }
   try {
-    await Promise.all(Array.from({ length: Math.min(3, rows.value.length) }, worker))
+    await Promise.all(Array.from({ length: Math.min(concurrency, rows.value.length) }, worker))
   } finally {
     if (run === generation) { controller = undefined; running.value = false; emit('completed') }
   }

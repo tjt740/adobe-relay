@@ -14,6 +14,12 @@ vi.mock('vue-i18n', () => ({ useI18n: () => ({
 }) }))
 
 describe('Daily changelog', () => {
+  it('groups configurable bulk concurrency and the node cap removal on their Beijing release date', () => {
+    const notes = dailyUpdates.filter(item => item.date === '2026-11-04')
+    expect(notes.map(item => item.id)).toEqual(['bulkTestConcurrency', 'clashNodeCount'])
+    expect(dailyOverviews['2026-11-04']).toBe('bulkTestConcurrency')
+    expect(pendingDailyUpdates.some(item => notes.some(note => note.id === item.id))).toBe(false)
+  })
   it('records image error details on its Beijing release date with complete notes', () => {
     const note = dailyUpdates.find(item => item.id === 'adobeImageErrorDetails')
     expect(note).toBeDefined()
