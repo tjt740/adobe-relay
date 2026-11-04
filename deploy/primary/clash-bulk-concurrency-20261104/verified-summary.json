@@ -1,0 +1,84 @@
+{
+  "at": "2026-11-04T14:25:14.565530+00:00",
+  "application_sha": "07427dee06811fb9cf51f1b07e4f782f3076fe38",
+  "application_version": "2026-11-04T22:25:13.070+0800\tINFO\tstdlog\tSub2API 0.2.17 (commit: 07427dee06811fb9cf51f1b07e4f782f3076fe38, built: 2026-11-04T13:56:39Z)\t{\"service\": \"sub2api\", \"env\": \"bootstrap\", \"legacy_stdlog\": true}",
+  "preserved": {
+    "other_containers": true,
+    "configuration": true,
+    "resources_and_go": true,
+    "environment": true,
+    "okad_settings": true,
+    "sub2_settings_including_smtp": true,
+    "clash_nodes_bindings_and_configuration": true,
+    "alert_rules": true,
+    "retired_route_matches_current_baseline": true
+  },
+  "business_preservation": {
+    "backup_accounts": 1059,
+    "checked_accounts": 1059,
+    "manual_pauses_preserved": true,
+    "manual_proxy_modes_preserved": true,
+    "proxy_bindings_changed_with_event_chain": 9,
+    "cookie_rotations_with_version_advance": 1,
+    "token_fields_only_changes": 0
+  },
+  "migration_checksums_preserved": true,
+  "migration_set_retained": true,
+  "retired_408_gates_empty": true,
+  "canonical_assets": {
+    "/assets/index-H-WuWftK.js": "fcc54e35192efe052292c808f256e6b3cee9aa4835b2a3846ca0fdbdfe81fa81",
+    "/assets/ProxiesView-C_4McxY8.js": "99f7240f3c7aef1ce825caa93f27a677805811002b6bb0935cd1445143e1359e",
+    "/assets/ChangelogView-DVAqvgI_.js": "987dca6e6d4265cf85e46971f516bc114bed1bcfd6ac41ac4bf4185bcab222a9",
+    "/assets/AccountsView-TB_7OvVn.js": "ec4b79dc3fbc0496c956839725e6cb2b591d9a596efa57fb655815b5e1afd8b3"
+  },
+  "live_browser_cases": 0,
+  "browser_limitation": "Live authenticated browser verification unavailable; asset and API checks only",
+  "heartbeat_after_temporary_process_cleanup": {
+    "at": "2026-11-04T22:25:13.174051+08:00",
+    "healthy": true
+  },
+  "passive_sample_count": 13,
+  "temporary_cleanup": {
+    "at": "2026-11-04T14:21:37.157511+00:00",
+    "temporary_container_removed": true,
+    "temporary_nat_rule_removed": true,
+    "rolling_lease_removed": true,
+    "nginx_configuration_unchanged": true
+  },
+  "adobe_custom_business_preserved": true,
+  "route_api_verified": true,
+  "excluded_1290": {
+    "excluded": false,
+    "status": null,
+    "bindings": 0,
+    "leases": 0
+  },
+  "cutover_route_checks": {
+    "retired_proxy_absence_preserved": true,
+    "no_bindings_or_test_leases": true
+  },
+  "active_adobe_probes": false,
+  "test_mail_sent": false,
+  "feature_pr": 132,
+  "main_merge": "42189db360564de4d71de8485b5a9c714bb419f1",
+  "build_run": 41842378330,
+  "preflight_run": 41844339046,
+  "prepare_run": 41844562735,
+  "start_run": 41845006646,
+  "verify_run": 41846967464,
+  "initial_failed_build": 41841575117,
+  "official_frontend_tests": 565,
+  "local_frontend_tests": 118,
+  "original_release_guard_tests": 44,
+  "release_guard_tests": 27,
+  "cutover_backup": "/opt/adobe-relay/backups/20261104T141629Z-07427dee06811fb9cf51f1b07e4f782f3076fe38",
+  "canary_routed_at": "2026-11-04T14:11:25.904832+00:00",
+  "canonical_routed_at": "2026-11-04T14:17:16.567422+00:00",
+  "baseline_okad_image": "adobe-team-cookie:e8938b4a20425a83556c4f9d14adaffa0b437904",
+  "archive_initial_run": 41848604961,
+  "rollback_guard": {
+    "passed": true,
+    "mutated": false
+  },
+  "archive_image_id": "sha256:cd2ec69fd5031a6e501044180918a1a8edae4af790b3725f1ef9d24cf820a11a"
+}

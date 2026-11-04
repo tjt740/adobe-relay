@@ -66,10 +66,14 @@ r=pathlib.Path('{root}');held=[]
 for path in ['/opt/adobe-relay/shared/.adobe-deploy.lock','/opt/adobe-relay/.release.lock','/opt/adobe-team-cookie/.release.lock','/opt/adobe-team-cookie/.incremental-release.lock']:
  f=open(path,'a');fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB);held.append(f)
 spec=importlib.util.spec_from_file_location('audit',r/'audit.py');a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
-assert a.inspect(a.APP)['Config']['Image']=='adobe-relay:{sha}'
+container=a.inspect(a.APP)
+assert container['Config']['Image']=='adobe-relay:{sha}'
+assert container['Image']==json.loads((r/'image-loaded.json').read_text())['image_id'], 'Running image differs from the checked archive'
 core=json.loads((r/'final-verification.json').read_text())
 assert core['application_sha']=='{sha}'
-checks=a.check_preserved(json.loads((r/'before.json').read_text()),a.snapshot())
+before=json.loads((r/'before.json').read_text());current=a.snapshot()
+checks=a.check_preserved(before,current)
+a.validate_rollback(before,current,'{sha}',a.inspect(a.ROLLBACK_IMAGE)['Id'])
 previous=r/'release-completion.json'
 if previous.exists():
  saved=json.loads(previous.read_text());assert saved['application_sha']=='{sha}' and saved['core_verified_at']==core['at']
@@ -80,7 +84,7 @@ for name,value in {payload!r}.items():
  data=base64.b64decode(value);assert b'PENDING' not in data
  path=r/name;path.write_bytes(data);path.chmod(0o600);files[name]=a.digest(data)
  if name=='primary-README.md':pathlib.Path('/opt/adobe-relay/deploy/primary/README.md').write_bytes(data)
-out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'adobe_requests':False,'mail_sent':False}}
+out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','image_id':container['Image'],'core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'adobe_requests':False,'mail_sent':False}}
 (r/'release-completion.json').write_text(json.dumps(out,ensure_ascii=False,indent=2));print(json.dumps(out))
 """)
 else:
