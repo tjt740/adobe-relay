@@ -1,4 +1,5 @@
 """Run the already-reviewed capacity handoff, retaining every accepted request."""
+import importlib.util
 import datetime, fcntl, json, os, pathlib, subprocess, sys, traceback
 
 ROOT=pathlib.Path('/opt/adobe-relay/releases/upstream-v0219-20261105')
@@ -19,7 +20,12 @@ if __name__=='__main__':
  assert json.loads((ROOT/'premigration-backup.json').read_text())['dump_verified']
  heartbeat=None
  try:
-  run_step('prepare-candidate',[sys.executable,str(ROOT/'rolling.py'),'prepare','--sha',SHA])
+  if sys.argv[1:]==['--resume-schema-check']:
+   spec=importlib.util.spec_from_file_location('resume_guard',ROOT/'resume_guard.py');g=importlib.util.module_from_spec(spec);spec.loader.exec_module(g)
+   g.verify(ROOT,SHA)
+  else:
+   assert not sys.argv[1:]
+   run_step('prepare-candidate',[sys.executable,str(ROOT/'rolling.py'),'prepare','--sha',SHA])
   run_step('schema-verification',[sys.executable,str(ROOT/'schema-verify.py')],timeout=90)
   heartbeat=subprocess.Popen([sys.executable,str(ROOT/'rolling.py'),'heartbeat'])
   for step in ['route-canary','drain-old']:
