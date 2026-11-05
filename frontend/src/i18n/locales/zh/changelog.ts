@@ -18,6 +18,7 @@ export default {
     },
     measurements: "发布准备实测与样本范围",
     overviews: {
+      adobeGptImage26: { title: '新增 Adobe GPT Image 2.6 Flare 与 Sunburst', body: '将 Adobe 已启用的 GPT Image 2.6 Flare、Sunburst 接入与 2.5 相同的图片流程，使用精确上游版本、2.6 尺寸校验和质量上限。其他模型、默认值、检测与提交保护保持。' },
       upstreamV0219: { title: '升级 v0.2.19，保留 Adobe 中档默认质量', body: '合入 v0.2.18–v0.2.19 的管理员受限密钥、流式用量、图片计费及多平台修复。保留 Adobe auto 默认 medium、手动 IP、批量并发、订阅流量保护与 Okad 联动。新增按张计费开关默认关闭，已有 Adobe 图片计费保持。' },
       adobeAutoMedium: { title: 'Adobe 自动质量默认使用中档', body: 'Adobe 原生 GPT Image 的 auto 和未填写质量统一使用 medium，并按实际提交档位返回标签。显式档位和模型上限保持，账号检测继续使用低档，原调度、计费及提交保护保留。' },
       bulkTestConcurrency: { title: '批量检测可选并发，订阅节点取消固定数量上限', body: '批量账号检测增加 1–15 同时检测账号数，默认 3，整批固定并保留后台进度；订阅解析、合并与导入移除 512 个节点限制。高并发仍受上游、代理和资源约束，下载、端口及原有业务保护继续生效。' },
@@ -33,6 +34,18 @@ export default {
       }
     },
     "updates": {
+      adobeGptImage26: {
+        title: '新增 Adobe GPT Image 2.6 模型',
+        body: '将 GPT Image 2.6 Flare 与 Sunburst 接入现有 Adobe 图片生成和编辑流程。',
+        sections: {
+          reason: { title: '开放上游已经启用的模型', body: 'Adobe 模型发现接口已返回两个 enabled 且 HEALTHY 的 GPT Image 2.6 版本，但 Firefly 菜单可能暂未展示。Sub2 现在提供清晰的 Flare、Sunburst 名称，不再让这些版本无法使用。' },
+          models: { title: '分别路由到准确的 Adobe 版本', body: 'GPT Image 2.6 Flare 使用 gpt-image-2.6-star-swirl，Sunburst 使用 gpt-image-2.6-aurora。对外名称、内部模型族、账号映射、模型列表和白名单快捷项与 2.5 分开，2.6 请求不会静默降级到其他版本。' },
+          workflow: { title: '复用现有图片业务流程', body: '文生图、编辑、参考图、任务轮询、下载、输出格式、未知结果不重放、按张计数和账号调度继续复用原 GPT Image 链路。检测默认、Adobe auto medium 和已有账号映射保持，只有运维明确启用新模型时才使用 2.6。' },
+          quality: { title: '遵守 2.6 质量和尺寸协议', body: '2.6 的 auto 和未传质量继续使用 detailLevel=3，low 使用 1，high、xhigh、max 受模型上限 5 限制。显式尺寸校验宽高 480–3840、必须是 16 的倍数、总像素 655,360–8,294,400，宽高比不超过 3:1。' },
+          validation: { title: '验证与线上放行条件', body: '后端、race、前端、类型和生产构建检查覆盖映射、请求体、质量回显、计费、模型列表和尺寸边界。两个 2.6 版本分别进行一次带独占标记的线上真实请求，并只沿用原任务结果；确认通过后才推送和发布。' },
+          boundary: { title: '保留的限制', body: '2.6 在 Adobe 发现记录中仍标为 alpha；enabled 和 HEALTHY 不代表每个账号最终都有权益，也不代表每次上游任务都会成功。本次不改数据库迁移、登录、Cookie 推送、代理、调度或检测默认值；不支持的尺寸在本地直接报错，不静默缩放。' },
+        },
+      },
       upstreamV0219: {
         title: '合入上游 v0.2.19 功能与修复',
         body: '从 v0.2.17 同步上游两个版本的功能代码，继续保留本站 Adobe、Kiro、代理与联动能力。',

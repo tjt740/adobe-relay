@@ -552,6 +552,22 @@
           "enabled": true,
           "releaseReadiness": "alpha",
           "bksGenerationModel": "firefly_3p:external:gpt_image_2_5_prism"
+        },
+        "gpt-image-2.6-aurora": {
+          "enabled": true,
+          "releaseReadiness": "alpha",
+          "outputModality": [
+            "image"
+          ],
+          "size_enum": null
+        },
+        "gpt-image-2.6-star-swirl": {
+          "enabled": true,
+          "releaseReadiness": "alpha",
+          "outputModality": [
+            "image"
+          ],
+          "size_enum": null
         }
       },
       "acModelFamilyProviderDisplayName": "OpenAI"

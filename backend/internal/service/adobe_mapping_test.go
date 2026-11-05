@@ -29,6 +29,8 @@ func TestAccountAdobeDefaultMapping(t *testing.T) {
 		require.Equal(t, "firefly-gpt-image-2-5-prism", account.GetMappedModel("gpt-image-2.5-sunburst"))
 		require.Equal(t, "firefly-gpt-image-2-5-prism", account.GetMappedModel("gpt-image-2.5-prism"))
 		require.Equal(t, "firefly-gpt-image-2-5-flare", account.GetMappedModel("gpt-image-2.5-flare"))
+		require.Equal(t, "firefly-gpt-image-2-6-flare", account.GetMappedModel("gpt-image-2.6-flare"))
+		require.Equal(t, "firefly-gpt-image-2-6-sunburst", account.GetMappedModel("gpt-image-2.6-sunburst"))
 	})
 
 	// Step 8：内部族 id 不再出现在 DefaultAdobeModelMapping 的键里。
@@ -62,7 +64,7 @@ func TestAccountAdobeDefaultMapping(t *testing.T) {
 func TestAdobeDefaultMappingTargetsResolve(t *testing.T) {
 	account := &Account{Platform: PlatformAdobe}
 	for _, requested := range []string{
-		"gpt-image-2", "gpt-image-1.5", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2.5-prism",
+		"gpt-image-2", "gpt-image-1.5", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2.5-prism", "gpt-image-2.6-flare", "gpt-image-2.6-sunburst",
 		"nano-banana", "nano-banana2", "nano-banana-pro",
 		"gemini-2.5-flash-image", "gemini-3-pro-image", "gemini-3.1-flash-image",
 		"gemini-2.5-flash-image-preview", "gemini-3-pro-image-preview", "gemini-3.1-flash-image-preview",

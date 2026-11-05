@@ -2465,6 +2465,8 @@ var adobeImagePriceTierByModel = map[string]string{
 	"gpt-image-2.5-flare":            "premium",
 	"gpt-image-2.5-prism":            "premium",
 	"gpt-image-2.5-sunburst":         "premium",
+	"gpt-image-2.6-flare":            "premium",
+	"gpt-image-2.6-sunburst":         "premium",
 	"flux-pro":                       "third",
 	"flux-ultra":                     "third",
 	"imagen-4":                       "third",

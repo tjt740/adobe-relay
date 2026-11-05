@@ -43,6 +43,8 @@ func TestAdobeImageServiceResponseQualityMatchesSubmittedDetailLevel(t *testing.
 		{"v2_max_clamped", "gpt-image-2", "max", "high", 5},
 		{"v2_xhigh_clamped", "gpt-image-2", "xhigh", "high", 5},
 		{"v15_xhigh_clamped", "gpt-image-1.5", "xhigh", "high", 5},
+		{"v26_max_clamped", "gpt-image-2.6-flare", "max", "high", 5},
+		{"v26_xhigh_clamped", "gpt-image-2.6-sunburst", "xhigh", "high", 5},
 		{"nano_banana_omits_quality", "nano-banana-pro", "max", "", 0},
 		{"flux_omits_quality", "flux-pro", "max", "", 0},
 	}

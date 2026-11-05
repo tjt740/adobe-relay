@@ -419,6 +419,8 @@ describe('useModelWhitelist', () => {
       'gpt-image-2.5-sunburst': 'firefly-gpt-image-2-5-prism',
       'gpt-image-2.5-prism': 'firefly-gpt-image-2-5-prism',
       'gpt-image-2.5-flare': 'firefly-gpt-image-2-5-flare',
+      'gpt-image-2.6-flare': 'firefly-gpt-image-2-6-flare',
+      'gpt-image-2.6-sunburst': 'firefly-gpt-image-2-6-sunburst',
       'gpt-image': 'firefly-gpt-image-2',
       'gpt-image-1': 'firefly-gpt-image-2',
       'gpt-image-1-mini': 'firefly-gpt-image-2',
@@ -439,7 +441,7 @@ describe('useModelWhitelist', () => {
       'runway-gen4-image': 'firefly-runway-gen4-image'
       // Step 8：所有 firefly-* 左侧的直通条目已删除。用户面只有干净外部名。
     })
-    expect(mappings).toHaveLength(23)
+    expect(mappings).toHaveLength(25)
   })
 
   // Step 8：用户面看到的每个模型（getModelsByPlatform('adobe')）都必须能在预设里找到——
