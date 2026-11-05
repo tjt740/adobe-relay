@@ -111,6 +111,9 @@ func accountReadableSnapshotJSON(account *Account) []byte {
 	clone.Credentials = nil
 	clone.Groups = nil
 	clone.AccountGroups = nil
+	// Request-local write intent is never readable account metadata.
+	clone.ManualProxyEnabledUpdate = nil
+	clone.ProxyIDExplicitUpdate = false
 	data, err := json.Marshal(&clone)
 	if err != nil {
 		return nil
