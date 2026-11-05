@@ -1,0 +1,68 @@
+name: Adobe GPT Image 2.6 account test
+on:
+  workflow_dispatch:
+    inputs:
+      application_sha:
+        description: Exact deployed application commit to verify
+        type: string
+        required: true
+      branch:
+        description: Source branch containing the account-test helper
+        type: string
+        required: true
+        default: main
+      account_email:
+        description: Existing Adobe account email to test once
+        type: string
+        required: true
+      model:
+        description: One GPT Image 2.6 model to test
+        type: choice
+        options: [gpt-image-2.6-flare, gpt-image-2.6-sunburst]
+        required: true
+        default: gpt-image-2.6-flare
+permissions:
+  contents: read
+concurrency:
+  group: adobe-relay-production
+  cancel-in-progress: false
+jobs:
+  account-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh account-test-evidence
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+      - name: Run one account test without replay
+        env:
+          APP_SHA: ${{ inputs.application_sha }}
+          ACCOUNT_EMAIL: ${{ inputs.account_email }}
+          MODEL: ${{ inputs.model }}
+        run: |
+          set -euo pipefail
+          target='root@173.234.15.150'
+          ssh_opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=20)
+          ssh "${ssh_opts[@]}" "$target" 'mkdir -p /opt/adobe-relay/releases/adobe-gpt-image-26-20261106'
+          scp "${ssh_opts[@]}" deploy/primary/adobe-gpt-image-26-20261106/account-test.py "$target:/opt/adobe-relay/releases/adobe-gpt-image-26-20261106/"
+          ssh "${ssh_opts[@]}" "$target" "python3 /opt/adobe-relay/releases/adobe-gpt-image-26-20261106/account-test.py '$ACCOUNT_EMAIL' '$MODEL' '$APP_SHA'" | tee account-test-evidence/result.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: adobe-gpt-image-26-account-test
+          path: account-test-evidence/result.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Remove runner SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
