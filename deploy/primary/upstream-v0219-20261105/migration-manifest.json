@@ -1,0 +1,5 @@
+{
+  "246_enable_gemini_image_generation_groups.sql": "f49b458cfbd52bd17f5bb02e30e3813c8e192e4ae38bce6358713ef65f3874b5",
+  "247_scoped_admin_api_keys.sql": "0c4c22f564f276fb305a54cf2d6c4b1a6179d748d5d8b74a3b99676282355bf6",
+  "248_group_image_count_billing.sql": "c91d6d31937658e71c68fa3af6a26fc47380f61243a681ac275aeb4706b242ab"
+}
