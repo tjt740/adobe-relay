@@ -18,9 +18,9 @@ on:
       model:
         description: One GPT Image 2.6 model to test
         type: choice
-        options: [gpt-image-2.6-flare, gpt-image-2.6-sunburst]
+        options: [gpt-image-2.6-star-swirl, gpt-image-2.6-aurora]
         required: true
-        default: gpt-image-2.6-flare
+        default: gpt-image-2.6-star-swirl
 permissions:
   contents: read
 concurrency:

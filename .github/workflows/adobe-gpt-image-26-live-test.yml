@@ -47,10 +47,10 @@ jobs:
           ssh_opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=20)
           ssh "${ssh_opts[@]}" "$target" 'mkdir -p /opt/adobe-relay/releases/adobe-gpt-image-26-20261106'
           scp "${ssh_opts[@]}" deploy/primary/adobe-gpt-image-26-20261106/live-test.py "$target:/opt/adobe-relay/releases/adobe-gpt-image-26-20261106/"
-          for model in gpt-image-2.6-flare gpt-image-2.6-sunburst; do
+          for model in gpt-image-2.6-star-swirl gpt-image-2.6-aurora; do
             ssh "${ssh_opts[@]}" "$target" "python3 /opt/adobe-relay/releases/adobe-gpt-image-26-20261106/live-test.py '$model' '$APP_SHA'" | tee "live-test-evidence/$model.json"
           done
-          for model in gpt-image-2.6-flare gpt-image-2.6-sunburst; do
+          for model in gpt-image-2.6-star-swirl gpt-image-2.6-aurora; do
             scp "${ssh_opts[@]}" "$target:/opt/adobe-relay/releases/adobe-gpt-image-26-20261106/$model-live-test.json" "live-test-evidence/"
             scp "${ssh_opts[@]}" "$target:/opt/adobe-relay/releases/adobe-gpt-image-26-20261106/$model-live-test.png" "live-test-evidence/"
           done

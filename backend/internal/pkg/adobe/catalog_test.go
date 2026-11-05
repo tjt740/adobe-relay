@@ -481,8 +481,8 @@ func TestResolveImageAcceptsExternalModelNames(t *testing.T) {
 		"gpt-image-1.5":                  "firefly-gpt-image-1.5",
 		"gpt-image-2.5-flare":            "firefly-gpt-image-2-5-flare",
 		"gpt-image-2.5-sunburst":         "firefly-gpt-image-2-5-prism",
-		"gpt-image-2.6-flare":            "firefly-gpt-image-2-6-flare",
-		"gpt-image-2.6-sunburst":         "firefly-gpt-image-2-6-sunburst",
+		"gpt-image-2.6-star-swirl":       "firefly-gpt-image-2-6-flare",
+		"gpt-image-2.6-aurora":           "firefly-gpt-image-2-6-sunburst",
 		"gemini-3-pro-image":             "firefly-nano-banana-pro",
 		"gemini-3-pro-image-preview":     "firefly-nano-banana-pro",
 		"gemini-2.5-flash-image":         "firefly-nano-banana",
@@ -514,6 +514,8 @@ func TestResolveImageGPTImage26FamiliesUseRealUpstreamVersions(t *testing.T) {
 	}{
 		{"gpt-image-2.6-flare", "firefly-gpt-image-2-6-flare", "gpt-image-2.6-star-swirl"},
 		{"gpt-image-2.6-sunburst", "firefly-gpt-image-2-6-sunburst", "gpt-image-2.6-aurora"},
+		{"gpt-image-2.6-star-swirl", "firefly-gpt-image-2-6-flare", "gpt-image-2.6-star-swirl"},
+		{"gpt-image-2.6-aurora", "firefly-gpt-image-2-6-sunburst", "gpt-image-2.6-aurora"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.model, func(t *testing.T) {
@@ -527,17 +529,19 @@ func TestResolveImageGPTImage26FamiliesUseRealUpstreamVersions(t *testing.T) {
 }
 
 func TestResolveImageGPTImage26ValidatesDiscoverySizeConstraints(t *testing.T) {
-	for _, size := range []string{"816x816", "1024x1024", "3840x2160", "480x1440"} {
-		_, err := ResolveImage(ImageRequest{ModelID: "gpt-image-2.6-flare", Size: size})
-		require.NoError(t, err, size)
+	for _, model := range []string{"gpt-image-2.6-star-swirl", "gpt-image-2.6-flare"} {
+		for _, size := range []string{"816x816", "1024x1024", "3840x2160", "480x1440"} {
+			_, err := ResolveImage(ImageRequest{ModelID: model, Size: size})
+			require.NoError(t, err, model+" "+size)
+		}
+		for _, size := range []string{"464x464", "1025x1024", "3840x3840", "4000x1024", "480x1456"} {
+			_, err := ResolveImage(ImageRequest{ModelID: model, Size: size})
+			require.Error(t, err, model+" "+size)
+			require.Equal(t, "image_size_exceeds_model_limit", err.(*RequestError).Code, model+" "+size)
+		}
+		_, err := ResolveImage(ImageRequest{ModelID: model, Size: ""})
+		require.NoError(t, err, model+" auto size remains supported")
 	}
-	for _, size := range []string{"464x464", "1025x1024", "3840x3840", "4000x1024", "480x1456"} {
-		_, err := ResolveImage(ImageRequest{ModelID: "gpt-image-2.6-flare", Size: size})
-		require.Error(t, err, size)
-		require.Equal(t, "image_size_exceeds_model_limit", err.(*RequestError).Code, size)
-	}
-	_, err := ResolveImage(ImageRequest{ModelID: "gpt-image-2.6-flare", Size: ""})
-	require.NoError(t, err, "auto size remains supported")
 }
 
 func TestResolveImageAcceptsLegacyNanoBananaAliases(t *testing.T) {
@@ -678,6 +682,20 @@ func TestDisplayLabel(t *testing.T) {
 	label, ok = DisplayLabel("gpt-image-2.5-sunburst")
 	require.True(t, ok)
 	require.Equal(t, "GPT Image 2.5 Sunburst", label)
+
+	for _, model := range []string{"gpt-image-2.6-star-swirl", "gpt-image-2.6-aurora"} {
+		label, ok = DisplayLabel(model)
+		require.True(t, ok, model)
+		require.Equal(t, model, label)
+	}
+	for legacy, want := range map[string]string{
+		"gpt-image-2.6-flare":    "gpt-image-2.6-star-swirl",
+		"gpt-image-2.6-sunburst": "gpt-image-2.6-aurora",
+	} {
+		label, ok = DisplayLabel(legacy)
+		require.True(t, ok, legacy)
+		require.Equal(t, want, label)
+	}
 
 	label, ok = DisplayLabel("gemini-2.5-flash-image")
 	require.True(t, ok)

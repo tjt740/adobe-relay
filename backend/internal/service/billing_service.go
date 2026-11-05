@@ -2465,14 +2465,17 @@ var adobeImagePriceTierByModel = map[string]string{
 	"gpt-image-2.5-flare":            "premium",
 	"gpt-image-2.5-prism":            "premium",
 	"gpt-image-2.5-sunburst":         "premium",
-	"gpt-image-2.6-flare":            "premium",
-	"gpt-image-2.6-sunburst":         "premium",
-	"flux-pro":                       "third",
-	"flux-ultra":                     "third",
-	"imagen-4":                       "third",
-	"imagen-4-fast":                  "third",
-	"gpt-4o-image":                   "third",
-	"runway-gen4-image":              "third",
+	"gpt-image-2.6-star-swirl":       "premium",
+	"gpt-image-2.6-aurora":           "premium",
+	// Backward-compatible aliases for accounts and clients saved before the naming correction.
+	"gpt-image-2.6-flare":    "premium",
+	"gpt-image-2.6-sunburst": "premium",
+	"flux-pro":               "third",
+	"flux-ultra":             "third",
+	"imagen-4":               "third",
+	"imagen-4-fast":          "third",
+	"gpt-4o-image":           "third",
+	"runway-gen4-image":      "third",
 }
 
 func isAdobeImageBillingPlatform(platform string) bool {

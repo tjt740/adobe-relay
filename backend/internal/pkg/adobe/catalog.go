@@ -216,7 +216,7 @@ var rawImageFamilySpecs = []imageFamilySpec{
 		upstreamModelID:      upstreamModelIDGPTImage,
 		upstreamModelVersion: "gpt-image-2.6-star-swirl",
 		payloadKind:          PayloadKindGPTImage26,
-		label:                "Firefly GPT Image 2.6 Flare",
+		label:                "Firefly gpt-image-2.6-star-swirl",
 	},
 	{
 		familyID:             "firefly-gpt-image-2-6-sunburst",
@@ -224,7 +224,7 @@ var rawImageFamilySpecs = []imageFamilySpec{
 		upstreamModelID:      upstreamModelIDGPTImage,
 		upstreamModelVersion: "gpt-image-2.6-aurora",
 		payloadKind:          PayloadKindGPTImage26,
-		label:                "Firefly GPT Image 2.6 Sunburst",
+		label:                "Firefly gpt-image-2.6-aurora",
 	},
 	{
 		familyID:             "firefly-nano-banana-pro",
@@ -398,8 +398,11 @@ var externalImageModelAliases = map[string]string{
 	"gpt-image-2.5-flare":    "firefly-gpt-image-2-5-flare",
 	"gpt-image-2.5-sunburst": "firefly-gpt-image-2-5-prism", // sunburst 是 UI 名，上游 modelVersion=prism
 	"gpt-image-2.5-prism":    "firefly-gpt-image-2-5-prism",
-	"gpt-image-2.6-flare":    "firefly-gpt-image-2-6-flare",
-	"gpt-image-2.6-sunburst": "firefly-gpt-image-2-6-sunburst",
+	// 2.6 对外使用 Adobe 实际接口版本名；旧 Flare/Sunburst 名继续作为兼容别名解析。
+	"gpt-image-2.6-star-swirl": "firefly-gpt-image-2-6-flare",
+	"gpt-image-2.6-aurora":     "firefly-gpt-image-2-6-sunburst",
+	"gpt-image-2.6-flare":      "firefly-gpt-image-2-6-flare",
+	"gpt-image-2.6-sunburst":   "firefly-gpt-image-2-6-sunburst",
 	// 更早的 gpt-image 名字：Adobe 侧没有对应版本，一律落 2。
 	"gpt-image":                      "firefly-gpt-image-2",
 	"gpt-image-1":                    "firefly-gpt-image-2",

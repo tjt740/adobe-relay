@@ -239,8 +239,11 @@ var DefaultAdobeModelMapping = map[string]string{
 	"gpt-image-2.5-flare":    "firefly-gpt-image-2-5-flare",
 	"gpt-image-2.5-prism":    "firefly-gpt-image-2-5-prism",
 	"gpt-image-2.5-sunburst": "firefly-gpt-image-2-5-prism",
-	"gpt-image-2.6-flare":    "firefly-gpt-image-2-6-flare",
-	"gpt-image-2.6-sunburst": "firefly-gpt-image-2-6-sunburst",
+	// 2.6 对外展示 Adobe 实际接口版本名；旧 Flare/Sunburst 保留为兼容别名。
+	"gpt-image-2.6-star-swirl": "firefly-gpt-image-2-6-flare",
+	"gpt-image-2.6-aurora":     "firefly-gpt-image-2-6-sunburst",
+	"gpt-image-2.6-flare":      "firefly-gpt-image-2-6-flare",
+	"gpt-image-2.6-sunburst":   "firefly-gpt-image-2-6-sunburst",
 	// 更早的 gpt-image 名字：Adobe 侧没有对应版本，一律落 v2；参考实现 GPT2Image-Pro 也是同样处理。
 	"gpt-image":        "firefly-gpt-image-2",
 	"gpt-image-1":      "firefly-gpt-image-2",
