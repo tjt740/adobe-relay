@@ -66,6 +66,7 @@ for name in ['progress.json','migration-manifest.json']:
 from pathlib import Path
 r=Path('{ROOT}');lock=open(r/'driver.lock','a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
 assert not (r/'resume-dispatched.json').exists()
+fcntl.flock(lock,fcntl.LOCK_UN)
 subprocess.run(['systemd-run','--unit=adobe-upstream-v0219-resume-20261105','--collect','--property=WorkingDirectory={ROOT}','--property=StandardOutput=append:{ROOT}/driver.log','--property=StandardError=append:{ROOT}/driver.log','/usr/bin/python3',str(r/'driver.py'),'--resume-schema-check'],check=True)
 (r/'resume-dispatched.json').write_text(json.dumps({{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','unchanged_application_artifact':True}}))
 print(json.dumps({{'resume_dispatched':True}}))
