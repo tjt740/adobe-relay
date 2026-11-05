@@ -1,7 +1,7 @@
 """Fixed-scope auto quality release using the original deployment guards."""
 import base64,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','status','live-test','verify','archive']
+assert phase in ['preflight','prepare','start','status','live-test','verify','archive','notify']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-auto-medium-20261105'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -64,6 +64,9 @@ assert (r/'rolling-finished.json').exists()
 for script,output in [('route-guard-review.py','route-guard-review.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('observe.py','observation.json'),('final-verify.py','final-verification.json')]:
  if not (r/output).exists():subprocess.run([sys.executable,str(r/script)],check=True)
 """)
+elif phase=='notify':
+ copy([pathlib.Path(__file__).parent/'notify-release.py'])
+ remote(f"import pathlib,subprocess,sys; r=pathlib.Path('{root}'); assert (r/'expected-sha').read_text().strip()=='{sha}'; subprocess.run([sys.executable,str(r/'notify-release.py'),'send'],check=True,timeout=90)")
 elif phase=='archive':
  documents={'release-notes.md':pathlib.Path('deploy/primary/adobe-auto-medium-20261105.md'),'primary-README.md':pathlib.Path('deploy/primary/README.md')}
  payload={name:base64.b64encode(path.read_bytes()).decode() for name,path in documents.items()}
@@ -90,18 +93,21 @@ for name,value in {payload!r}.items():
  data=base64.b64decode(value);assert b'PENDING' not in data
  path=r/name;path.write_bytes(data);path.chmod(0o600);files[name]=a.digest(data)
  if name=='primary-README.md':pathlib.Path('/opt/adobe-relay/deploy/primary/README.md').write_bytes(data)
-out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','image_id':container['Image'],'core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'adobe_requests':{'pre_release_medium':True,'post_release_auto':True},'mail_sent':False}}
+notification=json.loads((r/'release-notification.json').read_text()) if (r/'release-notification.json').exists() else None
+out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','image_id':container['Image'],'core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'adobe_requests':{{'pre_release_medium':True,'post_release_auto':True}},'mail_sent':bool(notification and notification.get('state')=='smtp_accepted'),'notification':notification}}
 (r/'release-completion.json').write_text(json.dumps(out,ensure_ascii=False,indent=2));print(json.dumps(out))
 """)
 else:
  evidence=pathlib.Path('primary-release-evidence');evidence.mkdir(exist_ok=True)
  script=f"""import importlib.util,json,pathlib
 r=pathlib.Path('{root}');out={{'application_sha':'{sha}','files':{{}}}}
-for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','before-live-test.json','after-live-test.json','final-verification.json','release-completion.json']:
+for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','before-live-test.json','after-live-test.json','final-verification.json','release-completion.json','release-notification.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
- if p.exists():out['files'][p.name]=json.loads(p.read_text())['samples'][-1]
+ if p.exists():
+  samples=json.loads(p.read_text())['samples'];out['files'][p.name]=samples[-1]
+  out.setdefault('recent_drain_samples',{{}})[side]=samples[-18:]
 if (r/'after.json').exists():out['cutover_backup']=json.loads((r/'after.json').read_text())['backup']
 log=r/'driver.log'
 if log.exists():out['driver_errors']=[line for line in log.read_text().splitlines() if line.startswith(('AssertionError:','RuntimeError:','subprocess.CalledProcessError:'))][-8:]
