@@ -3197,22 +3197,17 @@ func buildAdobeTestModels(mapping map[string]string) []adobe.Model {
 		if _, ok := emitted[id]; ok {
 			continue
 		}
+		if adobe.IsLegacyGPTImage26Alias(id) {
+			continue
+		}
 		extras = append(extras, id)
 	}
 	sort.Strings(extras)
 	// extras 刻意保留裸 id：默认映射里的 gpt-image / gpt-image-1 / gpt-image-1-mini
 	// 都落同一个族，套 label 会出现三行一模一样的「GPT Image 2」；
-	// 运维自定义的别名也该显示他自己写的那个名字。2.6 的历史 Flare/Sunburst
-	// 别名例外：它们必须显示 Adobe 实际接口版本名，避免旧请求把旧 UI 名重新带回界面。
+	// 运维自定义的别名也该显示他自己写的那个名字。
 	for _, id := range extras {
-		displayName := id
-		switch strings.ToLower(id) {
-		case "gpt-image-2.6-flare":
-			displayName = "gpt-image-2.6-star-swirl"
-		case "gpt-image-2.6-sunburst":
-			displayName = "gpt-image-2.6-aurora"
-		}
-		models = append(models, adobe.Model{ID: id, Type: "model", DisplayName: displayName})
+		models = append(models, adobe.Model{ID: id, Type: "model", DisplayName: id})
 	}
 	return models
 }

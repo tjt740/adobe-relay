@@ -569,6 +569,37 @@ func TestGetAvailableModels_UsesShortCacheAndSupportsInvalidation(t *testing.T) 
 	require.Equal(t, int64(2), store)
 }
 
+func TestGetAvailableModels_AdobeHidesLegacyGPTImage26Aliases(t *testing.T) {
+	groupID := int64(26)
+	repo := &modelsListAccountRepoStub{
+		byGroup: map[int64][]Account{
+			groupID: {{
+				ID:       1,
+				Platform: PlatformAdobe,
+				Credentials: map[string]any{
+					"model_mapping": map[string]any{
+						"gpt-image-2.6-star-swirl": "firefly-gpt-image-2-6-flare",
+						"gpt-image-2.6-aurora":     "firefly-gpt-image-2-6-sunburst",
+						"gpt-image-2.6-flare":      "firefly-gpt-image-2-6-flare",
+						"gpt-image-2.6-sunburst":   "firefly-gpt-image-2-6-sunburst",
+					},
+				},
+			}},
+		},
+	}
+
+	svc := &GatewayService{
+		accountRepo:        repo,
+		modelsListCache:    gocache.New(time.Minute, time.Minute),
+		modelsListCacheTTL: time.Minute,
+	}
+
+	require.Equal(t,
+		[]string{"gpt-image-2.6-aurora", "gpt-image-2.6-star-swirl"},
+		svc.GetAvailableModels(context.Background(), &groupID, PlatformAdobe),
+	)
+}
+
 // Scenario: 账号模型变更会失效所属平台缓存
 func TestResolveCompositeModelOwnershipUsesModelsCacheInvalidation(t *testing.T) {
 	groupID := int64(9)

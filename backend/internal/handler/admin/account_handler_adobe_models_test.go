@@ -87,8 +87,12 @@ func TestAccountHandlerGetAvailableModels_AdobeDisplayNames(t *testing.T) {
 	for _, legacy := range []string{"nano-banana", "nano-banana-pro", "nano-banana2"} {
 		require.Equal(t, legacy, byID[legacy], "历史别名 %s 应显示自身", legacy)
 	}
-	require.Equal(t, "gpt-image-2.6-star-swirl", byID["gpt-image-2.6-flare"])
-	require.Equal(t, "gpt-image-2.6-aurora", byID["gpt-image-2.6-sunburst"])
+	for _, legacy := range []string{"gpt-image-2.6-flare", "gpt-image-2.6-sunburst"} {
+		_, ok := byID[legacy]
+		require.False(t, ok, "兼容别名 %s 不应出现在新测试模型目录", legacy)
+	}
+	require.Equal(t, "gpt-image-2.6-star-swirl", byID["gpt-image-2.6-star-swirl"])
+	require.Equal(t, "gpt-image-2.6-aurora", byID["gpt-image-2.6-aurora"])
 }
 
 // 无显式 mapping 的 Adobe 账号（GetModelMapping 回落到 DefaultAdobeModelMapping）
@@ -106,7 +110,7 @@ func TestAccountHandlerGetAvailableModels_AdobeUsesDefaultMapping(t *testing.T) 
 		},
 	})
 
-	require.Len(t, ids, len(domain.DefaultAdobeModelMapping))
+	require.Len(t, ids, len(domain.DefaultAdobeModelMapping)-2)
 	require.Equal(t, adobe.ImageModelIDs()[0], ids[0],
 		"首项必须稳定——前端默认选中它")
 

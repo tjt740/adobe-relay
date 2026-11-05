@@ -21,6 +21,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
@@ -1612,6 +1613,12 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 
 		mapping := acc.GetModelMapping()
 		for model := range mapping {
+			// Adobe keeps the old 2.6 Flare/Sunburst names as request aliases,
+			// but new model directories must expose Adobe's actual interface
+			// version names only.
+			if platform == PlatformAdobe && adobe.IsLegacyGPTImage26Alias(model) {
+				continue
+			}
 			// Accounts pulled in through mixed scheduling only contribute the
 			// models that belong to the listing platform (e.g. an antigravity
 			// account's claude-* mappings must not surface on a gemini group).
