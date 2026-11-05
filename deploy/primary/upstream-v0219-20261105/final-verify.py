@@ -11,7 +11,7 @@ assert a.inspect(a.APP)['Config']['Image']=='adobe-relay:'+sha
 assert subprocess.run(['docker','inspect','adobe-relay-memory-canary'],capture_output=True).returncode!=0
 assert not subprocess.check_output(['docker','exec','adobe-relay-redis-1','redis-cli','--raw','GET','concurrency:rolling_deployment'],text=True).strip()
 assert 'upstream-v0219-20261105' not in subprocess.check_output(['iptables-save','-t','nat'],text=True)
-version=subprocess.check_output(['docker','exec',a.APP,'/app/sub2api','-version'],text=True).strip()
+version=subprocess.check_output(['docker','exec',a.APP,'/app/sub2api','-version'],stderr=subprocess.STDOUT,text=True).strip()
 assert 'Sub2API 0.2.19' in version and sha in version, 'Image version and commit must match the checked build'
 checks=a.check_preserved(json.loads((ROOT/'before.json').read_text()),a.snapshot())
 heartbeat=json.loads(a.sql("SELECT json_build_object('at',last_success_at,'healthy',last_success_at>now()-interval '5 minutes' AND (last_error_at IS NULL OR last_success_at>last_error_at)) FROM ops_job_heartbeats WHERE job_name='ops_alert_evaluator'"))

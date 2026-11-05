@@ -1,5 +1,5 @@
 """Resume only the recorded checksum-format failure before any routing."""
-import importlib.util,json
+import importlib.util,json,subprocess
 
 def validate_records(progress,log,prepared,old,canary,proof,sha,route_present,lease,rid):
  assert progress['step']=='failed' and progress['state']=='attention_required'
@@ -19,7 +19,7 @@ def verify(root,sha):
  assert not any((root/name).exists() for name in ['rolling-route-canary.json','rolling-route-canonical.json','after.json','rolling-finished.json','resume-validation.json'])
  load=lambda name:json.loads((root/name).read_text())
  validate_records(load('initial-progress.json'),(root/'driver.log').read_text(),load('rolling-prepared.json'),r.inspect(r.APP),r.inspect(r.CANARY),load('image-loaded.json'),sha,r.rule_present(),r.redis('GET',r.LEASE),r.RID)
- version=r.run(['docker','exec',r.CANARY,'/app/sub2api','-version'])
+ version=subprocess.check_output(['docker','exec',r.CANARY,'/app/sub2api','-version'],stderr=subprocess.STDOUT,text=True,timeout=30).strip()
  assert '0.2.19' in version and sha[:8] in version
  assert r.health(6666) and r.health(6667)
  r.own_lease()

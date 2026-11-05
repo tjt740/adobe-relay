@@ -56,18 +56,26 @@ from pathlib import Path
 r=Path('{ROOT}');assert (r/'expected-sha').read_text().strip()=='{sha}'
 lock=open(r/'driver.lock','a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
 p=json.loads((r/'progress.json').read_text());assert p['step']=='failed' and p['state']=='attention_required'
-assert 'schema-verify.py' in p['error']
-assert not (r/'rolling-route-canary.json').exists() and not (r/'resume-dispatched.json').exists()
-for name in ['progress.json','migration-manifest.json']:
- dst=r/('initial-'+name);assert not dst.exists();dst.write_bytes((r/name).read_bytes());dst.chmod(0o600)
+assert not (r/'rolling-route-canary.json').exists() and not (r/'resume-validation.json').exists()
+if not (r/'initial-progress.json').exists():
+ assert 'schema-verify.py' in p['error'] and not (r/'resume-dispatched.json').exists()
+ for name in ['progress.json','migration-manifest.json']:
+  dst=r/('initial-'+name);assert not dst.exists();dst.write_bytes((r/name).read_bytes());dst.chmod(0o600)
+else:
+ assert (r/'resume-dispatched.json').exists() and not (r/'version-output-check-failure.json').exists()
+ assert p['error']=='' and "assert '0.2.19' in version" in (r/'driver.log').read_text()
+ (r/'version-output-check-failure.json').write_text(json.dumps(p))
+
 """)
- copy([HERE/'driver.py',HERE/'resume_guard.py',HERE/'migration-manifest.json'])
+ copy([HERE/'driver.py',HERE/'resume_guard.py',HERE/'migration-manifest.json',HERE/'final-verify.py'])
  remote(f"""import datetime,fcntl,json,subprocess
 from pathlib import Path
 r=Path('{ROOT}');lock=open(r/'driver.lock','a');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-assert not (r/'resume-dispatched.json').exists()
+retry=(r/'version-output-check-failure.json').exists()
+assert retry or not (r/'resume-dispatched.json').exists()
+unit='adobe-upstream-v0219-resume-version-20261105' if retry else 'adobe-upstream-v0219-resume-20261105'
 fcntl.flock(lock,fcntl.LOCK_UN)
-subprocess.run(['systemd-run','--unit=adobe-upstream-v0219-resume-20261105','--collect','--property=WorkingDirectory={ROOT}','--property=StandardOutput=append:{ROOT}/driver.log','--property=StandardError=append:{ROOT}/driver.log','/usr/bin/python3',str(r/'driver.py'),'--resume-schema-check'],check=True)
+subprocess.run(['systemd-run','--unit='+unit,'--collect','--property=WorkingDirectory={ROOT}','--property=StandardOutput=append:{ROOT}/driver.log','--property=StandardError=append:{ROOT}/driver.log','/usr/bin/python3',str(r/'driver.py'),'--resume-schema-check'],check=True)
 (r/'resume-dispatched.json').write_text(json.dumps({{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','unchanged_application_artifact':True}}))
 print(json.dumps({{'resume_dispatched':True}}))
 """)
