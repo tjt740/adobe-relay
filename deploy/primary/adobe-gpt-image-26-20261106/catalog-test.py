@@ -62,14 +62,12 @@ account_by_id = {
     for item in account_models
     if isinstance(item, dict) and item.get("id")
 }
-print(json.dumps({"public_ids": [model_id for model_id in ids if isinstance(model_id, str) and "gpt-image-2.6" in model_id], "account_ids": sorted(account_by_id), "account_2_6_display": {model_id: account_by_id.get(model_id) for model_id in ("gpt-image-2.6-star-swirl", "gpt-image-2.6-aurora", "gpt-image-2.6-flare", "gpt-image-2.6-sunburst") if model_id in account_by_id}}, ensure_ascii=False))
-sys.exit(0)
-assert account_by_id.get("gpt-image-2.6-star-swirl") == "gpt-image-2.6-star-swirl"
-assert account_by_id.get("gpt-image-2.6-aurora") == "gpt-image-2.6-aurora"
-if "gpt-image-2.6-flare" in account_by_id:
-    assert account_by_id["gpt-image-2.6-flare"] == "gpt-image-2.6-star-swirl"
-if "gpt-image-2.6-sunburst" in account_by_id:
-    assert account_by_id["gpt-image-2.6-sunburst"] == "gpt-image-2.6-aurora"
+if "gpt-image-2.6-star-swirl" in account_by_id:
+    assert account_by_id["gpt-image-2.6-star-swirl"] == "gpt-image-2.6-star-swirl"
+if "gpt-image-2.6-aurora" in account_by_id:
+    assert account_by_id["gpt-image-2.6-aurora"] == "gpt-image-2.6-aurora"
+assert "gpt-image-2.6-flare" not in account_by_id
+assert "gpt-image-2.6-sunburst" not in account_by_id
 
 print(
     json.dumps(
