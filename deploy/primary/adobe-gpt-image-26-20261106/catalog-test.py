@@ -52,6 +52,13 @@ models = models_response.get("data", [])
 ids = [item.get("id") for item in models if isinstance(item, dict)]
 assert "gpt-image-2.6-star-swirl" in ids
 assert "gpt-image-2.6-aurora" in ids
+for model_id in (
+    "gpt-image-2",
+    "gpt-image-2.5-flare",
+    "gpt-image-2.5-sunburst",
+    "gpt-image-2.5-prism",
+):
+    assert model_id in ids
 assert "gpt-image-2.6-flare" not in ids
 assert "gpt-image-2.6-sunburst" not in ids
 
