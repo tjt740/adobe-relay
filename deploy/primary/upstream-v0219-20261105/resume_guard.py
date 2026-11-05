@@ -11,7 +11,7 @@ def validate_records(progress,log,prepared,old,canary,proof,sha,route_present,le
  assert canary['Id']==prepared['canary_id']
  assert canary['Config']['Image']=='adobe-relay:'+sha and canary['Image']==proof['image_id']
  assert all(d['State']['Health']['Status']=='healthy' for d in [old,canary])
- assert not route_present and lease==rid
+ assert not route_present and lease in ['',rid]
 
 def verify(root,sha):
  spec=importlib.util.spec_from_file_location('rolling',root/'rolling.py');r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
@@ -22,5 +22,7 @@ def verify(root,sha):
  version=subprocess.check_output(['docker','exec',r.CANARY,'/app/sub2api','-version'],stderr=subprocess.STDOUT,text=True,timeout=30).strip()
  assert '0.2.19' in version and sha[:8] in version
  assert r.health(6666) and r.health(6667)
+ spec=importlib.util.spec_from_file_location('audit',root/'audit.py');a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
+ a.check_preserved(load('before.json'),a.snapshot())
  r.own_lease()
  r.save('resume-validation.json',{'at':r.now(),'only_checksum_format_corrected':True,'existing_candidate_reused':True,'routing_unchanged':True,'old_container_unchanged':True,'candidate_version':version,'historical_failure_preserved':True})

@@ -18,9 +18,11 @@ class UpgradeSchemaTests(unittest.TestCase):
   for index,key,value in [(3,'Id','later'),(4,'Image','other')]:
    args=self.records();args[index][key]=value
    with self.assertRaises(AssertionError):m.validate_records(*args)
-  for index,value in [(7,True),(8,''),(8,'another')]:
+  for index,value in [(7,True),(8,'another')]:
    args=self.records();args[index]=value
    with self.assertRaises(AssertionError):m.validate_records(*args)
+ def test_expired_unowned_lease_can_be_atomically_reacquired(self):
+  args=self.records();args[8]='';m.validate_records(*args)
  def test_rejects_other_failure(self):
   args=self.records();args[1]='Something else'
   with self.assertRaises(AssertionError):m.validate_records(*args)
