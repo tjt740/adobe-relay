@@ -11,7 +11,7 @@ assert a.inspect(a.APP)['Config']['Image']=='adobe-relay:'+sha
 assert subprocess.run(['docker','inspect','adobe-relay-memory-canary'],capture_output=True).returncode!=0
 assert not subprocess.check_output(['docker','exec','adobe-relay-redis-1','redis-cli','--raw','GET','concurrency:rolling_deployment'],text=True).strip()
 assert 'upstream-v0219-20261105' not in subprocess.check_output(['iptables-save','-t','nat'],text=True)
-version=subprocess.check_output(['docker','exec',a.APP,'/app/sub2api','-version'],text=True).strip()
+version=subprocess.check_output(['docker','exec',a.APP,'/app/sub2api','-version'],stderr=subprocess.STDOUT,text=True).strip()
 assert 'Sub2API 0.2.19' in version and sha in version, 'Image version and commit must match the checked build'
 checks=a.check_preserved(json.loads((ROOT/'before.json').read_text()),a.snapshot())
 heartbeat=json.loads(a.sql("SELECT json_build_object('at',last_success_at,'healthy',last_success_at>now()-interval '5 minutes' AND (last_error_at IS NULL OR last_success_at>last_error_at)) FROM ops_job_heartbeats WHERE job_name='ops_alert_evaluator'"))
@@ -31,7 +31,7 @@ for name in names:assets['/assets/'+name]=read('/assets/'+name)
 combined='\n'.join(assets.values())
 assert all(marker in combined for marker in ['subscription-row','clash-bulk-urls','admin.proxies.clash.checkSource','clashSubscriptions','upstreamV0217','proxyVerificationPriority','adobeRouteReview','proxyHealth.nodeBalance','blocked_proxy_ids','manual-proxy-toggle','manual_proxy_enabled','clash-background-test-status','admin.proxies.clash.runInBackground','clashBackgroundTests','adobe408TimeoutScheduling','bulk-test-start','bulk-test-model','bulk-test-background-model','bulkAccountTestModels','adobeAutomaticTestFlare','gpt-image-2.5-flare','cookieRecoveryRevert','adobeImageErrorDetails','bulk-test-concurrency','bulk-test-background-concurrency','bulkTestConcurrency','clashNodeCount','2026-11-04','adobeAutoMedium','upstreamV0219','2026-11-05'])
 browser_file=ROOT/'live-browser-verification.json'
-browser=json.loads(browser_file.read_text()) if browser_file.exists() else {'case_count':0,'attempted_writes':[],'runtime_errors':[],'limitation':'Live authenticated browser verification unavailable; asset and API checks only'}
+browser=json.loads(browser_file.read_text()) if browser_file.exists() else {'case_count':0,'attempted_writes':[],'runtime_errors':[],'limitation':'Live authenticated browser verification not performed; asset and API checks only'}
 assert not browser['attempted_writes'] and not browser['runtime_errors']
 observation=json.loads((ROOT/'observation.json').read_text());assert len(observation['samples'])==13
 business=json.loads((ROOT/'business-verification.json').read_text())
@@ -46,6 +46,8 @@ manifest=json.loads((ROOT/'migration-manifest.json').read_text())
 assert all(installed.get(name)==checksum for name,checksum in expected.items()),'Historical migration checksum changed'
 assert {name:checksum for name,checksum in installed.items() if name not in expected}==manifest,'Unexpected new migration set'
 assert json.loads((ROOT/'schema-verification.json').read_text())['new_switch_defaults_off']
+upgrade_state=json.loads(a.sql("SELECT json_build_object('image_count_billing_enabled',(SELECT count(*) FROM groups WHERE image_count_billing),'scoped_admin_keys',(SELECT count(*) FROM scoped_admin_api_keys))"))
+assert upgrade_state=={'image_count_billing_enabled':0,'scoped_admin_keys':0},'Review new feature usage before asserting old-code rollback compatibility'
 assert '255_adobe_cookie_recovery_three_attempts.sql' in installed,'Applied migration must remain'
 assert any(name.startswith('254_') for name in installed),'Missing deployed 408 migration'
 retired=json.loads(a.sql("SELECT json_build_object('holds',(SELECT count(*) FROM adobe_proxy_408_holds),'blocks',(SELECT count(*) FROM adobe_proxy_408_blocks),'flags',(SELECT count(*) FROM accounts WHERE extra ? 'adobe_proxy_408'))"))
@@ -69,6 +71,6 @@ health_proof={'sources':health['sources'],'subscription_exclusion':subscription_
 a.save('route-api-verification.json',health_proof)
 
 route_at=datetime.datetime.fromisoformat(json.loads((ROOT/'rolling-route-canary.json').read_text())['at']);assert route_at.astimezone(datetime.timezone(datetime.timedelta(hours=8))).date().isoformat()=='2026-11-05', 'Release crossed its Beijing date; rebuild notes before claiming success'
-out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'migration_checksums_preserved':True,'migration_set_retained':True,'retired_408_gates_empty':True,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'adobe_custom_business_preserved':True,'route_api_verified':True,'excluded_1290':exclusion,'cutover_route_checks':route_checks,'schema_verification':json.loads((ROOT/'schema-verification.json').read_text()),'active_adobe_probes':False,'test_mail_sent':False}
+out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'migration_checksums_preserved':True,'migration_set_retained':True,'retired_408_gates_empty':True,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'adobe_custom_business_preserved':True,'route_api_verified':True,'excluded_1290':exclusion,'cutover_route_checks':route_checks,'upgrade_features_current':upgrade_state,'schema_verification':json.loads((ROOT/'schema-verification.json').read_text()),'active_adobe_probes':False,'test_mail_sent':False}
 a.save('final-verification.json',out)
 print(json.dumps(out,ensure_ascii=False))

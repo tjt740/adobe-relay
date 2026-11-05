@@ -1,0 +1,122 @@
+{
+  "at": "2026-11-05T13:30:41.281234+00:00",
+  "application_sha": "e634f947a8fcd56757cf3515fe7c8ce8604f3316",
+  "application_version": "2026-11-05T21:30:39.693+0800\tINFO\tstdlog\tSub2API 0.2.19 (commit: e634f947a8fcd56757cf3515fe7c8ce8604f3316, built: 2026-11-05T12:39:31Z)\t{\"service\": \"sub2api\", \"env\": \"bootstrap\", \"legacy_stdlog\": true}",
+  "preserved": {
+    "other_containers": true,
+    "configuration": true,
+    "resources_and_go": true,
+    "environment": true,
+    "okad_settings": true,
+    "sub2_settings_including_smtp": true,
+    "clash_nodes_bindings_and_configuration": true,
+    "alert_rules": true,
+    "retired_route_matches_current_baseline": true
+  },
+  "business_preservation": {
+    "backup_accounts": 1059,
+    "checked_accounts": 1059,
+    "manual_pauses_preserved": true,
+    "manual_proxy_modes_preserved": true,
+    "proxy_bindings_changed_with_event_chain": 5,
+    "cookie_rotations_with_version_advance": 0,
+    "token_fields_only_changes": 0
+  },
+  "migration_checksums_preserved": true,
+  "migration_set_retained": true,
+  "retired_408_gates_empty": true,
+  "canonical_assets": {
+    "/assets/index-B2knDquN.js": "7ba85e15cdf4a59aa85caadd83c574067eef8f69b327efbed8ed4be2390d9dc1",
+    "/assets/ChangelogView-Bopx6DWu.js": "f3fcccfca24c1b38f598d51b486e8a344eee68c8e886bde3dcd661a98a7d8f7c",
+    "/assets/ProxiesView-CjVb5Nxh.js": "b25647abe3ae59e6ed209afb76a32452f7304849c8f38350b7e8d5fed0145087",
+    "/assets/AccountsView-C_fk2Yb6.js": "aea23b119e1f4be16ece6719fc82d31cffc70fecf540097c9c9299ee77ecb0d9"
+  },
+  "live_browser_cases": 0,
+  "browser_limitation": "Live authenticated browser verification not performed; asset and API checks only",
+  "heartbeat_after_temporary_process_cleanup": {
+    "at": "2026-11-05T21:30:30.124991+08:00",
+    "healthy": true
+  },
+  "passive_sample_count": 13,
+  "temporary_cleanup": {
+    "at": "2026-11-05T13:25:55.226691+00:00",
+    "temporary_container_removed": true,
+    "temporary_nat_rule_removed": true,
+    "rolling_lease_removed": true,
+    "nginx_configuration_unchanged": true
+  },
+  "adobe_custom_business_preserved": true,
+  "route_api_verified": true,
+  "excluded_1290": {
+    "excluded": false,
+    "status": null,
+    "bindings": 0,
+    "leases": 0
+  },
+  "cutover_route_checks": {
+    "retired_proxy_absence_preserved": true,
+    "no_bindings_or_test_leases": true
+  },
+  "upgrade_features_current": {
+    "image_count_billing_enabled": 0,
+    "scoped_admin_keys": 0
+  },
+  "schema_verification": {
+    "at": "2026-11-05T13:16:19.355861+00:00",
+    "historical_migrations_preserved": 327,
+    "new_migrations": {
+      "246_enable_gemini_image_generation_groups.sql": "87267be7ab657173768989e2b0b105c5569c5930a7f1ed124f4cf81e5198297c",
+      "247_scoped_admin_api_keys.sql": "03445774e2dfad32da9e23279193d1bca02953896bc3d3b8a87ba0b36b6ed577",
+      "248_group_image_count_billing.sql": "a872dde339b19f311feb5fa6fd85c8ff7b11d69794c35a18e2086d9846b3499c"
+    },
+    "new_switch_defaults_off": true,
+    "groups_preserved": true,
+    "no_scoped_keys_created": true,
+    "read_only": true
+  },
+  "active_adobe_probes": false,
+  "test_mail_sent": false,
+  "image_id": "sha256:fcce70e460c6096cbe29d0b9ecd704eaf7858b62e81e56cce43e79acb82f8bb3",
+  "archive_sha256": "a98caef1b5379d26cc8e1b3626e6abe0a855a886baa9f8e2ef19959ef0d2fcc2",
+  "premigration_backup": {
+    "at": "2026-11-05T12:53:55.948608+00:00",
+    "backup": "/opt/adobe-relay/backups/20261105T125311Z-before-upstream-v0219",
+    "database_bytes": 314274602,
+    "database_sha256": "6b29b93be4cfbf2f9c95703acbb6def151401f641e83cb19b9ef6dacac5c342a",
+    "installed_migration_count": 327,
+    "source_image": "adobe-relay:4569e1bd2e1e8957d1a6bbba677f67d76d56b47e",
+    "dump_verified": true,
+    "routing_changed": false
+  },
+  "cutover_backup": "/opt/adobe-relay/backups/20261105T132040Z-e634f947a8fcd56757cf3515fe7c8ce8604f3316",
+  "upstream_tag_sha": "dece26153621959ccd7635814f4b2d08304e681a",
+  "workflow_runs": {
+    "build": 42028685460,
+    "preflight": 42029280955,
+    "prepare": 42030746621,
+    "start": 42031336891,
+    "independent_schema_diagnostic": 42032519476,
+    "resume": 42034210295,
+    "verify": 42036011770
+  },
+  "initial_failure_preserved": {
+    "at": "2026-11-05T12:56:45.529390+00:00",
+    "cause": "Release manifest used raw-file SHA256; migrator uses strings.TrimSpace before SHA256",
+    "migration_sql_or_application_changed": false,
+    "historical_checksums_preserved": 327,
+    "candidate_recreated": false,
+    "traffic_routed_before_schema_check": false
+  },
+  "natural_drain": {
+    "unclaimed_tests_deferred": false,
+    "persistent_queue_updates": false
+  },
+  "local_test_limitations": {
+    "frontend_total": 3392,
+    "passed": 3386,
+    "preexisting_failures": 6,
+    "baseline_reproduced": true,
+    "local_mock_browser_cases": 8,
+    "production_browser_cases": 0
+  }
+}
