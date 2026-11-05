@@ -17,7 +17,7 @@ func TestManualProxyModeUsesLatestLockedValueUnlessExplicitlyEdited(t *testing.T
 		db, mock, err := sqlmock.New()
 		require.NoError(t, err)
 		client := dbent.NewClient(dbent.Driver(entsql.OpenDB(dialect.Postgres, db)))
-		mock.ExpectQuery(`(?s)SELECT.*FOR NO KEY UPDATE`).WillReturnRows(sqlmock.NewRows([]string{"identity", "ollama_group", "ollama_proxy", "enabled", "rate_sync", "snapshot", "session", "auto", "ollama_snapshot", "opencode_group", "opencode_auto", "opencode_snapshot", "extra"}).AddRow(true, false, true, nil, nil, nil, nil, nil, nil, false, nil, nil, []byte(`{"manual_proxy_enabled":true}`)))
+		mock.ExpectQuery(`(?s)SELECT.*FOR NO KEY UPDATE`).WillReturnRows(sqlmock.NewRows([]string{"identity", "ollama_group", "ollama_proxy", "enabled", "rate_sync", "snapshot", "session", "auto", "ollama_snapshot", "opencode_group", "opencode_auto", "opencode_snapshot", "grok_observed_models", "upstream_model_metadata", "extra"}).AddRow(true, false, true, nil, nil, nil, nil, nil, nil, false, nil, nil, nil, nil, []byte(`{"manual_proxy_enabled":true}`)))
 		account := &service.Account{ID: 1, Platform: "adobe", Type: "oauth", Extra: map[string]any{"manual_proxy_enabled": false}, ManualProxyEnabledUpdate: explicit}
 		extra, err := lockAndMergeAccountProbeExtra(context.Background(), client, account, nil, nil)
 		require.NoError(t, err)
