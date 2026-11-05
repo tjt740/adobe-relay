@@ -439,6 +439,17 @@ func IsExternalImageModelID(modelID string) bool {
 	return ok
 }
 
+// IsLegacyGPTImage26Alias reports compatibility names that remain accepted by
+// request routing but are intentionally hidden from new model directories.
+func IsLegacyGPTImage26Alias(modelID string) bool {
+	switch strings.ToLower(strings.TrimSpace(modelID)) {
+	case "gpt-image-2.6-flare", "gpt-image-2.6-sunburst":
+		return true
+	default:
+		return false
+	}
+}
+
 // DisplayLabel 返回对外模型名的人类可读展示名，供管理端的模型选择器使用。
 //
 // 复用族 spec 的 label 而不是另建一张表：label 本来就是 "Firefly GPT Image 2"
