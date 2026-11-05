@@ -15,6 +15,8 @@ version=subprocess.check_output(['docker','exec',a.APP,'/app/sub2api','-version'
 assert 'Sub2API 0.2.17' in version and sha in version, 'Image version and commit must match the checked build'
 live_before=json.loads((ROOT/'before-live-test.json').read_text())
 assert live_before['success'] and live_before['requested_quality']=='medium' and live_before['response_quality']=='medium' and live_before['outer_posts']==1
+live_after=json.loads((ROOT/'after-live-test.json').read_text())
+assert live_after['success'] and live_after['application_sha']==sha and live_after['requested_quality']=='auto' and live_after['response_quality']=='medium' and live_after['outer_posts']==1
 checks=a.check_preserved(json.loads((ROOT/'before.json').read_text()),a.snapshot())
 heartbeat=json.loads(a.sql("SELECT json_build_object('at',last_success_at,'healthy',last_success_at>now()-interval '5 minutes' AND (last_error_at IS NULL OR last_success_at>last_error_at)) FROM ops_job_heartbeats WHERE job_name='ops_alert_evaluator'"))
 assert heartbeat['healthy'] and datetime.datetime.fromisoformat(heartbeat['at'])>=datetime.datetime.fromisoformat(cleanup['at']),'Wait for the canonical heartbeat after cleanup'
@@ -68,6 +70,6 @@ health_proof={'sources':health['sources'],'subscription_exclusion':subscription_
 a.save('route-api-verification.json',health_proof)
 
 route_at=datetime.datetime.fromisoformat(json.loads((ROOT/'rolling-route-canary.json').read_text())['at']);assert route_at.astimezone(datetime.timezone(datetime.timedelta(hours=8))).date().isoformat()=='2026-11-05', 'Release crossed its Beijing date; rebuild notes before claiming success'
-out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'migration_checksums_preserved':True,'migration_set_retained':True,'retired_408_gates_empty':True,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'adobe_custom_business_preserved':True,'route_api_verified':True,'excluded_1290':exclusion,'cutover_route_checks':route_checks,'active_adobe_probes':False,'test_mail_sent':False}
+out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'migration_checksums_preserved':True,'migration_set_retained':True,'retired_408_gates_empty':True,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'adobe_custom_business_preserved':True,'route_api_verified':True,'excluded_1290':exclusion,'cutover_route_checks':route_checks,'authorized_live_generation_tests':{'before':live_before,'after':live_after},'active_adobe_probes':False,'test_mail_sent':False}
 a.save('final-verification.json',out)
 print(json.dumps(out,ensure_ascii=False))

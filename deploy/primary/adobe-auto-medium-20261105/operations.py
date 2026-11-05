@@ -1,7 +1,7 @@
 """Fixed-scope auto quality release using the original deployment guards."""
 import base64,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','status','verify','archive']
+assert phase in ['preflight','prepare','start','status','live-test','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-auto-medium-20261105'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -51,6 +51,12 @@ assert not (r/'progress.json').exists(), 'Already started; inspect existing evid
 subprocess.run(['systemd-run','--unit=adobe-auto-medium-release-20261105','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/driver.log','--property=StandardError=append:{root}/driver.log','/usr/bin/python3',str(r/'driver.py')],check=True)
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 """)
+elif phase=='live-test':
+ remote(f"""import pathlib,subprocess,sys
+r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
+assert (r/'rolling-finished.json').exists()
+subprocess.run([sys.executable,str(r/'live-test.py'),'after','{sha}'],check=True,timeout=270)
+""")
 elif phase=='verify':
  remote(f"""import pathlib,subprocess,sys
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
@@ -91,7 +97,7 @@ else:
  evidence=pathlib.Path('primary-release-evidence');evidence.mkdir(exist_ok=True)
  script=f"""import importlib.util,json,pathlib
 r=pathlib.Path('{root}');out={{'application_sha':'{sha}','files':{{}}}}
-for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','final-verification.json','release-completion.json']:
+for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','before-live-test.json','after-live-test.json','final-verification.json','release-completion.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
