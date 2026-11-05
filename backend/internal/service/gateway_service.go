@@ -1617,7 +1617,7 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 			// but new model directories must expose Adobe's actual interface
 			// version names only.
 			if platform == PlatformAdobe && adobe.IsLegacyGPTImage26Alias(model) {
-				continue
+				model = adobe.CanonicalGPTImage26ModelID(model)
 			}
 			// Accounts pulled in through mixed scheduling only contribute the
 			// models that belong to the listing platform (e.g. an antigravity

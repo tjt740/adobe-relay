@@ -148,6 +148,33 @@ func TestAccountHandlerGetAvailableModels_AdobeRespectsExplicitMapping(t *testin
 	require.Equal(t, []string{"imagen-4", "my-own-alias"}, ids)
 }
 
+func TestAccountHandlerGetAvailableModels_AdobeNormalizesLegacyGPTImage26Aliases(t *testing.T) {
+	models := adobeAvailableModels(t, service.Account{
+		ID:       91,
+		Name:     "adobe-legacy-mapping",
+		Platform: domain.PlatformAdobe,
+		Type:     service.AccountTypeOAuth,
+		Status:   service.StatusActive,
+		Credentials: map[string]any{
+			"cookie":       "aux_sid=abc",
+			"access_token": "adobe-token",
+			"model_mapping": map[string]any{
+				"gpt-image-2.6-flare":    "firefly-gpt-image-2-6-flare",
+				"gpt-image-2.6-sunburst": "firefly-gpt-image-2-6-sunburst",
+			},
+		},
+	})
+
+	byID := make(map[string]string, len(models))
+	for _, model := range models {
+		byID[model.ID] = model.DisplayName
+	}
+	require.Equal(t, "gpt-image-2.6-star-swirl", byID["gpt-image-2.6-star-swirl"])
+	require.Equal(t, "gpt-image-2.6-aurora", byID["gpt-image-2.6-aurora"])
+	require.NotContains(t, byID, "gpt-image-2.6-flare")
+	require.NotContains(t, byID, "gpt-image-2.6-sunburst")
+}
+
 // 顺序必须确定：map 迭代顺序随机，若直接遍历 mapping 会让默认选中每次刷新都变。
 func TestAccountHandlerGetAvailableModels_AdobeOrderIsStable(t *testing.T) {
 	account := service.Account{

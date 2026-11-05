@@ -578,10 +578,8 @@ func TestGetAvailableModels_AdobeHidesLegacyGPTImage26Aliases(t *testing.T) {
 				Platform: PlatformAdobe,
 				Credentials: map[string]any{
 					"model_mapping": map[string]any{
-						"gpt-image-2.6-star-swirl": "firefly-gpt-image-2-6-flare",
-						"gpt-image-2.6-aurora":     "firefly-gpt-image-2-6-sunburst",
-						"gpt-image-2.6-flare":      "firefly-gpt-image-2-6-flare",
-						"gpt-image-2.6-sunburst":   "firefly-gpt-image-2-6-sunburst",
+						"gpt-image-2.6-flare":    "firefly-gpt-image-2-6-flare",
+						"gpt-image-2.6-sunburst": "firefly-gpt-image-2-6-sunburst",
 					},
 				},
 			}},

@@ -450,6 +450,20 @@ func IsLegacyGPTImage26Alias(modelID string) bool {
 	}
 }
 
+// CanonicalGPTImage26ModelID maps a legacy 2.6 request name to Adobe's actual
+// interface version name for user-facing model directories. Request routing
+// keeps accepting both names; this helper is only for directory generation.
+func CanonicalGPTImage26ModelID(modelID string) string {
+	switch strings.ToLower(strings.TrimSpace(modelID)) {
+	case "gpt-image-2.6-flare":
+		return "gpt-image-2.6-star-swirl"
+	case "gpt-image-2.6-sunburst":
+		return "gpt-image-2.6-aurora"
+	default:
+		return modelID
+	}
+}
+
 // DisplayLabel 返回对外模型名的人类可读展示名，供管理端的模型选择器使用。
 //
 // 复用族 spec 的 label 而不是另建一张表：label 本来就是 "Firefly GPT Image 2"
