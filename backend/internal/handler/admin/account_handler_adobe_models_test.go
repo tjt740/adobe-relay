@@ -87,6 +87,8 @@ func TestAccountHandlerGetAvailableModels_AdobeDisplayNames(t *testing.T) {
 	for _, legacy := range []string{"nano-banana", "nano-banana-pro", "nano-banana2"} {
 		require.Equal(t, legacy, byID[legacy], "历史别名 %s 应显示自身", legacy)
 	}
+	require.Equal(t, "gpt-image-2.6-star-swirl", byID["gpt-image-2.6-flare"])
+	require.Equal(t, "gpt-image-2.6-aurora", byID["gpt-image-2.6-sunburst"])
 }
 
 // 无显式 mapping 的 Adobe 账号（GetModelMapping 回落到 DefaultAdobeModelMapping）

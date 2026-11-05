@@ -3,7 +3,7 @@
 ## Adobe GPT Image 2.6 已上线（2026-11-06，当前 Sub2 应用）
 
 - 用户要求新增 GPT Image 2.6 模型并保持 GPT Image 2.5 的业务流程。功能 PR #139，main 应用提交／镜像 **`a1cf154c64badf2f889c1850f7785a64eeb324b4`**；云端 build-only 门禁 `42082974335`、正式发布 `42085544471` 全部成功，主服务器健康检查通过。归档 PR #140 只加入一次性账号测试辅助并使用 `[skip ci]`，没有重复构建或部署。
-- 新增对外模型 `gpt-image-2.6-flare` 与 `gpt-image-2.6-sunburst`，分别精确路由到 Adobe `gpt-image-2.6-star-swirl` 与 `gpt-image-2.6-aurora`。两者复用 2.5 的生成、编辑、参考图、轮询、下载、计费、错误和不重放保护；2.6 独立使用 detailLevel 上限 5，并按发现协议校验显式尺寸。其他模型、默认检测、Adobe auto medium、调度、代理、Cookie、凭据和订阅配置未改。
+- 新增对外模型 `gpt-image-2.6-star-swirl` 与 `gpt-image-2.6-aurora`，直接使用 Adobe 实际接口版本名。两者分别路由到对应上游版本，复用 2.5 的生成、编辑、参考图、轮询、下载、计费、错误和不重放保护；2.6 独立使用 detailLevel 上限 5，并按发现协议校验显式尺寸。旧 `gpt-image-2.6-flare`／`gpt-image-2.6-sunburst` 仍作为兼容别名解析，不在模型目录和界面展示。其他模型、默认检测、Adobe auto medium、调度、代理、Cookie、凭据和订阅配置未改。
 - 指定邮箱 `jhmvoq73843@hotmail.com` 解析到线上账号 ID **2933**。Flare 账号级连接测试 `42088714236` 与 Sunburst 账号级连接测试 `42088886266` 各一次，均 HTTP 200、SSE `test_complete=true`；耗时分别约 12.199 秒和 21.628 秒。测试结果只记录脱敏邮箱哈希，不输出 Cookie 或 Token。
 - 公共 API Key 的两次独立样本 `42087489745`（Flare）和 `42087822865`（Sunburst）在提交阶段收到上游 408、未受理、未出图，已保留原请求证据且没有重放。这说明该 API Key 选中的账号或出口不具备本次样本的可用性；不能据此否定账号 2933 已通过的结果，也不宣称全账号池或高峰恢复。
 - 正式切换备份为 `/opt/adobe-relay/backups/20261105T184520Z-a1cf154c64badf2f889c1850f7785a64eeb324b4`，之前运行镜像由备份中的 `previous-image` 记录；标准发布脚本已验证数据库转储、配置和应用数据并只更新 app 容器。没有数据库迁移，未修改业务数据、账号凭据、代理、SMTP、告警、订阅或 Okad。

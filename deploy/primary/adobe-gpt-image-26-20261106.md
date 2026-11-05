@@ -14,8 +14,9 @@
 
 PR #139 将两个独立的 Adobe 模型族加入目录：
 
-- `gpt-image-2.6-flare` → `firefly-gpt-image-2-6-flare` → `gpt-image-2.6-star-swirl`
-- `gpt-image-2.6-sunburst` → `firefly-gpt-image-2-6-sunburst` → `gpt-image-2.6-aurora`
+- `gpt-image-2.6-star-swirl` → `firefly-gpt-image-2-6-flare` → `gpt-image-2.6-star-swirl`
+- `gpt-image-2.6-aurora` → `firefly-gpt-image-2-6-sunburst` → `gpt-image-2.6-aurora`
+- 旧 `gpt-image-2.6-flare` 与 `gpt-image-2.6-sunburst` 仅保留为兼容别名，不出现在新的模型目录或界面展示中。
 
 两者沿用 GPT Image 2.5 的提交、编辑、参考图、任务轮询、下载、计费和错误处理链路。质量映射遵守 2.6 的 detailLevel 1–5；auto／未传质量为 3，low 为 1，high、xhigh、max 不超过 5。显式尺寸校验 480–3840、16 像素倍数、655,360–8,294,400 总像素和 3:1 最大宽高比。非法尺寸在本地拒绝，不静默调整；其他模型不走这组校验。
 
