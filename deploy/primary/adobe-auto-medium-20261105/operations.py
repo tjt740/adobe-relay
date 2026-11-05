@@ -1,7 +1,7 @@
 """Fixed-scope auto quality release using the original deployment guards."""
 import base64,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','status','live-test','verify','archive','notify']
+assert phase in ['preflight','prepare','start','status','live-test','verify','archive','notify','defer']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-auto-medium-20261105'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -64,6 +64,9 @@ assert (r/'rolling-finished.json').exists()
 for script,output in [('route-guard-review.py','route-guard-review.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('observe.py','observation.json'),('final-verify.py','final-verification.json')]:
  if not (r/output).exists():subprocess.run([sys.executable,str(r/script)],check=True)
 """)
+elif phase=='defer':
+ copy([pathlib.Path(__file__).parent/'defer-pending-tests.py'])
+ remote(f"import pathlib,subprocess,sys; r=pathlib.Path('{root}'); assert (r/'expected-sha').read_text().strip()=='{sha}'; subprocess.run([sys.executable,str(r/'defer-pending-tests.py'),'canary'],check=True,timeout=330)")
 elif phase=='notify':
  copy([pathlib.Path(__file__).parent/'notify-release.py'])
  remote(f"import pathlib,subprocess,sys; r=pathlib.Path('{root}'); assert (r/'expected-sha').read_text().strip()=='{sha}'; subprocess.run([sys.executable,str(r/'notify-release.py'),'send'],check=True,timeout=90)")
@@ -101,7 +104,7 @@ else:
  evidence=pathlib.Path('primary-release-evidence');evidence.mkdir(exist_ok=True)
  script=f"""import importlib.util,json,pathlib
 r=pathlib.Path('{root}');out={{'application_sha':'{sha}','files':{{}}}}
-for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','before-live-test.json','after-live-test.json','final-verification.json','release-completion.json','release-notification.json']:
+for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','deferred-canary.json','runtime-verification.json','business-verification.json','credential-change-review.json','before-live-test.json','after-live-test.json','final-verification.json','release-completion.json','release-notification.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')

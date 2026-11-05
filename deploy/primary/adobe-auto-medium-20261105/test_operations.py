@@ -10,7 +10,7 @@ from unittest import TestCase, mock
 class OperationsTests(TestCase):
     def test_archive_and_notify_construct_valid_remote_programs(self):
         path = Path(__file__).with_name('operations.py')
-        for phase in ['archive', 'notify']:
+        for phase in ['archive', 'notify', 'defer']:
             with self.subTest(phase), mock.patch.object(sys, 'argv', [str(path), phase, 'a' * 40, '123']), mock.patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)) as run:
                 runpy.run_path(str(path), run_name='__main__')
                 scripts = [call.kwargs['input'] for call in run.call_args_list if 'input' in call.kwargs]
