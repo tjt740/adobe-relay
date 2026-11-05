@@ -3177,6 +3177,11 @@ func (h *AccountHandler) respondAvailableModels(c *gin.Context, account *service
 func buildAdobeTestModels(mapping map[string]string) []adobe.Model {
 	models := make([]adobe.Model, 0, len(mapping))
 	emitted := make(map[string]struct{}, len(mapping))
+	listingMapping := make(map[string]string, len(mapping))
+	for id, target := range mapping {
+		listingMapping[adobe.CanonicalGPTImage26ModelID(id)] = target
+	}
+	mapping = listingMapping
 
 	// 对外清单里的模型给人类可读展示名（"gpt-image-2" → "GPT Image 2"），
 	// 与 OpenAI/Gemini 的选择器观感一致。
@@ -3195,9 +3200,6 @@ func buildAdobeTestModels(mapping map[string]string) []adobe.Model {
 	extras := make([]string, 0, len(mapping))
 	for id := range mapping {
 		if _, ok := emitted[id]; ok {
-			continue
-		}
-		if adobe.IsLegacyGPTImage26Alias(id) {
 			continue
 		}
 		extras = append(extras, id)
