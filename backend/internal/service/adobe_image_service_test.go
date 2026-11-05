@@ -438,7 +438,7 @@ func TestAdobeImageServiceReturnsB64WithoutStorage(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(result.Body, &payload))
 	require.Positive(t, payload.Created)
-	require.Equal(t, "low", payload.Quality)
+	require.Equal(t, "medium", payload.Quality)
 	require.Len(t, payload.Data, 1)
 	require.Empty(t, payload.Data[0].URL)
 	decoded, err := base64.StdEncoding.DecodeString(payload.Data[0].B64JSON)

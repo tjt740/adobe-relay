@@ -85,6 +85,10 @@ func TestTestAccountConnectionAdobeGeneratesImage(t *testing.T) {
 	// 改前 Adobe 会落到 testClaudeAccountConnection —— 这条钉死回归。
 	require.NotContains(t, body, "anthropic")
 	require.NotContains(t, body, "claude")
+	// 业务 auto 提升为 medium 后，账号检测继续显式使用低档。
+	bodies := adobeSubmitBodies(t, api)
+	require.Len(t, bodies, 1)
+	require.Equal(t, float64(1), bodies[0]["generationSettings"].(map[string]any)["detailLevel"])
 }
 
 // status 事件必须暴露映射结果：运维要能直接看到「我选的 2.5-flare 实际打到哪个

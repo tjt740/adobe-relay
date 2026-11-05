@@ -64,6 +64,8 @@ HTTP 200 示例（上游缺少真实用量，以下 usage 为随机模拟数字�
 
 第一张图片的 URL 在 `data[0].url`；多图遍历 `data`。`created` 是 Unix 秒，`size` / `output_format` 以实际交付图片为准。`quality` 表示网关采用的归一化质量标签，`moderation: "auto"` 表示默认审核方式。GPT Image 2.5 请求 `xhigh` 返回 `xhigh`，请求 `max` 返回 `max`，两者提交给 Adobe 的值仍同为 `detailLevel=7`；2 / 1.5 请求这两档仍返回 `high`。该标签不是上游对成图质量的评估。
 
+Adobe 原生 GPT Image 1.5、2、2.5 请求 `quality: "auto"`、省略 `quality` 或传空值时，默认提交 `medium` 对应的 `detailLevel=3`，成功响应返回 `quality: "medium"`。显式 `low` 仍提交档位 1；显式 `medium`、`high`、`xhigh`、`max` 及各模型上限保持。大小写和首尾空格会规范化，未知质量值沿用原低档兜底。文生图和图片编辑使用同一规则；非 GPT Image 模型及中转账号保留原处理。账号检测显式使用 `low`，不随业务默认值提高。站内按张数和分辨率的计费规则保持，较高生成档位对耗时与 Adobe 额度的影响以实际结果为准。
+
 ```bash
 jq -r '.data[] | select(.url != null) | .url' response.json
 ```

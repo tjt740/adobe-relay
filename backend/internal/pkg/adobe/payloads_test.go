@@ -30,7 +30,10 @@ func TestGPTImageDetailLevelFromQuality(t *testing.T) {
 		"low":     1,
 		"medium":  3,
 		"high":    5,
-		"":        1,
+		"":        3,
+		"auto":    3,
+		" AUTO ":  3,
+		"   ":     3,
 		"unknown": 1,
 		"xhigh":   5,
 		"max":     5,
@@ -43,6 +46,13 @@ func TestGPTImageDetailLevelFromQuality(t *testing.T) {
 }
 
 func TestGPTImageDetailLevelFromQualityForVersion(t *testing.T) {
+	for _, version := range []string{"1.5", "2", "gpt-image-2.5-flare", "gpt-image-2.5-prism", "gpt-image-2.5-sunburst"} {
+		for _, quality := range []string{"", "auto", " AUTO ", "medium"} {
+			require.Equal(t, 3, GPTImageDetailLevelFromQualityForVersion(quality, version), "quality=%q version=%q", quality, version)
+		}
+		require.Equal(t, 1, GPTImageDetailLevelFromQualityForVersion("low", version))
+		require.Equal(t, 1, GPTImageDetailLevelFromQualityForVersion("unknown", version))
+	}
 	require.Equal(t, 5, GPTImageDetailLevelFromQualityForVersion("xhigh", "2"))
 	require.Equal(t, 5, GPTImageDetailLevelFromQualityForVersion("max", "1.5"))
 	require.Equal(t, 7, GPTImageDetailLevelFromQualityForVersion("xhigh", "gpt-image-2.5-flare"))
