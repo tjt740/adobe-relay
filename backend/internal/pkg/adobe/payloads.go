@@ -30,7 +30,7 @@ func GPTImageDetailLevelFromQuality(qualityLevel string) int {
 }
 
 // GPTImageDetailLevelFromQualityForVersion 按上游 modelVersion 选择 detailLevel 上限：
-// gpt-image-2.5-* 为 7，其余为 5。
+// gpt-image-2.5-* 为 7，其余为 5。auto 和未指定质量默认 medium（3）。
 func GPTImageDetailLevelFromQualityForVersion(qualityLevel, modelVersion string) int {
 	return gptImageDetailLevelFromQuality(qualityLevel, gptImageDetailLevelCap(modelVersion))
 }
@@ -51,7 +51,7 @@ func gptImageDetailLevelFromQuality(qualityLevel string, max int) int {
 		return 5
 	case "xhigh", "max":
 		return max
-	case "medium":
+	case "medium", "auto", "":
 		return 3
 	default:
 		return 1

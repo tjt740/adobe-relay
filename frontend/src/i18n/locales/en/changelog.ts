@@ -18,6 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      adobeAutoMedium: { title: 'Adobe auto quality now defaults to medium', body: 'Native Adobe GPT Image requests with auto or omitted quality use medium and report the submitted tier. Explicit choices and model caps remain intact, account checks retain low quality, and scheduling, billing and submission protection are preserved.' },
       bulkTestConcurrency: { title: 'Choose bulk-test concurrency and remove the fixed subscription node cap', body: 'Bulk account tests now offer 1–15 simultaneous accounts, default 3, fixed for the batch with background progress. Subscription parsing, merging and import remove the 512-node cap. Upstream, proxy and resource constraints still apply, alongside download, port and existing business safeguards.' },
       adobeImageErrorDetails: { title: 'Specific image errors with safe submission protection', body: 'Today’s update separates Adobe parameter rejections, dependency failures, failed jobs and image fetch errors, adding codes, parameters, failure stages and request IDs. Existing settings and submission budgets remain. Accepted jobs and uncertain outcomes must not be resubmitted, and diagnostic details remain redacted.' },
       bulkAccountTestModels: { title: 'Bulk model selection and Flare defaults for Cookie and automatic tests', body: 'Today adds bulk model selection and extends the Flare default to Cookie delivery and background tests without an explicit model. Batch model snapshots, concurrency, progress, explicit choices and queue protection remain. A catalog does not prove upstream recovery; real requests record their actual outcomes.' },
@@ -31,6 +32,18 @@ export default {
       }
     },
     "updates": {
+      adobeAutoMedium: {
+        title: 'Default auto image quality to medium',
+        body: 'Text generation and image edits with auto or omitted quality submit the medium tier and return medium on success.',
+        sections: {
+          reason: { title: 'Raise the automatic quality default', body: 'Previously, auto and omitted quality selected the lowest tier and returned low. Requests that rely on the default now use medium while explicit quality choices continue to control generation.' },
+          default: { title: 'Keep submission and response labels consistent', body: 'Native Adobe GPT Image 1.5, 2 and 2.5 requests with auto, blank or omitted quality submit detailLevel=3 and return quality=medium on success. Case and surrounding whitespace are normalized. Generation, edits, multiple images, Base64, URLs and storage fallback share this rule. The label describes the submitted setting rather than grading the resulting image.' },
+          explicit: { title: 'Retain explicit choices and model caps', body: 'Explicit low remains tier 1, medium remains 3 and high remains 5. GPT Image 2.5 retains tier 7 for xhigh and max and preserves their distinct response labels; older models keep their existing caps. Unknown quality values retain the low fallback. Other models and relay accounts keep their existing behavior.' },
+          detection: { title: 'Keep account checks at low quality', body: 'Manual, bulk, Cookie-triggered and background account checks explicitly use low, retaining their existing 1K test and workload. Raising the business default does not raise the detection tier or trigger batch retests.' },
+          validation: { title: 'Validation scope and live request limits', body: 'Isolated regressions inspect upstream settings and response labels for defaults, explicit tiers, model mapping, edits, multiple images and delivery paths, and verify low-tier account checks. One pre-release production request with explicit medium successfully returned a 1K image. That sample verifies the existing medium path and cannot alone prove the new auto default, pool recovery or peak throughput.' },
+          boundary: { title: 'Scope and practical costs', body: 'The default applies to native Adobe GPT Image business requests handled by the new version. Historical images remain unchanged. Per-image and resolution billing, model mappings, manual pauses, proxies, concurrency, resources and alerts are preserved. Higher quality may affect latency and Adobe credit consumption; actual results determine the impact. Accepted or uncertain generation requests must still never be resubmitted.' },
+        },
+      },
       bulkTestConcurrency: {
         title: 'Choose 1–15 simultaneous bulk account tests',
         body: 'Choose the number of simultaneous account tests before starting, default 3, for sequential diagnosis or faster checks when capacity permits.',

@@ -1,0 +1,42 @@
+{
+  "backend/internal/pkg/adobe/payloads.go": {
+    "before": "93c8d7dfeb68b8ed47f464008c6f840ead7fb751b46d2422a8ec28e63a94fbba",
+    "candidate": "7e236adfab2c79aa656ccb6886c04d5718591561bafed7baa5d9dbee7454bf00"
+  },
+  "backend/internal/pkg/adobe/payloads_test.go": {
+    "before": "54ab98af7c74be92d8752cc78948836ef54bbdcce11510441f44d93cc3a3df2c",
+    "candidate": "38c2c2197238b3b35e324ecc0c0c70cd8109772cbb1287fa51f9669ddf588b72"
+  },
+  "backend/internal/service/account_test_adobe.go": {
+    "before": "fd6e373016b6caf93b51cfb0d18ff438a67dfef676181508fab52881a9391975",
+    "candidate": "8470d0e0aae8d537020ca82c8066a37df64dd64df3d275a28dc3d03d9f89f332"
+  },
+  "backend/internal/service/account_test_adobe_test.go": {
+    "before": "c859bcf74583d43ffd514de7e25419e3d0924135f14504ebd3c52134cd4c1028",
+    "candidate": "177727a818810f5142bdc9728f7d2869be5e6d5f22bf74de6bb36111fe1b0625"
+  },
+  "backend/internal/service/adobe_image_quality_test.go": {
+    "before": "6fe43a9fae513b7e1e210cba55f5e8a3af1a82e24f4a57732b3a4ceb3b65438e",
+    "candidate": "ae349052f3368febe1045f0b8c1f76dea9d9927f97ca59ace1fefd6cbcd03230"
+  },
+  "backend/internal/service/adobe_image_service_test.go": {
+    "before": "0c8b324135a9a3957b7662d4e65c58b51bcd188cccf10fe3e8f33ff878b2ec4a",
+    "candidate": "29b396fba4b694644349f7b91afab6218c3ccbdf1299cb2e0739a37ddc681e16"
+  },
+  "docs/ADOBE_IMAGE_CLIENT_GUIDE.md": {
+    "before": "a4446c021b821ce6aca391581db46f1dd228f1292bef1d8f63f06abf9882cb1d",
+    "candidate": "e4eab07bb6937238927571e142e5c3d72c38dcf7bedacadbb6405a513bba13f6"
+  },
+  "frontend/src/content/changelog/daily.ts": {
+    "before": "6141051dffc067ee7f30dd34ae613a3f54b6974ee6aee04dcfc655544126c37d",
+    "candidate": "56c750a46d0c4ea46f25f43ae8eabb42213655dc2eecdf2809b6eaff17b8ac9d"
+  },
+  "frontend/src/i18n/locales/en/changelog.ts": {
+    "before": "88806c3d9cd89f9348c563cc83817a7a2cf6cd6af6916e226b0b1eeee214d2b7",
+    "candidate": "81de42f25f0f2a2823308a2e73726795171b9a553ba062c796f1c168ccfaf9ea"
+  },
+  "frontend/src/i18n/locales/zh/changelog.ts": {
+    "before": "83faef1caece907ce55201a49568f9c9ccdd5f40b100b6e491a9397ebf71bce8",
+    "candidate": "0a747bfb078c04cd38d869d31436ce05658294c1e286f63e11676258c479f017"
+  }
+}

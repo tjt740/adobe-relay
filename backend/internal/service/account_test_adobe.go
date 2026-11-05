@@ -153,6 +153,8 @@ func (s *AccountTestService) testAdobeAccountConnection(
 			UpstreamModelVersion: conf.UpstreamModelVersion,
 			PayloadKind:          conf.PayloadKind,
 			SizePixels:           conf.SizePixels,
+			// 检测只验证链路，显式保留 low，不随业务 auto 默认档位提高。
+			QualityLevel: "low",
 		},
 	})
 	if err != nil {
