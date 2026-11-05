@@ -38,7 +38,7 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
           install -m 700 -d live-test-evidence
-      - name: Run exactly one request per new model
+      - name: Verify public and admin model directories without generation
         env:
           APP_SHA: ${{ inputs.application_sha }}
         run: |
@@ -46,14 +46,8 @@ jobs:
           target='root@173.234.15.150'
           ssh_opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=20)
           ssh "${ssh_opts[@]}" "$target" 'mkdir -p /opt/adobe-relay/releases/adobe-gpt-image-26-20261106'
-          scp "${ssh_opts[@]}" deploy/primary/adobe-gpt-image-26-20261106/live-test.py "$target:/opt/adobe-relay/releases/adobe-gpt-image-26-20261106/"
-          for model in gpt-image-2.6-star-swirl gpt-image-2.6-aurora; do
-            ssh "${ssh_opts[@]}" "$target" "python3 /opt/adobe-relay/releases/adobe-gpt-image-26-20261106/live-test.py '$model' '$APP_SHA'" | tee "live-test-evidence/$model.json"
-          done
-          for model in gpt-image-2.6-star-swirl gpt-image-2.6-aurora; do
-            scp "${ssh_opts[@]}" "$target:/opt/adobe-relay/releases/adobe-gpt-image-26-20261106/$model-live-test.json" "live-test-evidence/"
-            scp "${ssh_opts[@]}" "$target:/opt/adobe-relay/releases/adobe-gpt-image-26-20261106/$model-live-test.png" "live-test-evidence/"
-          done
+          scp "${ssh_opts[@]}" deploy/primary/adobe-gpt-image-26-20261106/catalog-test.py "$target:/opt/adobe-relay/releases/adobe-gpt-image-26-20261106/"
+          ssh "${ssh_opts[@]}" "$target" "python3 /opt/adobe-relay/releases/adobe-gpt-image-26-20261106/catalog-test.py '$APP_SHA'" | tee "live-test-evidence/catalog.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
