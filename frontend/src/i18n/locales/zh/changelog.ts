@@ -42,7 +42,7 @@ export default {
           models: { title: '分别路由到准确的 Adobe 版本', body: 'GPT Image 2.6 Flare 使用 gpt-image-2.6-star-swirl，Sunburst 使用 gpt-image-2.6-aurora。对外名称、内部模型族、账号映射、模型列表和白名单快捷项与 2.5 分开，2.6 请求不会静默降级到其他版本。' },
           workflow: { title: '复用现有图片业务流程', body: '文生图、编辑、参考图、任务轮询、下载、输出格式、未知结果不重放、按张计数和账号调度继续复用原 GPT Image 链路。检测默认、Adobe auto medium 和已有账号映射保持，只有运维明确启用新模型时才使用 2.6。' },
           quality: { title: '遵守 2.6 质量和尺寸协议', body: '2.6 的 auto 和未传质量继续使用 detailLevel=3，low 使用 1，high、xhigh、max 受模型上限 5 限制。显式尺寸校验宽高 480–3840、必须是 16 的倍数、总像素 655,360–8,294,400，宽高比不超过 3:1。' },
-          validation: { title: '验证与线上放行条件', body: '后端、race、前端、类型和生产构建检查覆盖映射、请求体、质量回显、计费、模型列表和尺寸边界。两个 2.6 版本分别进行一次带独占标记的线上真实请求，并只沿用原任务结果；确认通过后才推送和发布。' },
+          validation: { title: '验证与线上证据', body: '后端、race、前端、类型和生产构建检查覆盖映射、请求体、质量回显、计费、模型列表和尺寸边界。精确应用在主服务器健康后，对指定 Adobe 账号分别执行一次 Flare 和 Sunburst 账号级测试，均 HTTP 200 且收到 test_complete=true。独立公共 API Key 样本在提交阶段收到上游 408，已记录且没有重放；这些样本验证指定账号和已发布链路，不代表所有账号或峰值吞吐。' },
           boundary: { title: '保留的限制', body: '2.6 在 Adobe 发现记录中仍标为 alpha；enabled 和 HEALTHY 不代表每个账号最终都有权益，也不代表每次上游任务都会成功。本次不改数据库迁移、登录、Cookie 推送、代理、调度或检测默认值；不支持的尺寸在本地直接报错，不静默缩放。' },
         },
       },
