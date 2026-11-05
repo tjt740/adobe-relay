@@ -653,6 +653,24 @@ func TestBuildImagePayloadCandidatesGPTImage25Background(t *testing.T) {
 	require.Equal(t, "transparent", msp["background"])
 }
 
+func TestBuildImagePayloadCandidatesGPTImage26UsesSameProtocolWithDetailCapFive(t *testing.T) {
+	candidates, err := BuildImagePayloadCandidates(ImagePayloadOptions{
+		Prompt:               "a red cube",
+		UpstreamModelID:      "gpt-image",
+		UpstreamModelVersion: "gpt-image-2.6-star-swirl",
+		PayloadKind:          PayloadKindGPTImage26,
+		QualityLevel:         "max",
+		SizePixels:           Size{Width: 1024, Height: 1024},
+	})
+	require.NoError(t, err)
+	require.Len(t, candidates, 1)
+	p := candidates[0]
+	require.Equal(t, "gpt-image-2.6-star-swirl", p["modelVersion"])
+	require.Equal(t, "gpt-image", p["modelId"])
+	require.Equal(t, 5, p["generationSettings"].(map[string]any)["detailLevel"])
+	require.Equal(t, Size{Width: 1024, Height: 1024}, p["size"])
+}
+
 // enum-size 家族：顶层 size:{width,height} + 无 outputResolution / modelSpecificPayload。
 func TestBuildImagePayloadCandidatesSizeEnum(t *testing.T) {
 	candidates, err := BuildImagePayloadCandidates(ImagePayloadOptions{

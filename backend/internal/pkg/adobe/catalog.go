@@ -77,6 +77,9 @@ const (
 	// 有合法 WxH 时发顶层 size:{width,height}（含 4K，不夹紧）；空/auto 则省略
 	// 顶层 size，改写 modelSpecificPayload.size:"auto"。caiClaimVersion:2。
 	PayloadKindGPTImage25
+	// GPT Image 2.6 uses the same submit/edit protocol as 2.5, with its own
+	// upstream versions and stricter schema limits.
+	PayloadKindGPTImage26
 	// PayloadKindNanoBanana 对 gemini-flash 家族：方图档位 + 可选 aspectRatio
 	PayloadKindNanoBanana
 	// PayloadKindSizeEnum 对 flux / imagen / gpt-4o-image / runway-gen4-image：
@@ -206,6 +209,22 @@ var rawImageFamilySpecs = []imageFamilySpec{
 		upstreamModelVersion: "gpt-image-2.5-prism",
 		payloadKind:          PayloadKindGPTImage25,
 		label:                "Firefly GPT Image 2.5 Sunburst",
+	},
+	{
+		familyID:             "firefly-gpt-image-2-6-flare",
+		upstreamModel:        "openai:firefly:gpt-image",
+		upstreamModelID:      upstreamModelIDGPTImage,
+		upstreamModelVersion: "gpt-image-2.6-star-swirl",
+		payloadKind:          PayloadKindGPTImage26,
+		label:                "Firefly GPT Image 2.6 Flare",
+	},
+	{
+		familyID:             "firefly-gpt-image-2-6-sunburst",
+		upstreamModel:        "openai:firefly:gpt-image",
+		upstreamModelID:      upstreamModelIDGPTImage,
+		upstreamModelVersion: "gpt-image-2.6-aurora",
+		payloadKind:          PayloadKindGPTImage26,
+		label:                "Firefly GPT Image 2.6 Sunburst",
 	},
 	{
 		familyID:             "firefly-nano-banana-pro",
@@ -379,6 +398,8 @@ var externalImageModelAliases = map[string]string{
 	"gpt-image-2.5-flare":    "firefly-gpt-image-2-5-flare",
 	"gpt-image-2.5-sunburst": "firefly-gpt-image-2-5-prism", // sunburst 是 UI 名，上游 modelVersion=prism
 	"gpt-image-2.5-prism":    "firefly-gpt-image-2-5-prism",
+	"gpt-image-2.6-flare":    "firefly-gpt-image-2-6-flare",
+	"gpt-image-2.6-sunburst": "firefly-gpt-image-2-6-sunburst",
 	// 更早的 gpt-image 名字：Adobe 侧没有对应版本，一律落 2。
 	"gpt-image":                      "firefly-gpt-image-2",
 	"gpt-image-1":                    "firefly-gpt-image-2",
@@ -571,7 +592,7 @@ func resolveNonRatioFamily(spec imageFamilySpec, req ImageRequest) (ImageModelCo
 	var pixels Size
 	if len(spec.supportedSizes) > 0 {
 		pixels = NearestSize(req.Size, spec.supportedSizes)
-	} else if spec.payloadKind == PayloadKindGPTImage25 {
+	} else if spec.payloadKind == PayloadKindGPTImage25 || spec.payloadKind == PayloadKindGPTImage26 {
 		if width, height, ok := parseSizeWxH(req.Size); ok {
 			pixels = Size{Width: width, Height: height}
 		}
@@ -583,6 +604,22 @@ func resolveNonRatioFamily(spec imageFamilySpec, req ImageRequest) (ImageModelCo
 		(pixels.Width > 3840 || pixels.Height > 3840 || pixels.Width*pixels.Height > 8294400) {
 		return ImageModelConf{}, NewParameterError(fmt.Sprintf(
 			"Invalid size %s for gpt-image-2.5-flare: longest edge must not exceed 3840 pixels and total pixels must not exceed 8294400. Use 3840x2160 for landscape 4K or 2048x2048 for a square image.", pixels.String()), "image_size_exceeds_model_limit", "size")
+	}
+	if spec.payloadKind == PayloadKindGPTImage26 && pixels.Width > 0 && pixels.Height > 0 {
+		longest, shortest := pixels.Width, pixels.Height
+		if shortest > longest {
+			longest, shortest = shortest, longest
+		}
+		area := pixels.Width * pixels.Height
+		valid := pixels.Width >= 480 && pixels.Height >= 480 &&
+			pixels.Width <= 3840 && pixels.Height <= 3840 &&
+			pixels.Width%16 == 0 && pixels.Height%16 == 0 &&
+			area >= 655360 && area <= 8294400 &&
+			float64(longest) <= 3*float64(shortest)
+		if !valid {
+			return ImageModelConf{}, NewParameterError(fmt.Sprintf(
+				"Invalid size %s for %s: width and height must be 480..3840 pixels in multiples of 16, total pixels must be 655360..8294400, and aspect ratio must not exceed 3:1.", pixels.String(), spec.upstreamModelVersion), "image_size_exceeds_model_limit", "size")
+		}
 	}
 
 	// 计费档位必须跟实际发给上游的像素走，而不是客户端写的 size：enum 家族会被 NearestSize

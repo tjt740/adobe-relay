@@ -18,6 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      adobeGptImage26: { title: 'Add Adobe GPT Image 2.6 Flare and Sunburst', body: 'Expose Adobe’s enabled GPT Image 2.6 Flare and Sunburst versions through the same image workflow as 2.5, with exact upstream routing, 2.6 size validation and explicit quality limits. Existing models, defaults, checks and submission protections remain unchanged.' },
       upstreamV0219: { title: 'Upgrade to v0.2.19 with Adobe medium defaults retained', body: 'Integrates v0.2.18–v0.2.19 scoped administrator keys, streaming usage, image billing and provider fixes. Adobe auto quality remains medium. Manual IPs, batch concurrency, subscription protection and Okad integration remain available. The new per-image switch defaults off; existing Adobe billing is retained.' },
       adobeAutoMedium: { title: 'Adobe auto quality now defaults to medium', body: 'Native Adobe GPT Image requests with auto or omitted quality use medium and report the submitted tier. Explicit choices and model caps remain intact, account checks retain low quality, and scheduling, billing and submission protection are preserved.' },
       bulkTestConcurrency: { title: 'Choose bulk-test concurrency and remove the fixed subscription node cap', body: 'Bulk account tests now offer 1–15 simultaneous accounts, default 3, fixed for the batch with background progress. Subscription parsing, merging and import remove the 512-node cap. Upstream, proxy and resource constraints still apply, alongside download, port and existing business safeguards.' },
@@ -33,6 +34,18 @@ export default {
       }
     },
     "updates": {
+      adobeGptImage26: {
+        title: 'Add Adobe GPT Image 2.6 models',
+        body: 'Expose GPT Image 2.6 Flare and Sunburst through the existing Adobe image generation and editing flow.',
+        sections: {
+          reason: { title: 'Expose models already enabled upstream', body: 'Adobe’s discovery service reports two enabled and healthy GPT Image 2.6 versions while the Firefly menu may omit them. Sub2 now exposes clear Flare and Sunburst names instead of leaving those versions unreachable.' },
+          models: { title: 'Route each name to the exact Adobe version', body: 'GPT Image 2.6 Flare uses gpt-image-2.6-star-swirl and Sunburst uses gpt-image-2.6-aurora. The public names, internal families, account mappings, model lists and allowlist presets stay separate from the 2.5 entries, so a 2.6 request cannot silently downgrade to another version.' },
+          workflow: { title: 'Reuse the established image workflow', body: 'Generation, edits, reference images, task polling, downloads, output formatting, no-replay handling, image counting and account scheduling reuse the existing GPT Image path. Detection defaults, Adobe auto medium and existing account mappings remain unchanged unless an operator explicitly enables a new model.' },
+          quality: { title: 'Respect the 2.6 quality and size schema', body: '2.6 keeps auto and omitted quality at detailLevel 3, maps low to 1 and high, xhigh or max to the model cap of 5. Explicit sizes are checked for 480–3840 dimensions, multiples of 16, total pixels between 655,360 and 8,294,400 and an aspect ratio no wider than 3:1.' },
+          validation: { title: 'Validation and live rollout gate', body: 'Focused backend, race, frontend, type and production-build checks cover mapping, payloads, quality labels, pricing, model lists and size boundaries. Each 2.6 version is then verified with one exclusive live image request and its original task result before the application is pushed and released.' },
+          boundary: { title: 'Preserved limits', body: 'The 2.6 discovery record is alpha and healthy, which does not guarantee every Adobe account is entitled or that every upstream task succeeds. No database migration, login, cookie push, proxy, scheduler or default detection change is included. Unsupported 2.6 sizes fail locally and are never silently resized.' },
+        },
+      },
       upstreamV0219: {
         title: 'Integrate upstream v0.2.19 features and fixes',
         body: 'Updates the v0.2.17 code with two upstream releases while retaining this site’s Adobe, Kiro, proxy and integration features.',

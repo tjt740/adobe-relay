@@ -481,6 +481,8 @@ func TestResolveImageAcceptsExternalModelNames(t *testing.T) {
 		"gpt-image-1.5":                  "firefly-gpt-image-1.5",
 		"gpt-image-2.5-flare":            "firefly-gpt-image-2-5-flare",
 		"gpt-image-2.5-sunburst":         "firefly-gpt-image-2-5-prism",
+		"gpt-image-2.6-flare":            "firefly-gpt-image-2-6-flare",
+		"gpt-image-2.6-sunburst":         "firefly-gpt-image-2-6-sunburst",
 		"gemini-3-pro-image":             "firefly-nano-banana-pro",
 		"gemini-3-pro-image-preview":     "firefly-nano-banana-pro",
 		"gemini-2.5-flash-image":         "firefly-nano-banana",
@@ -504,6 +506,38 @@ func TestResolveImageAcceptsExternalModelNames(t *testing.T) {
 		require.NoError(t, err, "对外名 %s 必须可解析", externalID)
 		require.Equal(t, family, conf.Family, "对外名 %s 应落到族 %s", externalID, family)
 	}
+}
+
+func TestResolveImageGPTImage26FamiliesUseRealUpstreamVersions(t *testing.T) {
+	tests := []struct {
+		model, family, version string
+	}{
+		{"gpt-image-2.6-flare", "firefly-gpt-image-2-6-flare", "gpt-image-2.6-star-swirl"},
+		{"gpt-image-2.6-sunburst", "firefly-gpt-image-2-6-sunburst", "gpt-image-2.6-aurora"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.model, func(t *testing.T) {
+			conf, err := ResolveImage(ImageRequest{ModelID: tc.model, Size: "1024x1024"})
+			require.NoError(t, err)
+			require.Equal(t, tc.family, conf.Family)
+			require.Equal(t, tc.version, conf.UpstreamModelVersion)
+			require.Equal(t, PayloadKindGPTImage26, conf.PayloadKind)
+		})
+	}
+}
+
+func TestResolveImageGPTImage26ValidatesDiscoverySizeConstraints(t *testing.T) {
+	for _, size := range []string{"816x816", "1024x1024", "3840x2160", "480x1440"} {
+		_, err := ResolveImage(ImageRequest{ModelID: "gpt-image-2.6-flare", Size: size})
+		require.NoError(t, err, size)
+	}
+	for _, size := range []string{"464x464", "1025x1024", "3840x3840", "4000x1024", "480x1456"} {
+		_, err := ResolveImage(ImageRequest{ModelID: "gpt-image-2.6-flare", Size: size})
+		require.Error(t, err, size)
+		require.Equal(t, "image_size_exceeds_model_limit", err.(*RequestError).Code, size)
+	}
+	_, err := ResolveImage(ImageRequest{ModelID: "gpt-image-2.6-flare", Size: ""})
+	require.NoError(t, err, "auto size remains supported")
 }
 
 func TestResolveImageAcceptsLegacyNanoBananaAliases(t *testing.T) {

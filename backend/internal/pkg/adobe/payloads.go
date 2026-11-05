@@ -111,7 +111,7 @@ func BuildImagePayloadCandidates(opts ImagePayloadOptions) ([]map[string]any, er
 	normalizedRatio := strings.ToLower(strings.TrimSpace(opts.AspectRatio))
 
 	switch opts.PayloadKind {
-	case PayloadKindGPTImage25, PayloadKindGPTImage:
+	case PayloadKindGPTImage25, PayloadKindGPTImage26, PayloadKindGPTImage:
 		return buildGPTImage25Payloads(opts)
 	case PayloadKindSizeEnum:
 		return buildSizeEnumPayloads(opts)

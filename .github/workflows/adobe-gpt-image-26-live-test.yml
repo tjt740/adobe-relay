@@ -1,0 +1,66 @@
+name: Adobe GPT Image 2.6 live test
+on:
+  workflow_dispatch:
+    inputs:
+      application_sha:
+        description: Exact deployed application commit to verify
+        type: string
+        required: true
+      branch:
+        description: Source branch containing the live-test helper
+        type: string
+        required: true
+        default: main
+permissions:
+  contents: read
+concurrency:
+  group: adobe-relay-production
+  cancel-in-progress: false
+jobs:
+  live-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+      - name: Validate source and configure SSH
+        env:
+          APP_SHA: ${{ inputs.application_sha }}
+          SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [[ "$APP_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          install -m 700 -d live-test-evidence
+      - name: Run exactly one request per new model
+        env:
+          APP_SHA: ${{ inputs.application_sha }}
+        run: |
+          set -euo pipefail
+          target='root@173.234.15.150'
+          ssh_opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=20)
+          ssh "${ssh_opts[@]}" "$target" 'mkdir -p /opt/adobe-relay/releases/adobe-gpt-image-26-20261106'
+          scp "${ssh_opts[@]}" deploy/primary/adobe-gpt-image-26-20261106/live-test.py "$target:/opt/adobe-relay/releases/adobe-gpt-image-26-20261106/"
+          for model in gpt-image-2.6-flare gpt-image-2.6-sunburst; do
+            ssh "${ssh_opts[@]}" "$target" "python3 /opt/adobe-relay/releases/adobe-gpt-image-26-20261106/live-test.py '$model' '$APP_SHA'" | tee "live-test-evidence/$model.json"
+          done
+          for model in gpt-image-2.6-flare gpt-image-2.6-sunburst; do
+            scp "${ssh_opts[@]}" "$target:/opt/adobe-relay/releases/adobe-gpt-image-26-20261106/$model-live-test.json" "live-test-evidence/"
+            scp "${ssh_opts[@]}" "$target:/opt/adobe-relay/releases/adobe-gpt-image-26-20261106/$model-live-test.png" "live-test-evidence/"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: adobe-gpt-image-26-live-test
+          path: live-test-evidence/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Remove runner SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

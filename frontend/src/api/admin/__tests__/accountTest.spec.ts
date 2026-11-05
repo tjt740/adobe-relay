@@ -17,7 +17,7 @@ const response = (chunks: string[], status = 200) => {
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('account connection test stream', () => {
-  it.each(['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst', 'gpt-image-2'])('sends the selected model %s to the test endpoint', async modelId => {
+	it.each(['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst', 'gpt-image-2.6-flare', 'gpt-image-2.6-sunburst', 'gpt-image-2'])('sends the selected model %s to the test endpoint', async modelId => {
     const fetchMock = vi.fn().mockResolvedValue(response(['data: {"type":"test_complete","success":true}\n']))
     vi.stubGlobal('fetch', fetchMock)
     await testAccountConnection(42, new AbortController().signal, { modelId })
