@@ -74,6 +74,8 @@ subprocess.run(['systemd-run','--unit='+unit,'--collect','--property=WorkingDire
 print(json.dumps({{'resume_dispatched':True}}))
 """)
 elif phase=='verify':
+ remote(f"from pathlib import Path;r=Path('{ROOT}');assert (r/'rolling-finished.json').exists()")
+ copy([HERE/'final-verify.py'])
  remote(f"""import subprocess,sys
 from pathlib import Path
 r=Path('{ROOT}');assert (r/'expected-sha').read_text().strip()=='{sha}'
