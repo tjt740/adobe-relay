@@ -1,0 +1,124 @@
+{
+  "at": "2026-11-05T04:47:50.967976+00:00",
+  "application_sha": "4569e1bd2e1e8957d1a6bbba677f67d76d56b47e",
+  "application_version": "2026-11-05T12:47:49.548+0800\tINFO\tstdlog\tSub2API 0.2.17 (commit: 4569e1bd2e1e8957d1a6bbba677f67d76d56b47e, built: 2026-11-05T04:14:12Z)\t{\"service\": \"sub2api\", \"env\": \"bootstrap\", \"legacy_stdlog\": true}",
+  "preserved": {
+    "other_containers": true,
+    "configuration": true,
+    "resources_and_go": true,
+    "environment": true,
+    "okad_settings": true,
+    "sub2_settings_including_smtp": true,
+    "clash_nodes_bindings_and_configuration": true,
+    "alert_rules": true,
+    "retired_route_matches_current_baseline": true
+  },
+  "business_preservation": {
+    "backup_accounts": 1059,
+    "checked_accounts": 1059,
+    "manual_pauses_preserved": true,
+    "manual_proxy_modes_preserved": true,
+    "proxy_bindings_changed_with_event_chain": 47,
+    "cookie_rotations_with_version_advance": 17,
+    "token_fields_only_changes": 0
+  },
+  "migration_checksums_preserved": true,
+  "migration_set_retained": true,
+  "retired_408_gates_empty": true,
+  "canonical_assets": {
+    "/assets/index-C8diqNte.js": "83f16afc164c37a14383de8524f95495bf2e39905ba0cd0348f27349d11c7275",
+    "/assets/AccountsView-BuQ9XQ9j.js": "205ed907a86aefce8f9c8372d09727daa9d179fc3f16d42badb5d32c37160f36",
+    "/assets/ChangelogView-UQIsj8SL.js": "edc33c259ea7043ceb415698aff765dd38bba9478f089f043c999461dfd1cd59",
+    "/assets/ProxiesView-DbEmM8pW.js": "336d2deb342dbb94b76892f1ecf2ce7d3ae7c8e04e4cadcde575a122e880cdd0"
+  },
+  "live_browser_cases": 0,
+  "browser_limitation": "Live authenticated browser verification unavailable; asset and API checks only",
+  "heartbeat_after_temporary_process_cleanup": {
+    "at": "2026-11-05T12:47:27.913706+08:00",
+    "healthy": true
+  },
+  "passive_sample_count": 13,
+  "temporary_cleanup": {
+    "at": "2026-11-05T04:43:10.530519+00:00",
+    "temporary_container_removed": true,
+    "temporary_nat_rule_removed": true,
+    "rolling_lease_removed": true,
+    "nginx_configuration_unchanged": true
+  },
+  "adobe_custom_business_preserved": true,
+  "route_api_verified": true,
+  "excluded_1290": {
+    "excluded": false,
+    "status": null,
+    "bindings": 0,
+    "leases": 0
+  },
+  "cutover_route_checks": {
+    "retired_proxy_absence_preserved": true,
+    "no_bindings_or_test_leases": true
+  },
+  "authorized_live_generation_tests": {
+    "before": {
+      "at": "2026-11-05T04:08:09.266501+00:00",
+      "application_sha": "07427dee06811fb9cf51f1b07e4f782f3076fe38",
+      "phase": "before",
+      "requested_quality": "medium",
+      "api_key_id": 12,
+      "outer_posts": 1,
+      "success": true,
+      "status": 200,
+      "response_quality": "medium",
+      "image": {
+        "bytes": 1213978,
+        "sha256": "cd3572225d3c3d3190fbb842d26a1b6f935193ec2fc433f630e925c8a15a2bd7",
+        "width": 1024,
+        "height": 1024
+      },
+      "request_id": null,
+      "duration_seconds": 21.516
+    },
+    "after": {
+      "at": "2026-11-05T04:44:07.428209+00:00",
+      "application_sha": "4569e1bd2e1e8957d1a6bbba677f67d76d56b47e",
+      "phase": "after",
+      "requested_quality": "auto",
+      "api_key_id": 12,
+      "outer_posts": 1,
+      "success": true,
+      "status": 200,
+      "response_quality": "medium",
+      "image": {
+        "bytes": 1124008,
+        "sha256": "aca757410cacd1b8a4d1a863da6fd950ca53a1a12d293a7bdeff8133250e2c2f",
+        "width": 1024,
+        "height": 1024
+      },
+      "request_id": null,
+      "duration_seconds": 19.738
+    }
+  },
+  "active_adobe_probes": false,
+  "test_mail_sent": false,
+  "image_id": "sha256:b764d31706ff6e0143bc2ca3e0c51a302de92aa0ccfb3003844c161c35ca0ea8",
+  "cutover_backup": "/opt/adobe-relay/backups/20261105T043046Z-4569e1bd2e1e8957d1a6bbba677f67d76d56b47e",
+  "pending_deferral": {
+    "at": "2026-11-05T04:42:21.663452+00:00",
+    "phase": "canary",
+    "attempt": 1,
+    "persistent_data_updates": false,
+    "interrupted_running_tests": false,
+    "target_reached": true,
+    "seconds": 48.94,
+    "peak_pending_locked": 1,
+    "locks_released": true
+  },
+  "workflow_runs": {
+    "build": 41966320994,
+    "preflight": 41967481446,
+    "prepare": 41967551788,
+    "start": 41967718930,
+    "deferral": 41969407543,
+    "live_auto": 41969595194,
+    "verify": 41969752862
+  }
+}

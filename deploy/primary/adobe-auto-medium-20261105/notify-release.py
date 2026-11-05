@@ -1,7 +1,7 @@
 """Send one explicitly requested completion email after all release gates pass."""
 import datetime
 from email.message import EmailMessage
-from email.utils import formataddr, make_msgid
+from email.utils import formataddr, format_datetime, make_msgid
 import importlib.util
 import json
 import os
@@ -46,6 +46,7 @@ def main():
     message['Subject'] = '[发布完成] Adobe 图片 auto 默认 medium（2026-11-05）'
     message['From'] = formataddr((config.get('fromname') or 'Sub2 发布通知', config['from']))
     message['To'] = RECIPIENT
+    message['Date'] = format_datetime(datetime.datetime.now(datetime.timezone.utc))
     message['Message-ID'] = make_msgid(domain='creative.cheap')
     message.set_content(f'''Adobe 图片质量调整已发布到主服务器 https://creative.cheap 。
 
