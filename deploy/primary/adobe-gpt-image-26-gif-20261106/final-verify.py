@@ -17,15 +17,27 @@ assert 'Sub2API 0.2.19' in version and sha in version, 'Image version and commit
 live_before=json.loads((ROOT/'preflight-contract-summary.json').read_text())
 assert live_before['all_passed'] and live_before['static_models']==5 and live_before['edited_models']==5 and live_before['gif_edit_guard_cases']==6 and live_before['gif_edit_supported'] is False
 legacy_public=json.loads((ROOT/'post-release-tests.json').read_text())
-live_after=json.loads((ROOT/'customer-post-release-tests.json').read_text())
-test_cleanup=json.loads((ROOT/'customer-test-access-cleanup.json').read_text())
-public_contract=validate_public_contract(live_after,legacy_public,test_cleanup,sha)
-test_key=json.loads((ROOT/'customer-test-key-result.json').read_text())
-assert test_key['user_id']==1 and test_key['group_id']==33 and test_key['quota']==5
+current_public=json.loads((ROOT/'customer-post-release-tests.json').read_text())
+assert len(current_public['cases'])==18 and current_public['all_passed']==all(row['success'] for row in current_public['cases'])
+assert current_public['application_sha']==sha and current_public['group_id']==33
+current_cleanup=json.loads((ROOT/'customer-test-access-cleanup.json').read_text())
+assert all(current_cleanup[k] for k in ['key_deleted','temporary_grant_removed','private_files_removed','other_allowed_groups_preserved'])
+live_after=json.loads((ROOT/'selected-post-release-tests.json').read_text())
+test_cleanup=json.loads((ROOT/'selected-test-access-cleanup.json').read_text())
+test_group=json.loads((ROOT/'selected-test-group-result.json').read_text())
+public_contract=validate_public_contract(live_after,legacy_public,test_cleanup,sha,expected_group_id=test_group['id'])
+public_contract.update(current_group_33_all_passed=current_public['all_passed'],current_group_33_failures=sum(not row['success'] for row in current_public['cases']),current_group_results_retained=True)
+test_key=json.loads((ROOT/'selected-test-key-result.json').read_text())
+assert test_key['user_id']==1 and test_key['group_id']==test_group['id'] and test_key['quota']==5
 assert all(row['api_key_id']==test_key['id'] for row in live_after['cases'])
-assert not (ROOT/'private-customer-test-key.json').exists() and not (ROOT/'private-customer-test-admin-session.json').exists()
+assert all(not (ROOT/name).exists() for name in ['private-customer-test-key.json','private-customer-test-admin-session.json','private-selected-test-key.json','private-selected-test-admin-session.json'])
 assert a.sql('SELECT count(*) FROM api_keys WHERE id='+str(test_key['id'])+' AND deleted_at IS NULL')=='0'
 assert a.sql('SELECT count(*) FROM user_allowed_groups WHERE user_id=1 AND group_id=33')=='0'
+assert a.sql('SELECT count(*) FROM user_allowed_groups WHERE group_id='+str(test_group['id']))=='0'
+assert a.sql('SELECT count(*) FROM account_groups WHERE group_id='+str(test_group['id']))=='0'
+assert a.sql('SELECT count(*) FROM groups WHERE id='+str(test_group['id'])+' AND deleted_at IS NULL')=='0'
+selected_usage=json.loads(a.sql("SELECT json_build_object('count',count(*),'accounts',coalesce(json_agg(DISTINCT account_id),'[]'),'image_count',sum(image_count)) FROM usage_logs WHERE api_key_id="+str(test_key['id'])))
+assert selected_usage=={'count':12,'accounts':[2933],'image_count':12},'Verify all positive cases used the selected account and count GIF as one image'
 checks=a.check_preserved(json.loads((ROOT/'before.json').read_text()),a.snapshot())
 heartbeat=json.loads(a.sql("SELECT json_build_object('at',last_success_at,'healthy',last_success_at>now()-interval '5 minutes' AND (last_error_at IS NULL OR last_success_at>last_error_at)) FROM ops_job_heartbeats WHERE job_name='ops_alert_evaluator'"))
 assert heartbeat['healthy'] and datetime.datetime.fromisoformat(heartbeat['at'])>=datetime.datetime.fromisoformat(cleanup['at']),'Wait for the canonical heartbeat after cleanup'
@@ -79,6 +91,6 @@ health_proof={'sources':health['sources'],'subscription_exclusion':subscription_
 a.save('route-api-verification.json',health_proof)
 
 route_at=datetime.datetime.fromisoformat(json.loads((ROOT/'rolling-route-canary.json').read_text())['at']);assert route_at.astimezone(datetime.timezone(datetime.timedelta(hours=8))).date().isoformat()=='2026-11-06', 'Release crossed its Beijing date; rebuild notes before claiming success'
-out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'migration_checksums_preserved':True,'migration_set_retained':True,'retired_408_gates_empty':True,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'adobe_custom_business_preserved':True,'route_api_verified':True,'excluded_1290':exclusion,'cutover_route_checks':route_checks,'authorized_live_generation_tests':{'before':live_before,'after':live_after,'additional_legacy_group_diagnostics':legacy_public},'public_contract':public_contract,'temporary_test_access_cleanup':test_cleanup,'active_adobe_probes':False,'test_mail_sent':False}
+out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'migration_checksums_preserved':True,'migration_set_retained':True,'retired_408_gates_empty':True,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'adobe_custom_business_preserved':True,'route_api_verified':True,'excluded_1290':exclusion,'cutover_route_checks':route_checks,'authorized_live_generation_tests':{'before':live_before,'after':live_after,'additional_legacy_group_diagnostics':legacy_public,'additional_current_group_diagnostics':current_public},'public_contract':public_contract,'temporary_test_access_cleanup':test_cleanup,'current_group_test_access_cleanup':current_cleanup,'selected_account_usage':selected_usage,'active_adobe_probes':False,'test_mail_sent':False}
 a.save('final-verification.json',out)
 print(json.dumps(out,ensure_ascii=False))
