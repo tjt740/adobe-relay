@@ -26,6 +26,7 @@ import (
 var files embed.FS
 
 const cookieName = "__Host-docs_session"
+const basePath = "/docs"
 
 type session struct {
 	Token, Refresh, Pending, IP, UA string
@@ -52,6 +53,7 @@ type authData struct {
 	Expires     int    `json:"expires_in"`
 }
 type pageData struct {
+	Base          string
 	Logged, TwoFA bool
 	Error         string
 	Doc           template.HTML
@@ -160,6 +162,7 @@ func (a *app) clear(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1})
 }
 func (a *app) render(w http.ResponseWriter, status int, p pageData) {
+	p.Base = basePath
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	if err := a.page.Execute(w, p); err != nil {
@@ -167,6 +170,16 @@ func (a *app) render(w http.ResponseWriter, status int, p pageData) {
 	}
 }
 func (a *app) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == basePath {
+		http.Redirect(w, r, basePath+"/", 308)
+		return
+	}
+	if !strings.HasPrefix(r.URL.Path, basePath+"/") {
+		http.NotFound(w, r)
+		return
+	}
+	r = r.Clone(r.Context())
+	r.URL.Path = strings.TrimPrefix(r.URL.Path, basePath)
 	w.Header().Set("Cache-Control", "private, no-store, max-age=0")
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -201,7 +214,7 @@ func (a *app) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if ok && s.Refresh != "" {
 				_, _, _ = a.api(r, "POST", "/api/v1/auth/logout", "", map[string]string{"refresh_token": s.Refresh})
 			}
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			http.Redirect(w, r, basePath+"/login", http.StatusSeeOther)
 			return
 		default:
 			http.NotFound(w, r)
@@ -235,7 +248,7 @@ func (a *app) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/login":
 		if r.URL.Query().Get("restart") == "1" {
 			a.clear(w, r)
-			http.Redirect(w, r, "/login", 303)
+			http.Redirect(w, r, basePath+"/login", 303)
 			return
 		}
 		_, s, ok := a.current(r)
@@ -244,7 +257,7 @@ func (a *app) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/", "/guide.md":
 		_, s, ok := a.current(r)
 		if !ok || s.Token == "" {
-			http.Redirect(w, r, "/login", 303)
+			http.Redirect(w, r, basePath+"/login", 303)
 			return
 		}
 		status, data, err := a.api(r, "GET", "/api/v1/auth/me", s.Token, nil)
@@ -258,7 +271,7 @@ func (a *app) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if status != 200 || json.Unmarshal(data, &user) != nil || user.ID <= 0 || user.Status != "active" {
 			a.clear(w, r)
-			http.Redirect(w, r, "/login", 303)
+			http.Redirect(w, r, basePath+"/login", 303)
 			return
 		}
 		if r.URL.Path == "/guide.md" {
@@ -328,9 +341,9 @@ func (a *app) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.Pending != "" {
-		http.Redirect(w, r, "/login", 303)
+		http.Redirect(w, r, basePath+"/login", 303)
 	} else {
-		http.Redirect(w, r, "/", 303)
+		http.Redirect(w, r, basePath+"/", 303)
 	}
 }
 func main() {
@@ -340,7 +353,7 @@ func main() {
 	}
 	origin := os.Getenv("DOCS_ORIGIN")
 	if origin == "" {
-		origin = "https://docs.creative.cheap"
+		origin = "https://creative.cheap"
 	}
 	addr := os.Getenv("DOCS_LISTEN")
 	if addr == "" {

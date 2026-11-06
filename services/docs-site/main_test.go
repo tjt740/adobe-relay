@@ -11,10 +11,10 @@ import (
 	"time"
 )
 
-const origin = "https://docs.creative.cheap"
+const origin = "https://creative.cheap"
 
 func request(a *app, method, path, body string, cookie *http.Cookie) *httptest.ResponseRecorder {
-	r := httptest.NewRequest(method, origin+path, strings.NewReader(body))
+	r := httptest.NewRequest(method, origin+basePath+path, strings.NewReader(body))
 	r.Header.Set("User-Agent", "docs-test")
 	r.Header.Set("X-Real-IP", "203.0.113.7")
 	if method == "POST" {
@@ -169,7 +169,7 @@ func Test2FAAndRotation(t *testing.T) {
 }
 func TestOriginExpiryAndBinding(t *testing.T) {
 	a, _, hits := fixture(t)
-	r := httptest.NewRequest("POST", origin+"/auth/login", strings.NewReader("email=a&password=correct"))
+	r := httptest.NewRequest("POST", origin+basePath+"/auth/login", strings.NewReader("email=a&password=correct"))
 	r.Header.Set("Origin", "https://evil.example")
 	w := httptest.NewRecorder()
 	a.ServeHTTP(w, r)
@@ -186,7 +186,7 @@ func TestOriginExpiryAndBinding(t *testing.T) {
 		t.Fatal("expired accepted")
 	}
 	c = login(t, a)
-	r = httptest.NewRequest("GET", origin+"/", nil)
+	r = httptest.NewRequest("GET", origin+basePath+"/", nil)
 	r.Header.Set("X-Real-IP", "203.0.113.8")
 	r.Header.Set("User-Agent", "docs-test")
 	r.AddCookie(c)
@@ -215,7 +215,7 @@ func TestLoginRestart(t *testing.T) {
 	if w.Code != 303 {
 		t.Fatal(w.Code)
 	}
-	if strings.Contains(request(a, "GET", "/login", "", c).Body.String(), `action="/auth/2fa"`) {
+	if strings.Contains(request(a, "GET", "/login", "", c).Body.String(), `action="/docs/auth/2fa"`) {
 		t.Fatal("pending challenge retained")
 	}
 }
@@ -229,5 +229,28 @@ func TestConcurrentReads(t *testing.T) {
 				t.Error("read failed")
 			}
 		})
+	}
+}
+
+func TestPrefixIsolation(t *testing.T) {
+	a, _, hits := fixture(t)
+	for _, path := range []string{"/", "/auth/login", "/assets/site.css", "/docsevil/"} {
+		w := httptest.NewRecorder()
+		a.ServeHTTP(w, httptest.NewRequest("GET", origin+path, nil))
+		if w.Code != 404 {
+			t.Fatal(path, w.Code)
+		}
+	}
+	w := httptest.NewRecorder()
+	a.ServeHTTP(w, httptest.NewRequest("GET", origin+"/docs", nil))
+	if w.Code != 308 || w.Header().Get("Location") != "/docs/" {
+		t.Fatal("missing canonical redirect")
+	}
+	w = request(a, "GET", "/login", "", nil)
+	if !strings.Contains(w.Body.String(), `action="/docs/auth/login"`) || !strings.Contains(w.Body.String(), `href="/docs/assets/site.css"`) {
+		t.Fatal("unprefixed assets/form")
+	}
+	if hits.Load() != 0 {
+		t.Fatal("prefix probes reached Sub2")
 	}
 }

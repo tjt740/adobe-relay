@@ -3,13 +3,13 @@
 import hashlib, http.client, json, pathlib, subprocess, time, urllib.parse
 from http.cookies import SimpleCookie
 BASE='127.0.0.1'
-HEADERS={'Host':'docs.creative.cheap','Origin':'https://docs.creative.cheap','X-Real-IP':'127.0.0.1','User-Agent':'creative-docs-release-verification/1'}
+HEADERS={'Host':'creative.cheap','Origin':'https://creative.cheap','X-Real-IP':'127.0.0.1','User-Agent':'creative-docs-release-verification/1'}
 def call(method,path,body=None,cookie=None):
     headers=HEADERS.copy()
     if cookie: headers['Cookie']=cookie
     if body is not None: headers['Content-Type']='application/x-www-form-urlencoded';body=urllib.parse.urlencode(body)
     c=http.client.HTTPConnection(BASE,6670,timeout=25)
-    c.request(method,path,body,headers);r=c.getresponse();b=r.read();h=dict(r.getheaders());status=r.status;c.close()
+    c.request(method,"/docs"+path,body,headers);r=c.getresponse();b=r.read();h=dict(r.getheaders());status=r.status;c.close()
     return status,h,b
 results={}
 for path in ('/','/guide.md','/assets/guide.md','/.git/config'):
