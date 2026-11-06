@@ -6,6 +6,7 @@ on:
       - 'services/docs-site/**'
       - 'docs/ADOBE_IMAGE_CLIENT_GUIDE.md'
       - '.github/workflows/docs-site-checks.yml'
+      - '.github/workflows/docs-site-primary.yml'
 permissions:
   contents: read
 jobs:
