@@ -18,6 +18,7 @@ export default {
     },
     measurements: "发布准备实测与样本范围",
     overviews: {
+      adobeGptImage26Gif: { title: 'Adobe 2.6 模型、GIF 文生图与构图规划', body: '今天接入 Adobe 实际版本名 gpt-image-2.6-star-swirl 和 gpt-image-2.6-aurora，并增加 GIF 文生图、帧参数与独立 complexity 构图规划。静态生成和编辑沿用既有流程；GIF 参考编辑明确报不支持。Image 2、2.5 的原调用方式与提交保护保持。' },
       adobeGptImage26: { title: '新增 Adobe gpt-image-2.6-star-swirl 与 gpt-image-2.6-aurora', body: '将 Adobe 实际接口版本 gpt-image-2.6-star-swirl、gpt-image-2.6-aurora 接入与 2.5 相同的图片流程，使用精确上游版本、2.6 尺寸校验和质量上限。旧 Flare、Sunburst 仍可作为兼容别名解析，但不再出现在模型目录和界面中。其他模型、默认值、检测与提交保护保持。' },
       upstreamV0219: { title: '升级 v0.2.19，保留 Adobe 中档默认质量', body: '合入 v0.2.18–v0.2.19 的管理员受限密钥、流式用量、图片计费及多平台修复。保留 Adobe auto 默认 medium、手动 IP、批量并发、订阅流量保护与 Okad 联动。新增按张计费开关默认关闭，已有 Adobe 图片计费保持。' },
       adobeAutoMedium: { title: 'Adobe 自动质量默认使用中档', body: 'Adobe 原生 GPT Image 的 auto 和未填写质量统一使用 medium，并按实际提交档位返回标签。显式档位和模型上限保持，账号检测继续使用低档，原调度、计费及提交保护保留。' },
@@ -38,12 +39,25 @@ export default {
         title: '新增 Adobe GPT Image 2.6 模型',
         body: '将 Adobe 实际接口版本 gpt-image-2.6-star-swirl 与 gpt-image-2.6-aurora 接入现有图片生成和编辑流程。',
         sections: {
-          reason: { title: '开放上游已经启用的模型', body: 'Adobe 模型发现接口已返回两个 enabled 且 HEALTHY 的 GPT Image 2.6 版本，但 Firefly 菜单可能暂未展示。Sub2 现在提供清晰的 Flare、Sunburst 名称，不再让这些版本无法使用。' },
+          reason: { title: '开放上游已经启用的模型', body: 'Adobe 模型发现接口已返回两个 enabled 且 HEALTHY 的 GPT Image 2.6 版本，但 Firefly 菜单可能暂未展示。Sub2 使用 Adobe 实际接口版本名 star-swirl 和 aurora 开放这两个版本。' },
           models: { title: '直接展示 Adobe 实际接口版本名', body: '对外名称改为 gpt-image-2.6-star-swirl 与 gpt-image-2.6-aurora，并分别路由到对应 Adobe 版本。旧 Flare、Sunburst 别名仍落到相同内部模型族，但新的模型列表和白名单快捷项只使用实际接口版本名。' },
           workflow: { title: '复用现有图片业务流程', body: '文生图、编辑、参考图、任务轮询、下载、输出格式、未知结果不重放、按张计数和账号调度继续复用原 GPT Image 链路。检测默认、Adobe auto medium 和已有账号映射保持，只有运维明确启用新模型时才使用 2.6。' },
           quality: { title: '遵守 2.6 质量和尺寸协议', body: '2.6 的 auto 和未传质量继续使用 detailLevel=3，low 使用 1，high、xhigh、max 受模型上限 5 限制。显式尺寸校验宽高 480–3840、必须是 16 的倍数、总像素 655,360–8,294,400，宽高比不超过 3:1。' },
           validation: { title: '验证与线上证据', body: '后端、race、前端、类型和生产构建检查覆盖映射、请求体、质量回显、计费、模型列表和尺寸边界。精确应用在主服务器健康后，对指定 Adobe 账号分别执行一次 Flare 和 Sunburst 账号级测试，均 HTTP 200 且收到 test_complete=true。独立公共 API Key 样本在提交阶段收到上游 408，已记录且没有重放；这些样本验证指定账号和已发布链路，不代表所有账号或峰值吞吐。' },
           boundary: { title: '保留的限制', body: '2.6 在 Adobe 发现记录中仍标为 alpha；enabled 和 HEALTHY 不代表每个账号最终都有权益，也不代表每次上游任务都会成功。本次不改数据库迁移、登录、Cookie 推送、代理、调度或检测默认值；不支持的尺寸在本地直接报错，不静默缩放。' },
+        },
+      },
+      adobeGptImage26Gif: {
+        title: 'Adobe GPT Image 2.6 GIF 与构图规划参数',
+        body: '为 gpt-image-2.6-star-swirl 和 gpt-image-2.6-aurora 接入 complexity、frame_count、frame_duration_ms，同时保持 GPT Image 2 和 2.5 不变。',
+        sections: {
+          complexity: { title: '规划与画质独立控制', body: 'complexity 支持 low、medium、high，文生图 JSON、静态图编辑 JSON 和 multipart 均可传；2.6 会识别通用文件类型中的 PNG/JPEG，兼容常见 SDK 的上传方式。省略时保留上游默认，显式规划参数会传到 Adobe，画质仍按 quality 单独设置。此新增能力只对两个 2.6 模型开放。' },
+          reason: { title: '对齐公开 GIF 传参协议', body: '图片接口现在会识别文档中的 output_format=gif 及两个帧参数，并完整送入 Adobe 路径，不再在解析阶段丢弃。' },
+          parameters: { title: '提交前先校验参数', body: 'frame_count 支持 2–16，缺省 9；frame_duration_ms 至少 20 毫秒，缺省 200，按 10 毫秒取整且编码上限 655350 毫秒。size 省略或为 auto 时由 Adobe 根据帧数选取尺寸；固定 896x896 最多 9 帧，10–16 帧使用 auto。其他显式尺寸、超出拼图预算的组合、mask、流式、partial images 和自定义 output compression 会在提交前拒绝。' },
+          delivery: { title: '保留动图字节交付', body: '2.6 GIF 参数写入 Adobe 模型负载，绕过 PNG/JPEG 转码；下载后强制确认实际字节为 GIF，再按配置返回 Base64 或图片 URL，响应格式以实际交付字节为准。每个动画仍计一张图片，GIF 的分辨率档位由实际单帧尺寸确定。' },
+          compatibility: { title: '保持旧图片流程', body: 'GPT Image 2 和 2.5 继续使用原有 PNG/JPEG 转码和尺寸规则；兼容 Responses 请求构造器也会保留帧参数。' },
+          validation: { title: '上线前验证范围', body: '使用真实线上账号验证 Image 2、两款 2.5 和两款 2.6 的静态生成与 JSON 编辑；2.6 多图参考、multipart 静态编辑及 2K high 质量配 high 规划通过。GIF 文生图已验证 2/4/9/16 帧、默认参数、时长取整和交付字节；回归覆盖非法输入、本地拒绝及旧模型行为。这些样本不代表全账号池或高峰负载。' },
+          boundary: { title: '保留上游限制边界', body: 'GIF 目前仅支持无参考图的文生图。两款模型的 GIF 参考编辑实测收到上游 500，因此编辑端点和带参考图的 GIF 请求在上传或生成前明确返回 400 / gif_edit_unsupported；静态 PNG/JPEG 编辑继续支持。SVG 不在本次开放范围。旧模型不会因此获得 GIF 能力。' },
         },
       },
       upstreamV0219: {

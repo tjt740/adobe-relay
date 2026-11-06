@@ -1,0 +1,8 @@
+{
+  "all_passed": true,
+  "passed_events": 18320,
+  "failed_events": 0,
+  "log_sha256": "7a345d61db7a0ba978b893195148245a58137ab9a7967c3e1cfd563b0d16f2b6",
+  "elapsed_seconds": 230.333,
+  "scope": "full service unit tests after GIF edit guard; subsequent generation raw-image guard covered by final focused race and formal CI"
+}

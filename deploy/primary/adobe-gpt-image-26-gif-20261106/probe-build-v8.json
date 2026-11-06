@@ -1,0 +1,20 @@
+{
+  "baseline": "b97759edd35a80cc85dc868acce5e670a1f6efa0",
+  "binary_sha256": "90422e7af4f0bcb452652443503afe7f7859edeebfa368e0dc6fb9c70e1a0827",
+  "binary_bytes": 33677472,
+  "patch_bytes": 498040,
+  "source_sha256": {
+    "backend/internal/service/adobe_image_service_test.go": "7b5d08709abc113706bbf9b5b8e39d3eb508a7e2d95b9d91a58096145417c321",
+    "backend/internal/service/openai_images.go": "97b7a2236113fa6ea70236a6eedfcf74e6f487c1d385e757b5d50efad1b0e07e",
+    "backend/internal/service/adobe_image_output.go": "5309ebb35a676bdd6bc6c60cb94a4f5a0498b185d0d694ea21e508c70f53bb51",
+    "backend/internal/service/adobe_image_buffer.go": "c937752d2e6a34d670e13f8b407c3640b992880f0f05e0c13e8081c83fced8b7",
+    "backend/internal/service/openai_images_test.go": "4fed41d7c59f886a384bee3ca13b3deb10b25e984c4db6a7f500d1797ecf538f",
+    "backend/internal/service/adobe_image_output_test.go": "c3a6bcd102a9225ed3bfb966afab8808fa5a4b496836ad6399337b778877040c",
+    "backend/internal/service/openai_images_direct.go": "6a8a36993eb5c8201d3667dd21eabca53740402bfaf074798126fd1a146e7aa7",
+    "backend/internal/service/openai_images_responses.go": "15f08815d2b5f4dbd5dc9bd07787c2215c0c5a55ad4bb5af3596eda29b4f756b",
+    "backend/internal/service/adobe_image_service.go": "90ebe925291b30acc781fbe46e4d07707443b6c7a64b75f8031198d56bf73a13",
+    "backend/internal/service/adobe_image_buffer_test.go": "5b123dd7e784e0ffbd316a29aabe04c76717cb4c0e6ef1f56e4a4ff2ed4988c0",
+    "backend/internal/pkg/adobe/payloads_test.go": "2330c92227fe9799ea109c5638f16c4705b82cd32d38609a793eac3e57d2f9ea",
+    "backend/internal/pkg/adobe/payloads.go": "3537de7c57e66e32cd1f7840fe8ad06fa10665282b54b65023f811c17b7bf6d5"
+  }
+}

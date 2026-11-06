@@ -59,7 +59,7 @@ Sub2API は、Adobe Firefly Web のサブスクリプションアカウント（
 - 公開画像エンドポイント: `/v1/images/generations` と `/v1/images/edits`（`/v1` なしの既存エイリアスも含む）、および Gemini ネイティブの `POST /v1beta/models/{model}:generateContent` / `streamGenerateContent`
 - API キーのグループで画像生成を許可する必要があります（Adobe グループはデフォルトで有効）
 - `n` の省略時は 1、最大 10。Cookie 経路は n 回の Firefly ジョブに分割し（上流の `n` は常に 1）、枚数課金します。`n>10` は拒否します
-- `output_format` は `png`/`jpeg` をダウンロード後にローカル変換します（`jpg` は jpeg 扱い）。`webp` は未対応。未指定なら上流の形式を維持します
+- `output_format` は `png`/`jpeg` をダウンロード後にローカル変換します（`jpg` は jpeg 扱い）。Adobe GPT Image 2.6 の `gpt-image-2.6-star-swirl` と `gpt-image-2.6-aurora` はネイティブ `gif` もサポートします。`webp` は未対応。未指定なら上流の形式を維持します
 - `/v1/models` は公開用の外部モデル名のみを返します。内部の `firefly-*` ファミリー ID は送らないでください
 - 本プロバイダーの対象外: 動画ゲートウェイ、非同期画像タスク（`/v1/images/*/async`）、公式 Firefly Services API キー、チャット / TTS などの非画像プロトコル
 
@@ -71,6 +71,8 @@ Sub2API は、Adobe Firefly Web のサブスクリプションアカウント（
 | `gpt-image-1.5` | Firefly GPT Image 1.5 |
 | `gpt-image-2.5-flare` | Firefly GPT Image 2.5 Flare |
 | `gpt-image-2.5-sunburst` | Firefly GPT Image 2.5 Sunburst（上流の version 名は `prism`） |
+| `gpt-image-2.6-star-swirl` | Adobe の実際の star-swirl インターフェース名。ネイティブ GIF 対応 |
+| `gpt-image-2.6-aurora` | Adobe の実際の aurora インターフェース名。ネイティブ GIF 対応 |
 | `gemini-2.5-flash-image` / `gemini-3-pro-image` / `gemini-3.1-flash-image`（いずれも `*-preview` 名あり）| Firefly 上の Gemini 画像モデル（Gemini チャネルと同じ公開名） |
 | `flux-pro` / `flux-ultra` | Firefly FLUX |
 | `imagen-4` / `imagen-4-fast` | Firefly Imagen 4 |
@@ -120,6 +122,10 @@ Adobe Cookie 直結の GPT Image 生成・編集レスポンスは、ゲート�
 gpt-image ファミリーは OpenAI の `background`（`transparent` / `opaque` / `auto`）を受け付けます。
 
 `n` の省略時は 1（最大 10）です。Cookie アカウントは n 回の Firefly ジョブに分割し、枚数課金します。`output_format` が `png` または `jpeg` の場合はダウンロード後にローカル変換します。`webp` は拒否し、未指定なら Firefly の形式を維持します。`background=transparent` と `output_format=jpeg` は同時に使えません。
+
+2 つの GPT Image 2.6 モデルでは `complexity`（`low / medium / high`）を `quality` と独立して生成・編集に指定でき、省略時は上流の既定値を使います。`output_format: "gif"` を指定でき、`frame_count`（2–16、既定 9）と `frame_duration_ms`（20ms 以上、10ms 単位に丸め、符号化上限 655350ms、既定 200ms）を Adobe に転送します。`size` 省略または `auto` では Adobe がフレーム数に合うサイズを選択します。固定 `896x896` は最大 9 フレームで、10–16 フレームには `auto` を使用します。他の明示サイズや画素予算を超える組み合わせは送信前に拒否します。GIF では mask、ストリーミング、partial images、カスタム output compression は使えません。応答は実際の GIF バイトから `output_format: "gif"` を設定し、Base64 または設定済み画像 URL で返します。GPT Image 2 と 2.5 の PNG/JPEG 動作は変更しません。
+
+GIF は参照画像なしのテキスト生成のみ対応します。GIF 編集エンドポイントや参照画像付きリクエストは Adobe へのアップロード・生成前に HTTP 400（`gif_edit_unsupported`、`param: image`）を返します。静止画の編集には PNG/JPEG を使用してください。
 
 ### 応答形式と処理時間の診断
 

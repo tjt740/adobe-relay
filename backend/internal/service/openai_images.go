@@ -91,8 +91,11 @@ type OpenAIImagesRequest struct {
 	SizeTier           string
 	ResponseFormat     string
 	Quality            string
+	Complexity         string
 	Background         string
 	OutputFormat       string
+	FrameCount         *int
+	FrameDurationMS    *int
 	Moderation         string
 	InputFidelity      string
 	Style              string
@@ -279,6 +282,12 @@ func parseOpenAIImagesJSONRequest(body []byte, req *OpenAIImagesRequest) error {
 	}
 	req.ResponseFormat = strings.ToLower(strings.TrimSpace(gjson.GetBytes(body, "response_format").String()))
 	req.Quality = strings.TrimSpace(gjson.GetBytes(body, "quality").String())
+	if complexity := gjson.GetBytes(body, "complexity"); complexity.Exists() && complexity.Type != gjson.Null {
+		if complexity.Type != gjson.String {
+			return fmt.Errorf("invalid complexity field type")
+		}
+		req.Complexity = strings.TrimSpace(complexity.String())
+	}
 	req.Background = strings.TrimSpace(gjson.GetBytes(body, "background").String())
 	req.OutputFormat = strings.TrimSpace(gjson.GetBytes(body, "output_format").String())
 	req.Moderation = strings.TrimSpace(gjson.GetBytes(body, "moderation").String())
@@ -298,6 +307,26 @@ func parseOpenAIImagesJSONRequest(body []byte, req *OpenAIImagesRequest) error {
 		}
 		v := int(partialImages.Int())
 		req.PartialImages = &v
+	}
+	if frameCount := gjson.GetBytes(body, "frame_count"); frameCount.Exists() && frameCount.Type != gjson.Null {
+		if frameCount.Type != gjson.Number {
+			return fmt.Errorf("invalid frame_count field type")
+		}
+		v, err := strconv.Atoi(frameCount.Raw)
+		if err != nil {
+			return fmt.Errorf("frame_count must be an integer")
+		}
+		req.FrameCount = &v
+	}
+	if frameDuration := gjson.GetBytes(body, "frame_duration_ms"); frameDuration.Exists() && frameDuration.Type != gjson.Null {
+		if frameDuration.Type != gjson.Number {
+			return fmt.Errorf("invalid frame_duration_ms field type")
+		}
+		v, err := strconv.Atoi(frameDuration.Raw)
+		if err != nil {
+			return fmt.Errorf("frame_duration_ms must be an integer")
+		}
+		req.FrameDurationMS = &v
 	}
 	if req.IsEdits() {
 		images := gjson.GetBytes(body, "images")
@@ -443,6 +472,9 @@ func parseOpenAIImagesMultipartRequest(body []byte, contentType string, req *Ope
 		case "quality":
 			req.Quality = value
 			req.HasNativeOptions = true
+		case "complexity":
+			req.Complexity = value
+			req.HasNativeOptions = true
 		case "background":
 			req.Background = value
 			req.HasNativeOptions = true
@@ -471,6 +503,20 @@ func parseOpenAIImagesMultipartRequest(body []byte, contentType string, req *Ope
 				return fmt.Errorf("invalid partial_images field value")
 			}
 			req.PartialImages = &n
+			req.HasNativeOptions = true
+		case "frame_count":
+			n, err := strconv.Atoi(value)
+			if err != nil {
+				return fmt.Errorf("invalid frame_count field value")
+			}
+			req.FrameCount = &n
+			req.HasNativeOptions = true
+		case "frame_duration_ms":
+			n, err := strconv.Atoi(value)
+			if err != nil {
+				return fmt.Errorf("invalid frame_duration_ms field value")
+			}
+			req.FrameDurationMS = &n
 			req.HasNativeOptions = true
 		default:
 			if isOpenAINativeImageOption(name) && value != "" {
@@ -617,12 +663,15 @@ func hasOpenAINativeImageOptions(exists func(path string) bool) bool {
 	for _, path := range []string{
 		"background",
 		"quality",
+		"complexity",
 		"style",
 		"output_format",
 		"output_compression",
 		"moderation",
 		"input_fidelity",
 		"partial_images",
+		"frame_count",
+		"frame_duration_ms",
 	} {
 		if exists(path) {
 			return true
@@ -633,7 +682,7 @@ func hasOpenAINativeImageOptions(exists func(path string) bool) bool {
 
 func isOpenAINativeImageOption(name string) bool {
 	switch strings.TrimSpace(strings.ToLower(name)) {
-	case "background", "quality", "style", "output_format", "output_compression", "moderation", "input_fidelity", "partial_images":
+	case "background", "quality", "complexity", "style", "output_format", "output_compression", "moderation", "input_fidelity", "partial_images", "frame_count", "frame_duration_ms":
 		return true
 	default:
 		return false

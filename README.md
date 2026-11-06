@@ -60,7 +60,7 @@ Direct Firefly calls use **Firefly Web** (`firefly.adobe.com` / `clio-playground
 - Public image targets: `/v1/images/generations` and `/v1/images/edits`, plus the existing no-prefix aliases, and Gemini-native `POST /v1beta/models/{model}:generateContent` / `streamGenerateContent`
 - The API key's group must allow image generation (Adobe groups default this to on)
 - `n` defaults to 1 and is capped at 10. The cookie path fans out into n Firefly jobs (upstream `n` stays 1) and bills per image; `n>10` is rejected
-- `output_format` follows `png`/`jpeg` with a local transcode (`jpg` is accepted as jpeg). `webp` is not supported. Omit it to keep the upstream format
+- `output_format` follows `png`/`jpeg` with a local transcode (`jpg` is accepted as jpeg). The Adobe GPT Image 2.6 models `gpt-image-2.6-star-swirl` and `gpt-image-2.6-aurora` also support native `gif`; `webp` is not supported. Omit it to keep the upstream format
 - `/v1/models` lists public external names only; do not send internal `firefly-*` family IDs
 - Out of scope for this provider: the video gateway, asynchronous image tasks (`/v1/images/*/async`), official Firefly Services API keys, and non-image protocols such as chat or TTS
 
@@ -72,6 +72,8 @@ Direct Firefly calls use **Firefly Web** (`firefly.adobe.com` / `clio-playground
 | `gpt-image-1.5` | Firefly GPT Image 1.5 |
 | `gpt-image-2.5-flare` | Firefly GPT Image 2.5 Flare |
 | `gpt-image-2.5-sunburst` | Firefly GPT Image 2.5 Sunburst (upstream version name is `prism`) |
+| `gpt-image-2.6-star-swirl` | Adobe's actual star-swirl interface version; supports native GIF output |
+| `gpt-image-2.6-aurora` | Adobe's actual aurora interface version; supports native GIF output |
 | `gemini-2.5-flash-image` / `gemini-3-pro-image` / `gemini-3.1-flash-image` (each also as `*-preview`) | Gemini image models on Firefly (same public names as the Gemini channel) |
 | `flux-pro`, `flux-ultra` | Firefly FLUX |
 | `imagen-4`, `imagen-4-fast` | Firefly Imagen 4 |
@@ -121,6 +123,10 @@ Direct Adobe Cookie GPT Image generation and edit responses include a top-level 
 The gpt-image family accepts OpenAI `background` values: `transparent`, `opaque`, and `auto`.
 
 `n` defaults to 1 (max 10). Cookie accounts split it into n Firefly jobs and bill per image. `output_format` of `png` or `jpeg` is applied locally after download; `webp` is rejected; omitting it keeps whatever Firefly returned. `background=transparent` cannot be combined with `output_format=jpeg`.
+
+For the two GPT Image 2.6 models, `complexity` accepts `low`, `medium`, or `high` independently of `quality`, for generation and edits; omission preserves the upstream default. `output_format: "gif"` is forwarded to Adobe with `frame_count` (2–16, default 9) and `frame_duration_ms` (at least 20 ms, rounded to 10 ms and capped at 655350 ms, default 200 ms). Omitted or `auto` size lets Adobe choose a frame size that fits the frame count. Fixed `896x896` supports up to 9 frames; use `auto` for 10–16 frames. Other explicit sizes and over-budget combinations are rejected before submission; masks, streaming, partial images and custom output compression are rejected for GIF. The response contains the actual GIF bytes in `b64_json` or the configured image URL, and reports `output_format: "gif"` from the delivered bytes. GPT Image 2 and 2.5 keep their existing PNG/JPEG behavior.
+
+GIF supports text-only generation. GIF edit endpoints and requests with reference images are rejected before any Adobe upload or submission with HTTP 400 (`gif_edit_unsupported`, `param: image`); use PNG/JPEG for static edits.
 
 ### Response Format And Latency Diagnostics
 

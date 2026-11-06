@@ -1,0 +1,15 @@
+{
+  "package": "internal/service",
+  "flags": "-tags unit -count=1",
+  "passed_tests": 18306,
+  "failed_tests": [],
+  "elapsed_seconds": 227.933,
+  "exit_code": 0,
+  "log_sha256": "a3264f8465acc0d0e6c4b51ba14461536faae900acfab61c1a9932a1e7c1f934",
+  "source_files_sha256": {
+    "backend/internal/pkg/adobe/payloads.go": "67854f1a4d73a7488cbb9a3c6bc1a0fad709e1983b786d0f1a020fd4f62c7b3f",
+    "backend/internal/service/adobe_image_service.go": "00662a677920c84bb1f5b500863d966a0427bc5a75db8f98486a70acb905fc5b",
+    "backend/internal/service/adobe_image_output.go": "a05adb4c45a5413fd4c50c01100ea284828fea47ad71b42d66e1ca2009e7cfe4",
+    "backend/internal/service/openai_images.go": "97b7a2236113fa6ea70236a6eedfcf74e6f487c1d385e757b5d50efad1b0e07e"
+  }
+}

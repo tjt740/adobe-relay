@@ -1,0 +1,18 @@
+{
+  "old": "b7115a3ef91a51566abe8f25cc657f9964a8eaab15770a8c0a9513b37c13f003",
+  "new": "b4013a30eebd825437fb91e91318de6567941e5fb494c1581aef980e5a57a43c",
+  "bytes": 33673376,
+  "patch_bytes": 192704,
+  "baseline_sha": "b97759edd35a80cc85dc868acce5e670a1f6efa0",
+  "probe_version": "v7",
+  "production_sources": {
+    "backend/internal/pkg/adobe/payloads.go": "67854f1a4d73a7488cbb9a3c6bc1a0fad709e1983b786d0f1a020fd4f62c7b3f",
+    "backend/internal/service/adobe_image_buffer.go": "c937752d2e6a34d670e13f8b407c3640b992880f0f05e0c13e8081c83fced8b7",
+    "backend/internal/service/adobe_image_output.go": "c1bfa204966554c3e7f3d6b25c2988cdf6735108f27865f65e6316fedd541306",
+    "backend/internal/service/adobe_image_service.go": "90ebe925291b30acc781fbe46e4d07707443b6c7a64b75f8031198d56bf73a13",
+    "backend/internal/service/openai_images.go": "97b7a2236113fa6ea70236a6eedfcf74e6f487c1d385e757b5d50efad1b0e07e",
+    "backend/internal/service/openai_images_direct.go": "6a8a36993eb5c8201d3667dd21eabca53740402bfaf074798126fd1a146e7aa7",
+    "backend/internal/service/openai_images_responses.go": "15f08815d2b5f4dbd5dc9bd07787c2215c0c5a55ad4bb5af3596eda29b4f756b"
+  },
+  "released": false
+}

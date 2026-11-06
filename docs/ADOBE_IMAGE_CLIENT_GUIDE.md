@@ -30,6 +30,43 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
 
 `response_format: "url"` 请求返回图片链接；`n` 控制图片张数。Key 所属分组需要允许该模型和图片生成。请求可能耗时较长，客户端断开不等于上游取消，不要对超时请求无条件自动重发。
 
+### GPT Image 2.6 构图规划强度
+
+`complexity` 可传 `low`、`medium` 或 `high`，与 `quality` 独立；文生图 JSON、图生图 JSON 和 multipart 表单均支持。省略或传 `null` 时保留上游默认；非法值在提交前返回 400。2/2.5 和其他 Adobe 模型的原调用方式不变，不支持此新增字段。
+
+```json
+{
+  "model": "gpt-image-2.6-aurora",
+  "prompt": "一个热闹的夜市街景，多个摊位和行人，暖色灯光，电影感",
+  "size": "2048x2048",
+  "quality": "high",
+  "complexity": "high"
+}
+```
+
+### GPT Image 2.6 GIF
+
+`gpt-image-2.6-star-swirl` 和 `gpt-image-2.6-aurora` 支持原生 GIF 文生图。客户端仍调用同一个 `/v1/images/generations`，只需增加 GIF 参数：
+
+```bash
+curl --fail-with-body --connect-timeout 15 --max-time 600 \
+  'https://creative.cheap/v1/images/generations' \
+  -H "Authorization: Bearer ${CREATIVE_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "gpt-image-2.6-star-swirl",
+    "prompt": "一只红色陶瓷杯做短循环动画",
+    "size": "896x896",
+    "output_format": "gif",
+    "frame_count": 4,
+    "frame_duration_ms": 200,
+    "response_format": "b64_json"
+  }' \
+  -o response.json
+```
+
+`frame_count` 接受 2–16，省略时为 9；`frame_duration_ms` 接受不小于 20 的整数毫秒，并按 10 毫秒取整；GIF 编码时长上限为 655350 毫秒，省略时为 200。省略 `size` 或写 `auto` 时，由 Adobe 按帧数选择尺寸，支持 2–16 帧；16 帧已实测返回 512×512。需要固定尺寸时使用 `896x896`，此尺寸最多 9 帧，10–16 帧必须使用 `auto`；不支持的显式尺寸和超出拼图像素预算的组合会在提交前返回 400，不会静默缩小尺寸或减少帧数。GIF 按一个动画计一张图片，分辨率档位根据实际返回的单帧尺寸确定。GIF 仅支持无参考图的文生图；`/v1/images/edits` 或携带参考图/上传图的 GIF 请求在调用 Adobe 前返回 HTTP 400、`code: "gif_edit_unsupported"`、`param: "image"`。静态图编辑请使用 PNG/JPEG。GIF 也不支持流式、partial images、mask 或自定义 `output_compression`。成功后 `data[0].b64_json` 是完整 GIF 字节；若请求 URL 交付，客户端仍应兼容存储 URL 或 Base64 回退。
+
 ## 2. 成功返回与图片 URL
 
 HTTP 200 示例（上游缺少真实用量，以下 usage 为随机模拟数字）：

@@ -1,0 +1,8 @@
+{
+  "package": "internal/service",
+  "flags": "-tags unit -count=1",
+  "passed_tests": 18305,
+  "failed_tests": [],
+  "elapsed_seconds": 226.012,
+  "log_sha256": "67cb23169d25b4f0df7228e4c50ed6542dfb7e54d402e5b1ccb4751ac9560f2a"
+}

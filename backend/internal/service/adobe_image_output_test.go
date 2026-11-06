@@ -4,14 +4,40 @@ package service
 
 import (
 	"bytes"
+	"encoding/binary"
 	"image"
 	"image/color"
+	"image/gif"
 	"image/jpeg"
 	"image/png"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
 	"github.com/stretchr/testify/require"
 )
+
+func TestAdobeGIFBillingUsesDeliveredFrameDimensions(t *testing.T) {
+	var images [][]byte
+	for _, tc := range []struct {
+		edge uint16
+		want adobe.OutputResolution
+	}{{512, adobe.Resolution1K}, {1536, adobe.Resolution2K}, {3072, adobe.Resolution4K}} {
+		data := adobeTestGIF(t)
+		binary.LittleEndian.PutUint16(data[6:8], tc.edge)
+		binary.LittleEndian.PutUint16(data[8:10], tc.edge)
+		_, err := gif.DecodeAll(bytes.NewReader(data))
+		require.NoError(t, err)
+		tier, err := adobeGIFOutputResolution([][]byte{data})
+		require.NoError(t, err)
+		require.Equal(t, tc.want, tier)
+		images = append(images, data)
+	}
+	tier, err := adobeGIFOutputResolution(images)
+	require.NoError(t, err)
+	require.Equal(t, adobe.Resolution4K, tier)
+	_, err = adobeGIFOutputResolution([][]byte{[]byte("GIF89a")})
+	require.Error(t, err)
+}
 
 func TestNormalizeAdobeOutputFormat(t *testing.T) {
 	pngFormat, err := normalizeAdobeOutputFormat(" PNG ")
@@ -28,8 +54,9 @@ func TestNormalizeAdobeOutputFormat(t *testing.T) {
 
 	_, err = normalizeAdobeOutputFormat("webp")
 	require.ErrorContains(t, err, "output_format=")
-	_, err = normalizeAdobeOutputFormat("gif")
-	require.ErrorContains(t, err, "output_format=")
+	gifFormat, err := normalizeAdobeOutputFormat(" GIF ")
+	require.NoError(t, err)
+	require.Equal(t, adobeOutputFormatGIF, gifFormat)
 }
 
 func TestTranscodeAdobeImagePNGIdentity(t *testing.T) {
@@ -67,6 +94,19 @@ func TestApplyAdobeOutputFormatFallsBackOnCorruptBytes(t *testing.T) {
 	src := []byte("not-an-image")
 	got := applyAdobeOutputFormat(src, adobeOutputFormatPNG, nil)
 	require.Equal(t, src, got)
+}
+
+func TestTranscodeAdobeGIFIdentity(t *testing.T) {
+	src := adobeTestGIF(t)
+	got, err := transcodeAdobeImage(src, adobeOutputFormatGIF, nil)
+	require.NoError(t, err)
+	require.Equal(t, src, got)
+	require.Equal(t, adobeOutputFormatGIF, sniffAdobeImageFormat(got))
+}
+
+func TestTranscodeAdobeGIFRejectsStaticBytes(t *testing.T) {
+	_, err := transcodeAdobeImage(adobeTestPNG(t, false), adobeOutputFormatGIF, nil)
+	require.ErrorContains(t, err, "requested gif")
 }
 
 func TestTranscodeAdobeImageJPEGCompression(t *testing.T) {
@@ -112,5 +152,21 @@ func adobeTestJPEG(t *testing.T, quality int) []byte {
 	}
 	var buf bytes.Buffer
 	require.NoError(t, jpeg.Encode(&buf, img, &jpeg.Options{Quality: quality}))
+	return buf.Bytes()
+}
+
+func adobeTestGIF(t *testing.T) []byte {
+	t.Helper()
+	frames := []*image.Paletted{
+		image.NewPaletted(image.Rect(0, 0, 2, 2), color.Palette{color.Black, color.White}),
+		image.NewPaletted(image.Rect(0, 0, 2, 2), color.Palette{color.Black, color.RGBA{R: 255, A: 255}}),
+	}
+	for i, frame := range frames {
+		for p := range frame.Pix {
+			frame.Pix[p] = uint8((p + i) % 2)
+		}
+	}
+	var buf bytes.Buffer
+	require.NoError(t, gif.EncodeAll(&buf, &gif.GIF{Image: frames, Delay: []int{20, 20}}))
 	return buf.Bytes()
 }

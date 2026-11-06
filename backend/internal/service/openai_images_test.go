@@ -250,6 +250,8 @@ func TestOpenAIGatewayServiceParseOpenAIImagesRequest_MultipartEditWithMaskAndNa
 	require.NoError(t, writer.WriteField("input_fidelity", "high"))
 	require.NoError(t, writer.WriteField("output_compression", "80"))
 	require.NoError(t, writer.WriteField("partial_images", "2"))
+	require.NoError(t, writer.WriteField("frame_count", "4"))
+	require.NoError(t, writer.WriteField("frame_duration_ms", "200"))
 
 	imageHeader := make(textproto.MIMEHeader)
 	imageHeader.Set("Content-Disposition", `form-data; name="image"; filename="source.png"`)
@@ -288,7 +290,110 @@ func TestOpenAIGatewayServiceParseOpenAIImagesRequest_MultipartEditWithMaskAndNa
 	require.Equal(t, 80, *parsed.OutputCompression)
 	require.NotNil(t, parsed.PartialImages)
 	require.Equal(t, 2, *parsed.PartialImages)
+	require.NotNil(t, parsed.FrameCount)
+	require.Equal(t, 4, *parsed.FrameCount)
+	require.NotNil(t, parsed.FrameDurationMS)
+	require.Equal(t, 200, *parsed.FrameDurationMS)
 	require.Equal(t, OpenAIImagesCapabilityNative, parsed.RequiredCapability)
+}
+
+func TestOpenAIGatewayServiceParseOpenAIImagesRequest_GIFFrameOptionsJSON(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	body := []byte(`{"model":"gpt-image-2.6-star-swirl","prompt":"a loop","output_format":"gif","size":"896x896","frame_count":4,"frame_duration_ms":200}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = req
+
+	parsed, err := (&OpenAIGatewayService{}).ParseOpenAIImagesRequest(c, body)
+	require.NoError(t, err)
+	require.NotNil(t, parsed)
+	require.Equal(t, "gif", parsed.OutputFormat)
+	require.Equal(t, 4, *parsed.FrameCount)
+	require.Equal(t, 200, *parsed.FrameDurationMS)
+	require.Equal(t, OpenAIImagesCapabilityNative, parsed.RequiredCapability)
+}
+
+func TestOpenAIImages26ParameterParsing(t *testing.T) {
+	for _, tc := range []struct {
+		name, fields string
+		wantError    bool
+	}{
+		{"low", `"complexity":"low","quality":"high"`, false},
+		{"medium", `"complexity":"medium"`, false},
+		{"high", `"complexity":"high"`, false},
+		{"nulls", `"complexity":null,"frame_count":null,"frame_duration_ms":null`, false},
+		{"number_complexity", `"complexity":3`, true},
+		{"fractional_count", `"frame_count":4.9`, true},
+		{"fractional_duration", `"frame_duration_ms":200.5`, true},
+		{"overflow_count", `"frame_count":99999999999999999999999`, true},
+		{"string_count", `"frame_count":"4"`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := []byte(`{"model":"gpt-image-2.6-aurora","prompt":"a cat",` + tc.fields + `}`)
+			req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = req
+			parsed, err := (&OpenAIGatewayService{}).ParseOpenAIImagesRequest(c, body)
+			if tc.wantError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			if tc.name == "nulls" {
+				require.Empty(t, parsed.Complexity)
+				require.Nil(t, parsed.FrameCount)
+				require.Nil(t, parsed.FrameDurationMS)
+			} else {
+				require.Equal(t, tc.name, parsed.Complexity)
+			}
+		})
+	}
+}
+
+func TestOpenAIImages26MultipartPlanningAndGIFControls(t *testing.T) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for key, value := range map[string]string{
+		"model": "gpt-image-2.6-aurora", "prompt": "animate the reference",
+		"quality": "high", "complexity": "low", "output_format": "gif",
+		"frame_count": "4", "frame_duration_ms": "200",
+	} {
+		require.NoError(t, writer.WriteField(key, value))
+	}
+	part, err := writer.CreateFormFile("image[]", "reference.png")
+	require.NoError(t, err)
+	_, err = part.Write(adobeTestPNG(t, false))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+	req := httptest.NewRequest(http.MethodPost, openAIImagesEditsEndpoint, bytes.NewReader(body.Bytes()))
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	parsed, err := (&OpenAIGatewayService{}).ParseOpenAIImagesRequest(c, body.Bytes())
+	require.NoError(t, err)
+	require.Equal(t, "low", parsed.Complexity)
+	require.Equal(t, "high", parsed.Quality)
+	require.Equal(t, 4, *parsed.FrameCount)
+	require.Equal(t, 200, *parsed.FrameDurationMS)
+	direct := func(req *OpenAIImagesRequest, model string) ([]byte, error) {
+		payload, _, err := buildOpenAIImagesOAuthPayload(req, model)
+		return payload, err
+	}
+	for _, build := range []func(*OpenAIImagesRequest, string) ([]byte, error){direct, buildOpenAIImagesResponsesRequest} {
+		payload, err := build(parsed, parsed.Model)
+		require.NoError(t, err)
+		values := gjson.ParseBytes(payload)
+		if values.Get("tools").Exists() {
+			values = values.Get("tools.0")
+		}
+		require.Equal(t, "low", values.Get("complexity").String())
+		require.Equal(t, "high", values.Get("quality").String())
+		require.Equal(t, int64(4), values.Get("frame_count").Int())
+		require.Equal(t, int64(200), values.Get("frame_duration_ms").Int())
+	}
 }
 
 func TestOpenAIGatewayServiceParseOpenAIImagesRequest_PromptOnlyDefaultsRemainBasic(t *testing.T) {
@@ -1949,16 +2054,20 @@ func TestOpenAIGatewayServiceForwardImages_OAuthEditsStreamingTransformsEvents(t
 
 func TestBuildOpenAIImagesResponsesRequest_PassesThroughNForMultiImageModels(t *testing.T) {
 	parsed := &OpenAIImagesRequest{
-		Endpoint: openAIImagesGenerationsEndpoint,
-		Model:    "gpt-image-2",
-		Prompt:   "draw a cat",
-		N:        2,
+		Endpoint:        openAIImagesGenerationsEndpoint,
+		Model:           "gpt-image-2",
+		Prompt:          "draw a cat",
+		N:               2,
+		FrameCount:      intPtr(4),
+		FrameDurationMS: intPtr(200),
 	}
 
 	body, err := buildOpenAIImagesResponsesRequest(parsed, "gpt-image-2")
 	require.NoError(t, err)
 	require.NotNil(t, body)
 	require.Equal(t, int64(2), gjson.GetBytes(body, "tools.0.n").Int())
+	require.Equal(t, int64(4), gjson.GetBytes(body, "tools.0.frame_count").Int())
+	require.Equal(t, int64(200), gjson.GetBytes(body, "tools.0.frame_duration_ms").Int())
 	require.Equal(t, "gpt-image-2", gjson.GetBytes(body, "tools.0.model").String())
 	require.Equal(t, "draw a cat", gjson.GetBytes(body, "input.0.content.0.text").String())
 }

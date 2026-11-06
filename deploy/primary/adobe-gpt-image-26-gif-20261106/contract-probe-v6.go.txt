@@ -1,0 +1,294 @@
+// Diagnostic only: runs one isolated request without account or database writes.
+package main
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"image"
+	"image/gif"
+	_ "image/jpeg"
+	_ "image/png"
+	"io"
+	"log/slog"
+	"mime/multipart"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
+	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/gin-gonic/gin"
+)
+
+type input struct {
+	AccountID       int64
+	ProxyID         int64
+	Token           string
+	ProxyURL        string
+	ARPSessionID    string
+	Case            string
+	Model           string
+	Size            string
+	Quality         string
+	OutputFormat    string
+	FrameCount      int
+	FrameDurationMS int
+	Complexity      string
+	Override        map[string]any
+	Mode            string
+	Payload         json.RawMessage
+	Endpoint        string
+	Credentials     map[string]any
+	Multipart       bool
+}
+type captureTransport struct {
+	base       adobe.Transport
+	report     map[string]any
+	override   map[string]any
+	complexity string
+}
+
+func (t *captureTransport) Do(ctx context.Context, req *adobe.Request) (*adobe.Response, error) {
+	if req.URL == adobe.ImageSubmitURL {
+		var p map[string]any
+		if err := json.Unmarshal(req.Body, &p); err != nil {
+			return nil, err
+		}
+		specific := p["modelSpecificPayload"].(map[string]any)
+		if t.override != nil {
+			for k := range specific {
+				delete(specific, k)
+			}
+			for k, v := range t.override {
+				specific[k] = v
+			}
+		}
+		if t.complexity != "" {
+			specific["complexity"] = t.complexity
+		}
+		b, err := json.Marshal(p)
+		if err != nil {
+			return nil, err
+		}
+		copy := *req
+		copy.Body = b
+		req = &copy
+		t.report["submitted_payload"] = p
+	}
+	resp, err := t.base.Do(ctx, req)
+	if resp != nil && req.URL == adobe.ImageSubmitURL {
+		t.report["submit_status"] = resp.StatusCode
+		if resp.StatusCode != 200 {
+			t.report["submit_error"] = adobe.SafeDiagnosticMessage(string(resp.Body))
+		}
+	}
+	return resp, err
+}
+func main() {
+	os.Exit(run())
+}
+func run() int {
+	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	var in input
+	if json.NewDecoder(io.LimitReader(os.Stdin, 64<<20)).Decode(&in) != nil {
+		fmt.Println(`{"error":"invalid diagnostic input"}`)
+		return 2
+	}
+	if !regexp.MustCompile(`^[a-z0-9-]{1,90}$`).MatchString(in.Case) || in.AccountID != 2933 || in.Token == "" {
+		fmt.Println(`{"error":"diagnostic guard failed"}`)
+		return 2
+	}
+	root := "/opt/adobe-relay/releases/adobe-gpt-image-26-gif-20261106/preflight"
+	if err := os.MkdirAll(root, 0700); err != nil {
+		return 2
+	}
+	report := map[string]any{"case": in.Case, "account_id": in.AccountID, "proxy_id": in.ProxyID, "model": in.Model, "success": false, "single_submission": true, "started_at": time.Now().UTC().Format(time.RFC3339)}
+	marker, err := os.OpenFile(filepath.Join(root, in.Case+"-started.json"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		fmt.Println(`{"error":"case already started or audit directory unavailable; do not replay"}`)
+		return 2
+	}
+	json.NewEncoder(marker).Encode(report)
+	marker.Close()
+	defer func() {
+		b, _ := json.MarshalIndent(report, "", "  ")
+		os.WriteFile(filepath.Join(root, in.Case+"-result.json"), b, 0600)
+		fmt.Println(string(b))
+	}()
+	start := time.Now()
+	defer func() { report["elapsed_ms"] = time.Since(start).Milliseconds() }()
+	resolveSize := in.Size
+	if in.Mode == "raw-gif-size" {
+		if in.OutputFormat != "gif" || in.Size != "640x640" || in.FrameCount != 16 {
+			report["error"] = "raw size diagnostic guard failed"
+			return 2
+		}
+		resolveSize = ""
+	}
+	conf, err := adobe.ResolveImage(adobe.ImageRequest{ModelID: in.Model, Size: resolveSize})
+	if err != nil {
+		report["error"] = adobe.SafeDiagnosticMessage(err.Error())
+		return 1
+	}
+	if in.Mode == "raw-gif-size" {
+		conf.SizePixels = adobe.Size{Width: 640, Height: 640}
+	}
+	transport := &captureTransport{base: adobe.NewImpersonateTransport(adobe.DefaultIdentity, in.ProxyURL), report: report, override: in.Override, complexity: in.Complexity}
+	client := adobe.NewClient(adobe.ClientConfig{Transport: transport, ProxyURL: in.ProxyURL})
+	ctx, cancel := context.WithTimeout(adobe.WithSingleSubmission(context.Background()), 8*time.Minute)
+	defer cancel()
+	var result *adobe.GenerateResult
+	if in.Mode == "service" {
+		result, err = runService(ctx, in, report)
+	} else {
+		result, err = client.GenerateImage(ctx, adobe.GenerateImageInput{Token: in.Token, ARPSessionID: in.ARPSessionID, Timeout: 7 * time.Minute, Options: adobe.ImagePayloadOptions{
+			Prompt:      "A tiny blue bird waving one wing in a smooth looping animation on a plain white background. No text.",
+			AspectRatio: conf.AspectRatio, OutputResolution: conf.OutputResolution, UpstreamModelID: conf.UpstreamModelID, UpstreamModelVersion: conf.UpstreamModelVersion, PayloadKind: conf.PayloadKind, SizePixels: conf.SizePixels, QualityLevel: in.Quality, OutputFormat: in.OutputFormat, FrameCount: in.FrameCount, FrameDurationMS: in.FrameDurationMS,
+		}})
+	}
+	if err != nil {
+		report["error"] = adobe.SafeDiagnosticMessage(err.Error())
+		var op *adobe.OperationError
+		if errors.As(err, &op) {
+			report["stage"] = op.Stage
+			report["upstream_status"] = op.HTTPStatus
+			report["submission_rejected"] = op.SubmissionRejected
+			report["attempts"] = op.Attempts
+			report["request_id"] = op.UpstreamRequestID
+		}
+		return 1
+	}
+	report["timings"] = result.Timings
+	sum := sha256.Sum256(result.Bytes)
+	report["sha256"] = hex.EncodeToString(sum[:])
+	report["bytes"] = len(result.Bytes)
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(result.Bytes))
+	report["format"] = format
+	if err != nil {
+		report["error"] = "invalid output image"
+		return 1
+	}
+	report["width"] = cfg.Width
+	report["height"] = cfg.Height
+	if format == "gif" {
+		animation, e := gif.DecodeAll(bytes.NewReader(result.Bytes))
+		if e != nil {
+			report["error"] = "invalid GIF"
+			return 1
+		}
+		report["frame_count"] = len(animation.Image)
+		report["delays_centiseconds"] = animation.Delay
+		report["loop_count"] = animation.LoopCount
+	}
+	if e := os.WriteFile(filepath.Join(root, in.Case+"."+format), result.Bytes, 0600); e != nil {
+		report["error"] = "failed saving output"
+		return 1
+	}
+	report["success"] = format == in.OutputFormat || in.OutputFormat == ""
+	return 0
+}
+
+func runService(ctx context.Context, in input, report map[string]any) (*adobe.GenerateResult, error) {
+	gin.SetMode(gin.TestMode)
+	endpoint := in.Endpoint
+	if endpoint == "" {
+		endpoint = "/v1/images/generations"
+	}
+	body := []byte(in.Payload)
+	contentType := "application/json"
+	if in.Multipart {
+		var fields map[string]any
+		if err := json.Unmarshal(in.Payload, &fields); err != nil {
+			return nil, err
+		}
+		var buf bytes.Buffer
+		writer := multipart.NewWriter(&buf)
+		for key, value := range fields {
+			if key == "images" {
+				for index, item := range value.([]any) {
+					raw := item.(map[string]any)["image_url"].(string)
+					parts := strings.SplitN(raw, ",", 2)
+					if len(parts) != 2 {
+						return nil, fmt.Errorf("diagnostic reference must be data URL")
+					}
+					data, err := base64.StdEncoding.DecodeString(parts[1])
+					if err != nil {
+						return nil, err
+					}
+					part, err := writer.CreateFormFile("image[]", fmt.Sprintf("reference-%d.png", index))
+					if err != nil {
+						return nil, err
+					}
+					if _, err = part.Write(data); err != nil {
+						return nil, err
+					}
+				}
+			} else if err := writer.WriteField(key, fmt.Sprint(value)); err != nil {
+				return nil, err
+			}
+		}
+		if err := writer.Close(); err != nil {
+			return nil, err
+		}
+		body = buf.Bytes()
+		contentType = writer.FormDataContentType()
+	}
+	req := httptest.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body)).WithContext(ctx)
+	req.Header.Set("Content-Type", contentType)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	parsed, err := (&service.OpenAIGatewayService{}).ParseOpenAIImagesRequest(c, body)
+	if err != nil {
+		return nil, err
+	}
+	u, err := url.Parse(in.ProxyURL)
+	if err != nil {
+		return nil, err
+	}
+	port, err := strconv.Atoi(u.Port())
+	if err != nil {
+		return nil, err
+	}
+	proxy := &service.Proxy{ID: in.ProxyID, Protocol: u.Scheme, Host: u.Hostname(), Port: port, Status: service.StatusActive}
+	if u.User != nil {
+		proxy.Username = u.User.Username()
+		proxy.Password, _ = u.User.Password()
+	}
+	account := &service.Account{ID: in.AccountID, Platform: service.PlatformAdobe, Type: service.AccountTypeOAuth, ProxyID: &in.ProxyID, Proxy: proxy, Credentials: in.Credentials}
+	ctx, finish, _ := service.PrepareAdobeImageBuffer(ctx, parsed)
+	defer finish()
+	out, err := service.NewAdobeImageService(nil).Generate(ctx, account, in.Token, parsed)
+	if err != nil {
+		return nil, err
+	}
+	report["service_timings"] = out.Timings
+	if len(out.Images) != 1 {
+		return nil, fmt.Errorf("expected one image")
+	}
+	var responseBody map[string]any
+	if err = json.Unmarshal(out.Body, &responseBody); err != nil {
+		return nil, err
+	}
+	for _, key := range []string{"output_format", "quality", "size", "background"} {
+		if v, ok := responseBody[key]; ok {
+			report["response_"+key] = v
+		}
+	}
+	if out.Forward != nil {
+		report["billed_image_count"] = out.Forward.ImageCount
+		report["billed_image_size"] = out.Forward.ImageSize
+	}
+	return &adobe.GenerateResult{Bytes: append([]byte(nil), out.Images[0]...)}, nil
+}

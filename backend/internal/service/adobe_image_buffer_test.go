@@ -91,6 +91,10 @@ func TestAdobeBufferEligibilityAndRetainedInputs(t *testing.T) {
 		require.Nil(t, imagebuffer.FromContext(ctx))
 		cleanup()
 	}
+	ctx, cleanup, ok := PrepareAdobeImageBuffer(context.Background(), &OpenAIImagesRequest{OutputFormat: "gif"})
+	require.True(t, ok)
+	require.NotNil(t, imagebuffer.FromContext(ctx))
+	cleanup()
 	raw := make([]byte, 1000)
 	req := &OpenAIImagesRequest{Multipart: true, Body: raw, Prompt: "abc", Uploads: []OpenAIImagesUpload{{Data: raw[20:500], sharesBody: true}, {Data: make([]byte, 100)}}}
 	require.EqualValues(t, 1103, AdobeImageRetainedBytes(req))

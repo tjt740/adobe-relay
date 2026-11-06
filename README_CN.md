@@ -60,7 +60,7 @@ Sub2API 支持通过 Adobe Firefly Web 订阅账号（浏览器 Cookie）直连�
 - 公开出图入口：`/v1/images/generations`、`/v1/images/edits`（以及去掉 `/v1` 前缀的别名），以及 Gemini 原生生图 `POST /v1beta/models/{model}:generateContent` / `streamGenerateContent`
 - API Key 所在分组需要开启图片生成权限（Adobe 分组默认开启）
 - `n` 缺省 1，最大 10。Cookie 路径会拆成 n 次 Firefly 任务（上游每次仍是 n=1），按张计费；`n>10` 会直接拒绝
-- `output_format` 支持 `png`/`jpeg`（`jpg` 视为 jpeg），下载后本机转码；`webp` 不支持；未传则保持上游格式
+- `output_format` 支持 `png`/`jpeg`（`jpg` 视为 jpeg），下载后本机转码；Adobe GPT Image 2.6 的 `gpt-image-2.6-star-swirl` 和 `gpt-image-2.6-aurora` 额外支持原生 `gif`；`webp` 不支持；未传则保持上游格式
 - `/v1/models` 只返回干净的外部模型名，不要直接请求内部 `firefly-*` 族 id
 - 本渠道暂不提供：视频网关、异步出图任务（`/v1/images/*/async`）、官方 Firefly Services API、以及聊天 / TTS 等非出图协议
 
@@ -72,6 +72,8 @@ Sub2API 支持通过 Adobe Firefly Web 订阅账号（浏览器 Cookie）直连�
 | `gpt-image-1.5` | Firefly GPT Image 1.5 |
 | `gpt-image-2.5-flare` | Firefly GPT Image 2.5 Flare |
 | `gpt-image-2.5-sunburst` | Firefly GPT Image 2.5 Sunburst（上游版本名为 prism） |
+| `gpt-image-2.6-star-swirl` | Adobe 实际 star-swirl 接口版本名，支持原生 GIF |
+| `gpt-image-2.6-aurora` | Adobe 实际 aurora 接口版本名，支持原生 GIF |
 | `gemini-2.5-flash-image` / `gemini-3-pro-image` / `gemini-3.1-flash-image`（每个也有 `*-preview` 名）| Firefly 上的 Gemini 生图（与 Gemini 渠道同名） |
 | `flux-pro` / `flux-ultra` | Firefly FLUX |
 | `imagen-4` / `imagen-4-fast` | Firefly Imagen 4 |
@@ -121,6 +123,10 @@ Adobe Cookie 直连的 GPT Image 生图和编辑响应会在顶层返回 `qualit
 gpt-image 家族支持 OpenAI 的 `background`：`transparent` / `opaque` / `auto`。
 
 `n` 缺省 1，最大 10。Cookie 账号会拆成 n 次 Firefly 任务并按张计费。`output_format` 为 `png`/`jpeg` 时在下载后本机转码；`webp` 不支持；未传则保持上游格式。`background=transparent` 不能与 `output_format=jpeg` 同时使用。
+
+两个 GPT Image 2.6 模型支持独立于 `quality` 的 `complexity`（`low / medium / high`，省略时沿用上游默认），文生图和图生图均可传。两个模型还支持 `output_format: "gif"`，并把 `frame_count`（2–16，缺省 9）和 `frame_duration_ms`（至少 20 毫秒，按 10 毫秒取整、编码上限 655350 毫秒，缺省 200 毫秒）传给 Adobe。`size` 省略或为 `auto` 时由 Adobe 按帧数选择尺寸；固定 `896x896` 最多 9 帧，10–16 帧应使用 `auto`。其它显式尺寸及超出拼图像素预算的组合在提交前拒绝；GIF 不支持 mask、流式、partial images 和自定义 output compression。响应会从实际 GIF 字节生成 `output_format: "gif"`，按 `response_format` 返回 Base64 或图片 URL。GPT Image 2 和 2.5 的 PNG/JPEG 流程保持不变。
+
+GIF 仅支持无参考图的文生图。GIF 编辑端点或带参考图请求会在 Adobe 上传与生成之前返回 HTTP 400（`gif_edit_unsupported`、`param: image`）；静态编辑使用 PNG/JPEG。
 
 ### 返回格式与耗时诊断
 

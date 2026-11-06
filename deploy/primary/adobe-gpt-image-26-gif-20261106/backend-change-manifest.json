@@ -1,0 +1,66 @@
+{
+  "backend/internal/pkg/adobe/payloads.go": {
+    "before": "156918b80cecff1f8cce2c208a9d48e1857f86e5e558c323b64efd2596981c00",
+    "candidate": "3537de7c57e66e32cd1f7840fe8ad06fa10665282b54b65023f811c17b7bf6d5"
+  },
+  "backend/internal/pkg/adobe/payloads_test.go": {
+    "before": "201f1be321b28a660d78573da2c0a514afe9b31f4bc771dc92c8cf1989f07c1c",
+    "candidate": "2330c92227fe9799ea109c5638f16c4705b82cd32d38609a793eac3e57d2f9ea"
+  },
+  "backend/internal/service/adobe_image_buffer.go": {
+    "before": "b59dbb021d14d2e42c89203dda3be85961506906b86c86c327c1847e936ad31f",
+    "candidate": "c937752d2e6a34d670e13f8b407c3640b992880f0f05e0c13e8081c83fced8b7"
+  },
+  "backend/internal/service/adobe_image_buffer_test.go": {
+    "before": "b6aef0fc7559d044da8f759d2aabaeef4af42ec1bb8d0b0f605a7fbe272ffeb3",
+    "candidate": "5b123dd7e784e0ffbd316a29aabe04c76717cb4c0e6ef1f56e4a4ff2ed4988c0"
+  },
+  "backend/internal/service/adobe_image_output.go": {
+    "before": "6876ad890274592811a8403157140ab1fd769bd383ed344dbd073dd646952588",
+    "candidate": "e98bd10dcfd64fbc6a998ba767440d47cf4614d350b4bf1c321f37d80c2f67b1"
+  },
+  "backend/internal/service/adobe_image_output_test.go": {
+    "before": "fdcd5750e30367404e0474718cbaa9c7fe60d6c08cb07160940302e3adb295f1",
+    "candidate": "c3a6bcd102a9225ed3bfb966afab8808fa5a4b496836ad6399337b778877040c"
+  },
+  "backend/internal/service/adobe_image_service.go": {
+    "before": "69d22a06aeb2972cbf62fe57c033abfe4395d11fb316a837918c9f63176f4f56",
+    "candidate": "90ebe925291b30acc781fbe46e4d07707443b6c7a64b75f8031198d56bf73a13"
+  },
+  "backend/internal/service/adobe_image_service_test.go": {
+    "before": "29b396fba4b694644349f7b91afab6218c3ccbdf1299cb2e0739a37ddc681e16",
+    "candidate": "b37e2c5ba06bdc91d4d25412d9ecdaa5cb1e023cfc31ce6a39c2edd269c01dd8"
+  },
+  "backend/internal/service/openai_images.go": {
+    "before": "66f81d9a8f0143adb5383cc9f64df0ef165c18a37ddf0edd770abc5386fbc23c",
+    "candidate": "97b7a2236113fa6ea70236a6eedfcf74e6f487c1d385e757b5d50efad1b0e07e"
+  },
+  "backend/internal/service/openai_images_direct.go": {
+    "before": "e37e5259a132a154882203c46d37f21d70cba6c2286c70fb914d181ce210eaed",
+    "candidate": "6a8a36993eb5c8201d3667dd21eabca53740402bfaf074798126fd1a146e7aa7"
+  },
+  "backend/internal/service/openai_images_responses.go": {
+    "before": "0b006334719aa6b73cfa4f3dcc2bbf99acf608f32d32390f91f30517588e216b",
+    "candidate": "15f08815d2b5f4dbd5dc9bd07787c2215c0c5a55ad4bb5af3596eda29b4f756b"
+  },
+  "backend/internal/service/openai_images_test.go": {
+    "before": "182eb161adcbb539c8adb45fefbe2b121f26be01dd982138394de50503d7e58f",
+    "candidate": "4fed41d7c59f886a384bee3ca13b3deb10b25e984c4db6a7f500d1797ecf538f"
+  },
+  "docs/ADOBE_IMAGE_CLIENT_GUIDE.md": {
+    "before": "e4eab07bb6937238927571e142e5c3d72c38dcf7bedacadbb6405a513bba13f6",
+    "candidate": "8947b5b3eab745ce201527b5056847d2e615f7e0642ae7025a7a0f92db0c3b7a"
+  },
+  "frontend/src/content/changelog/daily.ts": {
+    "before": "32e8ffed6dbb7b70765f1a37214a85c9a24a526c2777585a38c5e847136e2c56",
+    "candidate": "9a6c32ee5c145216dd499766e96e6ff97efd25796cee67b31607b7ec6519f519"
+  },
+  "frontend/src/i18n/locales/en/changelog.ts": {
+    "before": "518b011dd755b64ae17278259beefca8648c1cd397569453906644ef85c22c47",
+    "candidate": "221d235a39737d741213281397cf102f97e1e3cbe36e083812945ccd58dcb184"
+  },
+  "frontend/src/i18n/locales/zh/changelog.ts": {
+    "before": "ed3c93802ab72e82feae57e924090c06033cb8d30f49330779c55e01ae18aed5",
+    "candidate": "713f63714f65494af611727112df2eebef4e86e38d9f0774dc52538e8a2a20d3"
+  }
+}
