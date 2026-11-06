@@ -1,0 +1,15 @@
+{
+  "baseline": "b97759edd35a80cc85dc868acce5e670a1f6efa0",
+  "binary_sha256": "281674b96bfd6bbf0a36bddebeb42c1daa4808273f5af78c02b6181647ce1fda",
+  "binary_bytes": 33677472,
+  "patch_bytes": 526222,
+  "source_sha256": {
+    "backend/internal/service/openai_images_direct.go": "6a8a36993eb5c8201d3667dd21eabca53740402bfaf074798126fd1a146e7aa7",
+    "backend/internal/service/adobe_image_service.go": "90ebe925291b30acc781fbe46e4d07707443b6c7a64b75f8031198d56bf73a13",
+    "backend/internal/service/openai_images_responses.go": "15f08815d2b5f4dbd5dc9bd07787c2215c0c5a55ad4bb5af3596eda29b4f756b",
+    "backend/internal/pkg/adobe/payloads.go": "3537de7c57e66e32cd1f7840fe8ad06fa10665282b54b65023f811c17b7bf6d5",
+    "backend/internal/service/adobe_image_buffer.go": "c937752d2e6a34d670e13f8b407c3640b992880f0f05e0c13e8081c83fced8b7",
+    "backend/internal/service/adobe_image_output.go": "e98bd10dcfd64fbc6a998ba767440d47cf4614d350b4bf1c321f37d80c2f67b1",
+    "backend/internal/service/openai_images.go": "97b7a2236113fa6ea70236a6eedfcf74e6f487c1d385e757b5d50efad1b0e07e"
+  }
+}

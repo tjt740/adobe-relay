@@ -85,6 +85,91 @@ func TestBuildImagePayloadCandidatesGPTImageText2Image(t *testing.T) {
 	require.Empty(t, p["referenceBlobs"])
 }
 
+func TestBuildImagePayloadCandidatesGPTImage26GIF(t *testing.T) {
+	candidates, err := BuildImagePayloadCandidates(ImagePayloadOptions{
+		Prompt:               "a looping red mug",
+		UpstreamModelID:      "gpt-image",
+		UpstreamModelVersion: "gpt-image-2.6-star-swirl",
+		PayloadKind:          PayloadKindGPTImage26,
+		OutputFormat:         "gif",
+		FrameCount:           4,
+		FrameDurationMS:      200,
+		SizePixels:           Size{Width: 896, Height: 896},
+	})
+	require.NoError(t, err)
+	require.Len(t, candidates, 1)
+	msp := candidates[0]["modelSpecificPayload"].(map[string]any)
+	require.Equal(t, "gif", msp["output_format"])
+	require.Equal(t, 4, msp["frame_count"])
+	require.Equal(t, 200, msp["frame_duration_ms"])
+	require.Equal(t, Size{Width: 896, Height: 896}, candidates[0]["size"])
+}
+
+func TestBuildImagePayloadCandidatesGPTImage25DoesNotReceiveGIFFields(t *testing.T) {
+	candidates, err := BuildImagePayloadCandidates(ImagePayloadOptions{
+		Prompt:               "a cat",
+		UpstreamModelID:      "gpt-image",
+		UpstreamModelVersion: "gpt-image-2.5-flare",
+		PayloadKind:          PayloadKindGPTImage25,
+		OutputFormat:         "gif",
+		FrameCount:           4,
+		FrameDurationMS:      200,
+		Complexity:           "high",
+		SizePixels:           Size{Width: 1024, Height: 1024},
+	})
+	require.NoError(t, err)
+	msp := candidates[0]["modelSpecificPayload"].(map[string]any)
+	require.NotContains(t, msp, "output_format")
+	require.NotContains(t, msp, "frame_count")
+	require.NotContains(t, msp, "frame_duration_ms")
+	require.NotContains(t, msp, "complexity")
+}
+
+func TestGPTImageReferencesPreserveSubjectUsage(t *testing.T) {
+	for _, tc := range []struct {
+		kind          PayloadKind
+		format, usage string
+	}{
+		{PayloadKindGPTImage26, "png", "subject"},
+		{PayloadKindGPTImage26, "jpeg", "subject"},
+		{PayloadKindGPTImage25, "png", "subject"},
+	} {
+		payloads, err := BuildImagePayloadCandidates(ImagePayloadOptions{
+			Prompt: "animate the mug", UpstreamModelID: "gpt-image",
+			PayloadKind: tc.kind, OutputFormat: tc.format, Edit: true,
+			SizePixels: Size{896, 896}, SourceImageIDs: []string{"reference-1"},
+		})
+		require.NoError(t, err)
+		require.Equal(t, []any{map[string]any{"id": "reference-1", "usage": tc.usage}}, payloads[0]["referenceBlobs"])
+	}
+}
+
+func TestGPTImage26ComplexityIndependentFromQuality(t *testing.T) {
+	for _, version := range []string{"gpt-image-2.6-star-swirl", "gpt-image-2.6-aurora"} {
+		for _, complexity := range []string{"", "low", "medium", "high"} {
+			for _, quality := range []string{"low", "medium", "high"} {
+				for _, edit := range []bool{false, true} {
+					opts := ImagePayloadOptions{Prompt: "a cat", UpstreamModelID: "gpt-image", UpstreamModelVersion: version, PayloadKind: PayloadKindGPTImage26, SizePixels: Size{1024, 1024}, QualityLevel: quality, Complexity: complexity, Edit: edit}
+					if edit {
+						opts.SourceImageIDs = []string{"reference-1"}
+					}
+					candidates, err := BuildImagePayloadCandidates(opts)
+					require.NoError(t, err)
+					for _, p := range candidates {
+						msp := p["modelSpecificPayload"].(map[string]any)
+						if complexity == "" {
+							require.NotContains(t, msp, "complexity")
+						} else {
+							require.Equal(t, complexity, msp["complexity"])
+						}
+						require.Equal(t, GPTImageDetailLevelFromQualityForVersion(quality, version), p["generationSettings"].(map[string]any)["detailLevel"])
+					}
+				}
+			}
+		}
+	}
+}
+
 func TestBuildImagePayloadCandidatesGPTImageDetailLevelOverride(t *testing.T) {
 	detail := 3
 	candidates, err := BuildImagePayloadCandidates(ImagePayloadOptions{

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -702,6 +703,195 @@ func TestAdobeImageServicePassesBackgroundThrough(t *testing.T) {
 	require.NoError(t, json.Unmarshal(api.calls[0].Body, &submitted))
 	msp := submitted["modelSpecificPayload"].(map[string]any)
 	require.Equal(t, "transparent", msp["background"])
+}
+
+func TestAdobeImageServiceGeneratesGPTImage26GIF(t *testing.T) {
+	api := &adobeFakeTransport{}
+	gifBytes := adobeTestGIF(t)
+	client := adobeSubmitPollDownload(t, api, gifBytes)
+	svc := newAdobeTestService(t, client, nil)
+
+	result, err := svc.Generate(context.Background(), adobeTestAccount(), "tok", &OpenAIImagesRequest{
+		Model: "gpt-image-2.6-star-swirl", Prompt: "a looping red mug", N: 1,
+		Size: "896x896", OutputFormat: "gif", FrameCount: intPtr(4), FrameDurationMS: intPtr(200),
+		ResponseFormat: "b64_json",
+	})
+	require.NoError(t, err)
+	bodies := adobeSubmitBodies(t, api)
+	require.Len(t, bodies, 1)
+	msp := bodies[0]["modelSpecificPayload"].(map[string]any)
+	require.Equal(t, "gif", msp["output_format"])
+	require.EqualValues(t, 4, msp["frame_count"])
+	require.EqualValues(t, 200, msp["frame_duration_ms"])
+	var response map[string]any
+	require.NoError(t, json.Unmarshal(result.Body, &response))
+	require.Equal(t, "gif", response["output_format"])
+	data := response["data"].([]any)[0].(map[string]any)
+	decoded, err := base64.StdEncoding.DecodeString(data["b64_json"].(string))
+	require.NoError(t, err)
+	require.Equal(t, gifBytes, decoded)
+}
+
+func TestAdobeImageServiceComplexityValidationBeforeSubmission(t *testing.T) {
+	for _, model := range []string{"gpt-image-2.6-star-swirl", "gpt-image-2.6-aurora", "gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst"} {
+		for _, value := range []string{"", "low", "medium", "high", "invalid"} {
+			t.Run(model+"/"+value, func(t *testing.T) {
+				api := &adobeFakeTransport{}
+				client := adobeSubmitPollDownload(t, api, adobeTestPNG(t, false))
+				svc := newAdobeTestService(t, client, nil)
+				_, err := svc.Generate(context.Background(), adobeTestAccount(), "tok", &OpenAIImagesRequest{Model: model, Prompt: "a cat", Size: "1024x1024", Quality: "medium", Complexity: value})
+				supported := model == "gpt-image-2.6-star-swirl" || model == "gpt-image-2.6-aurora"
+				if value == "invalid" || (!supported && value != "") {
+					require.Error(t, err)
+					require.Empty(t, api.calls)
+					return
+				}
+				require.NoError(t, err)
+				bodies := adobeSubmitBodies(t, api)
+				require.Len(t, bodies, 1)
+				msp := bodies[0]["modelSpecificPayload"].(map[string]any)
+				if value == "" {
+					require.NotContains(t, msp, "complexity")
+				} else {
+					require.Equal(t, value, msp["complexity"])
+				}
+				require.Equal(t, float64(3), bodies[0]["generationSettings"].(map[string]any)["detailLevel"])
+			})
+		}
+	}
+}
+
+func TestAdobeImageServiceGIFPreservesAutoSizeAndDefaultFrameOptions(t *testing.T) {
+	api := &adobeFakeTransport{}
+	client := adobeSubmitPollDownload(t, api, adobeTestGIF(t))
+	svc := newAdobeTestService(t, client, nil)
+
+	result, err := svc.Generate(context.Background(), adobeTestAccount(), "tok", &OpenAIImagesRequest{
+		Model: "gpt-image-2.6-aurora", Prompt: "a loop", N: 1, OutputFormat: "gif",
+		PartialImages: intPtr(0),
+	})
+	require.NoError(t, err)
+	bodies := adobeSubmitBodies(t, api)
+	require.Len(t, bodies, 1)
+	require.NotContains(t, bodies[0], "size")
+	msp := bodies[0]["modelSpecificPayload"].(map[string]any)
+	require.Equal(t, "auto", msp["size"])
+	require.EqualValues(t, 9, msp["frame_count"])
+	require.EqualValues(t, 200, msp["frame_duration_ms"])
+	require.Equal(t, "1K", result.Forward.ImageSize)
+	require.Equal(t, 1, result.Forward.ImageCount)
+}
+
+func TestAdobeImageServiceRejectsGIFOutsideSupportedContract(t *testing.T) {
+	api := &adobeFakeTransport{handler: func(*adobe.Request, int) (*adobe.Response, error) {
+		t.Fatal("GIF validation must happen before upstream submission")
+		return nil, nil
+	}}
+	svc := newAdobeTestService(t, adobe.NewClient(adobe.ClientConfig{Transport: api, DownloadTransport: api}), nil)
+
+	for _, tc := range []struct {
+		name string
+		req  *OpenAIImagesRequest
+		want string
+	}{
+		{name: "old model", req: &OpenAIImagesRequest{Model: "gpt-image-2.5-flare", OutputFormat: "gif"}, want: "supported only by gpt-image-2.6"},
+		{name: "wrong size", req: &OpenAIImagesRequest{Model: "gpt-image-2.6-star-swirl", OutputFormat: "gif", Size: "1024x1024"}, want: "requires size=auto or size=896x896"},
+		{name: "malformed size", req: &OpenAIImagesRequest{Model: "gpt-image-2.6-star-swirl", OutputFormat: "gif", Size: "invalid"}, want: "requires size=auto or size=896x896"},
+		{name: "frame too high", req: &OpenAIImagesRequest{Model: "gpt-image-2.6-star-swirl", OutputFormat: "gif", FrameCount: intPtr(17)}, want: "frame_count must be between"},
+		{name: "sheet budget", req: &OpenAIImagesRequest{Model: "gpt-image-2.6-star-swirl", OutputFormat: "gif", Size: "896x896", FrameCount: intPtr(16)}, want: "use size=auto"},
+		{name: "frame too low", req: &OpenAIImagesRequest{Model: "gpt-image-2.6-star-swirl", OutputFormat: "gif", Size: "896x896", FrameCount: intPtr(1)}, want: "frame_count must be between"},
+		{name: "duration too low", req: &OpenAIImagesRequest{Model: "gpt-image-2.6-star-swirl", OutputFormat: "gif", Size: "896x896", FrameDurationMS: intPtr(19)}, want: "frame_duration_ms must be at least"},
+		{name: "partial images", req: &OpenAIImagesRequest{Model: "gpt-image-2.6-star-swirl", OutputFormat: "gif", Size: "896x896", PartialImages: intPtr(1)}, want: "does not support partial images"},
+		{name: "frame without gif", req: &OpenAIImagesRequest{Model: "gpt-image-2.6-star-swirl", Size: "896x896", FrameCount: intPtr(4)}, want: "require output_format=gif"},
+		{name: "mask", req: &OpenAIImagesRequest{Model: "gpt-image-2.6-star-swirl", OutputFormat: "gif", Size: "896x896", HasMask: true}, want: "does not support masks"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := svc.Generate(context.Background(), adobeTestAccount(), "tok", tc.req)
+			require.Error(t, err)
+			require.ErrorContains(t, err, tc.want)
+		})
+	}
+}
+
+func TestAdobeImageServiceRejectsGIFEditsBeforeAnyUpstreamRequest(t *testing.T) {
+	for _, model := range []string{"gpt-image-2.6-star-swirl", "gpt-image-2.6-aurora"} {
+		for _, input := range []string{"edit endpoint", "JSON reference", "multiple references", "multipart upload", "generation images field", "generation image field"} {
+			t.Run(model+"/"+input, func(t *testing.T) {
+				api := &adobeFakeTransport{handler: func(*adobe.Request, int) (*adobe.Response, error) {
+					t.Fatal("unsupported GIF edits must not fetch, upload, or submit images")
+					return nil, nil
+				}}
+				req := &OpenAIImagesRequest{Model: model, Prompt: "a loop", OutputFormat: "gif", Size: "auto"}
+				switch input {
+				case "edit endpoint":
+					req.Endpoint = openAIImagesEditsEndpoint
+				case "JSON reference":
+					req.InputImageURLs = []string{"data:image/png;base64,invalid"}
+				case "multiple references":
+					req.InputImageURLs = []string{"https://example.com/one.png", "https://example.com/two.png"}
+				case "multipart upload":
+					req.Endpoint, req.Multipart = openAIImagesEditsEndpoint, true
+					req.Uploads = []OpenAIImagesUpload{{ContentType: "application/octet-stream", Data: []byte("invalid")}}
+				case "generation images field":
+					req.Body = []byte(`{"images":[{"image_url":"https://example.com/ref.png"}]}`)
+				case "generation image field":
+					req.Body = []byte(`{"image":"data:image/png;base64,invalid"}`)
+				}
+				svc := newAdobeTestService(t, adobe.NewClient(adobe.ClientConfig{Transport: api, DownloadTransport: api}), nil)
+				result, err := svc.Generate(context.Background(), adobeTestAccount(), "tok", req)
+				require.Nil(t, result)
+				var requestErr *adobe.RequestError
+				require.ErrorAs(t, err, &requestErr)
+				require.Equal(t, http.StatusBadRequest, classifyAdobeError(err).Failover.ClientStatusCode)
+				require.Equal(t, "gif_edit_unsupported", requestErr.Code)
+				require.Equal(t, "image", requestErr.Param)
+				require.Equal(t, "request", requestErr.Source)
+				require.False(t, adobe.IsRotatable(err))
+				require.Empty(t, api.calls)
+			})
+		}
+	}
+}
+func TestAdobeGIFDurationNormalization(t *testing.T) {
+	conf, err := adobe.ResolveImage(adobe.ImageRequest{ModelID: "gpt-image-2.6-star-swirl", Size: "896x896"})
+	require.NoError(t, err)
+	for _, tc := range []struct{ in, want int }{{20, 20}, {25, 30}, {200, 200}, {2001, 2000}, {655349, 655350}, {655350, 655350}, {int(^uint(0) >> 1), 655350}} {
+		out, err := validateAdobeGIFParams(&OpenAIImagesRequest{FrameDurationMS: intPtr(tc.in)}, conf, "gif")
+		require.NoError(t, err)
+		require.Equal(t, tc.want, out.FrameDurationMS)
+	}
+}
+
+func TestAdobe26GenericMultipartContentType(t *testing.T) {
+	for _, model := range []string{"gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.6-star-swirl", "gpt-image-2.6-aurora"} {
+		for _, declared := range []string{"", "application/octet-stream", "image/png"} {
+			t.Run(model+"/"+declared, func(t *testing.T) {
+				api := &adobeFakeTransport{}
+				client := adobeSubmitPollDownload(t, api, adobeTestPNG(t, false))
+				base := api.handler
+				api.handler = func(req *adobe.Request, index int) (*adobe.Response, error) {
+					if req.URL == adobe.ImageUploadURL {
+						want := declared
+						if strings.HasPrefix(model, "gpt-image-2.6-") {
+							want = "image/png"
+						} else if want == "" {
+							want = "image/jpeg"
+						}
+						require.Equal(t, want, req.Headers["content-type"])
+						return adobeJSONResponse(t, 200, map[string]any{"images": []any{map[string]any{"id": "source-1"}}}, nil), nil
+					}
+					return base(req, index)
+				}
+				_, err := newAdobeTestService(t, client, nil).Generate(context.Background(), adobeTestAccount(), "tok", &OpenAIImagesRequest{Model: model, Prompt: "a cat", Size: "1024x1024", Endpoint: openAIImagesEditsEndpoint, Complexity: func() string {
+					if strings.HasPrefix(model, "gpt-image-2.6-") {
+						return "low"
+					}
+					return ""
+				}(), Uploads: []OpenAIImagesUpload{{Data: adobeTestPNG(t, false), ContentType: declared}}})
+				require.NoError(t, err)
+			})
+		}
+	}
 }
 
 func TestAdobeImageServiceUploadsSourceImages(t *testing.T) {

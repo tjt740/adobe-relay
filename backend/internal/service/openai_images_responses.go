@@ -345,6 +345,8 @@ func openAIImageOutputMIMEType(outputFormat string) string {
 		return "image/jpeg"
 	case "webp":
 		return "image/webp"
+	case "gif":
+		return "image/gif"
 	default:
 		return "image/png"
 	}
@@ -437,6 +439,7 @@ func buildOpenAIImagesResponsesRequest(parsed *OpenAIImagesRequest, toolModel st
 	}{
 		{path: "size", value: parsed.Size},
 		{path: "quality", value: parsed.Quality},
+		{path: "complexity", value: parsed.Complexity},
 		{path: "background", value: parsed.Background},
 		{path: "output_format", value: parsed.OutputFormat},
 		{path: "moderation", value: parsed.Moderation},
@@ -451,6 +454,12 @@ func buildOpenAIImagesResponsesRequest(parsed *OpenAIImagesRequest, toolModel st
 	}
 	if parsed.PartialImages != nil {
 		tool, _ = sjson.SetBytes(tool, "partial_images", *parsed.PartialImages)
+	}
+	if parsed.FrameCount != nil {
+		tool, _ = sjson.SetBytes(tool, "frame_count", *parsed.FrameCount)
+	}
+	if parsed.FrameDurationMS != nil {
+		tool, _ = sjson.SetBytes(tool, "frame_duration_ms", *parsed.FrameDurationMS)
 	}
 
 	maskImageURL := strings.TrimSpace(parsed.MaskImageURL)

@@ -88,6 +88,8 @@ type ImagePayloadOptions struct {
 	SizePixels Size
 	// QualityLevel 是 OpenAI 的 quality；DetailLevel 为 nil 时由它推导。
 	QualityLevel string
+	// Complexity controls planning independently of rendering detail, on 2.6 only.
+	Complexity string
 	// DetailLevel 显式指定上游 detailLevel，优先于 QualityLevel。
 	DetailLevel *int
 	// SourceImageIDs 是已上传的参考图 id，非空即走图生图。
@@ -98,6 +100,12 @@ type ImagePayloadOptions struct {
 	// Background 是 OpenAI 的 background 参数（transparent / opaque / auto）。
 	// gpt-image 只把非 auto 的 background 塞进 modelSpecificPayload。
 	Background string
+	// OutputFormat is used by GPT Image 2.6's native animated GIF path. PNG and
+	// JPEG continue to be applied locally after download for every GPT Image
+	// version, so these fields are intentionally omitted unless GIF is requested.
+	OutputFormat    string
+	FrameCount      int
+	FrameDurationMS int
 	// Seed 写入 payload 的 seeds[0]。未设时用 SeedNow()。
 	Seed *int
 }
@@ -140,8 +148,22 @@ func buildGPTImage25Payloads(opts ImagePayloadOptions) ([]map[string]any, error)
 	}
 
 	modelSpecific := map[string]any{}
+	if opts.PayloadKind == PayloadKindGPTImage26 {
+		if complexity := strings.ToLower(strings.TrimSpace(opts.Complexity)); complexity != "" {
+			modelSpecific["complexity"] = complexity
+		}
+	}
 	if bg := strings.ToLower(strings.TrimSpace(opts.Background)); bg != "" && bg != "auto" {
 		modelSpecific["background"] = bg
+	}
+	if opts.PayloadKind == PayloadKindGPTImage26 && strings.EqualFold(strings.TrimSpace(opts.OutputFormat), "gif") {
+		modelSpecific["output_format"] = "gif"
+		if opts.FrameCount > 0 {
+			modelSpecific["frame_count"] = opts.FrameCount
+		}
+		if opts.FrameDurationMS > 0 {
+			modelSpecific["frame_duration_ms"] = opts.FrameDurationMS
+		}
 	}
 
 	hasPixels := opts.SizePixels.Width > 0 && opts.SizePixels.Height > 0

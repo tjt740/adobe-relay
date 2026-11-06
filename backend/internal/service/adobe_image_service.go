@@ -165,15 +165,26 @@ func (s *AdobeImageService) GenerateCall(
 		requestedModel = call.ChannelMappedModel
 	}
 	upstreamModelID := account.GetMappedModel(requestedModel)
-	conf, err := adobe.ResolveImage(call.imageRequest(upstreamModelID))
+	imageRequest := call.imageRequest(upstreamModelID)
+	// Preserve an omitted/auto size: Adobe selects a frame size that fits the
+	// complete GIF sheet. Forcing 896x896 here would reject valid 16-frame GIFs.
+	conf, err := adobe.ResolveImage(imageRequest)
 	if err != nil {
 		return nil, &adobe.OperationError{Stage: "prepare", Err: err}
+	}
+	gifOptions, err := validateAdobeGIFParams(req, conf, outputFormat)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := validateAdobeComplexity(req, conf)
+	if err != nil {
+		return nil, err
 	}
 
 	client := newAdobeAuthRetryClient(ctx, s.clients.clientForAccount(account), token)
 	timings := AdobeImageTimings{DiskBuffer: imagebuffer.FromContext(ctx) != nil}
 	stageStarted := time.Now()
-	sourceImageIDs, err := s.uploadSourceImages(ctx, client, token, call)
+	sourceImageIDs, err := s.uploadSourceImages(ctx, client, token, call, conf.PayloadKind == adobe.PayloadKindGPTImage26)
 	timings.SourceUploadMS = time.Since(stageStarted).Milliseconds()
 	if err != nil {
 		return nil, err
@@ -195,6 +206,10 @@ func (s *AdobeImageService) GenerateCall(
 		PayloadKind:          conf.PayloadKind,
 		SizePixels:           conf.SizePixels,
 		QualityLevel:         req.Quality,
+		Complexity:           complexity,
+		OutputFormat:         outputFormat,
+		FrameCount:           gifOptions.FrameCount,
+		FrameDurationMS:      gifOptions.FrameDurationMS,
 		SourceImageIDs:       sourceImageIDs,
 		Edit:                 req.IsEdits(),
 		Background:           req.Background,
@@ -217,6 +232,9 @@ func (s *AdobeImageService) GenerateCall(
 	for i := range images {
 		conversions.Go(func() error {
 			converted := applyAdobeOutputFormat(images[i], outputFormat, req.OutputCompression)
+			if err := validateAdobeOutputBytes(converted, outputFormat); err != nil {
+				return err
+			}
 			if !bytes.Equal(converted, images[i]) {
 				upstreamURLs[i] = "" // The upstream URL would deliver the wrong bytes.
 			}
@@ -224,7 +242,18 @@ func (s *AdobeImageService) GenerateCall(
 			return nil
 		})
 	}
-	_ = conversions.Wait() // Conversion failures already fall back to original bytes.
+	if err := conversions.Wait(); err != nil {
+		return nil, &adobe.OperationError{Stage: "transcode", Err: err}
+	}
+	if outputFormat == adobeOutputFormatGIF {
+		// GIF auto may choose a smaller frame than the static default. Charge
+		// the delivered frame resolution, while still counting one animation
+		// as one output image. All existing static billing paths stay intact.
+		conf.OutputResolution, err = adobeGIFOutputResolution(images)
+		if err != nil {
+			return nil, &adobe.OperationError{Stage: "transcode", Err: err}
+		}
+	}
 	timings.TranscodeMS = time.Since(stageStarted).Milliseconds()
 
 	requestID := uuid.NewString()
@@ -302,7 +331,7 @@ func generateAdobeImages(
 // 文生图时返回 nil。OpenAI mask 不上传：3p Image Edit 抓包没有 usage=mask blob，
 // 真 mask 由 handler 优先转到 API key 中转号。
 func (s *AdobeImageService) uploadSourceImages(
-	ctx context.Context, client adobeImageAPI, token string, call *AdobeImageCall,
+	ctx context.Context, client adobeImageAPI, token string, call *AdobeImageCall, detectGenericType bool,
 ) ([]string, error) {
 	req := call.Request
 	if len(req.Uploads) == 0 && len(req.InputImageURLs) == 0 {
@@ -315,7 +344,19 @@ func (s *AdobeImageService) uploadSourceImages(
 		if len(upload.Data) == 0 {
 			continue
 		}
-		id, err := client.UploadImage(ctx, token, upload.Data, upload.ContentType)
+		contentType := upload.ContentType
+		// Common multipart clients use a generic MIME type for file parts.
+		// Normalize only the new 2.6 path; keep existing model behavior intact.
+		if detectGenericType {
+			declared := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
+			if declared == "" || declared == "application/octet-stream" {
+				contentType = detectedImageContentType(upload.Data)
+				if contentType != "image/png" && contentType != "image/jpeg" {
+					return nil, adobe.NewParameterError("GPT Image 2.6 references must be PNG or JPEG images", "invalid_input_image", "image")
+				}
+			}
+		}
+		id, err := client.UploadImage(ctx, token, upload.Data, contentType)
 		if err != nil {
 			return nil, err
 		}

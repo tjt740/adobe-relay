@@ -12,7 +12,14 @@ import (
 // responses retain their existing reservation until they have equivalent
 // bounded encoders. Failure keeps the original memory-backed behavior.
 func PrepareAdobeImageBuffer(ctx context.Context, req *OpenAIImagesRequest) (context.Context, func(), bool) {
-	if req == nil || strings.TrimSpace(req.OutputFormat) != "" || req.Stream || req.N > 10 {
+	format := ""
+	if req != nil {
+		format = strings.ToLower(strings.TrimSpace(req.OutputFormat))
+	}
+	// GIF is returned unchanged by the upstream and can use the same bounded
+	// disk response path as the default native format. PNG/JPEG still opt out
+	// because they may require an in-memory transcode.
+	if req == nil || (format != "" && format != adobeOutputFormatGIF) || req.Stream || req.N > 10 {
 		return ctx, func() {}, false
 	}
 	n := adobeImageRequestCount(req.N)
