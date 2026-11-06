@@ -1,0 +1,18 @@
+{
+  "at": "2026-11-06T06:04:05.760396+00:00",
+  "selected_account_id": 2933,
+  "temporary_group_id": 36,
+  "key_deleted": true,
+  "temporary_grant_removed": true,
+  "temporary_group_deleted": true,
+  "private_files_removed": true,
+  "other_allowed_groups_preserved": true,
+  "account_original_groups_preserved": true,
+  "original_account_groups": [
+    33
+  ],
+  "current_account_groups": [
+    33
+  ],
+  "existing_customer_keys_changed": false
+}
