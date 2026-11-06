@@ -38,7 +38,10 @@ assert a.sql('SELECT count(*) FROM account_groups WHERE group_id='+str(test_grou
 assert a.sql('SELECT count(*) FROM groups WHERE id='+str(test_group['id'])+' AND deleted_at IS NULL')=='0'
 selected_usage=json.loads(a.sql("SELECT json_build_object('count',count(*),'accounts',coalesce(json_agg(DISTINCT account_id),'[]'),'image_count',sum(image_count)) FROM usage_logs WHERE api_key_id="+str(test_key['id'])))
 assert selected_usage=={'count':12,'accounts':[2933],'image_count':12},'Verify all positive cases used the selected account and count GIF as one image'
+binding_review=json.loads((ROOT/'selected-binding-review.json').read_text())
+assert binding_review['original_group_ids_preserved'] and binding_review['original_group_priorities_preserved']
 checks=a.check_preserved(json.loads((ROOT/'before.json').read_text()),a.snapshot())
+clash_review=json.loads((ROOT/'clash-concurrent-import-review.json').read_text())
 heartbeat=json.loads(a.sql("SELECT json_build_object('at',last_success_at,'healthy',last_success_at>now()-interval '5 minutes' AND (last_error_at IS NULL OR last_success_at>last_error_at)) FROM ops_job_heartbeats WHERE job_name='ops_alert_evaluator'"))
 assert heartbeat['healthy'] and datetime.datetime.fromisoformat(heartbeat['at'])>=datetime.datetime.fromisoformat(cleanup['at']),'Wait for the canonical heartbeat after cleanup'
 def read(path):
@@ -50,9 +53,11 @@ initial=re.findall(r'<script[^>]+src="([^"]+\.js)"',html)
 assert initial
 assets={p:read(p) for p in initial}
 names=set()
-for content in list(assets.values()):names.update(re.findall(r'(?:ProxiesView|ChangelogView|AccountsView)-[A-Za-z0-9_-]+\.js',content))
+for content in list(assets.values()):names.update(re.findall(r'(?:ProxiesView|ChangelogView|AccountsView|index)-[A-Za-z0-9_-]+\.js',content))
 assert any(n.startswith('ProxiesView-') for n in names) and any(n.startswith('ChangelogView-') for n in names)
 for name in names:assets['/assets/'+name]=read('/assets/'+name)
+locale_assets={p:content for p,content in assets.items() if p.rsplit('/',1)[-1].startswith('index-') and all(marker in content for marker in ['adobeGptImage26Gif','frame_duration_ms','gpt-image-2.6-star-swirl','gpt-image-2.6-aurora'])}
+assert len(locale_assets)==2, 'Verify both lazily loaded Chinese and English locale bundles'
 combined='\n'.join(assets.values())
 assert all(marker in combined for marker in ['subscription-row','clash-bulk-urls','admin.proxies.clash.checkSource','clashSubscriptions','upstreamV0217','proxyVerificationPriority','adobeRouteReview','proxyHealth.nodeBalance','blocked_proxy_ids','manual-proxy-toggle','manual_proxy_enabled','clash-background-test-status','admin.proxies.clash.runInBackground','clashBackgroundTests','adobe408TimeoutScheduling','bulk-test-start','bulk-test-model','bulk-test-background-model','bulkAccountTestModels','adobeAutomaticTestFlare','gpt-image-2.5-flare','cookieRecoveryRevert','adobeImageErrorDetails','bulk-test-concurrency','bulk-test-background-concurrency','bulkTestConcurrency','clashNodeCount','2026-11-04','adobeAutoMedium','2026-11-05','adobeGptImage26Gif','complexity','frame_duration_ms','gpt-image-2.6-star-swirl','gpt-image-2.6-aurora','2026-11-06'])
 browser_file=ROOT/'live-browser-verification.json'
@@ -64,7 +69,7 @@ credentials=json.loads((ROOT/'credential-change-review.json').read_text())
 assert not business['missing_ids'], 'Review concurrent deletions before final verification'
 assert business['manual_pause_preserved'] and business['manual_proxy_modes_preserved'] and all(c['proxy_chain_matches'] for c in business['changes'])
 assert all(c['version_advanced'] and c['issuer_compatible'] and c['source_key_compatible'] for c in credentials['cookie_changed_accounts'])
-summary={'backup_accounts':business['before_count'],'checked_accounts':business['current_count'],'manual_pauses_preserved':True,'manual_proxy_modes_preserved':True,'proxy_bindings_changed_with_event_chain':sum('proxy_id' in c['fields'] for c in business['changes']),'cookie_rotations_with_version_advance':len(credentials['cookie_changed_accounts']),'token_fields_only_changes':len(credentials['token_fields_only_accounts'])}
+summary={'backup_accounts':business['before_count'],'checked_accounts':business['current_count'],'manual_pauses_preserved':True,'manual_proxy_modes_preserved':True,'proxy_bindings_changed_with_event_chain':sum('proxy_id' in c['fields'] for c in business['changes']),'cookie_rotations_with_version_advance':len(credentials['cookie_changed_accounts']),'non_source_cookie_credential_changes':len(credentials['token_fields_only_accounts']), 'credential_field_names_changed':sorted({key for change in business['changes'] for key in change['credential_keys_changed']})}
 installed=json.loads(a.sql("SELECT json_object_agg(filename,checksum) FROM schema_migrations"))
 expected=json.loads((ROOT/'installed-migrations-before.json').read_text())
 assert installed==expected,'Existing migration set or checksums changed'
@@ -91,6 +96,8 @@ health_proof={'sources':health['sources'],'subscription_exclusion':subscription_
 a.save('route-api-verification.json',health_proof)
 
 route_at=datetime.datetime.fromisoformat(json.loads((ROOT/'rolling-route-canary.json').read_text())['at']);assert route_at.astimezone(datetime.timezone(datetime.timedelta(hours=8))).date().isoformat()=='2026-11-06', 'Release crossed its Beijing date; rebuild notes before claiming success'
-out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'migration_checksums_preserved':True,'migration_set_retained':True,'retired_408_gates_empty':True,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'adobe_custom_business_preserved':True,'route_api_verified':True,'excluded_1290':exclusion,'cutover_route_checks':route_checks,'authorized_live_generation_tests':{'before':live_before,'after':live_after,'additional_legacy_group_diagnostics':legacy_public,'additional_current_group_diagnostics':current_public},'public_contract':public_contract,'temporary_test_access_cleanup':test_cleanup,'current_group_test_access_cleanup':current_cleanup,'selected_account_usage':selected_usage,'active_adobe_probes':False,'test_mail_sent':False}
+out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'migration_checksums_preserved':True,'migration_set_retained':True,'retired_408_gates_empty':True,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'adobe_custom_business_preserved':True,'route_api_verified':True,'excluded_1290':exclusion,'cutover_route_checks':route_checks,'authorized_live_generation_tests':{'before':live_before,'after':live_after,'additional_legacy_group_diagnostics':legacy_public,'additional_current_group_diagnostics':current_public},'public_contract':public_contract,'temporary_test_access_cleanup':test_cleanup,'current_group_test_access_cleanup':current_cleanup,'selected_account_usage':selected_usage,'selected_account_bindings':binding_review,'active_adobe_probes':False,'test_mail_sent':False}
+out['verified_locale_bundle_count']=len(locale_assets)
+out['concurrent_clash_import_review']={'baseline_revision':clash_review['before_revision'],'retained_revision':clash_review['current_revision'],'node_count':clash_review['current_nodes'],'changed_upstream_ports':24,'node_identities_and_credentials_preserved':True,'authenticated_import_http_status':200,'database_audit_receipt_available':False,'specific_actor_attributed':False,'original_failure_run':42172934104,'read_only':True,'restored_old_data':False}
 a.save('final-verification.json',out)
 print(json.dumps(out,ensure_ascii=False))

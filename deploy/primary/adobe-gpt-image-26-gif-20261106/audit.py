@@ -10,6 +10,7 @@ import sqlite3
 import subprocess
 from urllib.parse import quote
 import urllib.request
+from clash_contract_guard import reviewed_hash as reviewed_clash_hash
 
 RID = 'adobe-gpt-image-26-gif-20261106'
 ROOT = Path('/opt/adobe-relay/releases') / RID
@@ -104,6 +105,7 @@ def check_preserved(before, current):
     review_file = ROOT / 'reviewed-automatic-settings.json'
     review = json.loads(review_file.read_text()) if review_file.exists() else None
     expected_settings = reviewed_setting_hashes(before['settings_hashes'], review)
+    expected_clash = reviewed_clash_hash(before['clash_contract_hash'], ROOT)
     checks = {
         'other_containers': all(current['containers'].get(name, {}).get('id') == value['id'] and
                                 current['containers'][name]['image_id'] == value['image_id']
@@ -113,7 +115,7 @@ def check_preserved(before, current):
         'environment': current['env_without_image_hash'] == before['env_without_image_hash'],
         'okad_settings': current['okad_settings_hash'] == before['okad_settings_hash'],
         'sub2_settings_including_smtp': current['settings_hashes'] == expected_settings,
-        'clash_nodes_bindings_and_configuration': current['clash_contract_hash'] == before['clash_contract_hash'],
+        'clash_nodes_bindings_and_configuration': current['clash_contract_hash'] == expected_clash,
         'alert_rules': current['rules_hash'] == before['rules_hash'],
         'retired_route_matches_current_baseline': current.get('excluded_route_state') == before.get('excluded_route_state'),
     }

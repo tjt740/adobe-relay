@@ -1,0 +1,21 @@
+{
+  "failures": [
+    {
+      "run": 42172934104,
+      "conclusion": "failure",
+      "reason": "Concurrent administrative Clash import changed protected snapshot; retained and precisely reviewed, without restoring data",
+      "operate_log_sha256": "3c12a1634d73d9cba9ccf5ac3fcd54bb51ae9f791b223581bae8bb398188640e",
+      "failure_retained": true,
+      "application_redeployed": false
+    },
+    {
+      "run": 42175251563,
+      "conclusion": "failure",
+      "reason": "Verifier omitted lazily loaded locale bundles; corrected evidence collection without application changes",
+      "operate_log_sha256": "a22eca267e121be49444483a7c59bfddea861e55e5f9a1163ebce15b48a8683b",
+      "failure_retained": true,
+      "application_redeployed": false
+    }
+  ],
+  "successful_followup_run": 42175564495
+}

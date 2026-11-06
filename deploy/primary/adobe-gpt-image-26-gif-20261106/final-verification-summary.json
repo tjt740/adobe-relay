@@ -1,0 +1,106 @@
+{
+  "at": "2026-11-06T06:37:31.337125+00:00",
+  "application_sha": "da24f5634a0fd332f95a14d666fa2e9cea19db53",
+  "application_version": "2026-11-06T14:37:29.381+0800\tINFO\tstdlog\tSub2API 0.2.19 (commit: da24f5634a0fd332f95a14d666fa2e9cea19db53, built: 2026-11-06T04:54:37Z)\t{\"service\": \"sub2api\", \"env\": \"bootstrap\", \"legacy_stdlog\": true}",
+  "preserved": {
+    "other_containers": true,
+    "configuration": true,
+    "resources_and_go": true,
+    "environment": true,
+    "okad_settings": true,
+    "sub2_settings_including_smtp": true,
+    "clash_nodes_bindings_and_configuration": true,
+    "alert_rules": true,
+    "retired_route_matches_current_baseline": true
+  },
+  "business_preservation": {
+    "backup_accounts": 1059,
+    "checked_accounts": 1059,
+    "manual_pauses_preserved": true,
+    "manual_proxy_modes_preserved": true,
+    "proxy_bindings_changed_with_event_chain": 982,
+    "cookie_rotations_with_version_advance": 2,
+    "non_source_cookie_credential_changes": 22,
+    "credential_field_names_changed": [
+      "_token_version",
+      "access_token",
+      "adobe_session_cookie",
+      "adobe_session_cookie_source_hash",
+      "cookie",
+      "expires_at"
+    ]
+  },
+  "migration_checksums_preserved": true,
+  "migration_set_retained": true,
+  "heartbeat_after_temporary_process_cleanup": {
+    "at": "2026-11-06T14:37:17.338439+08:00",
+    "healthy": true
+  },
+  "passive_sample_count": 13,
+  "public_contract": {
+    "scope": "selected live account 2933 through an isolated regular API group; five models, 18 distinct public endpoint cases",
+    "approved_scope_all_passed": true,
+    "legacy_group_7_all_passed": false,
+    "legacy_group_7_failures": 2,
+    "legacy_results_retained": true,
+    "temporary_test_access_cleaned": true,
+    "all_account_pool_verified": false,
+    "current_group_33_all_passed": false,
+    "current_group_33_failures": 5,
+    "current_group_results_retained": true
+  },
+  "selected_account_usage": {
+    "count": 12,
+    "accounts": [
+      2933
+    ],
+    "image_count": 12
+  },
+  "selected_account_bindings": {
+    "at": "2026-11-06T06:12:31.446846+00:00",
+    "account_id": 2933,
+    "cutover_backup": "/opt/adobe-relay/backups/20261106T052503Z-da24f5634a0fd332f95a14d666fa2e9cea19db53",
+    "before": [
+      {
+        "group_id": 33,
+        "priority": 1,
+        "created_at": "2026-11-06 11:26:25.967378+08"
+      }
+    ],
+    "current": [
+      {
+        "group_id": 33,
+        "priority": 1,
+        "created_at": "2026-11-06T14:00:29.0895+08:00"
+      }
+    ],
+    "original_group_ids_preserved": true,
+    "original_group_priorities_preserved": true,
+    "normal_admin_api_recreates_membership_rows": true,
+    "restored_old_data": false,
+    "read_only": true
+  },
+  "verified_locale_bundle_count": 2,
+  "concurrent_clash_import_review": {
+    "baseline_revision": 32,
+    "retained_revision": 33,
+    "node_count": 597,
+    "changed_upstream_ports": 24,
+    "node_identities_and_credentials_preserved": true,
+    "authenticated_import_http_status": 200,
+    "database_audit_receipt_available": false,
+    "specific_actor_attributed": false,
+    "original_failure_run": 42172934104,
+    "read_only": true,
+    "restored_old_data": false
+  },
+  "browser_limitation": "Live authenticated browser verification unavailable; asset and API checks only",
+  "excluded_1290": {
+    "excluded": false,
+    "status": null,
+    "bindings": 0,
+    "leases": 0
+  },
+  "workflow_run": 42175564495,
+  "raw_operate_log_sha256": "ccec52b3b80f701f16e64b8e1c194a24d0f89ec3047054fadb6617cdf4a0265a"
+}

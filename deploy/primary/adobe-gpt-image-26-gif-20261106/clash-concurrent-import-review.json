@@ -1,0 +1,145 @@
+{
+  "baseline_at": "2026-11-06T05:03:43.310145+00:00",
+  "node_changed_field_counts": {
+    "config": 24
+  },
+  "config_changed_field_counts": {
+    "port": 24
+  },
+  "changed_proxy_ids": [
+    1118,
+    1119,
+    1120,
+    1121,
+    1122,
+    1123,
+    1139,
+    1140,
+    1141,
+    1149,
+    1150,
+    1151,
+    1154,
+    1155,
+    1160,
+    1161,
+    1162,
+    1166,
+    1167,
+    1182,
+    1183,
+    1184,
+    1187,
+    1188
+  ],
+  "node_order_changed": true,
+  "nodes_equal_ignoring_order": false,
+  "audit_flush_failure_count_in_window": 1,
+  "nearby_authenticated_events": [],
+  "import_log_entries": [
+    {
+      "line_sha256": "79378e7918a471c063640ca5c6823a29b3da6f460d8ca4ac2732ef6dd76b46bf",
+      "component": "http.access",
+      "request_id": "8c435c8a-1d82-4619-aa58-e632d7fa68de",
+      "path": "/api/v1/admin/proxies/clash/import",
+      "method": "POST",
+      "status_code": 200,
+      "latency_ms": 4635,
+      "completed_at": "2026-11-06T14:11:16.373+0800"
+    }
+  ],
+  "app_window_log_sha256": "ad9f26cb84a8e989b08add63e15037a3a73df3e84f429bdd45a6bf2794dec484",
+  "at": "2026-11-06T06:30:38.823337+00:00",
+  "cutover_backup": "/opt/adobe-relay/backups/20261106T052503Z-da24f5634a0fd332f95a14d666fa2e9cea19db53",
+  "before_contract_hash": "1e32db4c3008faf77f9bd36394327b81",
+  "current_contract_hash": "1546d8db13442c6cc818740c03172343",
+  "before_revision": 32,
+  "current_revision": 33,
+  "current_updated_at": "2026-11-06T14:11:15.184119+08:00",
+  "contract_equal_without_revision": false,
+  "before_semantic_hash": "fa36a4499ee2078158a25d3864c07230",
+  "current_semantic_hash": "b883ce536f417210e28ddb7d5b482a42",
+  "before_nodes": 597,
+  "current_nodes": 597,
+  "before_disabled_nodes": 0,
+  "current_disabled_nodes": 0,
+  "added_names": 0,
+  "removed_names": 0,
+  "current_names_sha256": "f1ceb3a6acec9c34dab2abb0d4ce9982c82dccff201bea8986457be7b090ecaf",
+  "url_unchanged": true,
+  "changed_document_keys": [
+    "nodes",
+    "revision",
+    "sources",
+    "updated_at"
+  ],
+  "authenticated_import_events": [
+    {
+      "id": 144576,
+      "created_at": "2026-11-06T14:07:49.468649+08:00",
+      "actor_user_id": 1,
+      "actor_role": "admin",
+      "auth_method": "jwt",
+      "action": "admin.proxies.clash.check.create",
+      "method": "POST",
+      "path": "/api/v1/admin/proxies/clash/check",
+      "status_code": 200,
+      "latency_ms": 555,
+      "request_body_sha256": "250ab91d8fe04d129442144230248cec050f0e973f9d82273c525b89d3062a07",
+      "request_revision": null,
+      "requested_name_count": 0,
+      "requested_names_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "request_url_matches_current": false,
+      "request_field_names": [
+        "url"
+      ]
+    },
+    {
+      "id": 144577,
+      "created_at": "2026-11-06T14:07:55.696516+08:00",
+      "actor_user_id": 1,
+      "actor_role": "admin",
+      "auth_method": "jwt",
+      "action": "admin.proxies.clash.preview.create",
+      "method": "POST",
+      "path": "/api/v1/admin/proxies/clash/preview",
+      "status_code": 200,
+      "latency_ms": 3353,
+      "request_body_sha256": "0d891cd61411a07f3c3be0426f9cfdd76d1c8c84955cdd9d3a8e3b95d986b5d6",
+      "request_revision": null,
+      "requested_name_count": 0,
+      "requested_names_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "request_url_matches_current": false,
+      "request_field_names": [
+        "url"
+      ]
+    }
+  ],
+  "read_only": true,
+  "restored_old_data": false,
+  "credentials_in_output": false,
+  "unchanged_application_sources": [
+    {
+      "path": "backend/internal/clash/manager.go",
+      "baseline_sha256": "7a84552d14d83f558e96bcd738a9f868af877d3c246f5380d26d0696bbd1b83f",
+      "application_sha256": "7a84552d14d83f558e96bcd738a9f868af877d3c246f5380d26d0696bbd1b83f"
+    },
+    {
+      "path": "backend/internal/server/routes/admin.go",
+      "baseline_sha256": "f26e182bfe1224c081d6398f4e42bce808b9c6549a3b0573f653f3f13b5c6da3",
+      "application_sha256": "f26e182bfe1224c081d6398f4e42bce808b9c6549a3b0573f653f3f13b5c6da3"
+    },
+    {
+      "path": "backend/internal/server/middleware/admin_auth.go",
+      "baseline_sha256": "5ef93a45f16aba7f2e171e49f66974fdd4ee17f8fc1a3888d5d0cbf48e2ccfe1",
+      "application_sha256": "5ef93a45f16aba7f2e171e49f66974fdd4ee17f8fc1a3888d5d0cbf48e2ccfe1"
+    },
+    {
+      "path": "backend/internal/server/middleware/logger.go",
+      "baseline_sha256": "5bed268a6f8bf0f764ebf3bc85e8cf05b22a4eaa118a98062f5730b6f35e4f4d",
+      "application_sha256": "5bed268a6f8bf0f764ebf3bc85e8cf05b22a4eaa118a98062f5730b6f35e4f4d"
+    }
+  ],
+  "server_observation_file": "clash-observation-20261106T063038Z.json",
+  "interpretation": "An authenticated administrative import completed successfully; the exact actor and request body are unavailable because the database audit batch failed. Preserve this exact live import without attributing it to a specific user."
+}

@@ -1,7 +1,7 @@
 """Fixed-scope GIF and complexity release using the original deployment guards."""
 import base64,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','resume','public-test','customer-test','selected-test','status','verify','archive']
+assert phase in ['preflight','prepare','start','resume','public-test','customer-test','selected-test','inspect-clash','status','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-gpt-image-26-gif-20261106'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -98,12 +98,18 @@ with os.fdopen(os.open(r/'selected-test-dispatched.json',os.O_CREAT|os.O_EXCL|os
 subprocess.run(['systemd-run','--unit=adobe-gpt-image-26-gif-selected-tests-20261106','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/selected-test.log','--property=StandardError=append:{root}/selected-test.log','/usr/bin/python3',str(r/'selected-test-driver.py'),'{sha}'],check=True)
 print(json.dumps({{'selected_test_dispatched':True,'application_sha':'{sha}'}}))
 """)
+elif phase=='inspect-clash':
+ copy([pathlib.Path(__file__).parent/'clash-review.py'])
+ script=f"import pathlib,subprocess,sys; r=pathlib.Path('{root}'); assert (r/'expected-sha').read_text().strip()=='{sha}'; subprocess.run([sys.executable,str(r/'clash-review.py')],check=True)"
+ p=subprocess.run(['ssh',*options,target,'python3 -'],input=script,text=True,capture_output=True,check=True,timeout=180)
+ evidence=pathlib.Path('primary-release-evidence');evidence.mkdir(exist_ok=True)
+ (evidence/'clash-inspection.json').write_text(p.stdout);print(p.stdout)
 elif phase=='verify':
- copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','public_contract_guard.py']])
+ copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','public_contract_guard.py','selected-binding-review.py','audit.py','clash_contract_guard.py','clash-concurrent-import-review.json']])
  remote(f"""import pathlib,subprocess,sys
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
 assert (r/'rolling-finished.json').exists()
-for script,output in [('route-guard-review.py','route-guard-review.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('observe.py','observation.json'),('final-verify.py','final-verification.json')]:
+for script,output in [('selected-binding-review.py','selected-binding-review.json'),('route-guard-review.py','route-guard-review.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('observe.py','observation.json'),('final-verify.py','final-verification.json')]:
  if not (r/output).exists():subprocess.run([sys.executable,str(r/script)],check=True)
 """)
 elif phase=='archive':
@@ -133,7 +139,7 @@ for name,value in {payload!r}.items():
  path=r/name;path.write_bytes(data);path.chmod(0o600);files[name]=a.digest(data)
  if name=='primary-README.md':pathlib.Path('/opt/adobe-relay/deploy/primary/README.md').write_bytes(data)
 notification=json.loads((r/'release-notification.json').read_text()) if (r/'release-notification.json').exists() else None
-out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','image_id':container['Image'],'core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'adobe_requests':{{'preflight':core['authorized_live_generation_tests']['before'],'post_release':core['authorized_live_generation_tests']['after'],'additional_legacy_group_diagnostics':core['authorized_live_generation_tests']['additional_legacy_group_diagnostics'],'additional_current_group_diagnostics':core['authorized_live_generation_tests']['additional_current_group_diagnostics']}},'public_contract':core['public_contract'],'temporary_test_access_cleanup':core['temporary_test_access_cleanup'],'current_group_test_access_cleanup':core['current_group_test_access_cleanup'],'selected_account_usage':core['selected_account_usage'],'mail_sent':bool(notification and notification.get('state')=='smtp_accepted'),'notification':notification}}
+out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','image_id':container['Image'],'core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'adobe_requests':{{'preflight':core['authorized_live_generation_tests']['before'],'post_release':core['authorized_live_generation_tests']['after'],'additional_legacy_group_diagnostics':core['authorized_live_generation_tests']['additional_legacy_group_diagnostics'],'additional_current_group_diagnostics':core['authorized_live_generation_tests']['additional_current_group_diagnostics']}},'public_contract':core['public_contract'],'temporary_test_access_cleanup':core['temporary_test_access_cleanup'],'current_group_test_access_cleanup':core['current_group_test_access_cleanup'],'selected_account_usage':core['selected_account_usage'],'selected_account_bindings':core['selected_account_bindings'],'mail_sent':bool(notification and notification.get('state')=='smtp_accepted'),'notification':notification}}
 (r/'release-completion.json').write_text(json.dumps(out,ensure_ascii=False,indent=2));print(json.dumps(out))
 """)
 else:
