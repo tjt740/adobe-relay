@@ -28,6 +28,7 @@ try{
    results.push({browser:kind,case:'old-policy-native-form',status:403,origin:'null'});await old.close();
    for(const width of [1440,390]){
     const ctx=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width,height:950}});const page=await ctx.newPage();
+    await page.addInitScript(()=>Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.copiedExample=text}}}));
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     for(const email of ['admin@example.com','user@example.com','2fa@example.com']){
      const r=await page.goto(url+'/docs/login');assert.equal(r.headers()['referrer-policy'],'same-origin');
@@ -38,6 +39,36 @@ try{
      assert.equal(login.status(),303);assert.equal((await login.request().allHeaders()).origin,url);
      if(email.startsWith('2fa')){await page.locator('[name=totp_code]').fill('123456');await page.getByRole('button',{name:'验证',exact:false}).click()}
      await page.waitForURL(url+'/docs/');await page.locator('article h1').waitFor();
+     if(email==='admin@example.com'){
+      const original=await ctx.request.get(url+'/docs/');
+      const expected=await page.evaluate(html=>{
+       const doc=new DOMParser().parseFromString(html,'text/html');
+       return {codes:[...doc.querySelectorAll('pre code')].map(n=>n.textContent),cells:[...doc.querySelectorAll('td')].map(n=>n.textContent)};
+      },await original.text());
+      assert.deepEqual(await page.locator('pre code').allTextContents(),expected.codes,'highlighting must preserve every example byte');
+      assert.deepEqual(await page.locator('td').allTextContents(),expected.cells,'status styling must preserve table content');
+      assert(await page.locator('.token-key').count()>0&&await page.locator('.token-number').count()>0);
+      assert.equal(await page.locator('#toc [aria-current="location"]').count(),1);
+      await page.screenshot({path:path.join(out,`${kind}-document-${width}.png`)});
+      await page.locator('table').nth(1).scrollIntoViewIfNeeded();
+      await page.screenshot({path:path.join(out,`${kind}-models-${width}.png`)});
+      await page.locator('article pre').nth(1).scrollIntoViewIfNeeded();
+      await page.screenshot({path:path.join(out,`${kind}-code-${width}.png`)});
+      for(let i=0;i<expected.codes.length;i++){
+       await page.locator('.copy').nth(i).click();
+       assert.equal(await page.evaluate(()=>window.copiedExample),expected.codes[i],'copy must preserve exact example');
+      }
+      await page.locator('#search').fill('不存在的章节');
+      assert.equal(await page.locator('#search-empty').isVisible(),true);
+      await page.locator('#search').fill('GIF');
+      assert(await page.locator('#toc a:visible').count()>0);
+      await page.locator('#search').fill('');
+      const link=page.locator('#toc a.level-2').nth(1);
+      const target=await link.getAttribute('href');await link.click();
+      await page.waitForFunction(id=>document.querySelector('#toc [aria-current="location"]')?.getAttribute('href')===id,target);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'code/table overflow must stay inside containers');
+      results.push({browser:kind,width,case:'document-ui',exact_code_and_copy:expected.codes.length,exact_table_content:true,search:true,current_section:true});
+     }
      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'page overflow');
      const md=await ctx.request.get(url+'/docs/guide.md');assert.equal(md.status(),200);assert((await md.text()).includes('frame_duration_ms'));
      await page.getByRole('button',{name:'退出登录'}).click();await page.waitForURL(url+'/docs/login');
