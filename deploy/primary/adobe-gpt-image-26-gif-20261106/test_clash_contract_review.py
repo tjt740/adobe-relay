@@ -3,6 +3,8 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 from unittest import TestCase, mock
 
 from clash_contract_guard import BEFORE, AFTER, reviewed_hash
@@ -29,6 +31,10 @@ class ClashContractReviewTests(TestCase):
 
     def test_no_review_keeps_original_guard(self):
         self.assertEqual(reviewed_hash(BEFORE, self.root), BEFORE)
+
+    def test_audit_loads_by_absolute_path_outside_release_directory(self):
+        script = "import importlib.util,sys; s=importlib.util.spec_from_file_location('remote_audit',sys.argv[1]); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); assert callable(m.check_preserved)"
+        subprocess.run([sys.executable, '-I', '-c', script, str((HERE / 'audit.py').resolve())], cwd=self.root, check=True, capture_output=True, text=True)
 
     def test_exact_review_and_independent_observation(self):
         self.install()
