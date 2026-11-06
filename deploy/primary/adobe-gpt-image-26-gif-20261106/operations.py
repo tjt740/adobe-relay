@@ -87,6 +87,7 @@ subprocess.run(['systemd-run','--unit=adobe-gpt-image-26-gif-customer-tests-2026
 print(json.dumps({{'customer_test_dispatched':True,'application_sha':'{sha}'}}))
 """)
 elif phase=='verify':
+ copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','public_contract_guard.py']])
  remote(f"""import pathlib,subprocess,sys
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
 assert (r/'rolling-finished.json').exists()
@@ -120,7 +121,7 @@ for name,value in {payload!r}.items():
  path=r/name;path.write_bytes(data);path.chmod(0o600);files[name]=a.digest(data)
  if name=='primary-README.md':pathlib.Path('/opt/adobe-relay/deploy/primary/README.md').write_bytes(data)
 notification=json.loads((r/'release-notification.json').read_text()) if (r/'release-notification.json').exists() else None
-out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','image_id':container['Image'],'core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'adobe_requests':{{'preflight':core['authorized_live_generation_tests']['before'],'post_release':core['authorized_live_generation_tests']['after']}},'mail_sent':bool(notification and notification.get('state')=='smtp_accepted'),'notification':notification}}
+out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','image_id':container['Image'],'core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'adobe_requests':{{'preflight':core['authorized_live_generation_tests']['before'],'post_release':core['authorized_live_generation_tests']['after'],'additional_legacy_group_diagnostics':core['authorized_live_generation_tests']['additional_legacy_group_diagnostics']}},'public_contract':core['public_contract'],'temporary_test_access_cleanup':core['temporary_test_access_cleanup'],'mail_sent':bool(notification and notification.get('state')=='smtp_accepted'),'notification':notification}}
 (r/'release-completion.json').write_text(json.dumps(out,ensure_ascii=False,indent=2));print(json.dumps(out))
 """)
 else:
