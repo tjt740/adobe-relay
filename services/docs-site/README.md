@@ -19,3 +19,11 @@ The service binds to loopback, runs with a dynamic unprivileged user, 96 MiB max
 Rebuild from the exact committed source. Under the existing release lock, preserve the previous binary/symlink and nginx/service configuration, verify source and artifact hashes and current service state, atomically point `current` at the new release, restart only `creative-docs`, and verify access gates and health. Restart intentionally signs docs visitors out. Reverting only this binary uses the same procedure; do not roll back any Sub2 data, application or other service.
 
 To remove an initial installation, first verify no later update exists. Under the release lock remove only the recorded docs include from the current creative.cheap HTTPS server (do not restore a stale whole file), remove `00-creative-docs-limits.conf` and the two docs snippets, run `nginx -t`, and reload nginx. Then disable/stop `creative-docs`. Keep audit evidence and current Sub2/Okad data/configuration.
+
+## Browser form regression
+
+Use `Referrer-Policy: same-origin`. `no-referrer` makes native form POSTs send `Origin: null` under the Fetch standard and conflicts with the exact-origin CSRF gate. Keep the gate: missing/null/foreign origins remain rejected. Old open forms receive a fresh login page prompting reload.
+
+`browser-check.mjs` starts an isolated TLS fixture with simulated Sub2 users. Run with an installed Playwright module (`PLAYWRIGHT_MODULE_PATH` optional); `DOCS_CHROME_CHANNEL=chrome DOCS_BROWSERS=chromium` uses an existing Chrome installation. It reproduces the old policy's 403, then tests native administrator/user/2FA login, Markdown download, logout and desktop/mobile widths. The fixture is test-only and is excluded from the deployed binary. Screenshot/output directory defaults to ignored `.browser-output`.
+
+For a binary-only update, the primary workflow's `update` phase requires the exact currently installed binary SHA256. It holds the existing release lock, records prior version/configuration, atomically updates only the docs binary and restarts only docs. All document sessions expire at restart; Sub2/Okad and nginx are preserved. Health failure restores only the previous docs binary.

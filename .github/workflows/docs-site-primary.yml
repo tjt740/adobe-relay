@@ -8,9 +8,13 @@ on:
         required: true
       phase:
         type: choice
-        options: [install, verify, status]
+        options: [install, update, verify, status]
         default: status
         required: true
+      expected_binary_sha:
+        description: Required for update; exact currently installed docs binary SHA256
+        type: string
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -43,17 +47,18 @@ jobs:
           cmp guide.md ../../docs/ADOBE_IMAGE_CLIENT_GUIDE.md
           go test -race ./...
           go vet ./...
-          python3 -m py_compile install.py verify-live.py
+          python3 -m py_compile install.py update.py verify-live.py
           bash -n build.sh
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o docs-server .
           sha256sum docs-server guide.md > artifact-sha256.txt
-          tar -czf /tmp/creative-docs-bundle.tar.gz docs-server guide.md docs-site.service nginx-limits.conf nginx-locations.conf nginx-proxy.conf install.py verify-live.py README.md artifact-sha256.txt
+          tar -czf /tmp/creative-docs-bundle.tar.gz docs-server guide.md docs-site.service nginx-limits.conf nginx-locations.conf nginx-proxy.conf install.py update.py verify-live.py README.md artifact-sha256.txt
       - name: Operate independent docs service
         env:
           SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
           SOURCE_SHA: ${{ inputs.source_sha }}
           PHASE: ${{ inputs.phase }}
+          OLD_SHA: ${{ inputs.expected_binary_sha }}
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
@@ -63,11 +68,17 @@ jobs:
           mkdir -p docs-site-evidence
           ssh_opts=(-i ~/.ssh/docs_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=10 -o ServerAliveCountMax=3)
           stage="/opt/creative-docs/staging/$SOURCE_SHA"
-          if [ "$PHASE" = install ]; then
+          if [ "$PHASE" = install ] || [ "$PHASE" = update ]; then
+            if [ "$PHASE" = update ]; then [[ "$OLD_SHA" =~ ^[0-9a-f]{64}$ ]]; fi
             ssh "${ssh_opts[@]}" root@173.234.15.150 "install -d -m 700 '$stage'"
             scp "${ssh_opts[@]}" /tmp/creative-docs-bundle.tar.gz "root@173.234.15.150:$stage/bundle.tar.gz"
             binary_sha=$(sha256sum services/docs-site/docs-server | cut -d' ' -f1)
-            ssh "${ssh_opts[@]}" root@173.234.15.150 "cd '$stage' && tar -xzf bundle.tar.gz && sha256sum -c artifact-sha256.txt && python3 install.py '$binary_sha'" | tee docs-site-evidence/install.log
+            ssh "${ssh_opts[@]}" root@173.234.15.150 "cd '$stage' && tar -xzf bundle.tar.gz && sha256sum -c artifact-sha256.txt"
+            if [ "$PHASE" = install ]; then
+              ssh "${ssh_opts[@]}" root@173.234.15.150 "cd '$stage' && python3 install.py '$binary_sha'" | tee docs-site-evidence/install.log
+            else
+              ssh "${ssh_opts[@]}" root@173.234.15.150 "cd '$stage' && python3 update.py '$binary_sha' '$OLD_SHA'" | tee docs-site-evidence/update.log
+            fi
           elif [ "$PHASE" = verify ]; then
             ssh "${ssh_opts[@]}" root@173.234.15.150 "test -f '$stage/verify-live.py' && python3 '$stage/verify-live.py'" | tee docs-site-evidence/verify.log
           else

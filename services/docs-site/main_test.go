@@ -254,3 +254,25 @@ func TestPrefixIsolation(t *testing.T) {
 		t.Fatal("prefix probes reached Sub2")
 	}
 }
+
+// Ordinary browser forms derive Origin from the response's referrer policy.
+func TestNativeFormSourcePolicy(t *testing.T) {
+	a, _, hits := fixture(t)
+	w := request(a, "GET", "/login", "", nil)
+	if w.Header().Get("Referrer-Policy") != "same-origin" {
+		t.Fatal("native same-origin forms must retain their Origin")
+	}
+	for _, source := range []string{"", "null", "https://evil.example", "https://creative.cheap.evil.example"} {
+		r := httptest.NewRequest("POST", origin+basePath+"/auth/login", strings.NewReader("email=admin%40example.com&password=correct"))
+		r.Header.Set("Origin", source)
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+		a.ServeHTTP(w, r)
+		if w.Code != 403 || !strings.Contains(w.Body.String(), "请刷新登录页后重试") {
+			t.Fatal("untrusted source accepted", source, w.Code)
+		}
+	}
+	if hits.Load() != 0 {
+		t.Fatal("untrusted source reached Sub2")
+	}
+}
