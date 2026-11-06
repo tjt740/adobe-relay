@@ -1,0 +1,30 @@
+{
+  "application_sha": "da24f5634a0fd332f95a14d666fa2e9cea19db53",
+  "workflow_run": 42165026514,
+  "url": "https://github.com/tjt740/adobe-relay/actions/runs/42165026514",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "name": "frontend-checks",
+      "conclusion": "success"
+    },
+    {
+      "name": "image-build",
+      "conclusion": "success"
+    },
+    {
+      "name": "backend-checks",
+      "conclusion": "success"
+    },
+    {
+      "name": "build",
+      "conclusion": "success"
+    },
+    {
+      "name": "Deploy primary",
+      "conclusion": "skipped"
+    }
+  ],
+  "image_id": "sha256:05130a59e63020d14770708cc3fa1bbd27020ac0309a83b07ae91fcde5d2f1af",
+  "archive_sha256": "81c6c3870ec92c110871d94de1daba3ecf8754fa733cdd15cd15faed8401fe89"
+}

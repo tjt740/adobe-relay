@@ -90,7 +90,7 @@ def multipart(payload, reference):
     return b''.join(chunks), 'multipart/form-data; boundary=' + boundary
 
 
-def main(sha):
+def main(sha, current_group=False):
     os.umask(0o077)
     assert len(sha) == 40 and all(c in '0123456789abcdef' for c in sha)
     assert (ROOT / 'expected-sha').read_text().strip() == sha
@@ -98,8 +98,16 @@ def main(sha):
     c = json.loads(subprocess.check_output(['docker', 'inspect', 'adobe-relay-app-1']))[0]
     assert c['Config']['Image'] == 'adobe-relay:' + sha
     assert c['State']['Health']['Status'] == 'healthy'
-    query = "BEGIN READ ONLY; SELECT key FROM api_keys WHERE id=12 AND user_id=1 AND group_id=7 AND status='active' AND deleted_at IS NULL; COMMIT;"
-    key = subprocess.run(['docker', 'exec', '-i', 'adobe-relay-postgres-1', 'psql', '-U', 'sub2api', '-d', 'sub2api', '-Atq', '-v', 'ON_ERROR_STOP=1'], input=query, text=True, capture_output=True, check=True, timeout=25).stdout.strip()
+    prefix = 'customer-' if current_group else 'public-'
+    key_id = 12
+    if current_group:
+        private = json.loads((ROOT / 'private-customer-test-key.json').read_text())
+        assert private['user_id'] == 1 and private['group_id'] == 33 and private['id'] != 12
+        assert private['name'] == 'release-gif-20261106-current-group-temporary'
+        key_id, key = private['id'], private['key']
+    else:
+        query = "BEGIN READ ONLY; SELECT key FROM api_keys WHERE id=12 AND user_id=1 AND group_id=7 AND status='active' AND deleted_at IS NULL; COMMIT;"
+        key = subprocess.run(['docker', 'exec', '-i', 'adobe-relay-postgres-1', 'psql', '-U', 'sub2api', '-d', 'sub2api', '-Atq', '-v', 'ON_ERROR_STOP=1'], input=query, text=True, capture_output=True, check=True, timeout=25).stdout.strip()
     assert key and len(key) > 10
     reference = (ROOT / 'preflight/matrix-image2-png.png').read_bytes()
     image_url = 'data:image/png;base64,' + base64.b64encode(reference).decode()
@@ -107,20 +115,22 @@ def main(sha):
     for model in MODELS:
         extra = {'complexity': 'high'} if model.startswith('gpt-image-2.6-') else {}
         for edit in (False, True):
-            payload = dict(model=model, prompt='A blue ceramic mug on a plain white background, no text.', n=1, size='1024x1024', quality='low', output_format='jpeg' if edit else 'png', response_format='b64_json', **extra)
+            payload = dict(model=model, prompt='An orange ceramic teapot on white, no text.' if current_group else 'A blue ceramic mug on a plain white background, no text.', n=1, size='1024x1024', quality='low', output_format='jpeg' if edit else 'png', response_format='b64_json', **extra)
             if edit:
                 payload['images'] = [{'image_url': image_url}]
             cases.append((model + ('-edit' if edit else '-generate'), '/v1/images/edits' if edit else '/v1/images/generations', payload, False, False))
     for model in MODELS[-2:]:
         frames = 4 if model.endswith('star-swirl') else 16
         payload = dict(model=model, prompt='A tiny bird waves one wing in a looping animation on white, no text.', n=1, quality='low', size='896x896' if frames == 4 else 'auto', output_format='gif', frame_count=frames, frame_duration_ms=200, response_format='url' if frames == 16 else 'b64_json', complexity='medium')
+        if current_group:
+            payload['prompt'] = 'A small red ball bounces on white in a simple looping animation, no text.'
         cases.append((model + '-gif', '/v1/images/generations', payload, False, False))
         for variant in ('json', 'multipart', 'generation-reference'):
             edit_payload = dict(payload, images=[{'image_url': image_url}], response_format='b64_json')
             cases.append((model + '-reject-' + variant, '/v1/images/generations' if variant == 'generation-reference' else '/v1/images/edits', edit_payload, variant == 'multipart', True))
     results = []
     for name, endpoint, payload, form, rejection in cases:
-        result_file, marker = ROOT / ('public-' + name + '-result.json'), ROOT / ('public-' + name + '-started.json')
+        result_file, marker = ROOT / (prefix + name + '-result.json'), ROOT / (prefix + name + '-started.json')
         if result_file.exists():
             out = json.loads(result_file.read_text())
             assert out['application_sha'] == sha
@@ -128,10 +138,10 @@ def main(sha):
             continue
         started = datetime.datetime.now(datetime.timezone.utc).isoformat()
         with os.fdopen(os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w') as f:
-            json.dump({'at': started, 'application_sha': sha, 'case': name, 'api_key_id': 12, 'outer_posts': 1, 'never_replay_if_interrupted': True}, f)
+            json.dump({'at': started, 'application_sha': sha, 'case': name, 'api_key_id': key_id, 'outer_posts': 1, 'never_replay_if_interrupted': True}, f)
         data, content_type = multipart(payload, reference) if form else (json.dumps(payload).encode(), 'application/json')
         req = urllib.request.Request('https://creative.cheap' + endpoint, data=data, headers={'Authorization': 'Bearer ' + key, 'Content-Type': content_type}, method='POST')
-        out = {'at': started, 'case': name, 'model': payload['model'], 'endpoint': endpoint, 'application_sha': sha, 'api_key_id': 12, 'outer_posts': 1, 'expected_rejection': rejection, 'success': False}
+        out = {'at': started, 'case': name, 'model': payload['model'], 'endpoint': endpoint, 'application_sha': sha, 'api_key_id': key_id, 'outer_posts': 1, 'expected_rejection': rejection, 'success': False}
         begin = time.monotonic()
         try:
             with urllib.request.urlopen(req, timeout=300) as h:
@@ -154,7 +164,7 @@ def main(sha):
                 assert info['frame_count'] == payload['frame_count']
                 assert all(d == 20 for d in info['delays_centiseconds'])
                 assert body.get('output_format') == 'gif'
-            (ROOT / ('public-' + name + '.' + info['format'])).write_bytes(image)
+            (ROOT / (prefix + name + '.' + info['format'])).write_bytes(image)
             out.update(success=True, image=info, response_quality=body.get('quality'))
         except urllib.error.HTTPError as e:
             out['status'] = e.code
@@ -171,8 +181,8 @@ def main(sha):
             result_file.write_text(json.dumps(out, indent=2))
             results.append(out)
             print(json.dumps(out), flush=True)
-    summary = {'application_sha': sha, 'all_passed': len(results) == 18 and all(x['success'] for x in results), 'source': 'Public customer Images API with existing administrator-owned key 12/group 7; no customer keys or account changes', 'cases': results}
-    (ROOT / 'post-release-tests.json').write_text(json.dumps(summary, indent=2))
+    summary = {'application_sha': sha, 'all_passed': len(results) == 18 and all(x['success'] for x in results), 'source': 'Public customer Images API with bounded temporary administrator-owned key/group 33; normal authenticated grant with cleanup' if current_group else 'Public customer Images API with existing administrator-owned key 12/group 7; no customer keys or account changes', 'group_id': 33 if current_group else 7, 'cases': results}
+    (ROOT / ('customer-post-release-tests.json' if current_group else 'post-release-tests.json')).write_text(json.dumps(summary, indent=2))
     assert summary['all_passed'], 'Public matrix has failures; inspect evidence without replaying requests'
 
 

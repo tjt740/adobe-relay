@@ -420,9 +420,11 @@ Gemini 兼容入口仍采用 Google 错误信封：违规时 HTTP 451，`error.c
 ```json
 {
   "error": {
-    "type": "invalid_request_error",
+    "type": "adobe_request",
     "message": "GIF reference editing is not supported on the Adobe channel; use text-only /v1/images/generations for GIF output or png/jpeg for image edits",
     "code": "gif_edit_unsupported",
+    "retryable": false,
+    "resubmit_allowed": false,
     "param": "image",
     "stage": "validation",
     "source": "request"
@@ -430,7 +432,7 @@ Gemini 兼容入口仍采用 Google 错误信封：违规时 HTTP 451，`error.c
 }
 ```
 
-这是结构示例。客户端主要按 HTTP 状态、`code`、`param` 判断，不要匹配整段英文 `message`。`stage` 表示校验、输入抓取、上传、提交、轮询或下载等阶段；`source` 区分请求、上游或网关。只有存在实际上游状态时才有 `upstream_status`；`request_id` 如返回，应连同调用时间保存用于排查，不是可直接重试或查询任务的凭证。
+这是结构示例。终态错误可能同时携带 `x-should-retry: false`、`retryable: false`、`resubmit_allowed: false`，表示不要原样重放本次请求。客户端主要按 HTTP 状态、`code`、`param` 判断，不要匹配整段英文 `message`。`stage` 表示校验、输入抓取、上传、提交、轮询或下载等阶段；`source` 区分请求、上游或网关。只有存在实际上游状态时才有 `upstream_status`；`request_id` 如返回，应连同调用时间保存用于排查，不是可直接重试或查询任务的凭证。
 
 | HTTP / `code` | 含义 | 客户处理 |
 | --- | --- | --- |
@@ -611,6 +613,10 @@ for index, item in enumerate(response.get("data", []), 1):
         raise RuntimeError("返回字节不是 GIF，不应修改后缀冒充动图")
     Path(f"animation-{index}.gif").write_bytes(data)
 ```
+
+### 8.1 SDK 与前端接入
+
+若 SDK 的参数列表尚未包含 complexity、frame_count、frame_duration_ms，使用它提供的额外 JSON 请求体选项，或直接按 curl 示例发送 HTTP；关键是最终请求体确实含这些 snake_case 字段，而不是只在前端表单里保存。不要改写成 frameCount、frameDurationMs。GIF 展示必须使用原始 GIF 字节或完整图片链接；做缩略图、画布导出或统一 PNG 压缩时应保留原动画供用户下载。客户端遇到新参数不兼容时，先检查最终 HTTP 请求，再排查模型权限与服务端错误。
 
 ## 9. 验证范围与使用边界
 
