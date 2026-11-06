@@ -130,6 +130,15 @@ def pending_uploads(name):
   sent=re.search(r'bytes_sent:(\d+)',block)
   if sent is None or int(sent[1])<=128:pending+=1
  return pending
+def running_checks_observation():
+ try:
+  return int(run(['docker','exec','adobe-relay-postgres-1','psql','-U','sub2api','-d','sub2api','-Atqc',"SELECT count(*) FROM accounts WHERE deleted_at IS NULL AND extra->'okad_connection_test'->>'state'='running'"]))
+ except RuntimeError as error:
+  if 'too many clients already' not in str(error):raise
+  # A failed read is unknown, never zero. The bounded drain loop resets its
+  # stable window and observes again without changing any database setting.
+  return None
+
 def drain(which):
  state=load('rolling-prepared.json');own_lease()
  if which=='old':prefixes=state['old_prefixes'];name=APP
@@ -142,7 +151,7 @@ def drain(which):
   own_lease();current=slot_prefixes()
   if which=='old':prefixes=list(set(prefixes)|{p for p in current if p!=state['canary_prefix']})
   count=sum(current.get(p,0) for p in prefixes);pending=pending_uploads(name)
-  running_checks=int(run(['docker','exec','adobe-relay-postgres-1','psql','-U','sub2api','-d','sub2api','-Atqc',"SELECT count(*) FROM accounts WHERE deleted_at IS NULL AND extra->'okad_connection_test'->>'state'='running'"]))
+  running_checks=running_checks_observation()
   row={'at':now(),'running_automatic_checks':running_checks,'elapsed_seconds':round(time.monotonic()-began),'remaining_tracked_slots':count,'pending_input_sockets':pending,'host_available_bytes':available()}
   samples.append(row);save('rolling-'+which+'-drain-progress.json',{'samples':samples})
   if available()<2*1024**3:

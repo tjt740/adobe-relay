@@ -6,6 +6,18 @@ spec=importlib.util.spec_from_file_location('rolling',Path(__file__).with_name('
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
 class RollingHandoffTests(TestCase):
+    def test_database_connection_pressure_is_unknown_not_zero(self):
+        with mock.patch.object(m,'run',side_effect=RuntimeError('FATAL: sorry, too many clients already')):
+            self.assertIsNone(m.running_checks_observation())
+        with mock.patch.object(m,'run',side_effect=RuntimeError('authentication failed')):
+            with self.assertRaises(RuntimeError):m.running_checks_observation()
+
+    def test_unknown_database_observation_never_completes_drain(self):
+        with mock.patch.object(m,'own_lease'), mock.patch.object(m,'load',return_value={'old_id':'old','old_prefixes':['prefix'],'canary_prefix':'new'}), mock.patch.object(m,'inspect',return_value={'Id':'old'}), mock.patch.object(m,'slot_prefixes',return_value={}), mock.patch.object(m,'pending_uploads',return_value=0), mock.patch.object(m,'running_checks_observation',return_value=None), mock.patch.object(m,'available',return_value=10*1024**3), mock.patch.object(m.time,'monotonic',side_effect=[0,1,1501]), mock.patch.object(m,'save') as save:
+            with self.assertRaises(AssertionError):m.drain('old')
+            self.assertEqual([c.args[0] for c in save.call_args_list],['rolling-old-drain-progress.json'])
+            self.assertIsNone(save.call_args.args[1]['samples'][0]['running_automatic_checks'])
+
     def test_default_root_user_null_and_empty_are_same_startup_contract(self):
         self.assertEqual(m.startup_contract({'User':None}),m.startup_contract({'User':''}))
         self.assertNotEqual(m.startup_contract({'User':'1000'}),m.startup_contract({'User':''}))
