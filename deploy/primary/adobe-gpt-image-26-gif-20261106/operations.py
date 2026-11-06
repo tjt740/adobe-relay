@@ -105,7 +105,7 @@ elif phase=='inspect-clash':
  evidence=pathlib.Path('primary-release-evidence');evidence.mkdir(exist_ok=True)
  (evidence/'clash-inspection.json').write_text(p.stdout);print(p.stdout)
 elif phase=='verify':
- copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','public_contract_guard.py','selected-binding-review.py']])
+ copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','public_contract_guard.py','selected-binding-review.py','audit.py','clash_contract_guard.py','clash-concurrent-import-review.json']])
  remote(f"""import pathlib,subprocess,sys
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
 assert (r/'rolling-finished.json').exists()
