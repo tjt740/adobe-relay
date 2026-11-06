@@ -91,14 +91,14 @@ def main():
         if '/clash/import' not in line:
             continue
         try:
-            entry = json.loads(line)
+            entry = json.loads(line[line.index('{'):])
         except ValueError:
             safe_logs.append({'line_sha256': hashlib.sha256(line.encode()).hexdigest(), 'format': 'non_json'})
             continue
-        safe_logs.append({k:v for k,v in entry.items() if k in ['time','timestamp','ts','method','path','status','status_code','latency','latency_ms','request_id','component','msg'] and (k != 'msg' or len(str(v)) < 100)})
+        safe_logs.append({'line_sha256': hashlib.sha256(line.encode()).hexdigest(), **{k:v for k,v in entry.items() if k in ['time','timestamp','ts','method','path','status','status_code','latency','latency_ms','request_id','component','completed_at']}})
     out = {'baseline_at': baseline['at'], 'node_changed_field_counts': dict(changed_fields), 'config_changed_field_counts': dict(changed_config_fields), 'changed_proxy_ids': changed_proxy_ids,
            'node_order_changed': [n['name'] for n in old_nodes] != [n['name'] for n in new_nodes], 'nodes_equal_ignoring_order': digest(sorted(old_nodes,key=lambda n:n['name'])) == digest(sorted(new_nodes,key=lambda n:n['name'])),
-           'nearby_authenticated_events': recent, 'import_log_entries': safe_logs, 'app_window_log_sha256': hashlib.sha256(log_text.encode()).hexdigest(),
+           'audit_flush_failure_count_in_window': log_text.count('audit log flush failed'), 'nearby_authenticated_events': recent, 'import_log_entries': safe_logs, 'app_window_log_sha256': hashlib.sha256(log_text.encode()).hexdigest(),
            'at': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'cutover_backup': str(backup), 'before_contract_hash': old_hash, 'current_contract_hash': new_hash,
            'before_revision': old.get('revision'), 'current_revision': new.get('revision'), 'current_updated_at': current['updated_at'],
            'contract_equal_without_revision': old_semantic == new_semantic, 'before_semantic_hash': old_semantic, 'current_semantic_hash': new_semantic,
