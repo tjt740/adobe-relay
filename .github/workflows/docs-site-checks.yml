@@ -1,0 +1,28 @@
+name: Docs site checks
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'services/docs-site/**'
+      - 'docs/ADOBE_IMAGE_CLIENT_GUIDE.md'
+      - '.github/workflows/docs-site-checks.yml'
+permissions:
+  contents: read
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: services/docs-site/go.sum
+      - name: Check exact source and authentication gates
+        working-directory: services/docs-site
+        run: |
+          cmp guide.md ../../docs/ADOBE_IMAGE_CLIENT_GUIDE.md
+          go test -race ./...
+          go vet ./...
+          python3 -m py_compile install.py verify-live.py
+          bash -n build.sh
+          CGO_ENABLED=0 go build -trimpath -o docs-server .
