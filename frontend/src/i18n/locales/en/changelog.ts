@@ -18,6 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      docsColors: {"title": "More readable API documentation and code examples", "body": "The independent /docs site adds blue navigation and table headings, violet parameters, green supported states and amber restrictions. Syntax highlighting preserves complete copying, document content and existing access rules."},
       adobeGptImage26Gif: { title: 'Adobe 2.6 models, text-only GIFs and planning controls', body: 'Today exposes the actual Adobe gpt-image-2.6-star-swirl and gpt-image-2.6-aurora names, GIF text generation, frame controls and independent complexity planning. Static generation and editing retain the established workflow; GIF reference editing is explicitly unsupported. Image 2/2.5 calls and submission protections remain unchanged.' },
       adobeGptImage26: { title: 'Add Adobe gpt-image-2.6-star-swirl and gpt-image-2.6-aurora', body: 'Expose Adobe’s actual GPT Image 2.6 interface versions gpt-image-2.6-star-swirl and gpt-image-2.6-aurora through the same image workflow as 2.5, with exact upstream routing, 2.6 size validation and explicit quality limits. Legacy Flare and Sunburst aliases remain accepted without appearing in the model directory or UI. Existing models, defaults, checks and submission protections remain unchanged.' },
       upstreamV0219: { title: 'Upgrade to v0.2.19 with Adobe medium defaults retained', body: 'Integrates v0.2.18–v0.2.19 scoped administrator keys, streaming usage, image billing and provider fixes. Adobe auto quality remains medium. Manual IPs, batch concurrency, subscription protection and Okad integration remain available. The new per-image switch defaults off; existing Adobe billing is retained.' },
@@ -35,6 +36,36 @@ export default {
       }
     },
     "updates": {
+      docsColors: {
+        "title": "Add color hierarchy to API documentation",
+        "body": "Color distinguishes sections, parameters and model capabilities while reading the reference.",
+        "sections": {
+          "reason": {
+            "title": "Improve the single-color presentation",
+            "body": "The previous green palette gave navigation, parameters and examples little visual separation. This update refreshes the independent documentation site."
+          },
+          "presentation": {
+            "title": "Color follows content",
+            "body": "Navigation and table headings are blue, parameters violet, supported states green and explicit rejections amber. Text labels remain, and the current reading section is highlighted."
+          },
+          "examples": {
+            "title": "Highlight and copy complete examples",
+            "body": "Bash, JSON and Python use local syntax highlighting with separate language labels and copy controls. Copying preserves original text; wide tables and code scroll inside their containers on narrow screens."
+          },
+          "access": {
+            "title": "Keep concise login and existing access",
+            "body": "Login retains email, password, the sign-in button and recovery/registration links. Administrators, regular users and existing two-factor authentication retain the same rules. Documents and Markdown downloads still require authentication."
+          },
+          "validation": {
+            "title": "Browser and content verification",
+            "body": "Chrome at 1440 and 390 widths passed administrator, regular-user and two-factor flows. All 18 examples retain exact display and clipboard text, all table cells remain unchanged, and search, current-section and page-width checks passed."
+          },
+          "boundary": {
+            "title": "Presentation only",
+            "body": "API parameters, examples, model capabilities and authentication logic are unchanged. A 390-pixel viewport check is not physical-phone or other-browser acceptance."
+          }
+        }
+      },
       adobeGptImage26: {
         title: 'Add Adobe GPT Image 2.6 models',
         body: 'Expose Adobe’s actual gpt-image-2.6-star-swirl and gpt-image-2.6-aurora versions through the existing image generation and editing flow.',

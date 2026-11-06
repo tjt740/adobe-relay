@@ -18,6 +18,7 @@ export default {
     },
     measurements: "发布准备实测与样本范围",
     overviews: {
+      docsColors: {"title": "接口文档配色与代码阅读体验升级", "body": "独立 /docs 文档新增蓝色导航与表头、紫色参数、绿色支持状态和琥珀色限制提示。代码示例增加语法高亮，保留完整复制、原有内容与登录权限。"},
       adobeGptImage26Gif: { title: 'Adobe 2.6 模型、GIF 文生图与构图规划', body: '今天接入 Adobe 实际版本名 gpt-image-2.6-star-swirl 和 gpt-image-2.6-aurora，并增加 GIF 文生图、帧参数与独立 complexity 构图规划。静态生成和编辑沿用既有流程；GIF 参考编辑明确报不支持。Image 2、2.5 的原调用方式与提交保护保持。' },
       adobeGptImage26: { title: '新增 Adobe gpt-image-2.6-star-swirl 与 gpt-image-2.6-aurora', body: '将 Adobe 实际接口版本 gpt-image-2.6-star-swirl、gpt-image-2.6-aurora 接入与 2.5 相同的图片流程，使用精确上游版本、2.6 尺寸校验和质量上限。旧 Flare、Sunburst 仍可作为兼容别名解析，但不再出现在模型目录和界面中。其他模型、默认值、检测与提交保护保持。' },
       upstreamV0219: { title: '升级 v0.2.19，保留 Adobe 中档默认质量', body: '合入 v0.2.18–v0.2.19 的管理员受限密钥、流式用量、图片计费及多平台修复。保留 Adobe auto 默认 medium、手动 IP、批量并发、订阅流量保护与 Okad 联动。新增按张计费开关默认关闭，已有 Adobe 图片计费保持。' },
@@ -35,6 +36,36 @@ export default {
       }
     },
     "updates": {
+      docsColors: {
+        "title": "接口文档增加颜色层次",
+        "body": "使用颜色区分章节、参数和模型能力，让长文档更容易查阅。",
+        "sections": {
+          "reason": {
+            "title": "改善单一配色",
+            "body": "原页面主要使用绿色，导航、参数和示例缺少视觉区分。本次调整独立文档站的配色与阅读层次。"
+          },
+          "presentation": {
+            "title": "按内容区分颜色",
+            "body": "导航和表头使用蓝色，参数使用紫色，支持状态使用绿色，明确拒绝项使用琥珀色。文字说明继续保留，当前阅读章节同步高亮。"
+          },
+          "examples": {
+            "title": "示例高亮与完整复制",
+            "body": "Bash、JSON、Python 使用本地语法高亮，语言标签和复制按钮独立于代码区域。复制保留原始文本；窄屏表格与代码在各自区域横向滚动。"
+          },
+          "access": {
+            "title": "保留简洁登录和访问权限",
+            "body": "登录页保持邮箱、密码与登录按钮，保留找回和注册入口。管理员、普通用户及已有两步验证继续使用原认证规则，文档和 Markdown 下载仍需登录。"
+          },
+          "validation": {
+            "title": "浏览器与内容核验",
+            "body": "Chrome 在 1440 和 390 宽度通过管理员、普通用户及两步验证流程；18 段示例的显示与复制文本、全部表格内容保持一致，搜索、章节标记和页面宽度检查通过。"
+          },
+          "boundary": {
+            "title": "仅调整文档呈现",
+            "body": "接口参数、调用示例、模型能力和鉴权逻辑不变。390 宽度检查属于浏览器视口验证，不代表真实手机或其他浏览器验收。"
+          }
+        }
+      },
       adobeGptImage26: {
         title: '新增 Adobe GPT Image 2.6 模型',
         body: '将 Adobe 实际接口版本 gpt-image-2.6-star-swirl 与 gpt-image-2.6-aurora 接入现有图片生成和编辑流程。',
