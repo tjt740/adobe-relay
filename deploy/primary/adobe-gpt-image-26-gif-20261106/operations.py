@@ -1,7 +1,7 @@
 """Fixed-scope GIF and complexity release using the original deployment guards."""
 import base64,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','resume','public-test','status','verify','archive']
+assert phase in ['preflight','prepare','start','resume','public-test','customer-test','status','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-gpt-image-26-gif-20261106'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -75,6 +75,17 @@ with os.fdopen(os.open(r/'public-test-dispatched.json',os.O_CREAT|os.O_EXCL|os.O
 subprocess.run(['systemd-run','--unit=adobe-gpt-image-26-gif-public-tests-20261106','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/public-test.log','--property=StandardError=append:{root}/public-test.log','/usr/bin/python3',str(r/'public-test.py'),'{sha}'],check=True)
 print(json.dumps({{'public_test_dispatched':True,'application_sha':'{sha}'}}))
 """)
+elif phase=='customer-test':
+ copy([pathlib.Path(__file__).parent/name for name in ['public-test.py','customer-test-access.py','customer-test-driver.py']])
+ remote(f"""import json,os,pathlib,subprocess
+r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
+assert (r/'rolling-finished.json').exists() and (r/'runtime-verification.json').exists()
+assert not (r/'customer-test-access-started.json').exists() and not (r/'customer-post-release-tests.json').exists()
+assert not list(r.glob('customer-gpt-image-*-started.json'))
+with os.fdopen(os.open(r/'customer-test-dispatched.json',os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600),'w') as f:json.dump({{'application_sha':'{sha}','single_dispatch':True,'group_id':33}},f)
+subprocess.run(['systemd-run','--unit=adobe-gpt-image-26-gif-customer-tests-20261106','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/customer-test.log','--property=StandardError=append:{root}/customer-test.log','/usr/bin/python3',str(r/'customer-test-driver.py'),'{sha}'],check=True)
+print(json.dumps({{'customer_test_dispatched':True,'application_sha':'{sha}'}}))
+""")
 elif phase=='verify':
  remote(f"""import pathlib,subprocess,sys
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
@@ -122,7 +133,8 @@ for name in ['adobe-relay-app-1','adobe-relay-memory-canary']:
  if p.returncode==0:
   d=json.loads(p.stdout)[0];out['current_containers'][name]={{'image':d['Config']['Image'],'health':d['State'].get('Health',{{}}).get('Status'),'oom':d['State']['OOMKilled'],'restarts':d['RestartCount']}}
 out['public_completed_cases']=[json.loads(p.read_text()) for p in sorted(r.glob('public-gpt-image-*-result.json'))]
-for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','deferred-canary.json','runtime-verification.json','business-verification.json','credential-change-review.json','preflight-contract-summary.json','post-release-tests.json','final-verification.json','release-completion.json','release-notification.json']:
+out['customer_completed_cases']=[json.loads(p.read_text()) for p in sorted(r.glob('customer-gpt-image-*-result.json'))]
+for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','deferred-canary.json','runtime-verification.json','business-verification.json','credential-change-review.json','preflight-contract-summary.json','post-release-tests.json','customer-post-release-tests.json','customer-test-key-result.json','customer-test-access-cleanup.json','final-verification.json','release-completion.json','release-notification.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
@@ -134,6 +146,8 @@ log=r/'driver.log'
 if log.exists():out['driver_errors']=[line for line in log.read_text().splitlines() if line.startswith(('AssertionError:','RuntimeError:','subprocess.CalledProcessError:'))][-8:]
 resume=r/'resume.log'
 if resume.exists():out['resume_errors']=[line for line in resume.read_text().splitlines() if line.startswith(('AssertionError:','RuntimeError:','subprocess.CalledProcessError:'))][-8:]
+customer=r/'customer-test.log'
+if customer.exists():out['customer_test_errors']=[line for line in customer.read_text().splitlines() if line.startswith(('AssertionError:','RuntimeError:','subprocess.CalledProcessError:'))][-8:]
 if (r/'progress.json').exists() and json.loads((r/'progress.json').read_text()).get('state')=='attention_required':
  spec=importlib.util.spec_from_file_location('audit',r/'audit.py');a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
  before=json.loads((r/'before.json').read_text());current=a.snapshot()
