@@ -1,0 +1,29 @@
+[Unit]
+Description=Goaifast registered-user API documentation
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+DynamicUser=yes
+ExecStart=/opt/creative-docs/current/docs-server
+Environment=GOMEMLIMIT=64MiB
+Environment=GOMAXPROCS=2
+Restart=on-failure
+RestartSec=5
+MemoryMax=96M
+CPUQuota=100%
+TasksMax=64
+LimitNOFILE=1024
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+[Install]
+WantedBy=multi-user.target

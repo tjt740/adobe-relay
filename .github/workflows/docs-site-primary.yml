@@ -1,0 +1,85 @@
+name: Publish protected docs on primary server
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact merged and reviewed docs source commit
+        type: string
+        required: true
+      phase:
+        type: choice
+        options: [install, verify, status]
+        default: status
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: adobe-relay-production
+  cancel-in-progress: false
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select exact merged source
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          git checkout --detach "$SOURCE_SHA"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: services/docs-site/go.sum
+      - name: Validate and build standalone docs
+        working-directory: services/docs-site
+        run: |
+          set -euo pipefail
+          cmp guide.md ../../docs/ADOBE_IMAGE_CLIENT_GUIDE.md
+          go test -race ./...
+          go vet ./...
+          python3 -m py_compile install.py verify-live.py
+          bash -n build.sh
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o docs-server .
+          sha256sum docs-server guide.md > artifact-sha256.txt
+          tar -czf /tmp/creative-docs-bundle.tar.gz docs-server guide.md docs-site.service nginx-limits.conf nginx-locations.conf nginx-proxy.conf install.py verify-live.py README.md artifact-sha256.txt
+      - name: Operate independent docs service
+        env:
+          SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          PHASE: ${{ inputs.phase }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/docs_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/docs_key ~/.ssh/known_hosts
+          mkdir -p docs-site-evidence
+          ssh_opts=(-i ~/.ssh/docs_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=10 -o ServerAliveCountMax=3)
+          stage="/opt/creative-docs/staging/$SOURCE_SHA"
+          if [ "$PHASE" = install ]; then
+            ssh "${ssh_opts[@]}" root@173.234.15.150 "install -d -m 700 '$stage'"
+            scp "${ssh_opts[@]}" /tmp/creative-docs-bundle.tar.gz "root@173.234.15.150:$stage/bundle.tar.gz"
+            binary_sha=$(sha256sum services/docs-site/docs-server | cut -d' ' -f1)
+            ssh "${ssh_opts[@]}" root@173.234.15.150 "cd '$stage' && tar -xzf bundle.tar.gz && sha256sum -c artifact-sha256.txt && python3 install.py '$binary_sha'" | tee docs-site-evidence/install.log
+          elif [ "$PHASE" = verify ]; then
+            ssh "${ssh_opts[@]}" root@173.234.15.150 "test -f '$stage/verify-live.py' && python3 '$stage/verify-live.py'" | tee docs-site-evidence/verify.log
+          else
+            ssh "${ssh_opts[@]}" root@173.234.15.150 'systemctl is-active creative-docs; curl --fail --silent http://127.0.0.1:6670/docs/healthz; docker ps --format "{{.Names}} {{.Image}}"; test ! -f /opt/creative-docs/audit/live-verification.json || cat /opt/creative-docs/audit/live-verification.json' | tee docs-site-evidence/status.log
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docs-site-evidence
+          path: docs-site-evidence/
+          if-no-files-found: ignore
+          retention-days: 30
+      - name: Remove runner SSH key
+        if: always()
+        run: rm -f ~/.ssh/docs_key
