@@ -4,7 +4,7 @@ on:
     inputs:
       phase:
         type: choice
-        options: [preflight, prepare, start, resume, public-test, customer-test, selected-test, status, verify, archive]
+        options: [preflight, prepare, start, resume, public-test, customer-test, selected-test, inspect-clash, status, verify, archive]
         required: true
         default: status
       application_sha:

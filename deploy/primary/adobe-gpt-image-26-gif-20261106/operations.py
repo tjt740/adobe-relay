@@ -1,7 +1,7 @@
 """Fixed-scope GIF and complexity release using the original deployment guards."""
 import base64,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','resume','public-test','customer-test','selected-test','status','verify','archive']
+assert phase in ['preflight','prepare','start','resume','public-test','customer-test','selected-test','inspect-clash','status','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-gpt-image-26-gif-20261106'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -98,6 +98,12 @@ with os.fdopen(os.open(r/'selected-test-dispatched.json',os.O_CREAT|os.O_EXCL|os
 subprocess.run(['systemd-run','--unit=adobe-gpt-image-26-gif-selected-tests-20261106','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/selected-test.log','--property=StandardError=append:{root}/selected-test.log','/usr/bin/python3',str(r/'selected-test-driver.py'),'{sha}'],check=True)
 print(json.dumps({{'selected_test_dispatched':True,'application_sha':'{sha}'}}))
 """)
+elif phase=='inspect-clash':
+ copy([pathlib.Path(__file__).parent/'clash-review.py'])
+ script=f"import pathlib,subprocess,sys; r=pathlib.Path('{root}'); assert (r/'expected-sha').read_text().strip()=='{sha}'; subprocess.run([sys.executable,str(r/'clash-review.py')],check=True)"
+ p=subprocess.run(['ssh',*options,target,'python3 -'],input=script,text=True,capture_output=True,check=True,timeout=180)
+ evidence=pathlib.Path('primary-release-evidence');evidence.mkdir(exist_ok=True)
+ (evidence/'clash-inspection.json').write_text(p.stdout);print(p.stdout)
 elif phase=='verify':
  copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','public_contract_guard.py','selected-binding-review.py']])
  remote(f"""import pathlib,subprocess,sys
