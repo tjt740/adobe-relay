@@ -90,7 +90,7 @@ def multipart(payload, reference):
     return b''.join(chunks), 'multipart/form-data; boundary=' + boundary
 
 
-def main(sha, current_group=False):
+def main(sha, current_group=False, selected_account=False):
     os.umask(0o077)
     assert len(sha) == 40 and all(c in '0123456789abcdef' for c in sha)
     assert (ROOT / 'expected-sha').read_text().strip() == sha
@@ -98,12 +98,19 @@ def main(sha, current_group=False):
     c = json.loads(subprocess.check_output(['docker', 'inspect', 'adobe-relay-app-1']))[0]
     assert c['Config']['Image'] == 'adobe-relay:' + sha
     assert c['State']['Health']['Status'] == 'healthy'
-    prefix = 'customer-' if current_group else 'public-'
+    if selected_account:
+        current_group = True
+    prefix = 'selected-' if selected_account else 'customer-' if current_group else 'public-'
     key_id = 12
+    group_id = 33 if current_group else 7
     if current_group:
-        private = json.loads((ROOT / 'private-customer-test-key.json').read_text())
-        assert private['user_id'] == 1 and private['group_id'] == 33 and private['id'] != 12
-        assert private['name'] == 'release-gif-20261106-current-group-temporary'
+        private = json.loads((ROOT / ('private-selected-test-key.json' if selected_account else 'private-customer-test-key.json')).read_text())
+        if selected_account:
+            group = json.loads((ROOT / 'selected-test-group-result.json').read_text())
+            assert group['selected_account_id'] == 2933 and group['id'] not in [7, 33]
+            group_id = group['id']
+        assert private['user_id'] == 1 and private['group_id'] == group_id and private['id'] != 12
+        assert private['name'] == ('release-gif-20261106-selected-2933-temporary' if selected_account else 'release-gif-20261106-current-group-temporary')
         key_id, key = private['id'], private['key']
     else:
         query = "BEGIN READ ONLY; SELECT key FROM api_keys WHERE id=12 AND user_id=1 AND group_id=7 AND status='active' AND deleted_at IS NULL; COMMIT;"
@@ -116,6 +123,8 @@ def main(sha, current_group=False):
         extra = {'complexity': 'high'} if model.startswith('gpt-image-2.6-') else {}
         for edit in (False, True):
             payload = dict(model=model, prompt='An orange ceramic teapot on white, no text.' if current_group else 'A blue ceramic mug on a plain white background, no text.', n=1, size='1024x1024', quality='low', output_format='jpeg' if edit else 'png', response_format='b64_json', **extra)
+            if selected_account:
+                payload['prompt'] = 'A green glass vase on a pale background, no text.'
             if edit:
                 payload['images'] = [{'image_url': image_url}]
             cases.append((model + ('-edit' if edit else '-generate'), '/v1/images/edits' if edit else '/v1/images/generations', payload, False, False))
@@ -124,6 +133,8 @@ def main(sha, current_group=False):
         payload = dict(model=model, prompt='A tiny bird waves one wing in a looping animation on white, no text.', n=1, quality='low', size='896x896' if frames == 4 else 'auto', output_format='gif', frame_count=frames, frame_duration_ms=200, response_format='url' if frames == 16 else 'b64_json', complexity='medium')
         if current_group:
             payload['prompt'] = 'A small red ball bounces on white in a simple looping animation, no text.'
+        if selected_account:
+            payload['prompt'] = 'A yellow butterfly gently flaps its wings on white in a simple looping animation, no text.'
         cases.append((model + '-gif', '/v1/images/generations', payload, False, False))
         for variant in ('json', 'multipart', 'generation-reference'):
             edit_payload = dict(payload, images=[{'image_url': image_url}], response_format='b64_json')
@@ -181,8 +192,10 @@ def main(sha, current_group=False):
             result_file.write_text(json.dumps(out, indent=2))
             results.append(out)
             print(json.dumps(out), flush=True)
-    summary = {'application_sha': sha, 'all_passed': len(results) == 18 and all(x['success'] for x in results), 'source': 'Public customer Images API with bounded temporary administrator-owned key/group 33; normal authenticated grant with cleanup' if current_group else 'Public customer Images API with existing administrator-owned key 12/group 7; no customer keys or account changes', 'group_id': 33 if current_group else 7, 'cases': results}
-    (ROOT / ('customer-post-release-tests.json' if current_group else 'post-release-tests.json')).write_text(json.dumps(summary, indent=2))
+    summary = {'application_sha': sha, 'all_passed': len(results) == 18 and all(x['success'] for x in results), 'source': 'Public Images API with selected live account 2933 in a temporary exclusive test group; original account groups retained' if selected_account else 'Public customer Images API with bounded temporary administrator-owned key/group 33; normal authenticated grant with cleanup' if current_group else 'Public customer Images API with existing administrator-owned key 12/group 7; no customer keys or account changes', 'group_id': group_id, 'cases': results}
+    if selected_account:
+        summary['selected_account_id'] = 2933
+    (ROOT / ('selected-post-release-tests.json' if selected_account else 'customer-post-release-tests.json' if current_group else 'post-release-tests.json')).write_text(json.dumps(summary, indent=2))
     assert summary['all_passed'], 'Public matrix has failures; inspect evidence without replaying requests'
 
 

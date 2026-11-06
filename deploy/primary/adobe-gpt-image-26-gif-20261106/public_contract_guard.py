@@ -3,9 +3,13 @@ MODELS = ['gpt-image-2', 'gpt-image-2.5-flare', 'gpt-image-2.5-sunburst',
           'gpt-image-2.6-star-swirl', 'gpt-image-2.6-aurora']
 
 
-def validate(current, legacy, cleanup, sha):
+def validate(current, legacy, cleanup, sha, expected_group_id=33):
     assert current['application_sha'] == legacy['application_sha'] == sha
-    assert current['group_id'] == 33 and current['all_passed'] is True
+    assert current['group_id'] == expected_group_id and current['all_passed'] is True
+    if expected_group_id != 33:
+        assert expected_group_id > 0 and expected_group_id != 7 and current['selected_account_id'] == 2933
+        assert cleanup['selected_account_id'] == 2933 and cleanup['temporary_group_id'] == expected_group_id
+        assert cleanup['temporary_group_deleted'] is True and cleanup['account_original_groups_preserved'] is True
     expected = {m + '-' + mode for m in MODELS for mode in ['generate', 'edit']}
     expected.update(m + '-' + mode for m in MODELS[-2:] for mode in ['gif', 'reject-json', 'reject-multipart', 'reject-generation-reference'])
     rows = current['cases']
@@ -31,7 +35,7 @@ def validate(current, legacy, cleanup, sha):
                 assert image['delays_centiseconds'] == [20] * frames
     assert all(cleanup[k] is True for k in ['key_deleted', 'temporary_grant_removed', 'private_files_removed', 'other_allowed_groups_preserved'])
     assert cleanup['existing_customer_keys_changed'] is False
-    return {'scope': 'current Adobe business group 33, five models, 18 distinct public endpoint cases',
+    return {'scope': 'selected live account 2933 through an isolated regular API group; five models, 18 distinct public endpoint cases' if expected_group_id != 33 else 'current Adobe business group 33, five models, 18 distinct public endpoint cases',
             'approved_scope_all_passed': True, 'legacy_group_7_all_passed': legacy['all_passed'],
             'legacy_group_7_failures': sum(not row['success'] for row in legacy['cases']),
             'legacy_results_retained': True, 'temporary_test_access_cleaned': True,

@@ -21,6 +21,21 @@ def proof():
 
 
 class PublicContractTests(unittest.TestCase):
+    def test_selected_account_requires_removed_group_and_retained_bindings(self):
+        args = proof()
+        args[0].update(group_id=1234, selected_account_id=2933)
+        args[2].update(selected_account_id=2933, temporary_group_id=1234, temporary_group_deleted=True, account_original_groups_preserved=True)
+        self.assertTrue(validate(*args, expected_group_id=1234)['approved_scope_all_passed'])
+        args[2]['account_original_groups_preserved'] = False
+        with self.assertRaises(AssertionError):
+            validate(*args, expected_group_id=1234)
+
+    def test_other_selected_account_cannot_replace_user_choice(self):
+        args = proof()
+        args[0].update(group_id=1234, selected_account_id=2934)
+        with self.assertRaises(AssertionError):
+            validate(*args, expected_group_id=1234)
+
     def test_preserves_failed_legacy_diagnostics(self):
         args = proof()
         original = copy.deepcopy(args[1])
