@@ -24,6 +24,6 @@ jobs:
           cmp guide.md ../../docs/ADOBE_IMAGE_CLIENT_GUIDE.md
           go test -race ./...
           go vet ./...
-          python3 -m py_compile install.py verify-live.py
+          python3 -m py_compile install.py update.py verify-live.py
           bash -n build.sh
           CGO_ENABLED=0 go build -trimpath -o docs-server .

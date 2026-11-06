@@ -184,7 +184,9 @@ func (a *app) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
-	w.Header().Set("Referrer-Policy", "no-referrer")
+	// Native form POSTs serialize Origin as null under no-referrer.
+	// Keep same-origin form requests compatible without leaking external referrers.
+	w.Header().Set("Referrer-Policy", "same-origin")
 	w.Header().Set("X-Robots-Tag", "noindex, nofollow, noarchive")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 	select {
@@ -196,7 +198,7 @@ func (a *app) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == http.MethodPost {
 		if r.Header.Get("Origin") != a.origin {
-			http.Error(w, "请求来源无效", 403)
+			a.render(w, http.StatusForbidden, pageData{Error: "请刷新登录页后重试。"})
 			return
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
