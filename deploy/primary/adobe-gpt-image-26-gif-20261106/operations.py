@@ -1,7 +1,7 @@
 """Fixed-scope GIF and complexity release using the original deployment guards."""
 import base64,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','status','verify','archive']
+assert phase in ['preflight','prepare','start','resume','public-test','status','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-gpt-image-26-gif-20261106'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -53,6 +53,28 @@ assert not (r/'progress.json').exists(), 'Already started; inspect existing evid
 subprocess.run(['systemd-run','--unit=adobe-gpt-image-26-gif-release-20261106','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/driver.log','--property=StandardError=append:{root}/driver.log','/usr/bin/python3',str(r/'driver.py')],check=True)
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 """)
+elif phase=='resume':
+ copy([pathlib.Path(__file__).parent/name for name in ['rolling.py','resume.py']])
+ remote(f"""import json,os,pathlib,subprocess
+r=pathlib.Path('{root}')
+assert (r/'expected-sha').read_text().strip()=='{sha}'=='da24f5634a0fd332f95a14d666fa2e9cea19db53'
+assert json.loads((r/'progress.json').read_text())['state']=='attention_required'
+assert not (r/'after.json').exists() and not (r/'rolling-old-drained.json').exists()
+assert subprocess.run(['systemctl','is-active','--quiet','adobe-gpt-image-26-gif-release-20261106']).returncode!=0
+with os.fdopen(os.open(r/'resume-dispatched.json',os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600),'w') as f:json.dump({{'application_sha':'{sha}','resume_once':True}},f)
+subprocess.run(['systemd-run','--unit=adobe-gpt-image-26-gif-resume-20261106','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/resume.log','--property=StandardError=append:{root}/resume.log','/usr/bin/python3',str(r/'resume.py')],check=True)
+print(json.dumps({{'resume_dispatched':True,'application_sha':'{sha}'}}))
+""")
+elif phase=='public-test':
+ copy([pathlib.Path(__file__).parent/'public-test.py'])
+ remote(f"""import json,os,pathlib,subprocess
+r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
+assert (r/'rolling-finished.json').exists() and (r/'runtime-verification.json').exists()
+assert not list(r.glob('public-gpt-image-*-started.json')) and not (r/'post-release-tests.json').exists()
+with os.fdopen(os.open(r/'public-test-dispatched.json',os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600),'w') as f:json.dump({{'application_sha':'{sha}','single_dispatch':True}},f)
+subprocess.run(['systemd-run','--unit=adobe-gpt-image-26-gif-public-tests-20261106','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/public-test.log','--property=StandardError=append:{root}/public-test.log','/usr/bin/python3',str(r/'public-test.py'),'{sha}'],check=True)
+print(json.dumps({{'public_test_dispatched':True,'application_sha':'{sha}'}}))
+""")
 elif phase=='verify':
  remote(f"""import pathlib,subprocess,sys
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
@@ -92,8 +114,14 @@ out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application
 """)
 else:
  evidence=pathlib.Path('primary-release-evidence');evidence.mkdir(exist_ok=True)
- script=f"""import importlib.util,json,pathlib
+ script=f"""import importlib.util,json,pathlib,subprocess
 r=pathlib.Path('{root}');out={{'application_sha':'{sha}','files':{{}}}}
+out['current_containers']={{}}
+for name in ['adobe-relay-app-1','adobe-relay-memory-canary']:
+ p=subprocess.run(['docker','inspect',name],text=True,capture_output=True)
+ if p.returncode==0:
+  d=json.loads(p.stdout)[0];out['current_containers'][name]={{'image':d['Config']['Image'],'health':d['State'].get('Health',{{}}).get('Status'),'oom':d['State']['OOMKilled'],'restarts':d['RestartCount']}}
+out['public_completed_cases']=[json.loads(p.read_text()) for p in sorted(r.glob('public-gpt-image-*-result.json'))]
 for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','deferred-canary.json','runtime-verification.json','business-verification.json','credential-change-review.json','preflight-contract-summary.json','post-release-tests.json','final-verification.json','release-completion.json','release-notification.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
@@ -104,6 +132,8 @@ for side in ['old','canary']:
 if (r/'after.json').exists():out['cutover_backup']=json.loads((r/'after.json').read_text())['backup']
 log=r/'driver.log'
 if log.exists():out['driver_errors']=[line for line in log.read_text().splitlines() if line.startswith(('AssertionError:','RuntimeError:','subprocess.CalledProcessError:'))][-8:]
+resume=r/'resume.log'
+if resume.exists():out['resume_errors']=[line for line in resume.read_text().splitlines() if line.startswith(('AssertionError:','RuntimeError:','subprocess.CalledProcessError:'))][-8:]
 if (r/'progress.json').exists() and json.loads((r/'progress.json').read_text()).get('state')=='attention_required':
  spec=importlib.util.spec_from_file_location('audit',r/'audit.py');a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
  before=json.loads((r/'before.json').read_text());current=a.snapshot()
