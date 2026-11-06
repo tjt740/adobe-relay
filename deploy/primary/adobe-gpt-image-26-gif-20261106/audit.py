@@ -3,6 +3,7 @@ import argparse
 import datetime
 import fcntl
 import hashlib
+import importlib.util
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -10,7 +11,11 @@ import sqlite3
 import subprocess
 from urllib.parse import quote
 import urllib.request
-from clash_contract_guard import reviewed_hash as reviewed_clash_hash
+
+_guard_spec = importlib.util.spec_from_file_location('adobe_gif_clash_contract_guard', Path(__file__).with_name('clash_contract_guard.py'))
+_guard_module = importlib.util.module_from_spec(_guard_spec)
+_guard_spec.loader.exec_module(_guard_module)
+reviewed_clash_hash = _guard_module.reviewed_hash
 
 RID = 'adobe-gpt-image-26-gif-20261106'
 ROOT = Path('/opt/adobe-relay/releases') / RID

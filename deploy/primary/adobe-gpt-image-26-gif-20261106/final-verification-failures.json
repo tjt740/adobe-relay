@@ -17,5 +17,17 @@
       "application_redeployed": false
     }
   ],
-  "successful_followup_run": 42175564495
+  "successful_followup_run": 42175564495,
+  "archive_attempts": [
+    {
+      "run": 42176042866,
+      "conclusion": "failure",
+      "reason": "Audit helper imported a sibling module using the stdin interpreter search path; stopped before document writes. Fixed absolute sibling loading, with isolated interpreter regression coverage.",
+      "operate_log_sha256": "0c1143ea06df10993b203bee12595539da5c9f6831fda476f48ab545818fb27e",
+      "failure_retained": true,
+      "application_redeployed": false,
+      "documents_written": false,
+      "rollback_executed": false
+    }
+  ]
 }

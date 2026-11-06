@@ -113,6 +113,7 @@ for script,output in [('selected-binding-review.py','selected-binding-review.jso
  if not (r/output).exists():subprocess.run([sys.executable,str(r/script)],check=True)
 """)
 elif phase=='archive':
+ copy([pathlib.Path(__file__).parent/name for name in ['audit.py','clash_contract_guard.py']])
  documents={'release-notes.md':pathlib.Path('deploy/primary/adobe-gpt-image-26-gif-20261106.md'),'primary-README.md':pathlib.Path('deploy/primary/README.md')}
  payload={name:base64.b64encode(path.read_bytes()).decode() for name,path in documents.items()}
  remote(f"""import base64,datetime,fcntl,importlib.util,json,pathlib
