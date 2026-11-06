@@ -18,7 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
-      docsColors: {"title": "More readable API documentation and code examples", "body": "The independent /docs site adds blue navigation and table headings, violet parameters, green supported states and amber restrictions. Syntax highlighting preserves complete copying, document content and existing access rules."},
+      docsColors: {"title": "Coordinated green navigation and softer documentation colors", "body": "The independent /docs site uses green navigation and table headings, soft teal parameters, and subdued status and restriction colors. Mint, blue-grey and warm sand code highlighting preserves complete copying, document content and access rules."},
       adobeGptImage26Gif: { title: 'Adobe 2.6 models, text-only GIFs and planning controls', body: 'Today exposes the actual Adobe gpt-image-2.6-star-swirl and gpt-image-2.6-aurora names, GIF text generation, frame controls and independent complexity planning. Static generation and editing retain the established workflow; GIF reference editing is explicitly unsupported. Image 2/2.5 calls and submission protections remain unchanged.' },
       adobeGptImage26: { title: 'Add Adobe gpt-image-2.6-star-swirl and gpt-image-2.6-aurora', body: 'Expose Adobe’s actual GPT Image 2.6 interface versions gpt-image-2.6-star-swirl and gpt-image-2.6-aurora through the same image workflow as 2.5, with exact upstream routing, 2.6 size validation and explicit quality limits. Legacy Flare and Sunburst aliases remain accepted without appearing in the model directory or UI. Existing models, defaults, checks and submission protections remain unchanged.' },
       upstreamV0219: { title: 'Upgrade to v0.2.19 with Adobe medium defaults retained', body: 'Integrates v0.2.18–v0.2.19 scoped administrator keys, streaming usage, image billing and provider fixes. Adobe auto quality remains medium. Manual IPs, batch concurrency, subscription protection and Okad integration remain available. The new per-image switch defaults off; existing Adobe billing is retained.' },
@@ -37,20 +37,20 @@ export default {
     },
     "updates": {
       docsColors: {
-        "title": "Add color hierarchy to API documentation",
+        "title": "Coordinate API documentation around green navigation",
         "body": "Color distinguishes sections, parameters and model capabilities while reading the reference.",
         "sections": {
           "reason": {
-            "title": "Improve the single-color presentation",
-            "body": "The previous green palette gave navigation, parameters and examples little visual separation. This update refreshes the independent documentation site."
+            "title": "Coordinate navigation and supporting colors",
+            "body": "Following reading feedback, navigation uses green with coordinated parameter, status and code accents to reduce distracting color changes and keep the page simple."
           },
           "presentation": {
             "title": "Color follows content",
-            "body": "Navigation and table headings are blue, parameters violet, supported states green and explicit rejections amber. Text labels remain, and the current reading section is highlighted."
+            "body": "Navigation and table headings are green, parameters soft teal, supported states muted green and restrictions restrained warm amber. Text labels remain, and the current reading section is highlighted."
           },
           "examples": {
             "title": "Highlight and copy complete examples",
-            "body": "Bash, JSON and Python use local syntax highlighting with separate language labels and copy controls. Copying preserves original text; wide tables and code scroll inside their containers on narrow screens."
+            "body": "Bash, JSON and Python use mint, sage, blue-grey and warm sand highlighting on a dark green-grey surface, with separate language labels and copy controls. Copying preserves original text; wide tables and code scroll inside their containers on narrow screens."
           },
           "access": {
             "title": "Keep concise login and existing access",
