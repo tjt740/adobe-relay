@@ -27,3 +27,9 @@ Use `Referrer-Policy: same-origin`. `no-referrer` makes native form POSTs send `
 `browser-check.mjs` starts an isolated TLS fixture with simulated Sub2 users. Run with an installed Playwright module (`PLAYWRIGHT_MODULE_PATH` optional); `DOCS_CHROME_CHANNEL=chrome DOCS_BROWSERS=chromium` uses an existing Chrome installation. It reproduces the old policy's 403, then tests native administrator/user/2FA login, Markdown download, logout and desktop/mobile widths. The fixture is test-only and is excluded from the deployed binary. Screenshot/output directory defaults to ignored `.browser-output`.
 
 For a binary-only update, the primary workflow's `update` phase requires the exact currently installed binary SHA256. It holds the existing release lock, records prior version/configuration, atomically updates only the docs binary and restarts only docs. All document sessions expire at restart; Sub2/Okad and nginx are preserved. Health failure restores only the previous docs binary.
+
+## Document presentation
+
+Blue navigation/table headings, violet inline parameters, green supported capabilities and amber limitations distinguish the reference material. Active navigation follows the reading position. Bash, JSON and Python examples use local text-node highlighting with no external scripts or HTML injection; copy buttons use the untouched source string. Unknown languages remain plain text. Wide tables and examples scroll within their own containers.
+
+The browser check compares all rendered examples and table cells to the server HTML, checks exact clipboard payloads for all 18 examples, verifies section search/current navigation, and captures login, document, capability-table and code views at 1440/390 widths. These are Chrome viewport checks, not physical-device or other-browser proof.
