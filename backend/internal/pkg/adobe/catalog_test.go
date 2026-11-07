@@ -481,6 +481,8 @@ func TestResolveImageAcceptsExternalModelNames(t *testing.T) {
 		"gpt-image-1.5":                  "firefly-gpt-image-1.5",
 		"gpt-image-2.5-flare":            "firefly-gpt-image-2-5-flare",
 		"gpt-image-2.5-sunburst":         "firefly-gpt-image-2-5-prism",
+		"gpt-image-2.6-flare":            "firefly-gpt-image-2-6-flare",
+		"gpt-image-2.6-sunburst":         "firefly-gpt-image-2-6-sunburst",
 		"gpt-image-2.6-star-swirl":       "firefly-gpt-image-2-6-flare",
 		"gpt-image-2.6-aurora":           "firefly-gpt-image-2-6-sunburst",
 		"gemini-3-pro-image":             "firefly-nano-banana-pro",
@@ -683,17 +685,14 @@ func TestDisplayLabel(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "GPT Image 2.5 Sunburst", label)
 
-	for _, model := range []string{"gpt-image-2.6-star-swirl", "gpt-image-2.6-aurora"} {
+	for model, want := range map[string]string{
+		"gpt-image-2.6-flare":      "GPT Image 2.6 Flare",
+		"gpt-image-2.6-star-swirl": "GPT Image 2.6 Flare",
+		"gpt-image-2.6-sunburst":   "GPT Image 2.6 Sunburst",
+		"gpt-image-2.6-aurora":     "GPT Image 2.6 Sunburst",
+	} {
 		label, ok = DisplayLabel(model)
 		require.True(t, ok, model)
-		require.Equal(t, model, label)
-	}
-	for legacy, want := range map[string]string{
-		"gpt-image-2.6-flare":    "gpt-image-2.6-star-swirl",
-		"gpt-image-2.6-sunburst": "gpt-image-2.6-aurora",
-	} {
-		label, ok = DisplayLabel(legacy)
-		require.True(t, ok, legacy)
 		require.Equal(t, want, label)
 	}
 

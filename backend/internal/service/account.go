@@ -17,6 +17,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/typesafe"
@@ -1022,6 +1023,11 @@ func (a *Account) isModelMappingSupported(requestedModel string) bool {
 	if normalized != requestedModel && mappingSupportsRequestedModel(mapping, normalized) {
 		return true
 	}
+	if a.Platform == PlatformAdobe {
+		if alias := adobe.GPTImage26AlternateModelID(requestedModel); alias != "" && mappingSupportsRequestedModel(mapping, alias) {
+			return true
+		}
+	}
 	if isKiroDirectModeAccount(a) {
 		_, ok := resolveKiroClaudeAlias(mapping, requestedModel)
 		return ok
@@ -1050,6 +1056,13 @@ func (a *Account) ResolveMappedModel(requestedModel string) (mappedModel string,
 	if normalized != requestedModel {
 		if mappedModel, matched := resolveRequestedModelInMapping(mapping, normalized); matched {
 			return mappedModel, true
+		}
+	}
+	if a.Platform == PlatformAdobe {
+		if alias := adobe.GPTImage26AlternateModelID(requestedModel); alias != "" {
+			if mapped, ok := resolveRequestedModelInMapping(mapping, alias); ok {
+				return mapped, true
+			}
 		}
 	}
 	if isKiroDirectModeAccount(a) {

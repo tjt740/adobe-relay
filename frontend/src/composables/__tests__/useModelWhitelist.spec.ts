@@ -403,7 +403,7 @@ describe('useModelWhitelist', () => {
   })
 
   // 对齐 backend/internal/domain/constants.go 的用户面模型映射；后端另保留
-  // 旧 Flare/Sunburst 兼容别名，但这些别名不再进入新的前端展示目录。
+  // 旧 star-swirl/aurora 兼容别名，但这些别名不再进入新的前端展示目录。
   //
   // Step 10 起 Adobe 用通用的白名单/映射区块，不再预填默认映射行；但它们仍是「映射」
   // 模式的快捷 chips，点一下就会原样写进 credentials.model_mapping，两边漂移
@@ -419,8 +419,8 @@ describe('useModelWhitelist', () => {
       'gpt-image-2.5-sunburst': 'firefly-gpt-image-2-5-prism',
       'gpt-image-2.5-prism': 'firefly-gpt-image-2-5-prism',
       'gpt-image-2.5-flare': 'firefly-gpt-image-2-5-flare',
-      'gpt-image-2.6-star-swirl': 'firefly-gpt-image-2-6-flare',
-      'gpt-image-2.6-aurora': 'firefly-gpt-image-2-6-sunburst',
+      'gpt-image-2.6-flare': 'firefly-gpt-image-2-6-flare',
+      'gpt-image-2.6-sunburst': 'firefly-gpt-image-2-6-sunburst',
       'gpt-image': 'firefly-gpt-image-2',
       'gpt-image-1': 'firefly-gpt-image-2',
       'gpt-image-1-mini': 'firefly-gpt-image-2',
@@ -442,8 +442,8 @@ describe('useModelWhitelist', () => {
       // Step 8：所有 firefly-* 左侧的直通条目已删除。用户面只有干净外部名。
     })
     expect(mappings).toHaveLength(25)
-    expect(mappings.some(item => item.from === 'gpt-image-2.6-flare')).toBe(false)
-    expect(mappings.some(item => item.from === 'gpt-image-2.6-sunburst')).toBe(false)
+    expect(mappings.some(item => item.from === 'gpt-image-2.6-star-swirl')).toBe(false)
+    expect(mappings.some(item => item.from === 'gpt-image-2.6-aurora')).toBe(false)
   })
 
   // Step 8：用户面看到的每个模型（getModelsByPlatform('adobe')）都必须能在预设里找到——

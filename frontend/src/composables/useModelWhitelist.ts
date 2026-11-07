@@ -21,7 +21,7 @@ const openaiModels = [
   'gpt-5.3-codex-spark', 'codex-auto-review',
   'gpt-4o-audio-preview', 'gpt-4o-realtime-preview',
   // GPT Image 系列
-  'gpt-image-1', 'gpt-image-1.5', 'gpt-image-2', 'gpt-image-2.5-flare', 'gpt-image-2.5-sunburst', 'gpt-image-2.6-star-swirl', 'gpt-image-2.6-aurora'
+  'gpt-image-1', 'gpt-image-1.5', 'gpt-image-2', 'gpt-image-2.5-flare', 'gpt-image-2.5-sunburst', 'gpt-image-2.6-flare', 'gpt-image-2.6-sunburst'
 ]
 
 // Anthropic Claude
@@ -151,8 +151,8 @@ const adobeModels = [
   // sunburst 是 UI 展示名；后端把它映到上游 modelVersion=gpt-image-2.5-prism。
   'gpt-image-2.5-flare',
   'gpt-image-2.5-sunburst',
-  'gpt-image-2.6-star-swirl',
-  'gpt-image-2.6-aurora',
+  'gpt-image-2.6-flare',
+  'gpt-image-2.6-sunburst',
   // preview 名与非 preview 名落同一个 Firefly 族，后端默认映射里都在，
   // 所以白名单同步也要给出来，否则勾了白名单的账号会把它们挡在门外。
   'gemini-3-pro-image',
@@ -523,8 +523,8 @@ const adobePresetMappings = [
   { label: 'GPT Image 2.5 Sunburst', from: 'gpt-image-2.5-sunburst', to: 'firefly-gpt-image-2-5-prism', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300' },
   { label: 'GPT Image 2.5 Prism', from: 'gpt-image-2.5-prism', to: 'firefly-gpt-image-2-5-prism', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300' },
   { label: 'GPT Image 2.5 Flare', from: 'gpt-image-2.5-flare', to: 'firefly-gpt-image-2-5-flare', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300' },
-  { label: 'gpt-image-2.6-aurora', from: 'gpt-image-2.6-aurora', to: 'firefly-gpt-image-2-6-sunburst', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300' },
-  { label: 'gpt-image-2.6-star-swirl', from: 'gpt-image-2.6-star-swirl', to: 'firefly-gpt-image-2-6-flare', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300' },
+  { label: 'GPT Image 2.6 Sunburst', from: 'gpt-image-2.6-sunburst', to: 'firefly-gpt-image-2-6-sunburst', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300' },
+  { label: 'GPT Image 2.6 Flare', from: 'gpt-image-2.6-flare', to: 'firefly-gpt-image-2-6-flare', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300' },
   // 更早的 gpt-image 名字：Adobe 侧没有对应版本，一律落 2（与后端默认表一致）
   { label: 'GPT Image', from: 'gpt-image', to: 'firefly-gpt-image-2', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300' },
   { label: 'GPT Image 1', from: 'gpt-image-1', to: 'firefly-gpt-image-2', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300' },

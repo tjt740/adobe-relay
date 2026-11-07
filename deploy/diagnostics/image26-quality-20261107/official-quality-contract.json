@@ -1,0 +1,47 @@
+{
+  "verified_at": "2026-11-07T13:17:16.642482+08:00",
+  "discovery_url": "https://gateway.ff.adobe.io/v2/models/discovery?resolveSchema=true&includeFirstParty=false",
+  "conversion_url": "https://firefly.adobe.com/releases/6ac3bff29a3249ef34d1d14442db6eb2b452d25b/assets/convert-discovery-inputs-AzJx1QFg.js",
+  "quality_conversion": "function W(e){switch(e){case`low`:return 1;case`medium`:return 3;case`high`:return 5;case`extraHigh`:return 6;case`max`:return 7;default:return e}}",
+  "models": [
+    {
+      "version": "gpt-image-2.6-aurora",
+      "name": "GPT Image 2.6 Sunburst",
+      "detail_level_schema": {
+        "anyOf": [
+          {
+            "maximum": 7,
+            "minimum": 1,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": 3,
+        "description": "Controls the detail level of the generated image",
+        "title": "The detail level"
+      }
+    },
+    {
+      "version": "gpt-image-2.6-star-swirl",
+      "name": "GPT Image 2.6 Flare",
+      "detail_level_schema": {
+        "anyOf": [
+          {
+            "maximum": 7,
+            "minimum": 1,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": 3,
+        "description": "Controls the detail level of the generated image",
+        "title": "The detail level"
+      }
+    }
+  ],
+  "discovery_sha256": "184a642614bb261998028e345f2c0e6e6791ebd250986add37f7953ead98efd7"
+}

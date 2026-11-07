@@ -252,16 +252,19 @@ type GenerateResult struct {
 	Timings GenerationTimings
 }
 
-// GenerationTimings contains durations and counts only, never prompts, tokens or signed URLs.
+// GenerationTimings contains durations, counts and applied model/quality only;
+// never prompts, tokens, full payloads or signed URLs.
 // PollMS includes time spent waiting for the upstream job, but excludes downloading its output.
 type GenerationTimings struct {
-	SubmitMS         int64 `json:"submit_ms"`
-	PollMS           int64 `json:"poll_ms"`
-	DownloadMS       int64 `json:"download_ms"`
-	SubmitAttempts   int   `json:"submit_attempts"`
-	PollCount        int   `json:"poll_count"`
-	DownloadAttempts int   `json:"download_attempts"`
-	DownloadFallback bool  `json:"download_fallback,omitempty"`
+	SubmittedModelVersion string `json:"submitted_model_version,omitempty"`
+	SubmittedDetailLevel  int    `json:"submitted_detail_level,omitempty"`
+	SubmitMS              int64  `json:"submit_ms"`
+	PollMS                int64  `json:"poll_ms"`
+	DownloadMS            int64  `json:"download_ms"`
+	SubmitAttempts        int    `json:"submit_attempts"`
+	PollCount             int    `json:"poll_count"`
+	DownloadAttempts      int    `json:"download_attempts"`
+	DownloadFallback      bool   `json:"download_fallback,omitempty"`
 	// HTTP time includes both network transit and Adobe's handling/long polling.
 	// It is not a measurement of network latency alone.
 	PollHTTPMS         int64             `json:"poll_http_ms"`
@@ -297,10 +300,19 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) (r
 	stage = "submit"
 	submitStarted := time.Now()
 	submitAttemptCount := 0
+	var submittedModelVersion string
+	var submittedDetailLevel int
 	for _, payload := range candidates {
 		body, err := marshalPayloadJSON(payload)
 		if err != nil {
 			return nil, NewInternalError(fmt.Sprintf("marshal image payload: %v", err), "image_payload_encoding_failed")
+		}
+		// Read the actual serialized submission fields, not the requested label.
+		if input.Options.PayloadKind == PayloadKindGPTImage26 {
+			submittedModelVersion, _ = payload["modelVersion"].(string)
+			if settings, ok := payload["generationSettings"].(map[string]any); ok {
+				submittedDetailLevel, _ = settings["detailLevel"].(int)
+			}
 		}
 		submitResp, err = c.postSubmit(ctx, ImageSubmitURL, headers, order, body)
 		if submitResp != nil {
@@ -341,6 +353,8 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) (r
 		downloadFallback: c.imageDownloadFallback,
 	})
 	if result != nil {
+		result.Timings.SubmittedModelVersion = submittedModelVersion
+		result.Timings.SubmittedDetailLevel = submittedDetailLevel
 		result.Timings.SubmitMS = submitMS
 		result.Timings.SubmitAttempts = submitAttemptCount
 	}

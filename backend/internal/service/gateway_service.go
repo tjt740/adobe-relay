@@ -1613,9 +1613,8 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 
 		mapping := acc.GetModelMapping()
 		for model := range mapping {
-			// Adobe keeps the old 2.6 Flare/Sunburst names as request aliases,
-			// but new model directories must expose Adobe's actual interface
-			// version names only.
+			// Adobe keeps star-swirl/aurora as request aliases while public
+			// directories use the website names Flare/Sunburst.
 			if platform == PlatformAdobe && adobe.IsLegacyGPTImage26Alias(model) {
 				model = adobe.CanonicalGPTImage26ModelID(model)
 			}

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/domain"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
@@ -154,6 +155,7 @@ func groupModelAllowlistCandidates(model string) []string {
 	}
 
 	add(model)
+	add(adobe.GPTImage26AlternateModelID(model))
 	add(strings.TrimPrefix(model, "models/"))
 	add(claude.NormalizeModelID(strings.TrimSuffix(model, "-thinking")))
 	add(NormalizeOpenAICompatRequestedModel(model))
@@ -190,6 +192,7 @@ func (a GroupModelAllowlist) FilterForListing(source []string) []string {
 	seen := make(map[string]struct{}, len(a.Models)+len(patterns))
 	filtered := make([]string, 0, len(patterns))
 	add := func(model string) {
+		model = adobe.CanonicalGPTImage26ModelID(model)
 		key := strings.ToLower(model)
 		if _, ok := seen[key]; ok {
 			return
@@ -205,7 +208,7 @@ func (a GroupModelAllowlist) FilterForListing(source []string) []string {
 		}
 		if strings.Contains(entry, "*") {
 			for _, pattern := range patterns {
-				if groupAllowlistPatternMatches(entry, pattern) {
+				if groupAllowlistPatternMatches(entry, pattern) || (adobe.GPTImage26AlternateModelID(pattern) != "" && groupAllowlistPatternMatches(entry, adobe.GPTImage26AlternateModelID(pattern))) {
 					add(pattern)
 				} else if strings.HasSuffix(pattern, "*") &&
 					!strings.Contains(strings.TrimSuffix(pattern, "*"), "*") &&
@@ -227,7 +230,7 @@ func (a GroupModelAllowlist) FilterForListing(source []string) []string {
 // 后的精确匹配。比较与 Allows 一律大小写不敏感，保证「准入允许 ⇒ 列表可见」。
 func allowlistSourcePatternAllowsModel(patterns []string, model string) bool {
 	for _, pattern := range patterns {
-		if strings.EqualFold(pattern, model) {
+		if strings.EqualFold(pattern, model) || (adobe.GPTImage26AlternateModelID(model) != "" && strings.EqualFold(pattern, adobe.GPTImage26AlternateModelID(model))) {
 			return true
 		}
 		if strings.HasSuffix(pattern, "*") && strings.HasPrefix(strings.ToLower(model), strings.ToLower(strings.TrimSuffix(pattern, "*"))) {

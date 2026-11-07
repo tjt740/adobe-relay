@@ -75,13 +75,33 @@ type adobeGIFOptions struct {
 	FrameDurationMS int
 }
 
+// Never silently downgrade an explicit 2.6 quality request, including when an
+// account or channel mapping points at an older model. Validate before uploads.
+func validateAdobeImage26Quality(req *OpenAIImagesRequest, conf adobe.ImageModelConf) error {
+	quality := strings.ToLower(strings.TrimSpace(req.Quality))
+	requested26 := adobe.GPTImage26AlternateModelID(req.Model) != ""
+	resolved26 := conf.PayloadKind == adobe.PayloadKindGPTImage26
+	if requested26 && !resolved26 && (quality == "xhigh" || quality == "max") {
+		return adobe.NewParameterError("the configured model mapping does not preserve Image 2.6 Extra High or Max; choose a matching 2.6 model", "quality_model_not_supported", "quality")
+	}
+	if requested26 || resolved26 {
+		switch quality {
+		case "", "auto", "low", "medium", "high", "xhigh", "max":
+			return nil
+		default:
+			return adobe.NewParameterError("Image 2.6 quality must be auto, low, medium, high, xhigh, or max; Extra High uses xhigh", "invalid_quality", "quality")
+		}
+	}
+	return nil
+}
+
 func validateAdobeComplexity(req *OpenAIImagesRequest, conf adobe.ImageModelConf) (string, error) {
 	value := strings.ToLower(strings.TrimSpace(req.Complexity))
 	if value == "" {
 		return "", nil
 	}
 	if conf.PayloadKind != adobe.PayloadKindGPTImage26 {
-		return "", adobe.NewParameterError("complexity is supported only by gpt-image-2.6-star-swirl and gpt-image-2.6-aurora", "complexity_model_not_supported", "complexity")
+		return "", adobe.NewParameterError("complexity is supported only by gpt-image-2.6-flare and gpt-image-2.6-sunburst", "complexity_model_not_supported", "complexity")
 	}
 	switch value {
 	case "low", "medium", "high":
@@ -105,7 +125,7 @@ func validateAdobeGIFParams(req *OpenAIImagesRequest, conf adobe.ImageModelConf,
 	}
 	if conf.PayloadKind != adobe.PayloadKindGPTImage26 {
 		return adobeGIFOptions{}, adobe.NewParameterError(
-			"output_format=gif is supported only by gpt-image-2.6-star-swirl and gpt-image-2.6-aurora", "gif_model_not_supported", "output_format")
+			"output_format=gif is supported only by gpt-image-2.6-flare and gpt-image-2.6-sunburst", "gif_model_not_supported", "output_format")
 	}
 	if req == nil {
 		return adobeGIFOptions{}, adobe.NewParameterError("GIF request is missing", "gif_parameters_invalid", "output_format")
@@ -188,6 +208,7 @@ func hasAdobeGIFReferenceInput(req *OpenAIImagesRequest) bool {
 
 // adobeImageResponseQuality 返回网关采用的质量标签，复用 payload 映射处理默认值和模型上限。
 // 2.5 的 xhigh / max 仍提交 detailLevel=7，对外分别保留规范化的请求名称。
+// 2.6 的 xhigh / max 分别提交 6 / 7，响应保留各自档位。
 // 非 GPT Image 模型没有这个生成控制，不回显请求值，以免声称未生效的参数已生效。
 func adobeImageResponseQuality(conf adobe.ImageModelConf, requested string) string {
 	if !conf.IsGPTImage() {
@@ -199,6 +220,8 @@ func adobeImageResponseQuality(conf adobe.ImageModelConf, requested string) stri
 			return "xhigh"
 		}
 		return "max"
+	case 6:
+		return "xhigh"
 	case 5:
 		return "high"
 	case 3:

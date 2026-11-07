@@ -30,19 +30,20 @@ Key 必须属于有相应模型权限、可用账号及余额/额度的分组。
 | `gpt-image-2` | 支持 | 支持 | 不支持 | 不支持 | 不支持 |
 | `gpt-image-2.5-flare` | 支持 | 支持 | 不支持 | 不支持 | 不支持 |
 | `gpt-image-2.5-sunburst` | 支持 | 支持 | 不支持 | 不支持 | 不支持 |
-| `gpt-image-2.6-star-swirl` | 支持 | 支持 | `low / medium / high` | 支持 | 本地明确拒绝 |
-| `gpt-image-2.6-aurora` | 支持 | 支持 | `low / medium / high` | 支持 | 本地明确拒绝 |
+| `gpt-image-2.6-flare` | 支持 | 支持 | `low / medium / high` | 支持 | 本地明确拒绝 |
+| `gpt-image-2.6-sunburst` | 支持 | 支持 | `low / medium / high` | 支持 | 本地明确拒绝 |
 
-两款 2.6 使用 Adobe 实际接口版本名，新的接入请直接使用表内名称。历史别名 `gpt-image-2.6-flare` 对应 `gpt-image-2.6-star-swirl`，`gpt-image-2.6-sunburst` 对应 `gpt-image-2.6-aurora`；仍受分组与账号白名单限制。2.5 的 `gpt-image-2.5-prism` 是 Sunburst 的兼容名称。不要用没有变体后缀的 `gpt-image-2.5` 或 `gpt-image-2.6` 代替表内模型。
+两款 2.6 与 Adobe 官网同名：**GPT Image 2.6 Flare**、**GPT Image 2.6 Sunburst**。新的接入使用表内 `gpt-image-2.6-flare` / `gpt-image-2.6-sunburst`。旧 `gpt-image-2.6-star-swirl` / `gpt-image-2.6-aurora` 分别作为相同变体的兼容名称，仍受分组与账号白名单限制；已有旧名称白名单可识别对应新名称，不跨变体放行。2.5 的 `gpt-image-2.5-prism` 是 Sunburst 的兼容名称。不要使用没有变体后缀的 `gpt-image-2.5` 或 `gpt-image-2.6`。
 
 **不支持 WebP、SVG 和流式出图。** Adobe 原生静态输出支持 PNG/JPEG，2.6 另支持纯文字 GIF 文生图；添加 `svg.model` 或更换模型别名不会开启 SVG。
 
 ### 0.2.1 两款 2.6 的线上实测支持范围
 
-2026-11-07 通过本站正式图片接口分别验证了 Flare（`gpt-image-2.6-star-swirl`）与 Sunburst（`gpt-image-2.6-aurora`），以下结果两款一致。支持范围以本通道为准，不能直接照搬其他平台的参数列表。
+2026-11-07 通过本站正式图片接口分别验证了 Flare（`gpt-image-2.6-flare`）与 Sunburst（`gpt-image-2.6-sunburst`），以下结果两款一致。支持范围以本通道为准，不能直接照搬其他平台的参数列表。
 
 | 参数 / 能力 | 当前支持情况 | 实测结果与限制 |
 | --- | --- | --- |
+| `size=3840x2160 + quality=high` | 两款均支持 4K High 静态 PNG | 2026-11-07 正式接口两次成功，逐文件核验真实 3840×2160 像素与完整性 |
 | `background=auto / opaque` | 支持 | auto 请求正常生成；opaque 的 PNG 实际为完全不透明图片 |
 | `background=transparent` | 支持 PNG 透明背景 | 两款返回的 PNG 均有真实透明像素；与 JPEG 组合返回 400 / `incompatible_image_background` |
 | `complexity` | 仅支持 `low / medium / high` | 三档均有成功输出；`none / xhigh / max` 均返回 400 / `invalid_complexity`。不传时沿用上游默认，不等同于关闭规划 |
@@ -82,16 +83,38 @@ Key 必须属于有相应模型权限、可用账号及余额/额度的分组。
 
 ### 0.4 `quality` 实际档位
 
+两款 2.6 的 **Extra High 与 Max 是独立档位**：`quality=xhigh` 对应 Extra High（上游档位 6），`quality=max` 对应 Max（档位 7），成功响应分别返回 `xhigh`、`max`，不再限制为 High。旧版把两档限制到 High 的行为已修正。
+
+2026-11-07 发布前对两款 2.6 的 `xhigh / max` 各做一次真实上游生成，4/4 成功，逐项核对提交档位并完整解码为 3840×2160 PNG。静态文生图样本不能代表高档位 GIF、图片编辑、全部账号或高峰可靠性。
+
+官网的质量菜单对应 `quality`；`complexity` 是独立的构图规划参数，不支持 `xhigh / max`。客户端应使用本站的 `xhigh` 名称，不要直接传官网内部的 `extraHigh` 或显示文字 `Extra High`。
+
 | 客户传入 | Image 2 | 两款 Image 2.5 | 两款 Image 2.6 |
 | --- | --- | --- | --- |
 | 省略 / 空 / `auto` | medium | medium | medium |
 | `low` | low | low | low |
 | `medium` | medium | medium | medium |
 | `high` | high | high | high |
-| `xhigh` | 达到 high 上限，返回 high | 最高档，响应保留 xhigh | 达到 high 上限，返回 high |
-| `max` | 达到 high 上限，返回 high | 与 xhigh 相同最高档，响应保留 max | 达到 high 上限，返回 high |
+| `xhigh` | 达到 high 上限，返回 high | 最高档，响应保留 xhigh | Extra High（6），返回 xhigh |
+| `max` | 达到 high 上限，返回 high | 与 xhigh 相同最高档，响应保留 max | Max（7），返回 max |
 
-六种名字可被接收，不代表每个版本有六种不同的上游质量档位。`complexity` 不会覆盖 `quality`：例如 `quality=low, complexity=high` 表示低生成质量、高构图规划强度。未知 quality 字符串沿用旧行为回落 low，客户应只使用表内值，避免拼写错误造成降档。
+六种名字可被接收，不代表每个版本有六种不同的上游质量档位。`complexity` 不会覆盖 `quality`：例如 `quality=low, complexity=high` 表示低生成质量、高构图规划强度。两款 2.6 的未知质量值返回 400 / `invalid_quality`，不会因拼写错误悄悄回落 low；若 2.6 的 xhigh/max 被账号或渠道映射到其他模型，返回 400 / `quality_model_not_supported`，不降档生成。其他旧模型的未知质量值仍沿用原 low 兜底。
+
+Extra High / Max 的 4K 调用示例（两款模型可互换）：
+
+```bash
+curl "$BASE_URL/v1/images/generations" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"gpt-image-2.6-flare","prompt":"A blue ceramic mug on a wooden table","quality":"xhigh","size":"3840x2160","output_format":"png","response_format":"b64_json","n":1}'
+```
+
+```bash
+curl "$BASE_URL/v1/images/generations" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"gpt-image-2.6-sunburst","prompt":"A blue ceramic mug on a wooden table","quality":"max","size":"3840x2160","output_format":"png","response_format":"b64_json","n":1}'
+```
 
 ### 0.5 静态 `size` 与 4K 边界
 
@@ -110,7 +133,7 @@ Key 必须属于有相应模型权限、可用账号及余额/额度的分组。
 
 | 参数 / 组合 | 实际行为 |
 | --- | --- |
-| 模型 | 仅 `gpt-image-2.6-star-swirl`、`gpt-image-2.6-aurora` |
+| 模型 | 仅 `gpt-image-2.6-flare`、`gpt-image-2.6-sunburst` |
 | 端点与输入 | `/v1/images/generations`，纯提示词，不传参考图 |
 | `output_format` | 必须为 `gif` |
 | `frame_count` | 整数 2–16；省略或 JSON null 为 9；小数和超范围值返回 400 |
@@ -176,7 +199,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
 
 ```json
 {
-  "model": "gpt-image-2.6-aurora",
+  "model": "gpt-image-2.6-sunburst",
   "prompt": "一个热闹的夜市街景，多个摊位和行人，暖色灯光，电影感",
   "size": "2048x2048",
   "quality": "high",
@@ -186,7 +209,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
 
 ### GPT Image 2.6 GIF
 
-`gpt-image-2.6-star-swirl` 和 `gpt-image-2.6-aurora` 支持原生 GIF 文生图。客户端仍调用同一个 `/v1/images/generations`，只需增加 GIF 参数：
+`gpt-image-2.6-flare` 和 `gpt-image-2.6-sunburst` 支持原生 GIF 文生图。客户端仍调用同一个 `/v1/images/generations`，只需增加 GIF 参数：
 
 ```bash
 curl --fail-with-body --connect-timeout 15 --max-time 600 \
@@ -194,7 +217,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
   -H "Authorization: Bearer ${CREATIVE_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{
-    "model": "gpt-image-2.6-star-swirl",
+    "model": "gpt-image-2.6-flare",
     "prompt": "一只红色陶瓷杯做短循环动画",
     "size": "896x896",
     "output_format": "gif",
@@ -241,7 +264,7 @@ HTTP 200 示例（上游缺少真实用量，以下 usage 为随机模拟数字�
 
 第一张图片的 URL 在 `data[0].url`；多图遍历 `data`。`created` 是 Unix 秒，`size` / `output_format` 以实际交付图片为准。`quality` 表示网关采用的归一化质量标签，`moderation: "auto"` 表示默认审核方式。GPT Image 2.5 请求 `xhigh` 返回 `xhigh`，请求 `max` 返回 `max`，两者提交给 Adobe 的值仍同为 `detailLevel=7`；2 / 1.5 请求这两档仍返回 `high`。该标签不是上游对成图质量的评估。
 
-Adobe 原生 GPT Image 1.5、2、2.5、2.6 请求 `quality: "auto"`、省略 `quality` 或传空值时，默认提交 `medium` 对应的 `detailLevel=3`，成功响应返回 `quality: "medium"`。显式 `low` 仍提交档位 1；显式 `medium`、`high`、`xhigh`、`max` 及各模型上限保持。大小写和首尾空格会规范化，未知质量值沿用原低档兜底。文生图和图片编辑使用同一规则；非 GPT Image 模型及中转账号保留原处理。账号检测显式使用 `low`，不随业务默认值提高。站内按张数和分辨率的计费规则保持，较高生成档位对耗时与 Adobe 额度的影响以实际结果为准。
+Adobe 原生 GPT Image 1.5、2、2.5、2.6 请求 `quality: "auto"`、省略 `quality` 或传空值时，默认提交 `medium` 对应的 `detailLevel=3`，成功响应返回 `quality: "medium"`。显式 `low` 仍提交档位 1；显式 `medium`、`high`、`xhigh`、`max` 及各模型上限保持。大小写和首尾空格会规范化；2.6 未知质量值明确拒绝，其他旧模型沿用原低档兜底。文生图和图片编辑使用同一规则；非 GPT Image 模型及中转账号保留原处理。账号检测显式使用 `low`，不随业务默认值提高。站内按张数和分辨率的计费规则保持，较高生成档位对耗时与 Adobe 额度的影响以实际结果为准。
 
 ```bash
 jq -r '.data[] | select(.url != null) | .url' response.json
@@ -517,7 +540,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
   -H "Authorization: Bearer ${CREATIVE_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{
-    "model": "gpt-image-2.6-aurora",
+    "model": "gpt-image-2.6-sunburst",
     "prompt": "一个热闹的夜市街景，多个摊位和行人，暖色灯光，电影感",
     "size": "2048x2048",
     "quality": "high",
@@ -536,7 +559,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
   -H "Authorization: Bearer ${CREATIVE_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{
-    "model": "gpt-image-2.6-aurora",
+    "model": "gpt-image-2.6-sunburst",
     "prompt": "一只小鸟挥动翅膀，白色背景，连贯循环动画",
     "size": "auto",
     "quality": "medium",
@@ -549,7 +572,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
   }' -o response.json
 ```
 
-这是一份动画，不是 16 张图片。成功返回 `data[0].b64_json` 时直接解码并保存 `.gif`，不要将其转成 PNG 后再交给客户，否则会丢失动画。也可替换为 `gpt-image-2.6-star-swirl`。
+这是一份动画，不是 16 张图片。成功返回 `data[0].b64_json` 时直接解码并保存 `.gif`，不要将其转成 PNG 后再交给客户，否则会丢失动画。也可替换为 `gpt-image-2.6-flare`。
 
 ### 7.4 Image 2.6：JSON 多图参考与 complexity
 
@@ -561,7 +584,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
   -H "Authorization: Bearer ${CREATIVE_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{
-    "model": "gpt-image-2.6-aurora",
+    "model": "gpt-image-2.6-sunburst",
     "prompt": "保留第一张图中杯子的造型，采用第二张图的配色与背景",
     "images": [
       {"image_url": "https://example.com/reference-1.png"},
@@ -583,7 +606,7 @@ Image 2/2.5 使用相同 `images` 数组结构，但必须移除 complexity。�
 curl --fail-with-body --connect-timeout 15 --max-time 600 \
   'https://creative.cheap/v1/images/edits' \
   -H "Authorization: Bearer ${CREATIVE_API_KEY}" \
-  -F 'model=gpt-image-2.6-star-swirl' \
+  -F 'model=gpt-image-2.6-flare' \
   -F 'prompt=融合两张参考图，保持主体外形，使用统一摄影棚光照' \
   -F 'image[]=@reference-1.png;type=image/png' \
   -F 'image[]=@reference-2.jpg;type=image/jpeg' \
@@ -599,7 +622,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
 
 ### 7.6 Image 2.6：透明 PNG
 
-以下参数组合已在线上两款 2.6 验证。示例选 Flare，也可仅将 model 改为 `gpt-image-2.6-aurora`。透明效果应读取 PNG 的透明通道，不应只看响应中的 background 标签。
+以下参数组合已在线上两款 2.6 验证。示例选 Flare，也可仅将 model 改为 `gpt-image-2.6-sunburst`。透明效果应读取 PNG 的透明通道，不应只看响应中的 background 标签。
 
 ```bash
 curl --fail-with-body --connect-timeout 15 --max-time 600 \
@@ -607,7 +630,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
   -H "Authorization: Bearer ${CREATIVE_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{
-    "model": "gpt-image-2.6-star-swirl",
+    "model": "gpt-image-2.6-flare",
     "prompt": "一把橙色陶瓷茶壶，主体完整，透明背景，无文字",
     "size": "1024x1024",
     "quality": "low",
@@ -632,7 +655,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
   -H "Authorization: Bearer ${CREATIVE_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{
-    "model": "gpt-image-2.6-aurora",
+    "model": "gpt-image-2.6-sunburst",
     "prompt": "一把橙色陶瓷茶壶，简洁摄影棚背景，无文字",
     "size": "1024x1024",
     "quality": "low",
@@ -658,7 +681,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
   -H "Authorization: Bearer ${CREATIVE_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{
-    "model": "gpt-image-2.6-star-swirl",
+    "model": "gpt-image-2.6-flare",
     "prompt": "一片绿色叶子轻轻旋转，白色背景，连贯循环动画，无文字",
     "size": "auto",
     "quality": "low",
@@ -721,7 +744,7 @@ for index, item in enumerate(response.get("data", []), 1):
 
 2026-11-07 通过正式域名补测两款 2.6，共 40 项独立请求：14 个真实输出、26 次符合预期的参数拒绝。每款均取得透明 PNG、不透明 PNG、25/90 两档 JPEG、默认 9 帧 GIF、auto 16 帧 GIF 和固定 896×896 的 2 帧 GIF。已解码验证透明像素、JPEG 编码参数、GIF 的不同画面帧数和逐帧时长；不是只凭 HTTP 200 判断支持。非流式 partial_images=2 只返回完整图片，WebP、SVG、无效 complexity 与不支持的组合有明确错误。
 
-另有首次测试分组的一次上游认证 401，未计为通过，也未作为“透明参数不支持”的依据；之后使用有近期成功记录的业务分组完成独立样本。测试没有重放失败或未知结果，临时测试权限已清理。上述证据只覆盖已列组合，不代表所有账号、所有尺寸、所有参数组合或高峰吞吐；本次仅补充文档，没有新增或放开模型能力。
+另有首次测试分组的一次上游认证 401，未计为通过，也未作为“透明参数不支持”的依据；之后使用有近期成功记录的业务分组完成独立样本。测试没有重放失败或未知结果，临时测试权限已清理。上述证据只覆盖已列组合，不代表所有账号、所有尺寸、所有参数组合或高峰吞吐；本节记录此前参数实测；本次 2.6 质量修正与新增 4K 高档位证据见 0.4 节。
 
 2026-11-06 的接入验证使用真实线上 Adobe 账号测试了五款模型的静态生成和 JSON 编辑；2.6 的多图参考、multipart 静态编辑、2K high quality + high complexity 及 GIF 2/4/9/16 帧有成功样本。两款 GIF 的默认 9 帧、auto 16 帧、20/200/2000ms 时长和 25→30ms 取整也有实际输出验证。
 

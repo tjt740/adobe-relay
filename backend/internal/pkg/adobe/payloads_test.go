@@ -738,7 +738,7 @@ func TestBuildImagePayloadCandidatesGPTImage25Background(t *testing.T) {
 	require.Equal(t, "transparent", msp["background"])
 }
 
-func TestBuildImagePayloadCandidatesGPTImage26UsesSameProtocolWithDetailCapFive(t *testing.T) {
+func TestBuildImagePayloadCandidatesGPTImage26UsesSameProtocolWithDetailCapSeven(t *testing.T) {
 	candidates, err := BuildImagePayloadCandidates(ImagePayloadOptions{
 		Prompt:               "a red cube",
 		UpstreamModelID:      "gpt-image",
@@ -752,7 +752,7 @@ func TestBuildImagePayloadCandidatesGPTImage26UsesSameProtocolWithDetailCapFive(
 	p := candidates[0]
 	require.Equal(t, "gpt-image-2.6-star-swirl", p["modelVersion"])
 	require.Equal(t, "gpt-image", p["modelId"])
-	require.Equal(t, 5, p["generationSettings"].(map[string]any)["detailLevel"])
+	require.Equal(t, 7, p["generationSettings"].(map[string]any)["detailLevel"])
 	require.Equal(t, Size{Width: 1024, Height: 1024}, p["size"])
 }
 

@@ -43,8 +43,12 @@ func TestAdobeImageServiceResponseQualityMatchesSubmittedDetailLevel(t *testing.
 		{"v2_max_clamped", "gpt-image-2", "max", "high", 5},
 		{"v2_xhigh_clamped", "gpt-image-2", "xhigh", "high", 5},
 		{"v15_xhigh_clamped", "gpt-image-1.5", "xhigh", "high", 5},
-		{"v26_max_clamped", "gpt-image-2.6-star-swirl", "max", "high", 5},
-		{"v26_xhigh_clamped", "gpt-image-2.6-aurora", "xhigh", "high", 5},
+		{"v26_flare_max", "gpt-image-2.6-star-swirl", "max", "max", 7},
+		{"v26_flare_xhigh", "gpt-image-2.6-star-swirl", "xhigh", "xhigh", 6},
+		{"v26_aurora_max", "gpt-image-2.6-aurora", "max", "max", 7},
+		{"v26_aurora_xhigh", "gpt-image-2.6-aurora", "xhigh", "xhigh", 6},
+		{"v26_flare_alias_xhigh", "gpt-image-2.6-flare", " XHIGH ", "xhigh", 6},
+		{"v26_sunburst_alias_max", "gpt-image-2.6-sunburst", " MAX ", "max", 7},
 		{"nano_banana_omits_quality", "nano-banana-pro", "max", "", 0},
 		{"flux_omits_quality", "flux-pro", "max", "", 0},
 	}
@@ -91,6 +95,8 @@ func TestAdobeImageServiceResponseQualityUsesMappedModel(t *testing.T) {
 		{"xhigh_to_v2", "gpt-image-2.5-flare", "firefly-gpt-image-2", "xhigh", "high", "2", 5},
 		{"auto_to_flare", "gpt-image-2", "firefly-gpt-image-2-5-flare", "auto", "medium", "gpt-image-2.5-flare", 3},
 		{"default_to_v2", "gpt-image-2.5-flare", "firefly-gpt-image-2", "", "medium", "2", 3},
+		{"xhigh_to_v26", "gpt-image-2", "firefly-gpt-image-2-6-flare", "xhigh", "xhigh", "gpt-image-2.6-star-swirl", 6},
+		{"max_to_v26", "gpt-image-2", "firefly-gpt-image-2-6-sunburst", "max", "max", "gpt-image-2.6-aurora", 7},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -132,13 +138,17 @@ func TestAdobeImageServiceQualityResponseAcrossDeliveryPaths(t *testing.T) {
 		{"buffered_storage_fallback", openAIImagesEditsEndpoint, "", "failed", "b64_json", true},
 	}
 	for _, quality := range []struct {
-		name, requested, response string
-		detailLevel               int
+		name, requested, response, model string
+		detailLevel                      int
 	}{
-		{"auto", "auto", "medium", 3},
-		{"default", "", "medium", 3},
-		{"low", "low", "low", 1},
-		{"xhigh", "xhigh", "xhigh", 7},
+		{"auto", "auto", "medium", "gpt-image-2.5-sunburst", 3},
+		{"default", "", "medium", "gpt-image-2.5-sunburst", 3},
+		{"low", "low", "low", "gpt-image-2.5-sunburst", 1},
+		{"xhigh", "xhigh", "xhigh", "gpt-image-2.5-sunburst", 7},
+		{"v26_flare_xhigh", "xhigh", "xhigh", "gpt-image-2.6-star-swirl", 6},
+		{"v26_flare_max", "max", "max", "gpt-image-2.6-star-swirl", 7},
+		{"v26_aurora_xhigh", "xhigh", "xhigh", "gpt-image-2.6-aurora", 6},
+		{"v26_aurora_max", "max", "max", "gpt-image-2.6-aurora", 7},
 	} {
 		for _, tc := range cases {
 			t.Run(tc.name+"/"+quality.name, func(t *testing.T) {
@@ -165,7 +175,7 @@ func TestAdobeImageServiceQualityResponseAcrossDeliveryPaths(t *testing.T) {
 					}
 				}
 				req := &OpenAIImagesRequest{
-					Model: "gpt-image-2.5-sunburst", Prompt: "a cat", Size: "1024x1024",
+					Model: quality.model, Prompt: "a cat", Size: "1024x1024",
 					Quality: quality.requested, N: 2, Endpoint: tc.endpoint, ResponseFormat: tc.format,
 				}
 				if req.IsEdits() {
@@ -207,6 +217,28 @@ func TestAdobeImageServiceQualityResponseAcrossDeliveryPaths(t *testing.T) {
 					}
 				}
 			})
+		}
+	}
+}
+
+func TestAdobeImage26RejectsSilentQualityDowngradeBeforeSubmission(t *testing.T) {
+	for _, model := range []string{"gpt-image-2.6-flare", "gpt-image-2.6-sunburst", "gpt-image-2.6-star-swirl", "gpt-image-2.6-aurora"} {
+		for _, quality := range []string{"xhigh", "max", "extraHigh", "typo"} {
+			for _, mapped := range []string{"firefly-gpt-image-2", "firefly-gpt-image-2-5-flare", "firefly-gpt-image-2-6-flare"} {
+				if mapped == "firefly-gpt-image-2-6-flare" && (quality == "xhigh" || quality == "max") {
+					continue
+				}
+				t.Run(model+"/"+quality+"/"+mapped, func(t *testing.T) {
+					api := &adobeFakeTransport{}
+					svc := newAdobeTestService(t, adobeSubmitPollDownload(t, api, []byte("PNG")), nil)
+					account := adobeTestAccount()
+					account.Credentials = map[string]any{"model_mapping": map[string]any{model: mapped}}
+					result, err := svc.GenerateCall(context.Background(), account, "tok", NewAdobeImageCall(&OpenAIImagesRequest{Model: model, Prompt: "a mug", Quality: quality, Size: "1024x1024", N: 1}, ""))
+					require.Error(t, err)
+					require.Nil(t, result)
+					require.Empty(t, adobeSubmitBodies(t, api), "invalid quality must not spend a generation")
+				})
+			}
 		}
 	}
 }

@@ -87,12 +87,12 @@ func TestAccountHandlerGetAvailableModels_AdobeDisplayNames(t *testing.T) {
 	for _, legacy := range []string{"nano-banana", "nano-banana-pro", "nano-banana2"} {
 		require.Equal(t, legacy, byID[legacy], "历史别名 %s 应显示自身", legacy)
 	}
-	for _, legacy := range []string{"gpt-image-2.6-flare", "gpt-image-2.6-sunburst"} {
+	for _, legacy := range []string{"gpt-image-2.6-star-swirl", "gpt-image-2.6-aurora"} {
 		_, ok := byID[legacy]
 		require.False(t, ok, "兼容别名 %s 不应出现在新测试模型目录", legacy)
 	}
-	require.Equal(t, "gpt-image-2.6-star-swirl", byID["gpt-image-2.6-star-swirl"])
-	require.Equal(t, "gpt-image-2.6-aurora", byID["gpt-image-2.6-aurora"])
+	require.Equal(t, "GPT Image 2.6 Flare", byID["gpt-image-2.6-flare"])
+	require.Equal(t, "GPT Image 2.6 Sunburst", byID["gpt-image-2.6-sunburst"])
 }
 
 // 无显式 mapping 的 Adobe 账号（GetModelMapping 回落到 DefaultAdobeModelMapping）
@@ -159,8 +159,8 @@ func TestAccountHandlerGetAvailableModels_AdobeNormalizesLegacyGPTImage26Aliases
 			"cookie":       "aux_sid=abc",
 			"access_token": "adobe-token",
 			"model_mapping": map[string]any{
-				"gpt-image-2.6-flare":    "firefly-gpt-image-2-6-flare",
-				"gpt-image-2.6-sunburst": "firefly-gpt-image-2-6-sunburst",
+				"gpt-image-2.6-star-swirl": "firefly-gpt-image-2-6-flare",
+				"gpt-image-2.6-aurora":     "firefly-gpt-image-2-6-sunburst",
 			},
 		},
 	})
@@ -169,10 +169,10 @@ func TestAccountHandlerGetAvailableModels_AdobeNormalizesLegacyGPTImage26Aliases
 	for _, model := range models {
 		byID[model.ID] = model.DisplayName
 	}
-	require.Equal(t, "gpt-image-2.6-star-swirl", byID["gpt-image-2.6-star-swirl"])
-	require.Equal(t, "gpt-image-2.6-aurora", byID["gpt-image-2.6-aurora"])
-	require.NotContains(t, byID, "gpt-image-2.6-flare")
-	require.NotContains(t, byID, "gpt-image-2.6-sunburst")
+	require.Equal(t, "GPT Image 2.6 Flare", byID["gpt-image-2.6-flare"])
+	require.Equal(t, "GPT Image 2.6 Sunburst", byID["gpt-image-2.6-sunburst"])
+	require.NotContains(t, byID, "gpt-image-2.6-star-swirl")
+	require.NotContains(t, byID, "gpt-image-2.6-aurora")
 }
 
 // 顺序必须确定：map 迭代顺序随机，若直接遍历 mapping 会让默认选中每次刷新都变。
