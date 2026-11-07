@@ -18,6 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      docsReadingTheme: {"title": "More readable docs with updated parameters and shared sign-in", "body": "Stronger body/table contrast and dark syntax-highlighted code improve reading, with the same tab icon as the main site. Green navigation, Sub2 shared sign-in and the latest 2.6 parameters/examples remain; original downloads and copied text stay intact."},
       docsCapabilities: {"title": "Document verified 2.6 parameters and working examples", "body": "The API guide now includes a live-tested support table for both 2.6 models, transparent PNG, JPEG compression and GIF timing examples, and explicit WebP, SVG, streaming and preview limitations. Shared Sub2 sign-in, green styling, copying and protected downloads remain available."},
       docsSharedLogin: {"title": "Shared documentation sign-in, updated parameters and green navigation", "body": "Signing into Sub2 in the same browser now opens the API documentation without another login. Signed-out visitors still see the login page. Green navigation and softer parameter and code colors accompany the updated parameters and examples, with copying and downloads available."},
       docsColors: {"title": "Coordinated green navigation and softer documentation colors", "body": "The independent /docs site uses green navigation and table headings, soft teal parameters, and subdued status and restriction colors. Mint, blue-grey and warm sand code highlighting preserves complete copying, document content and access rules."},
@@ -38,6 +39,36 @@ export default {
       }
     },
     "updates": {
+      docsReadingTheme: {
+        "title": "Improve documentation readability and unify its favicon",
+        "body": "Make body text and code easier to read, with clearer separation between parameters, strings and keywords.",
+        "sections": {
+          "reason": {
+            "title": "Distinguish text and code more clearly",
+            "body": "The previous green-grey tones were too similar, with small code and parameter text. Reading feedback led to stronger separation between prose, tables and examples while retaining green navigation."
+          },
+          "reading": {
+            "title": "Dark text on white with clear table headings",
+            "body": "Body text increases to 16px, with larger inline parameters and table text. Current navigation and headings use deep green with white text; parameters have distinct light chips. Wide tables and code scroll within their own containers."
+          },
+          "code": {
+            "title": "Separate, colorful code blocks",
+            "body": "Examples use a dark surface and brighter text, with distinct colors for keys, strings, keywords, functions and numbers. Code is 14px on desktop and 13px on narrow screens, with clearer language labels and copy controls. Highlighting changes presentation only; copying preserves the complete source."
+          },
+          "icon": {
+            "title": "Match the main-site tab icon",
+            "body": "Documentation reuses the same creative.cheap SVG favicon on its login page, document and section links."
+          },
+          "validation": {
+            "title": "Content, presentation and access checks",
+            "body": "Chrome at 1440/390 widths passed all 21 exact copies, table-text comparisons, search and section navigation. Administrator, regular-user, two-factor and shared-session checks passed. Checked text contrast exceeds 4.5:1 and code colors reach at least about 9.1:1. Public checks verified the theme, favicon, download and logout."
+          },
+          "boundary": {
+            "title": "Preserve content and access rules",
+            "body": "API parameters, all 21 examples and the original Markdown remain unchanged. Sub2 shared sign-in and independent documentation login remain available. A 390-pixel Chrome viewport is not physical-phone or other-browser acceptance."
+          }
+        }
+      },
       docsCapabilities: {
         "title": "Document live-tested 2.6 parameters and limitations",
         "body": "Describe verified public-endpoint behavior, including effective controls, explicit rejections and parameters that are accepted without producing the requested feature.",
