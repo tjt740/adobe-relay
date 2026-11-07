@@ -1,0 +1,295 @@
+{
+  "source": "473c93e3664582d79ad7c49829310c58aa8f8b62",
+  "binary_sha256": "d9ac486d20be91e090b805e9dafb72cbb5feaad50d7f9fa687e7c7b2c1d7f3ec",
+  "checks_run": 42335814182,
+  "update_run": 42335919425,
+  "live": {
+    "anonymous_shows_login": true,
+    "native_sub2_login": true,
+    "favicon_matches_main": true,
+    "favicon_url": "https://creative.cheap/logo.svg",
+    "fragment_9_preserved": true,
+    "applied_palette": {
+      "body": "16px",
+      "code": "rgb(17, 24, 39)",
+      "key": "rgb(125, 211, 252)",
+      "string": "rgb(134, 239, 172)",
+      "keyword": "rgb(196, 181, 253)",
+      "number": "rgb(253, 186, 116)"
+    },
+    "no_second_login": true,
+    "no_shared_docs_cookie": true,
+    "chrome_viewports": [
+      1440,
+      390
+    ],
+    "markdown_sha256": "7df3d367f4c499075f14460a3ed0dc4931b22f8aac6bd6506d22e878c3d744dc",
+    "docs_logout_keeps_sub2": true,
+    "native_logout_status": 200,
+    "sub2_logout_closes_shared_docs": true,
+    "anonymous_document_and_download_denied": true,
+    "trace": [
+      {
+        "stage": "sub2-native-login",
+        "path": "/api/v1/auth/login",
+        "status": 200,
+        "page": "main"
+      },
+      {
+        "stage": "automatic-docs-entry",
+        "path": "/docs/session",
+        "status": 200,
+        "page": "docs"
+      },
+      {
+        "stage": "shared-download",
+        "path": "/docs/session/guide.md",
+        "status": 200,
+        "page": "docs"
+      },
+      {
+        "stage": "docs-logout-scope",
+        "path": "/docs/session",
+        "status": 200,
+        "page": "docs"
+      },
+      {
+        "stage": "sub2-native-logout",
+        "path": "/api/v1/auth/logout",
+        "status": 200,
+        "page": "main"
+      },
+      {
+        "stage": "sub2-native-logout",
+        "path": "/docs/session",
+        "status": 401
+      },
+      {
+        "stage": "sub2-native-logout",
+        "path": "/docs/session",
+        "status": 401,
+        "page": "docs"
+      }
+    ],
+    "verified_at_utc": "2026-11-07T03:54:56.033Z",
+    "password_or_tokens_in_artifacts": false,
+    "adobe_requests": 0
+  },
+  "contrast": {
+    "ratios": {
+      "body": 12.64,
+      "inline-parameter": 7.23,
+      "navigation-active": 6.89,
+      "table-heading": 6.89,
+      "muted": 5.87,
+      "code-default": 16.19,
+      "code-toolbar": 11.87,
+      "copy": 9.9,
+      "warning": 7.78,
+      ".token-key": 10.64,
+      ".token-flag, .token-variable": 9.38,
+      ".token-function": 14.24,
+      ".token-string": 12.63,
+      ".token-number": 10.52,
+      ".token-keyword": 9.61,
+      ".token-comment": 9.1
+    },
+    "minimum_code_contrast": 9.1,
+    "scope": "CSS color pairs checked with standard relative luminance; screenshots separately inspected."
+  },
+  "public_assets": {
+    "verified_at_utc": "2026-11-07T03:53:47.672536+00:00",
+    "assets": {
+      "site.css": "723c4e2e8444cd79f349e0509107acdca145137767a32ac2cc124e6aaca9fd4b",
+      "site.js": "4f5f6f321c8a403f830a52f606694c08c510ab93127545238e49741e18a444ae",
+      "session.js": "efa6afa135126509f02a58f5f2ab21e666f2354cb118982ff6dd096dbf878085"
+    },
+    "login_favicon": true,
+    "anonymous_has_no_document": true,
+    "favicon_sha256": "ce1f2ac07efcfff80904a9582578b5db8fdd14a3118a5c7b58f408ed06df18e1"
+  },
+  "manual": [
+    {
+      "browser": "chromium",
+      "case": "old-policy-native-form",
+      "status": 403,
+      "origin": "null"
+    },
+    {
+      "browser": "chromium",
+      "width": 1440,
+      "case": "document-ui",
+      "exact_code_and_copy": 21,
+      "exact_table_content": true,
+      "search": true,
+      "current_section": true
+    },
+    {
+      "browser": "chromium",
+      "width": 1440,
+      "case": "admin",
+      "native_login": true,
+      "download": true,
+      "logout": true,
+      "overflow": false
+    },
+    {
+      "browser": "chromium",
+      "width": 1440,
+      "case": "user",
+      "native_login": true,
+      "download": true,
+      "logout": true,
+      "overflow": false
+    },
+    {
+      "browser": "chromium",
+      "width": 1440,
+      "case": "2fa",
+      "native_login": true,
+      "download": true,
+      "logout": true,
+      "overflow": false
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "case": "document-ui",
+      "exact_code_and_copy": 21,
+      "exact_table_content": true,
+      "search": true,
+      "current_section": true
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "case": "admin",
+      "native_login": true,
+      "download": true,
+      "logout": true,
+      "overflow": false
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "case": "user",
+      "native_login": true,
+      "download": true,
+      "logout": true,
+      "overflow": false
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "case": "2fa",
+      "native_login": true,
+      "download": true,
+      "logout": true,
+      "overflow": false
+    }
+  ],
+  "shared": [
+    {
+      "case": "existing-admin",
+      "width": 1440,
+      "no_second_login": true,
+      "no_shared_cookie": true,
+      "download": true,
+      "docs_logout_keeps_sub2": true,
+      "sub2_logout_closes_docs": true
+    },
+    {
+      "case": "existing-user",
+      "width": 1440,
+      "no_second_login": true,
+      "no_shared_cookie": true,
+      "download": true,
+      "docs_logout_keeps_sub2": true,
+      "sub2_logout_closes_docs": true
+    },
+    {
+      "case": "existing-2fa",
+      "width": 1440,
+      "no_second_login": true,
+      "no_shared_cookie": true,
+      "download": true,
+      "docs_logout_keeps_sub2": true,
+      "sub2_logout_closes_docs": true
+    },
+    {
+      "case": "existing-admin",
+      "width": 390,
+      "no_second_login": true,
+      "no_shared_cookie": true,
+      "download": true,
+      "docs_logout_keeps_sub2": true,
+      "sub2_logout_closes_docs": true
+    },
+    {
+      "case": "existing-user",
+      "width": 390,
+      "no_second_login": true,
+      "no_shared_cookie": true,
+      "download": true,
+      "docs_logout_keeps_sub2": true,
+      "sub2_logout_closes_docs": true
+    },
+    {
+      "case": "existing-2fa",
+      "width": 390,
+      "no_second_login": true,
+      "no_shared_cookie": true,
+      "download": true,
+      "docs_logout_keeps_sub2": true,
+      "sub2_logout_closes_docs": true
+    },
+    {
+      "case": "forged-token",
+      "denied": true
+    },
+    {
+      "case": "fixture-challenge",
+      "denied": true
+    },
+    {
+      "case": "inactive-token",
+      "denied": true
+    },
+    {
+      "case": "outage-token",
+      "denied": true
+    },
+    {
+      "case": "concurrent-expired-session",
+      "single_refresh": true,
+      "automatic_entry": true
+    },
+    {
+      "case": "main-tab-refresh-lock",
+      "round": 0,
+      "adopts_peer": true,
+      "no_duplicate_refresh": true
+    },
+    {
+      "case": "no-web-locks-refresh-race",
+      "adopts_delayed_winner": true,
+      "no_session_loss": true
+    },
+    {
+      "case": "late-refresh-logout",
+      "no_session_restore": true
+    },
+    {
+      "case": "late-refresh-account-switch",
+      "no_session_restore": true
+    },
+    {
+      "case": "direct-markdown-entry",
+      "authenticated_download": true
+    },
+    {
+      "case": "blocked-storage",
+      "manual_login_available": true
+    }
+  ]
+}
