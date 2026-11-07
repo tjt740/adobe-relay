@@ -1,0 +1,137 @@
+{
+  "verified_at": "2026-11-07T12:56:24.918130+08:00",
+  "results": [
+    {
+      "case": "star-swirl-4k-high",
+      "model": "gpt-image-2.6-star-swirl",
+      "requested": {
+        "model": "gpt-image-2.6-star-swirl",
+        "prompt": "A blue ceramic mug on a pale wooden table beside a small orange, bright natural window light, product photograph, no text. Test reference image26-retest-20261107 star-swirl-4k-high.",
+        "n": 1,
+        "quality": "high",
+        "size": "3840x2160",
+        "response_format": "b64_json",
+        "output_format": "png"
+      },
+      "outer_posts": 1,
+      "api_key_id": 168,
+      "http_status": 200,
+      "content_type": "application/json",
+      "request_id": "d0c4807f-2d2b-4034-b71a-4ed3dc69a7a0",
+      "response": {
+        "background": "auto",
+        "created": 1794027244,
+        "model": "gpt-image-2.6-star-swirl",
+        "moderation": "auto",
+        "output_format": "png",
+        "quality": "high",
+        "size": "3840x2160"
+      },
+      "image_count": 1,
+      "images": [
+        {
+          "file": "star-swirl-4k-high-0.png",
+          "format": "png",
+          "bytes": 11006730,
+          "sha256": "a8debf25dd0e6bb146f6d53141e8ca1e38bce838df465f103ba0c04ccb5b157f",
+          "width": 3840,
+          "height": 2160
+        }
+      ],
+      "duration_seconds": 31.934
+    },
+    {
+      "case": "aurora-4k-high",
+      "model": "gpt-image-2.6-aurora",
+      "requested": {
+        "model": "gpt-image-2.6-aurora",
+        "prompt": "A blue ceramic mug on a pale wooden table beside a small orange, bright natural window light, product photograph, no text. Test reference image26-retest-20261107 aurora-4k-high.",
+        "n": 1,
+        "quality": "high",
+        "size": "3840x2160",
+        "response_format": "b64_json",
+        "output_format": "png"
+      },
+      "outer_posts": 1,
+      "api_key_id": 168,
+      "http_status": 200,
+      "content_type": "application/json",
+      "request_id": "dc383430-7390-4c18-af55-b3f6efa2468d",
+      "response": {
+        "background": "auto",
+        "created": 1794027296,
+        "model": "gpt-image-2.6-aurora",
+        "moderation": "auto",
+        "output_format": "png",
+        "quality": "high",
+        "size": "3840x2160"
+      },
+      "image_count": 1,
+      "images": [
+        {
+          "file": "aurora-4k-high-0.png",
+          "format": "png",
+          "bytes": 11081583,
+          "sha256": "9a34f97e410213b7d2cf4cf237b6da897b9938671a67deafe436c7a2222458ad",
+          "width": 3840,
+          "height": 2160
+        }
+      ],
+      "duration_seconds": 51.613
+    }
+  ],
+  "png_checks": [
+    {
+      "file": "aurora-4k-high-0.png",
+      "width": 3840,
+      "height": 2160,
+      "bytes": 11081583,
+      "sha256": "9a34f97e410213b7d2cf4cf237b6da897b9938671a67deafe436c7a2222458ad",
+      "all_chunks_crc_valid": true,
+      "full_pixel_stream_decompressed": true
+    },
+    {
+      "file": "star-swirl-4k-high-0.png",
+      "width": 3840,
+      "height": 2160,
+      "bytes": 11006730,
+      "sha256": "a8debf25dd0e6bb146f6d53141e8ca1e38bce838df465f103ba0c04ccb5b157f",
+      "all_chunks_crc_valid": true,
+      "full_pixel_stream_decompressed": true
+    }
+  ],
+  "usage": [
+    {
+      "request_id": "client:5e580b87-c164-466c-a96c-b80e00f8ff06",
+      "account_id": 2470,
+      "group_id": 2,
+      "model": "gpt-image-2.6-star-swirl",
+      "upstream_model": "firefly-gpt-image-2-6-flare",
+      "image_count": 1,
+      "total_cost": 0.07,
+      "actual_cost": 0.07,
+      "created_at": "2026-11-07T12:54:04.717924+08:00"
+    },
+    {
+      "request_id": "client:c22165cb-343a-4e3e-ba5e-d04733cc1039",
+      "account_id": 2470,
+      "group_id": 2,
+      "model": "gpt-image-2.6-aurora",
+      "upstream_model": "firefly-gpt-image-2-6-sunburst",
+      "image_count": 1,
+      "total_cost": 0.07,
+      "actual_cost": 0.07,
+      "created_at": "2026-11-07T12:54:56.341286+08:00"
+    }
+  ],
+  "runtime_unchanged": true,
+  "cleanup": {
+    "at": "2026-11-07T04:54:57.069515+00:00",
+    "temporary_key_deleted": true,
+    "temporary_grant_removed": true,
+    "original_allowed_groups": [],
+    "current_allowed_groups": [],
+    "credentials_persisted": false
+  },
+  "original_images_on_server": "/opt/adobe-relay/diagnostics/image26-retest-20261107/business-group2"
+}

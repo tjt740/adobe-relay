@@ -30,8 +30,16 @@ func GPTImageDetailLevelFromQuality(qualityLevel string) int {
 }
 
 // GPTImageDetailLevelFromQualityForVersion 按上游 modelVersion 选择 detailLevel 上限：
-// gpt-image-2.5-* 为 7，其余为 5。auto 和未指定质量默认 medium（3）。
+// 2.6 的 Extra High / Max 分别为 6 / 7；2.5 保留原最高档 7，旧模型上限 5。
+// auto 和未指定质量默认 medium（3）。
 func GPTImageDetailLevelFromQualityForVersion(qualityLevel, modelVersion string) int {
+	switch strings.ToLower(strings.TrimSpace(modelVersion)) {
+	case "gpt-image-2.6-star-swirl", "gpt-image-2.6-aurora":
+		if strings.EqualFold(strings.TrimSpace(qualityLevel), "xhigh") {
+			return 6
+		}
+		return gptImageDetailLevelFromQuality(qualityLevel, 7)
+	}
 	return gptImageDetailLevelFromQuality(qualityLevel, gptImageDetailLevelCap(modelVersion))
 }
 

@@ -18,6 +18,7 @@ export default {
     },
     measurements: "发布准备实测与样本范围",
     overviews: {
+      adobeImage26Quality: {"title": "两款 2.6 高档质量与官网名称同步，接口文档同步更新", "body": "2.6 Flare / Sunburst 支持独立 Extra High、Max 并拒绝静默降档；同步模型列表、旧名称兼容及调用示例。保留今天已更新的文档阅读主题、共享登录和受保护下载。"},
       docsReadingTheme: {"title": "接口文档更易读，参数与登录同步更新", "body": "文档采用更清晰的正文、表格与深色代码高亮，标签页图标与主站统一。保留绿色导航、Sub2 共享登录和最新 2.6 参数与调用示例，原文与复制内容保持一致。"},
       docsCapabilities: {"title": "补充 2.6 接口实测参数与调用示例", "body": "接口文档新增两款 2.6 的实测支持表、透明 PNG、JPEG 压缩和 GIF 时长示例，明确标出 WebP、SVG、流式及渐进预览等限制。保留 Sub2 共享登录、绿色配色、复制和受保护下载。"},
       docsSharedLogin: {"title": "文档共享登录、参数更新与绿色配色", "body": "在同一浏览器登录 Sub2 后可直接查看接口文档，未登录时仍显示登录页。文档沿用绿色导航、柔和参数和代码配色，并补齐最新参数与调用示例，支持复制和下载。"},
@@ -39,6 +40,40 @@ export default {
       }
     },
     "updates": {
+      adobeImage26Quality: {
+        "title": "2.6 支持独立 Extra High / Max，名称与 Adobe 官网一致",
+        "body": "GPT Image 2.6 Flare 与 Sunburst 使用独立的 Extra High 和 Max 质量档位，修正旧版降至 High 的限制。模型列表、检测选项与接口文档统一使用官网名称。",
+        "sections": {
+          "reason": {
+            "title": "依据最新实测更新支持范围",
+            "body": "Adobe 官网已开放两款 2.6 的五档生成质量。旧版中转虽然接受 xhigh/max，却限制到 High；现在按实际提交档位处理，不能再把请求成功误认为高档位生效。"
+          },
+          "mapping": {
+            "title": "Extra High 与 Max 分开生效",
+            "body": "quality=xhigh 使用 Extra High，quality=max 使用 Max，响应分别返回 xhigh、max。low、medium、high 和 auto 默认 medium 保持；两款 2.6 的未知质量值明确报错，映射到其他模型的高档请求也明确拒绝，不静默降档。"
+          },
+          "names": {
+            "title": "Flare / Sunburst 与官网同名",
+            "body": "界面显示 GPT Image 2.6 Flare、GPT Image 2.6 Sunburst，新的接口接入使用 gpt-image-2.6-flare、gpt-image-2.6-sunburst。旧 star-swirl、aurora 名称仍可调用，同一变体的新旧名称兼容已有白名单。"
+          },
+          "usage": {
+            "title": "示例与参数说明同步更新",
+            "body": "接口文档同步模型名称、质量支持表和两段 4K Extra High / Max 调用示例。官网 Extra High 对应 quality=xhigh；complexity 仍只接受 low、medium、high，JPEG 编码质量也保持独立。"
+          },
+          "compatibility": {
+            "title": "保留既有调用与明确限制",
+            "body": "旧名称继续路由到原来的对应变体，已有显式账号映射优先，Flare 与 Sunburst 权限不互相放开。静态生成、编辑、链接与 Base64 返回沿用同一档位规则；Image 2、1.5、2.5 与提交保护保持。"
+          },
+          "validation": {
+            "title": "核对真实提交与输出",
+            "body": "发布前两款模型各验证 Extra High 和 Max，四次真实上游生成均返回完整 3840×2160 PNG，并核对实际提交档位。回归覆盖新旧名称、白名单、显式映射、质量拒绝和不同返回路径；生成日志记录实际档位供正式接口复核。"
+          },
+          "boundary": {
+            "title": "支持范围与使用边界",
+            "body": "高档位可能耗时更长，仍受上游权益、负载及账号状态影响。静态 4K 样本不代表高档 GIF、真实编辑、所有账号或高峰可靠性；已受理或结果未知的请求继续禁止重复提交。"
+          }
+        }
+      },
       docsReadingTheme: {
         "title": "接口文档升级阅读主题并统一图标",
         "body": "提升正文与代码的辨识度，让参数、字符串和关键字更容易区分。",

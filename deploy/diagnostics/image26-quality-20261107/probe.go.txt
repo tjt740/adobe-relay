@@ -1,0 +1,143 @@
+// Diagnostic only. Credentials arrive through stdin and are never persisted.
+package main
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"image/png"
+	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
+)
+
+type input struct {
+	AccountID                                     int64
+	ProxyID                                       int64
+	Token, ProxyURL, ARPSessionID, Model, Quality string
+}
+
+type capture struct {
+	base     adobe.Transport
+	report   map[string]any
+	submits  int
+	expected int
+}
+
+func (t *capture) Do(ctx context.Context, req *adobe.Request) (*adobe.Response, error) {
+	if req.URL == adobe.ImageSubmitURL {
+		t.submits++
+		if t.submits != 1 {
+			return nil, errors.New("diagnostic forbids resubmission")
+		}
+		var p map[string]any
+		if err := json.Unmarshal(req.Body, &p); err != nil {
+			return nil, err
+		}
+		settings, ok := p["generationSettings"].(map[string]any)
+		if !ok || settings["detailLevel"] != float64(t.expected) {
+			return nil, errors.New("unexpected detail level; no submission")
+		}
+		t.report["submitted_payload"] = p
+		t.report["submit_attempts"] = t.submits
+	}
+	r, err := t.base.Do(ctx, req)
+	if r != nil && req.URL == adobe.ImageSubmitURL {
+		t.report["submit_status"] = r.StatusCode
+		if r.StatusCode != 200 {
+			t.report["submit_error"] = adobe.SafeDiagnosticMessage(string(r.Body))
+		}
+	}
+	return r, err
+}
+
+func main() { os.Exit(run()) }
+func run() int {
+	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	var in input
+	if json.NewDecoder(io.LimitReader(os.Stdin, 1<<20)).Decode(&in) != nil {
+		return 2
+	}
+	if in.AccountID != 2470 || in.Token == "" || in.ProxyURL == "" {
+		return 2
+	}
+	if in.Model != "gpt-image-2.6-star-swirl" && in.Model != "gpt-image-2.6-aurora" {
+		return 2
+	}
+	level := 6
+	if in.Quality == "max" {
+		level = 7
+	} else if in.Quality != "xhigh" {
+		return 2
+	}
+	root := "/opt/adobe-relay/diagnostics/image26-quality-20261107/native"
+	if os.MkdirAll(root, 0700) != nil {
+		return 2
+	}
+	name := in.Model + "-" + in.Quality
+	report := map[string]any{"case": name, "model": in.Model, "quality": in.Quality, "expected_detail_level": level, "account_id": in.AccountID, "proxy_id": in.ProxyID, "success": false, "started_at": time.Now().UTC().Format(time.RFC3339)}
+	marker, err := os.OpenFile(filepath.Join(root, name+"-started.json"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		fmt.Println("case already started; do not replay")
+		return 2
+	}
+	json.NewEncoder(marker).Encode(report)
+	marker.Close()
+	start := time.Now()
+	defer func() {
+		report["duration_seconds"] = time.Since(start).Seconds()
+		b, _ := json.MarshalIndent(report, "", "  ")
+		os.WriteFile(filepath.Join(root, name+"-result.json"), b, 0600)
+		fmt.Println(string(b))
+	}()
+	conf, err := adobe.ResolveImage(adobe.ImageRequest{ModelID: in.Model, Size: "3840x2160"})
+	if err != nil {
+		report["error"] = adobe.SafeDiagnosticMessage(err.Error())
+		return 1
+	}
+	t := &capture{base: adobe.NewImpersonateTransport(adobe.DefaultIdentity, in.ProxyURL), report: report, expected: level}
+	client := adobe.NewClient(adobe.ClientConfig{Transport: t, ProxyURL: in.ProxyURL})
+	ctx, cancel := context.WithTimeout(adobe.WithSingleSubmission(context.Background()), 8*time.Minute)
+	defer cancel()
+	result, err := client.GenerateImage(ctx, adobe.GenerateImageInput{Token: in.Token, ARPSessionID: in.ARPSessionID, Timeout: 7 * time.Minute, Options: adobe.ImagePayloadOptions{
+		Prompt:          "A blue ceramic mug beside a small orange on a pale wooden table, natural window light, product photography, no text. Test reference image26-quality-20261107 " + name,
+		UpstreamModelID: conf.UpstreamModelID, UpstreamModelVersion: conf.UpstreamModelVersion, PayloadKind: conf.PayloadKind, SizePixels: conf.SizePixels, AspectRatio: conf.AspectRatio, OutputResolution: conf.OutputResolution, QualityLevel: in.Quality,
+	}})
+	if err != nil {
+		report["error"] = adobe.SafeDiagnosticMessage(err.Error())
+		var op *adobe.OperationError
+		if errors.As(err, &op) {
+			report["stage"] = op.Stage
+			report["upstream_status"] = op.HTTPStatus
+			report["submission_rejected"] = op.SubmissionRejected
+			report["request_id"] = op.UpstreamRequestID
+		}
+		return 1
+	}
+	img, err := png.Decode(bytes.NewReader(result.Bytes))
+	if err != nil {
+		report["error"] = "output was not a valid PNG"
+		return 1
+	}
+	sum := sha256.Sum256(result.Bytes)
+	report["sha256"] = hex.EncodeToString(sum[:])
+	report["bytes"] = len(result.Bytes)
+	report["timings"] = result.Timings
+	report["width"] = img.Bounds().Dx()
+	report["height"] = img.Bounds().Dy()
+	report["png_fully_decoded"] = true
+	if err = os.WriteFile(filepath.Join(root, name+".png"), result.Bytes, 0600); err != nil {
+		report["error"] = "cannot save output"
+		return 1
+	}
+	report["success"] = img.Bounds().Dx() == 3840 && img.Bounds().Dy() == 2160 && t.submits == 1
+	return 0
+}

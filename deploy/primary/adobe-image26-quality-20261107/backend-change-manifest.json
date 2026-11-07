@@ -1,0 +1,98 @@
+{
+  "backend/internal/domain/constants.go": {
+    "before": "fa77b4971770d95a1cba99b1a967377cd80f543ddf0ad0e6cf41dcd06679ee0a",
+    "candidate": "19c0cea40ba77cdf02292f934d01a99fd0831c067f6e3fea37e7e77b972e4dea"
+  },
+  "backend/internal/handler/admin/account_handler_adobe_models_test.go": {
+    "before": "c16c97cdaa5cd0d13d0a21fb573e1fdd70b03659d2a029efb3154ee6f5756c56",
+    "candidate": "8c7148388c3144a1d66fab5eab8037fdc25ec833b792625623e8563a68e94bf7"
+  },
+  "backend/internal/pkg/adobe/catalog.go": {
+    "before": "affa1f80f0838fa8757c1924b484a5b6f3acb6a194cbdddf35eb91d42ab4dcb2",
+    "candidate": "bf6d600ff0a1df0ece3d2500990505d00744f816b4e53191877a17e77e650e47"
+  },
+  "backend/internal/pkg/adobe/catalog_test.go": {
+    "before": "29dafcdebbae13ba613c43036d3cda13cd8bbc601bbdba16cad2ed9e5a5f51d5",
+    "candidate": "fb374b1b186149a21a5ed47311ce418afadda8cf3fca65b2da562390df5b6e89"
+  },
+  "backend/internal/pkg/adobe/client.go": {
+    "before": "e13d1a3d30661bb86041694799c305be98a30b867f77be69b43ef0f52b2e9994",
+    "candidate": "a71ca9abd8e10e284e457128d42beb664c2637878cbf5c9f0af1a149ab985910"
+  },
+  "backend/internal/pkg/adobe/models.go": {
+    "before": "270c1c8e71e0a58bb7fe81046d3808b876742d2c5514b62b63d2cb69fc502be8",
+    "candidate": "3aad803dca2cc6e009f1964ca7800d02518d9388cd1c7c6f204d5ad1aa411ae7"
+  },
+  "backend/internal/pkg/adobe/payloads.go": {
+    "before": "3537de7c57e66e32cd1f7840fe8ad06fa10665282b54b65023f811c17b7bf6d5",
+    "candidate": "8cfae136134710009b648dbd98fb37084dafdc9a33b8bae53493b30cfb5b8115"
+  },
+  "backend/internal/pkg/adobe/payloads_test.go": {
+    "before": "2330c92227fe9799ea109c5638f16c4705b82cd32d38609a793eac3e57d2f9ea",
+    "candidate": "36153d737fbc50238bda8b63f07184b2a5a5d61e872843d0dd771881b516a7cc"
+  },
+  "backend/internal/pkg/adobe/quality26_client_test.go": {
+    "before": null,
+    "candidate": "4bec07e641ef3d5ecdd7ff6c638e0c430279904ca852358f96f224e717f59d10"
+  },
+  "backend/internal/pkg/adobe/quality26_test.go": {
+    "before": null,
+    "candidate": "598576de7b7c8d1c662de40e3b5f73a81d6bb0adc0fe274183ab1e9130b82f86"
+  },
+  "backend/internal/service/account.go": {
+    "before": "1725e565cfd0bc648f6d42387248a77ec269b03a3fe7a77688d0c6703f23efe5",
+    "candidate": "0ed2a4bab74d7ed3ef4fad43ff430efde8cf7183b18059195ed2f5c7ad456121"
+  },
+  "backend/internal/service/adobe_image_output.go": {
+    "before": "e98bd10dcfd64fbc6a998ba767440d47cf4614d350b4bf1c321f37d80c2f67b1",
+    "candidate": "c3074b86c87a2328954a2d0be7e922215bc456c609f0a2211c3ac5d955f0c0fa"
+  },
+  "backend/internal/service/adobe_image_quality_test.go": {
+    "before": "8176e7fbd4d6f055b56601e89f1ff2ce557f3f053b1376454c895d66dfe98a7d",
+    "candidate": "c21fad23a2ba6c32d7c48b37a9359fd76dd1378363e45178ddb2a3399579e6b4"
+  },
+  "backend/internal/service/adobe_image_service.go": {
+    "before": "90ebe925291b30acc781fbe46e4d07707443b6c7a64b75f8031198d56bf73a13",
+    "candidate": "f1ef4de873dcbbcbb0de5306fe4d22fa88cdf58c3173394af25fb899ecfe3452"
+  },
+  "backend/internal/service/adobe_model_names_test.go": {
+    "before": null,
+    "candidate": "15f00f6d2304ff9c8bf20153296fa8cd4bc3ef5d24760a8b6ccc8923480c0718"
+  },
+  "backend/internal/service/gateway_hotpath_optimization_test.go": {
+    "before": "65013a61dd08b3ea3f200f61937c1d94b19424b6cab04d28a422c187b1594c74",
+    "candidate": "a62d6132fc5fed06f36192578c2996e6f93a53b1c0aad80936cb0124d1320717"
+  },
+  "backend/internal/service/gateway_service.go": {
+    "before": "52a72d50464924e3e368b9e2fc8c039d390ac9a43795373f643bcd51540f8969",
+    "candidate": "2ce056bf49ce7b21fee713be8feac96c3fbfc7fa0e774af88bdf5ef9bb40be18"
+  },
+  "backend/internal/service/group_model_allowlist.go": {
+    "before": "02091a513bd221f4d507eb0757bb3cda4b99f938600c1ddab7e270fc5b9877f4",
+    "candidate": "7dc00c05f3094b42e0d6f8c7f86e08d9506ace52a5c24d3d58e8486614c989c9"
+  },
+  "docs/ADOBE_IMAGE_CLIENT_GUIDE.md": {
+    "before": "8947b5b3eab745ce201527b5056847d2e615f7e0642ae7025a7a0f92db0c3b7a",
+    "candidate": "248ace0d1e01178aac2c00909565fcc596a37ebd6ef6e587e92b76d3a7156b75"
+  },
+  "frontend/src/composables/__tests__/useModelWhitelist.spec.ts": {
+    "before": "19b5aac26c4658f75ec4664d7b7234675ec69bd852d83f2ac1a549f114c61d29",
+    "candidate": "fc93244a231fd4e7f84561672a310e9010dca234ee0e8fa3d59ae6d44ee5a4db"
+  },
+  "frontend/src/composables/useModelWhitelist.ts": {
+    "before": "dcaefde48d64d222f08e48287755c6cd2cfb5626c7b741c9b310ac9094b6583b",
+    "candidate": "d39790a2f9ed958a8e4f531a4106a0f9523d21089817e4395afc4ec7bd3081d4"
+  },
+  "frontend/src/content/changelog/daily.ts": {
+    "before": "9a6c32ee5c145216dd499766e96e6ff97efd25796cee67b31607b7ec6519f519",
+    "candidate": "8f23be4633aedcc3d1a8a7586162d46014a16ecaaac23219bcca4fba201dfd37"
+  },
+  "frontend/src/i18n/locales/en/changelog.ts": {
+    "before": "221d235a39737d741213281397cf102f97e1e3cbe36e083812945ccd58dcb184",
+    "candidate": "285b19cc7ee1fc6033c9062f388f4e5afde6c48786ebc7c9c86e22a50aabad59"
+  },
+  "frontend/src/i18n/locales/zh/changelog.ts": {
+    "before": "713f63714f65494af611727112df2eebef4e86e38d9f0774dc52538e8a2a20d3",
+    "candidate": "e61a226bf085c69c7cb25bf463c3d75b1d9ae6e0e67d3858357d32377ca194ff"
+  }
+}

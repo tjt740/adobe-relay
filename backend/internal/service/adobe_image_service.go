@@ -172,6 +172,9 @@ func (s *AdobeImageService) GenerateCall(
 	if err != nil {
 		return nil, &adobe.OperationError{Stage: "prepare", Err: err}
 	}
+	if err := validateAdobeImage26Quality(req, conf); err != nil {
+		return nil, err
+	}
 	gifOptions, err := validateAdobeGIFParams(req, conf, outputFormat)
 	if err != nil {
 		return nil, err

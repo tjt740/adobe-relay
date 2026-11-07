@@ -1,0 +1,88 @@
+{
+  "verified_at": "2026-11-07T13:28:12.679003+08:00",
+  "production_application": "da24f5634a0fd332f95a14d666fa2e9cea19db53",
+  "candidate_base": "5d3742ec8751d7891043ef238c8e7b6c62adf966",
+  "candidate_deployed": false,
+  "public_baseline": [
+    {
+      "model": "gpt-image-2.6-star-swirl",
+      "requested_quality": "xhigh",
+      "returned_quality": "high",
+      "http_status": 200,
+      "duration_seconds": 20.651
+    },
+    {
+      "model": "gpt-image-2.6-aurora",
+      "requested_quality": "max",
+      "returned_quality": "high",
+      "http_status": 200,
+      "duration_seconds": 52.743
+    }
+  ],
+  "native_candidate_results": [
+    {
+      "model": "gpt-image-2.6-aurora",
+      "quality": "max",
+      "expected_detail_level": 7,
+      "submit_status": 200,
+      "submit_attempts": 1,
+      "width": 3840,
+      "height": 2160,
+      "bytes": 11118843,
+      "sha256": "fa4eea1860005761138055e790beeb0d7ad28a748b0dd21e40e71719fd220f6f",
+      "duration_seconds": 102.445591301,
+      "success": true,
+      "png_fully_decoded": true
+    },
+    {
+      "model": "gpt-image-2.6-aurora",
+      "quality": "xhigh",
+      "expected_detail_level": 6,
+      "submit_status": 200,
+      "submit_attempts": 1,
+      "width": 3840,
+      "height": 2160,
+      "bytes": 11203925,
+      "sha256": "ce4e002763c5989a3a9dad98b324eef0f0bd3ec56563d46c102583ab558db646",
+      "duration_seconds": 59.662689178,
+      "success": true,
+      "png_fully_decoded": true
+    },
+    {
+      "model": "gpt-image-2.6-star-swirl",
+      "quality": "max",
+      "expected_detail_level": 7,
+      "submit_status": 200,
+      "submit_attempts": 1,
+      "width": 3840,
+      "height": 2160,
+      "bytes": 9520156,
+      "sha256": "2df3dbd40ce299ed9058fd8b9a38abde612f665bd9efa925925cc56501a5ffbd",
+      "duration_seconds": 35.021074869,
+      "success": true,
+      "png_fully_decoded": true
+    },
+    {
+      "model": "gpt-image-2.6-star-swirl",
+      "quality": "xhigh",
+      "expected_detail_level": 6,
+      "submit_status": 200,
+      "submit_attempts": 1,
+      "width": 3840,
+      "height": 2160,
+      "bytes": 9843932,
+      "sha256": "91d4e7575442b9e10695dae3a48db225ac4ef336dc35cc407f85e15dac5dc6ab",
+      "duration_seconds": 25.260305868,
+      "success": true,
+      "png_fully_decoded": true
+    }
+  ],
+  "native_test_account_count": 1,
+  "total_generation_requests": 6,
+  "replayed_requests": 0,
+  "temporary_access_cleaned": true,
+  "production_runtime_unchanged": true,
+  "readback_run": "https://github.com/tjt740/adobe-relay/actions/runs/42342737165",
+  "server_evidence": "/opt/adobe-relay/diagnostics/image26-quality-20261107/",
+  "limits": "Four isolated candidate static PNG generations at 3840x2160; not a public deployment, GIF or live edit test, all-account or load-capacity proof."
+}

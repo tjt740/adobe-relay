@@ -18,6 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      adobeImage26Quality: {"title": "Image 2.6 quality, website names and API documentation updated", "body": "2.6 Flare / Sunburst support distinct Extra High and Max levels without silent downgrades. Model lists, previous-name compatibility and examples are updated, alongside today’s documentation reading theme, shared login and protected downloads."},
       docsReadingTheme: {"title": "More readable docs with updated parameters and shared sign-in", "body": "Stronger body/table contrast and dark syntax-highlighted code improve reading, with the same tab icon as the main site. Green navigation, Sub2 shared sign-in and the latest 2.6 parameters/examples remain; original downloads and copied text stay intact."},
       docsCapabilities: {"title": "Document verified 2.6 parameters and working examples", "body": "The API guide now includes a live-tested support table for both 2.6 models, transparent PNG, JPEG compression and GIF timing examples, and explicit WebP, SVG, streaming and preview limitations. Shared Sub2 sign-in, green styling, copying and protected downloads remain available."},
       docsSharedLogin: {"title": "Shared documentation sign-in, updated parameters and green navigation", "body": "Signing into Sub2 in the same browser now opens the API documentation without another login. Signed-out visitors still see the login page. Green navigation and softer parameter and code colors accompany the updated parameters and examples, with copying and downloads available."},
@@ -39,6 +40,40 @@ export default {
       }
     },
     "updates": {
+      adobeImage26Quality: {
+        "title": "Distinct Extra High / Max quality and Adobe website names for Image 2.6",
+        "body": "GPT Image 2.6 Flare and Sunburst now use separate Extra High and Max levels, removing the former High cap. Model directories, connection-test choices and API documentation use the website names.",
+        "sections": {
+          "reason": {
+            "title": "Follow current verified upstream capabilities",
+            "body": "Adobe now offers five quality levels for both 2.6 variants. The former relay accepted xhigh/max but capped them at High. Applied submission levels now determine the result; a successful response alone is not evidence that a higher level was used."
+          },
+          "mapping": {
+            "title": "Apply Extra High and Max separately",
+            "body": "quality=xhigh selects Extra High and quality=max selects Max; responses preserve xhigh and max. Low, medium, high and the medium default for auto remain unchanged. Unknown 2.6 quality values and high-level 2.6 requests mapped to another model are rejected explicitly instead of silently downgraded."
+          },
+          "names": {
+            "title": "Match the Flare and Sunburst names on Adobe’s website",
+            "body": "The interface shows GPT Image 2.6 Flare and GPT Image 2.6 Sunburst. New API integrations use gpt-image-2.6-flare and gpt-image-2.6-sunburst. Existing star-swirl and aurora names remain accepted; equivalent names work with existing allowlists for the same variant."
+          },
+          "usage": {
+            "title": "Update examples and parameter guidance",
+            "body": "API documentation includes the new names, the quality support table and two 4K Extra High / Max examples. The website’s Extra High setting uses quality=xhigh. Complexity still accepts only low, medium and high; JPEG encoding quality is a separate control."
+          },
+          "compatibility": {
+            "title": "Preserve existing calls and explicit restrictions",
+            "body": "Previous names route to their original variants, explicit account mappings retain priority, and permissions do not cross between Flare and Sunburst. Static generation, edits, URL and Base64 delivery share the quality rule. Image 2, 1.5, 2.5 and submission protections are preserved."
+          },
+          "validation": {
+            "title": "Verify submitted levels and actual outputs",
+            "body": "Before release, both variants were tested once with Extra High and once with Max. All four real upstream generations returned complete 3840×2160 PNGs with the submitted levels verified. Regressions cover names, allowlists, explicit mappings, quality rejection and delivery paths; generation logs record applied levels for public-endpoint verification."
+          },
+          "boundary": {
+            "title": "Keep the supported scope clear",
+            "body": "Higher levels may take longer and remain subject to upstream entitlements, load and account state. Static 4K samples do not prove high-level GIFs, live edits, all-account or peak-load reliability. Accepted or uncertain requests remain protected against repeat submission."
+          }
+        }
+      },
       docsReadingTheme: {
         "title": "Improve documentation readability and unify its favicon",
         "body": "Make body text and code easier to read, with clearer separation between parameters, strings and keywords.",

@@ -216,7 +216,7 @@ var rawImageFamilySpecs = []imageFamilySpec{
 		upstreamModelID:      upstreamModelIDGPTImage,
 		upstreamModelVersion: "gpt-image-2.6-star-swirl",
 		payloadKind:          PayloadKindGPTImage26,
-		label:                "Firefly gpt-image-2.6-star-swirl",
+		label:                "Firefly GPT Image 2.6 Flare",
 	},
 	{
 		familyID:             "firefly-gpt-image-2-6-sunburst",
@@ -224,7 +224,7 @@ var rawImageFamilySpecs = []imageFamilySpec{
 		upstreamModelID:      upstreamModelIDGPTImage,
 		upstreamModelVersion: "gpt-image-2.6-aurora",
 		payloadKind:          PayloadKindGPTImage26,
-		label:                "Firefly gpt-image-2.6-aurora",
+		label:                "Firefly GPT Image 2.6 Sunburst",
 	},
 	{
 		familyID:             "firefly-nano-banana-pro",
@@ -398,7 +398,7 @@ var externalImageModelAliases = map[string]string{
 	"gpt-image-2.5-flare":    "firefly-gpt-image-2-5-flare",
 	"gpt-image-2.5-sunburst": "firefly-gpt-image-2-5-prism", // sunburst 是 UI 名，上游 modelVersion=prism
 	"gpt-image-2.5-prism":    "firefly-gpt-image-2-5-prism",
-	// 2.6 对外使用 Adobe 实际接口版本名；旧 Flare/Sunburst 名继续作为兼容别名解析。
+	// 2.6 对外使用官网 Flare/Sunburst 名；star-swirl/aurora 保留为兼容别名。
 	"gpt-image-2.6-star-swirl": "firefly-gpt-image-2-6-flare",
 	"gpt-image-2.6-aurora":     "firefly-gpt-image-2-6-sunburst",
 	"gpt-image-2.6-flare":      "firefly-gpt-image-2-6-flare",
@@ -439,28 +439,43 @@ func IsExternalImageModelID(modelID string) bool {
 	return ok
 }
 
-// IsLegacyGPTImage26Alias reports compatibility names that remain accepted by
-// request routing but are intentionally hidden from new model directories.
+// IsLegacyGPTImage26Alias identifies previous public IDs hidden from new directories.
 func IsLegacyGPTImage26Alias(modelID string) bool {
 	switch strings.ToLower(strings.TrimSpace(modelID)) {
-	case "gpt-image-2.6-flare", "gpt-image-2.6-sunburst":
+	case "gpt-image-2.6-star-swirl", "gpt-image-2.6-aurora":
 		return true
 	default:
 		return false
 	}
 }
 
-// CanonicalGPTImage26ModelID maps a legacy 2.6 request name to Adobe's actual
-// interface version name for user-facing model directories. Request routing
-// keeps accepting both names; this helper is only for directory generation.
+// CanonicalGPTImage26ModelID uses Adobe's website names in public directories.
+// Upstream modelVersion values remain star-swirl and aurora.
 func CanonicalGPTImage26ModelID(modelID string) string {
+	switch strings.ToLower(strings.TrimSpace(modelID)) {
+	case "gpt-image-2.6-star-swirl", "gpt-image-2.6-flare":
+		return "gpt-image-2.6-flare"
+	case "gpt-image-2.6-aurora", "gpt-image-2.6-sunburst":
+		return "gpt-image-2.6-sunburst"
+	default:
+		return modelID
+	}
+}
+
+// GPTImage26AlternateModelID returns only the equivalent public name of the same
+// variant. It never maps between variants or grants another model family.
+func GPTImage26AlternateModelID(modelID string) string {
 	switch strings.ToLower(strings.TrimSpace(modelID)) {
 	case "gpt-image-2.6-flare":
 		return "gpt-image-2.6-star-swirl"
+	case "gpt-image-2.6-star-swirl":
+		return "gpt-image-2.6-flare"
 	case "gpt-image-2.6-sunburst":
 		return "gpt-image-2.6-aurora"
+	case "gpt-image-2.6-aurora":
+		return "gpt-image-2.6-sunburst"
 	default:
-		return modelID
+		return ""
 	}
 }
 

@@ -239,7 +239,7 @@ var DefaultAdobeModelMapping = map[string]string{
 	"gpt-image-2.5-flare":    "firefly-gpt-image-2-5-flare",
 	"gpt-image-2.5-prism":    "firefly-gpt-image-2-5-prism",
 	"gpt-image-2.5-sunburst": "firefly-gpt-image-2-5-prism",
-	// 2.6 对外展示 Adobe 实际接口版本名；旧 Flare/Sunburst 保留为兼容别名。
+	// 2.6 对外展示官网 Flare/Sunburst 名；star-swirl/aurora 保留为兼容别名。
 	"gpt-image-2.6-star-swirl": "firefly-gpt-image-2-6-flare",
 	"gpt-image-2.6-aurora":     "firefly-gpt-image-2-6-sunburst",
 	"gpt-image-2.6-flare":      "firefly-gpt-image-2-6-flare",

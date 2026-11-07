@@ -18,7 +18,7 @@ export const pendingDailyUpdates: readonly Omit<DailyUpdate, 'date'>[] = [
 ]
 
 export const dailyOverviews: Readonly<Record<string, string>> = {
-  '2026-11-07': 'docsReadingTheme',
+  '2026-11-07': 'adobeImage26Quality',
   '2026-11-06': 'adobeGptImage26Gif',
   '2026-11-05': 'upstreamV0219',
   '2026-11-04': 'bulkTestConcurrency',
@@ -32,6 +32,7 @@ export const dailyOverviews: Readonly<Record<string, string>> = {
 
 // Use the actual release date in Asia/Shanghai; multiple releases share one day.
 export const dailyUpdates: readonly DailyUpdate[] = [
+  { date: '2026-11-07', id: 'adobeImage26Quality', type: 'fixed', sections: ['reason', 'mapping', 'names', 'usage', 'compatibility', 'validation', 'boundary'] },
   { date: '2026-11-07', id: 'docsReadingTheme', type: 'improved', sections: ['reason', 'reading', 'code', 'icon', 'validation', 'boundary'] },
   { date: '2026-11-07', id: 'docsCapabilities', type: 'improved', sections: ['reason', 'parameters', 'examples', 'unsupported', 'validation', 'boundary'] },
   { date: '2026-11-07', id: 'docsSharedLogin', type: 'improved', sections: ['reason', 'access', 'refresh', 'logout', 'validation', 'boundary'] },
