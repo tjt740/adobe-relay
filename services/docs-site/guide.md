@@ -3,7 +3,7 @@
 适用于 `https://creative.cheap` 的 Adobe 图片分组。使用本站分配的 API Key；示例中的 Key、图片链接、时间和用量数字均为占位或结构示例，不是生产回执。默认使用同步、非流式调用。
 
 
-文档范围：本站 **Adobe 原生图片通道**，版本日期 2026-11-06。相同分组如配置了其他兼容中转，其蒙版、流式及扩展参数以该通道实际能力为准；不能仅凭 OpenAI 接口形状推断 Adobe 支持所有功能。
+文档范围：本站 **Adobe 原生图片通道**，版本日期 2026-11-07。相同分组如配置了其他兼容中转，其蒙版、流式及扩展参数以该通道实际能力为准；不能仅凭 OpenAI 接口形状推断 Adobe 支持所有功能。
 
 ## 0. 参数参考与模型差异
 
@@ -35,7 +35,27 @@ Key 必须属于有相应模型权限、可用账号及余额/额度的分组。
 
 两款 2.6 使用 Adobe 实际接口版本名，新的接入请直接使用表内名称。历史别名 `gpt-image-2.6-flare` 对应 `gpt-image-2.6-star-swirl`，`gpt-image-2.6-sunburst` 对应 `gpt-image-2.6-aurora`；仍受分组与账号白名单限制。2.5 的 `gpt-image-2.5-prism` 是 Sunburst 的兼容名称。不要用没有变体后缀的 `gpt-image-2.5` 或 `gpt-image-2.6` 代替表内模型。
 
-本次 **不开放 SVG**。Adobe 原生静态输出支持 PNG/JPEG，2.6 另支持 GIF 文生图；WebP 和 SVG 都不是本通道可用的 `output_format`。
+**不支持 WebP、SVG 和流式出图。** Adobe 原生静态输出支持 PNG/JPEG，2.6 另支持纯文字 GIF 文生图；添加 `svg.model` 或更换模型别名不会开启 SVG。
+
+### 0.2.1 两款 2.6 的线上实测支持范围
+
+2026-11-07 通过本站正式图片接口分别验证了 Flare（`gpt-image-2.6-star-swirl`）与 Sunburst（`gpt-image-2.6-aurora`），以下结果两款一致。支持范围以本通道为准，不能直接照搬其他平台的参数列表。
+
+| 参数 / 能力 | 当前支持情况 | 实测结果与限制 |
+| --- | --- | --- |
+| `background=auto / opaque` | 支持 | auto 请求正常生成；opaque 的 PNG 实际为完全不透明图片 |
+| `background=transparent` | 支持 PNG 透明背景 | 两款返回的 PNG 均有真实透明像素；与 JPEG 组合返回 400 / `incompatible_image_background` |
+| `complexity` | 仅支持 `low / medium / high` | 三档均有成功输出；`none / xhigh / max` 均返回 400 / `invalid_complexity`。不传时沿用上游默认，不等同于关闭规划 |
+| `output_format` | 支持 `png / jpeg / gif` | 实际解码确认三种文件；`webp / svg` 均返回 400 / `unsupported_output_format` |
+| `frame_count` | GIF 支持 2–16，默认 9 | 两款均验证 2、9、16 帧；1 和 17 返回 400。16 帧使用 `size=auto` |
+| `frame_duration_ms` | GIF 支持至少 20ms，按 10ms 取整 | 实际逐帧验证 20ms、默认 200ms，以及传 25ms 得到 30ms；19ms 返回 400 |
+| `output_compression` | 仅 JPEG 编码质量控制 | 25、90 均与实际 JPEG 编码参数一致；PNG 不使用该值，GIF 传此字段返回 400 |
+| `stream=true` | 不支持 | 两款均返回 400 / `invalid_stream`；省略或使用 false |
+| `partial_images` | 不支持渐进预览 | 静态非流式请求传 2 仍只返回一张完整图片，不产生中间图；GIF 传正数返回 400 / `gif_partial_images_unsupported` |
+| `svg.model` | 不支持 SVG 模型选择 | 与 `output_format=svg` 一起传仍被拒绝，不是启用 SVG 的开关 |
+
+这里的“支持”已经核对实际文件，不只检查 HTTP 200 或响应标签。`complexity` 控制规划，`quality` 控制生成质量，`output_compression` 控制 JPEG 编码，三者不能互相代替。透明背景请明确使用 PNG；不要把不支持的 WebP 当作透明输出备选。
+
 
 ### 0.3 公共参数
 
@@ -50,9 +70,10 @@ Key 必须属于有相应模型权限、可用账号及余额/额度的分组。
 | `quality` | string | `auto / low / medium / high / xhigh / max` | 省略、空值或 `auto` 使用 medium；不同模型上限见质量表 |
 | `output_format` | string | 省略保留上游格式；`png / jpeg / jpg`；2.6 可用 `gif` | `jpg` 归一化为 JPEG；GIF 必须显式传 `gif`。静态转码失败可能保留原字节，应读取实际响应格式 |
 | `response_format` | string | `b64_json / url`，建议显式传 | `b64_json` 强制内联 Base64；`url` 优先链接，但存储或原图链接不可用时回退 Base64。省略时按服务器存储配置决定 |
-| `background` | string | 省略 / `auto`，可用 `opaque / transparent` | 非 auto 值会传给 Adobe；最终效果取决于上游。`transparent` 不能与 `jpeg/jpg` 一起使用；透明图优先 PNG |
-| `output_compression` | integer | JPEG 默认 `100`，建议 `1–100` | 控制本站 JPEG 编码质量，不是模型生成质量；范围外按 1–100 截断，PNG 不使用该值。GIF 不能传此参数 |
-| `stream` | boolean | 默认 `false` | Adobe 原生仅非流式；不要传 true |
+| `background` | string | 省略 / `auto`，可用 `opaque / transparent` | 两款 2.6 的透明 PNG 和不透明 PNG 已实测；本次不扩大为旧模型的透明支持保证。`transparent` 不能与 `jpeg/jpg` 一起使用；透明图明确选 PNG |
+| `output_compression` | integer | JPEG 默认 `100`，建议 `1–100` | 控制本站 JPEG 编码质量，不是模型生成质量；当前实现将范围外数值截到 1–100（0 按 1）；本次实测 25、90。PNG 不使用该值，GIF 不能传此参数 |
+| `stream` | boolean | 默认 `false` | 不支持 true，返回 400 / `invalid_stream`；保持 false 或省略 |
+| `partial_images` | integer | 请省略 | 不支持渐进预览；静态非流式中不会产生中间图，GIF 对正值返回 400 |
 | `complexity` | string | 省略 / JSON `null` 保留上游默认；`low / medium / high` | 仅两款 2.6；与 quality 独立，适用于静态生成、静态编辑及 GIF 文生图 |
 | `frame_count` | integer | 默认 `9`，允许 `2–16` | 仅两款 2.6 且 `output_format=gif`；固定 896×896 最多 9 帧 |
 | `frame_duration_ms` | integer | 默认 `200`，至少 `20` | 仅 GIF；毫秒，按 10ms 取整，编码上限 655350ms，详见 GIF 参数表 |
@@ -93,8 +114,8 @@ Key 必须属于有相应模型权限、可用账号及余额/额度的分组。
 | 端点与输入 | `/v1/images/generations`，纯提示词，不传参考图 |
 | `output_format` | 必须为 `gif` |
 | `frame_count` | 整数 2–16；省略或 JSON null 为 9；小数和超范围值返回 400 |
-| `frame_duration_ms` | 整数且至少 20；省略或 JSON null 为 200；25ms 会取整为 30ms，2001ms 取整为 2000ms；超过 655350ms 按编码上限处理 |
-| `size` 省略 / `auto` | Adobe 按帧数决定尺寸；支持 2–16 帧。两款 16 帧样本实际为 512×512，但不承诺 auto 永远返回这个尺寸 |
+| `frame_duration_ms` | 整数且至少 20；省略或 JSON null 为 200；25ms 会取整为 30ms。本次验证 20、25→30 和默认 200ms；此前有 2000ms 成功样本。实现将超过 655350ms 的值截到 GIF 编码上限，不代表已实测长时延生成 |
+| `size` 省略 / `auto` | Adobe 按帧数决定尺寸；支持 2–16 帧。本次两款默认 9 帧和 16 帧样本实际均为 512×512，但不承诺 auto 永远返回这个尺寸 |
 | `size=896x896` | 仅允许 2–9 帧；默认 9 帧可用。需 10–16 帧时改为 auto |
 | 其他显式尺寸 | 本通道 GIF 返回 400，包括 `1024x1024`、`512x512`、`640x640`；auto 输出 512×512 不代表允许显式传此尺寸 |
 | 总动画时长 | 近似为 `frame_count × 实际取整后的 frame_duration_ms`，不是独立参数；4 帧 × 200ms 为一轮 0.8 秒 |
@@ -151,7 +172,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
 
 ### GPT Image 2.6 构图规划强度
 
-`complexity` 可传 `low`、`medium` 或 `high`，与 `quality` 独立；文生图 JSON、图生图 JSON 和 multipart 表单均支持。省略或传 `null` 时保留上游默认；非法值在提交前返回 400。2/2.5 和其他 Adobe 模型的原调用方式不变，不支持此新增字段。
+`complexity` 仅可传 `low`、`medium` 或 `high`，不支持 `none`、`xhigh`、`max`，与 `quality` 独立；文生图 JSON、图生图 JSON 和 multipart 表单均支持。省略或传 `null` 时保留上游默认；非法值在提交前返回 400。2/2.5 和其他 Adobe 模型的原调用方式不变，不支持此新增字段。
 
 ```json
 {
@@ -298,7 +319,7 @@ if not images:
     raise RuntimeError("响应中没有图片")
 
 extension = result.get("output_format", "png")
-if extension not in {"png", "jpeg", "gif", "webp"}:
+if extension not in {"png", "jpeg", "gif"}:
     extension = "bin"
 for index, item in enumerate(images, 1):
     if item.get("url"):
@@ -439,7 +460,8 @@ Gemini 兼容入口仍采用 Google 错误信封：违规时 HTTP 451，`error.c
 | 400 / `invalid_n` | n 超出当前支持范围 | 使用 1–10 的整数 |
 | 400 / `unsupported_output_format` | 请求 WebP、SVG 等不支持格式 | 静态使用 PNG/JPEG；2.6 动图使用 GIF |
 | 400 / `image_size_exceeds_model_limit` | 显式静态尺寸不满足模型规则 | 按模型尺寸表修改，勿把 4K 当作 4096 方图 |
-| 400 / `invalid_complexity` | complexity 不在 low/medium/high | 修正值 |
+| 400 / `invalid_complexity` | complexity 使用 none、xhigh、max 等无效值 | 仅使用 low / medium / high；不传时保留上游默认 |
+| 400 / `invalid_stream` | 请求 stream=true | 使用 false 或省略；本通道不支持流式出图 |
 | 400 / `complexity_model_not_supported` | 给 2/2.5 等模型添加 complexity | 移除该字段，或改用有权限的 2.6 |
 | 400 / `gif_model_not_supported` | 对不支持的模型请求 GIF | 只用两款 2.6 |
 | 400 / `gif_edit_unsupported` | GIF 携带参考图或调用编辑端点 | 改为无参考图的 GIF 文生图，或把编辑输出改为 PNG/JPEG |
@@ -575,6 +597,83 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
 
 不要同时给 curl 手工添加 `Content-Type: multipart/form-data`，否则容易缺少 boundary。JSON 的 `null` 与表单字符串 `null` 不同；multipart 参数想使用默认值时直接省略字段，不要写 `frame_count=null`。
 
+### 7.6 Image 2.6：透明 PNG
+
+以下参数组合已在线上两款 2.6 验证。示例选 Flare，也可仅将 model 改为 `gpt-image-2.6-aurora`。透明效果应读取 PNG 的透明通道，不应只看响应中的 background 标签。
+
+```bash
+curl --fail-with-body --connect-timeout 15 --max-time 600 \
+  'https://creative.cheap/v1/images/generations' \
+  -H "Authorization: Bearer ${CREATIVE_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "gpt-image-2.6-star-swirl",
+    "prompt": "一把橙色陶瓷茶壶，主体完整，透明背景，无文字",
+    "size": "1024x1024",
+    "quality": "low",
+    "complexity": "low",
+    "background": "transparent",
+    "output_format": "png",
+    "response_format": "b64_json",
+    "stream": false,
+    "n": 1
+  }' -o transparent-response.json
+```
+
+将 `data[0].b64_json` 解码后保存为 `.png`。需要不透明背景时改为 `background: "opaque"`；交给上游决定时用 `auto`。不要将透明示例的 output_format 改成 jpeg、webp 或 svg。
+
+### 7.7 Image 2.6：JPEG 压缩质量
+
+`quality` 与 `complexity` 保持独立。下面的 `output_compression=25` 控制 JPEG 编码；改为 `90` 可使用另一档已验证的编码质量。数值不是“文件缩小到原来的百分之几”，不能承诺固定文件大小。
+
+```bash
+curl --fail-with-body --connect-timeout 15 --max-time 600 \
+  'https://creative.cheap/v1/images/generations' \
+  -H "Authorization: Bearer ${CREATIVE_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "gpt-image-2.6-aurora",
+    "prompt": "一把橙色陶瓷茶壶，简洁摄影棚背景，无文字",
+    "size": "1024x1024",
+    "quality": "low",
+    "complexity": "high",
+    "background": "auto",
+    "output_format": "jpeg",
+    "output_compression": 25,
+    "response_format": "b64_json",
+    "stream": false,
+    "n": 1
+  }' -o jpeg-response.json
+```
+
+解码后保存为 `.jpg` 或 `.jpeg`。透明背景不能用于 JPEG；PNG 不使用 output_compression，GIF 不能传此字段。`complexity=high` 不会把本示例的 `quality=low` 自动升为 high。
+
+### 7.8 Image 2.6：GIF 帧时长取整
+
+两款均已验证 `size=auto + 16 帧 + 25ms`，实际文件为 16 帧、每帧 30ms，本次单帧为 512×512。一轮动画约 0.48 秒；auto 的尺寸由上游决定，不保证每次固定为 512×512。
+
+```bash
+curl --fail-with-body --connect-timeout 15 --max-time 600 \
+  'https://creative.cheap/v1/images/generations' \
+  -H "Authorization: Bearer ${CREATIVE_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "gpt-image-2.6-star-swirl",
+    "prompt": "一片绿色叶子轻轻旋转，白色背景，连贯循环动画，无文字",
+    "size": "auto",
+    "quality": "low",
+    "complexity": "medium",
+    "output_format": "gif",
+    "frame_count": 16,
+    "frame_duration_ms": 25,
+    "response_format": "b64_json",
+    "stream": false,
+    "n": 1
+  }' -o animation-response.json
+```
+
+默认动画可省略 frame_count 和 frame_duration_ms，本次两款实际均为 9 帧、每帧 200ms。需要验证最小值时可改为 `size=896x896, frame_count=2, frame_duration_ms=20`，此组合也已通过。GIF 示例不能加入参考图、mask、partial_images 或 output_compression；也不能改用编辑端点。
+
 ## 8. 响应字段、计费与客户端保存
 
 | 响应字段 | 类型 | 使用说明 |
@@ -620,8 +719,12 @@ for index, item in enumerate(response.get("data", []), 1):
 
 ## 9. 验证范围与使用边界
 
-本次用真实线上 Adobe 账号验证了五款模型的静态生成和 JSON 编辑；2.6 的多图参考、multipart 静态编辑、2K high quality + high complexity 及 GIF 2/4/9/16 帧有成功样本。两款 GIF 的默认 9 帧、auto 16 帧、20/200/2000ms 时长和 25→30ms 取整也有实际输出验证。
+2026-11-07 通过正式域名补测两款 2.6，共 40 项独立请求：14 个真实输出、26 次符合预期的参数拒绝。每款均取得透明 PNG、不透明 PNG、25/90 两档 JPEG、默认 9 帧 GIF、auto 16 帧 GIF 和固定 896×896 的 2 帧 GIF。已解码验证透明像素、JPEG 编码参数、GIF 的不同画面帧数和逐帧时长；不是只凭 HTTP 200 判断支持。非流式 partial_images=2 只返回完整图片，WebP、SVG、无效 complexity 与不支持的组合有明确错误。
+
+另有首次测试分组的一次上游认证 401，未计为通过，也未作为“透明参数不支持”的依据；之后使用有近期成功记录的业务分组完成独立样本。测试没有重放失败或未知结果，临时测试权限已清理。上述证据只覆盖已列组合，不代表所有账号、所有尺寸、所有参数组合或高峰吞吐；本次仅补充文档，没有新增或放开模型能力。
+
+2026-11-06 的接入验证使用真实线上 Adobe 账号测试了五款模型的静态生成和 JSON 编辑；2.6 的多图参考、multipart 静态编辑、2K high quality + high complexity 及 GIF 2/4/9/16 帧有成功样本。两款 GIF 的默认 9 帧、auto 16 帧、20/200/2000ms 时长和 25→30ms 取整也有实际输出验证。
 
 2026-11-06 发布后，指定真实账号通过正式域名完成 **18/18** 项验证：五款模型各一项 PNG 生成和 JPEG 编辑、两款 2.6 的 GIF 文生图，以及六项 GIF 编辑/参考图的明确拒绝。验证读取了实际图片文件和 GIF 帧时长，不只判断 HTTP 状态。另两轮普通分组抽样分别为 16/18、13/18，未通过项是上游 408 或提交/上传超时，原记录保留；不能把指定账号成功说成全账号池没有故障。客户遇到此类错误应保留 request_id，并按第 6 节处理。
 
-GIF 参考编辑在本次 Adobe 接入中持续返回上游 500，因此按发布范围明确关闭，并在本地阻止上传和生成。静态编辑、GIF 文生图是不同能力，不能从其中一项成功推断另一项可用。正式发布后的客户入口验证结果记录在 [本期发布记录](../deploy/primary/adobe-gpt-image-26-gif-20261106.md)。样本通过不代表所有账号权益、所有提示词、所有上游时段或任意高并发都能成功。
+GIF 参考编辑在本次 Adobe 接入中持续返回上游 500，因此按发布范围明确关闭，并在本地阻止上传和生成。静态编辑、GIF 文生图是不同能力，不能从其中一项成功推断另一项可用。正式发布后的客户入口验证结果记录在 [本期发布记录](https://github.com/tjt740/adobe-relay/blob/main/deploy/primary/adobe-gpt-image-26-gif-20261106.md)。样本通过不代表所有账号权益、所有提示词、所有上游时段或任意高并发都能成功。

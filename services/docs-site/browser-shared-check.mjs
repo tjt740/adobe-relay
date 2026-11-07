@@ -58,7 +58,7 @@ try {
    assert.equal(logins,1);assert.equal(refreshes,0);assert.deepEqual(await page.evaluate(()=>({...localStorage})),state);
    assert(!(await ctx.cookies()).some(c=>c.name==='__Host-docs_session'),'shared access must not persist docs cookie');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-   assert.equal(await page.locator('.copy').count(),18);
+   assert.equal(await page.locator('.copy').count(),(expected.toString().match(/^```[^\n]*$/gm)||[]).length/2);
    if(role==='admin')await page.screenshot({path:path.join(out,`shared-${width}.png`)});
    await page.setViewportSize({width:1440,height:950});
    const downloading=page.waitForEvent('download');await page.getByRole('link',{name:'下载 Markdown'}).click();

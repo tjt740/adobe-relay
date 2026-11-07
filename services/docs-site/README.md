@@ -32,7 +32,7 @@ For a binary-only update, the primary workflow's `update` phase requires the exa
 
 Green navigation and table headings, soft teal inline parameters, muted green supported states and restrained amber limitations form a coordinated palette. Code examples use mint, sage, blue-grey and warm sand on a dark green-grey surface. Active navigation follows the reading position. Bash, JSON and Python examples use local text-node highlighting with no external scripts or HTML injection; copy buttons use the untouched source string. Unknown languages remain plain text. Wide tables and examples scroll within their own containers.
 
-The browser check compares all rendered examples and table cells to the server HTML, checks exact clipboard payloads for all 18 examples, verifies section search/current navigation, and captures login, document, capability-table and code views at 1440/390 widths. These are Chrome viewport checks, not physical-device or other-browser proof.
+The browser check compares all rendered examples and table cells to the server HTML, checks exact clipboard payloads for every example, verifies section search/current navigation, and captures login, document, capability-table and code views at 1440/390 widths. These are Chrome viewport checks, not physical-device or other-browser proof.
 
 ## Reuse the existing Sub2 browser login
 
