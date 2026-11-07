@@ -408,6 +408,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		ImageInputTokens:         result.Usage.ImageInputTokens,
 		ImageOutputTokens:        result.Usage.ImageOutputTokens,
 		ImageCount:               result.ImageCount,
+		ImageQuality:             optionalTrimmedStringPtr(result.ImageQuality),
 		ImageSize:                optionalTrimmedStringPtr(result.ImageSize),
 		ImageInputSize:           optionalTrimmedStringPtr(result.ImageInputSize),
 		ImageOutputSize:          optionalTrimmedStringPtr(result.ImageOutputSize),
@@ -782,6 +783,18 @@ func (s *OpenAIGatewayService) calculateOpenAIImageCost(
 	platform string,
 ) *CostBreakdown {
 	sizeTier := NormalizeImageBillingTierOrDefault(result.ImageSize)
+	if platform == PlatformAdobe && result.ImageQuality != "" {
+		apiKey = s.apiKeyWithFreshGroupMediaPricing(ctx, apiKey)
+		if apiKey != nil && apiKey.Group != nil {
+			if price, ok := lookupImageQualityPrice(apiKey.Group.ImageQualityPrices, billingModel, sizeTier, result.ImageQuality); ok {
+				total := price * float64(max(0, result.ImageCount))
+				if multiplier < 0 {
+					multiplier = 0
+				}
+				return &CostBreakdown{TotalCost: total, ActualCost: total * multiplier, BillingMode: string(BillingModeImage)}
+			}
+		}
+	}
 	resolved := s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey)
 	if resolved != nil && resolved.Source == PricingSourceGroup &&
 		(resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage) {
@@ -937,7 +950,7 @@ func groupMediaPricingLooksIncomplete(group *Group) bool {
 		return false
 	}
 	// Any first-class pricing field present means the projection is not a blank shell.
-	if len(group.VideoModelPrices) > 0 {
+	if len(group.VideoModelPrices) > 0 || len(group.ImageQualityPrices) > 0 {
 		return false
 	}
 	if len(group.ModelPricing) > 0 || group.LongContextPricingEnabled {

@@ -947,6 +947,26 @@ func (_u *UsageLogUpdate) SetNillableCacheTTLOverridden(v *bool) *UsageLogUpdate
 	return _u
 }
 
+// SetImageQuality sets the "image_quality" field.
+func (_u *UsageLogUpdate) SetImageQuality(v string) *UsageLogUpdate {
+	_u.mutation.SetImageQuality(v)
+	return _u
+}
+
+// SetNillableImageQuality sets the "image_quality" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableImageQuality(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetImageQuality(*v)
+	}
+	return _u
+}
+
+// ClearImageQuality clears the value of the "image_quality" field.
+func (_u *UsageLogUpdate) ClearImageQuality() *UsageLogUpdate {
+	_u.mutation.ClearImageQuality()
+	return _u
+}
+
 // SetUser sets the "user" edge to the User entity.
 func (_u *UsageLogUpdate) SetUser(v *User) *UsageLogUpdate {
 	return _u.SetUserID(v.ID)
@@ -1109,6 +1129,11 @@ func (_u *UsageLogUpdate) check() error {
 	if v, ok := _u.mutation.VideoResolution(); ok {
 		if err := usagelog.VideoResolutionValidator(v); err != nil {
 			return &ValidationError{Name: "video_resolution", err: fmt.Errorf(`ent: validator failed for field "UsageLog.video_resolution": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ImageQuality(); ok {
+		if err := usagelog.ImageQualityValidator(v); err != nil {
+			return &ValidationError{Name: "image_quality", err: fmt.Errorf(`ent: validator failed for field "UsageLog.image_quality": %w`, err)}
 		}
 	}
 	if _u.mutation.UserCleared() && len(_u.mutation.UserIDs()) > 0 {
@@ -1380,6 +1405,12 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.CacheTTLOverridden(); ok {
 		_spec.SetField(usagelog.FieldCacheTTLOverridden, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.ImageQuality(); ok {
+		_spec.SetField(usagelog.FieldImageQuality, field.TypeString, value)
+	}
+	if _u.mutation.ImageQualityCleared() {
+		_spec.ClearField(usagelog.FieldImageQuality, field.TypeString)
 	}
 	if _u.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -2461,6 +2492,26 @@ func (_u *UsageLogUpdateOne) SetNillableCacheTTLOverridden(v *bool) *UsageLogUpd
 	return _u
 }
 
+// SetImageQuality sets the "image_quality" field.
+func (_u *UsageLogUpdateOne) SetImageQuality(v string) *UsageLogUpdateOne {
+	_u.mutation.SetImageQuality(v)
+	return _u
+}
+
+// SetNillableImageQuality sets the "image_quality" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableImageQuality(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetImageQuality(*v)
+	}
+	return _u
+}
+
+// ClearImageQuality clears the value of the "image_quality" field.
+func (_u *UsageLogUpdateOne) ClearImageQuality() *UsageLogUpdateOne {
+	_u.mutation.ClearImageQuality()
+	return _u
+}
+
 // SetUser sets the "user" edge to the User entity.
 func (_u *UsageLogUpdateOne) SetUser(v *User) *UsageLogUpdateOne {
 	return _u.SetUserID(v.ID)
@@ -2636,6 +2687,11 @@ func (_u *UsageLogUpdateOne) check() error {
 	if v, ok := _u.mutation.VideoResolution(); ok {
 		if err := usagelog.VideoResolutionValidator(v); err != nil {
 			return &ValidationError{Name: "video_resolution", err: fmt.Errorf(`ent: validator failed for field "UsageLog.video_resolution": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ImageQuality(); ok {
+		if err := usagelog.ImageQualityValidator(v); err != nil {
+			return &ValidationError{Name: "image_quality", err: fmt.Errorf(`ent: validator failed for field "UsageLog.image_quality": %w`, err)}
 		}
 	}
 	if _u.mutation.UserCleared() && len(_u.mutation.UserIDs()) > 0 {
@@ -2924,6 +2980,12 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if value, ok := _u.mutation.CacheTTLOverridden(); ok {
 		_spec.SetField(usagelog.FieldCacheTTLOverridden, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.ImageQuality(); ok {
+		_spec.SetField(usagelog.FieldImageQuality, field.TypeString, value)
+	}
+	if _u.mutation.ImageQualityCleared() {
+		_spec.ClearField(usagelog.FieldImageQuality, field.TypeString)
 	}
 	if _u.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{

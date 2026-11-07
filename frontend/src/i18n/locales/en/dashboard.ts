@@ -436,6 +436,7 @@ export default {
     imageSizeSourceDefault: 'Default billing tier',
     imageSizeSourceLegacy: 'Legacy record',
     imageSizeSourceMissing: 'Not recorded',
+    imageQuality: 'Image quality',
     imageSizeNotRecorded: 'not recorded',
     imageSizeLegacyUnstandardized: 'legacy unstandardized',
     imageSizeUnknown: 'unknown',

@@ -106,6 +106,8 @@ const (
 	FieldVideoDurationSeconds = "video_duration_seconds"
 	// FieldCacheTTLOverridden holds the string denoting the cache_ttl_overridden field in the database.
 	FieldCacheTTLOverridden = "cache_ttl_overridden"
+	// FieldImageQuality holds the string denoting the image_quality field in the database.
+	FieldImageQuality = "image_quality"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// EdgeUser holds the string denoting the user edge name in mutations.
@@ -206,6 +208,7 @@ var Columns = []string{
 	FieldVideoResolution,
 	FieldVideoDurationSeconds,
 	FieldCacheTTLOverridden,
+	FieldImageQuality,
 	FieldCreatedAt,
 }
 
@@ -288,6 +291,8 @@ var (
 	VideoResolutionValidator func(string) error
 	// DefaultCacheTTLOverridden holds the default value on creation for the "cache_ttl_overridden" field.
 	DefaultCacheTTLOverridden bool
+	// ImageQualityValidator is a validator for the "image_quality" field. It is called by the builders before save.
+	ImageQualityValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 )
@@ -523,6 +528,11 @@ func ByVideoDurationSeconds(opts ...sql.OrderTermOption) OrderOption {
 // ByCacheTTLOverridden orders the results by the cache_ttl_overridden field.
 func ByCacheTTLOverridden(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCacheTTLOverridden, opts...).ToFunc()
+}
+
+// ByImageQuality orders the results by the image_quality field.
+func ByImageQuality(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldImageQuality, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

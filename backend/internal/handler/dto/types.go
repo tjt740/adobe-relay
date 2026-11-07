@@ -131,7 +131,8 @@ type Group struct {
 	VideoPrice720P     *float64 `json:"video_price_720p"`
 	VideoPrice1080P    *float64 `json:"video_price_1080p"`
 	// VideoModelPrices 可选按模型族×分辨率覆盖视频每秒单价 (USD/s)。
-	VideoModelPrices map[string]map[string]float64 `json:"video_model_prices,omitempty"`
+	VideoModelPrices   map[string]map[string]float64            `json:"video_model_prices,omitempty"`
+	ImageQualityPrices map[string]map[string]map[string]float64 `json:"image_quality_prices,omitempty"`
 	// Codex alpha/search 网页搜索单次价格（USD/次）；null 表示使用默认价 0.01
 	WebSearchPricePerCall        *float64 `json:"web_search_price_per_call"`
 	SearchPricePer1k             *float64 `json:"search_price_per_1k"`
@@ -662,6 +663,7 @@ type UsageLog struct {
 
 	// 图片生成字段
 	ImageCount         int            `json:"image_count"`
+	ImageQuality       *string        `json:"image_quality,omitempty"`
 	ImageSize          *string        `json:"image_size"`
 	ImageInputSize     *string        `json:"image_input_size"`
 	ImageOutputSize    *string        `json:"image_output_size"`

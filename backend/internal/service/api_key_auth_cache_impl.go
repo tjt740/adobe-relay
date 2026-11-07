@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 26 // v26: retain model allowlist and Kiro fields, add image_count_billing.
+const apiKeyAuthSnapshotVersion = 27 // v27: include optional Adobe Image 2.6 quality prices.
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -409,6 +409,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			VideoPrice720P:                  groupForSnapshot.VideoPrice720P,
 			VideoPrice1080P:                 groupForSnapshot.VideoPrice1080P,
 			VideoModelPrices:                NormalizeVideoModelPrices(groupForSnapshot.VideoModelPrices),
+			ImageQualityPrices:              CloneImageQualityPrices(groupForSnapshot.ImageQualityPrices),
 			WebSearchPricePerCall:           groupForSnapshot.WebSearchPricePerCall,
 			SearchPricePer1k:                groupForSnapshot.SearchPricePer1k,
 			AudioRealtimePricePerMin:        groupForSnapshot.AudioRealtimePricePerMin,
@@ -520,6 +521,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			VideoPrice720P:                  snapshot.Group.VideoPrice720P,
 			VideoPrice1080P:                 snapshot.Group.VideoPrice1080P,
 			VideoModelPrices:                NormalizeVideoModelPrices(snapshot.Group.VideoModelPrices),
+			ImageQualityPrices:              CloneImageQualityPrices(snapshot.Group.ImageQualityPrices),
 			WebSearchPricePerCall:           snapshot.Group.WebSearchPricePerCall,
 			SearchPricePer1k:                snapshot.Group.SearchPricePer1k,
 			AudioRealtimePricePerMin:        snapshot.Group.AudioRealtimePricePerMin,

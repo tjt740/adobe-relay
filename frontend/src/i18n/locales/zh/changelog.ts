@@ -18,6 +18,7 @@ export default {
     },
     measurements: "发布准备实测与样本范围",
     overviews: {
+      adobeImage26Pricing: {"title": "两款 2.6 支持按分辨率和质量分别定价", "body": "Adobe 分组新增 Flare、Sunburst 各自的质量价格表，Extra High 与 Max 可独立收费，未填写沿用原价。保留今天上线的高档生成、官网名称、接口文档阅读和共享登录。"},
       adobeImage26Quality: {"title": "两款 2.6 高档质量与官网名称同步，接口文档同步更新", "body": "2.6 Flare / Sunburst 支持独立 Extra High、Max 并拒绝静默降档；同步模型列表、旧名称兼容及调用示例。保留今天已更新的文档阅读主题、共享登录和受保护下载。"},
       docsReadingTheme: {"title": "接口文档更易读，参数与登录同步更新", "body": "文档采用更清晰的正文、表格与深色代码高亮，标签页图标与主站统一。保留绿色导航、Sub2 共享登录和最新 2.6 参数与调用示例，原文与复制内容保持一致。"},
       docsCapabilities: {"title": "补充 2.6 接口实测参数与调用示例", "body": "接口文档新增两款 2.6 的实测支持表、透明 PNG、JPEG 压缩和 GIF 时长示例，明确标出 WebP、SVG、流式及渐进预览等限制。保留 Sub2 共享登录、绿色配色、复制和受保护下载。"},
@@ -40,6 +41,7 @@ export default {
       }
     },
     "updates": {
+      adobeImage26Pricing: {"title": "两款 2.6 支持按分辨率和质量分别定价", "body": "Adobe 分组新增 Flare、Sunburst 各自的质量价格表，Extra High 与 Max 可独立收费，未填写沿用原价。保留今天上线的高档生成、官网名称、接口文档阅读和共享登录。", "sections": {"reason": {"title": "高档生成需要独立价格", "body": "此前图片计费只区分模型和分辨率，无法分别设置 Extra High 与 Max。现在在 Adobe 分组图片计费区域提供两款 2.6 的专用价格表。"}, "pricing": {"title": "两款模型各有 15 个价格格子", "body": "每款分别设置 1K、2K、4K 与 Low、Medium、High、Extra High、Max 的每张单价。命中格子的价格优先，最终扣费仍叠加适用的图片倍率。"}, "fallback": {"title": "空白沿用原价，0 表示免费", "body": "上线不自动填价或修改现有客户收费。未填格子保持原逐模型、分组、渠道和内置计费优先级；清空恢复原价，显式 0 按免费处理。旧模型名称使用对应变体的同一价格。"}, "usage": {"title": "用量显示实际图片质量", "body": "新用量记录保存实际采用的质量，可与分辨率、张数及扣费核对；auto 和省略质量按 Medium 匹配。历史记录不补猜质量、不重新计费；接口文档同步说明设置入口和规则。"}, "validation": {"title": "覆盖计费链路和保存读取", "body": "回归检查两款模型、新旧名称、三种分辨率、五档质量和默认档位，核对实际提交、用量与费用；同时检查空白、0、倍率、原价格回退、缓存和分组复制。"}, "boundary": {"title": "价格不改变生成质量", "body": "Extra High 和 Max 保持实际请求档位，不因未配置价格而降档。适用于 Adobe 原生 2.6 已支持的生成路径，不扩大 GIF 编辑等能力；质量未知的中转响应沿用原收费。"}}},
       adobeImage26Quality: {
         "title": "2.6 支持独立 Extra High / Max，名称与 Adobe 官网一致",
         "body": "GPT Image 2.6 Flare 与 Sunburst 使用独立的 Extra High 和 Max 质量档位，修正旧版降至 High 的限制。模型列表、检测选项与接口文档统一使用官网名称。",

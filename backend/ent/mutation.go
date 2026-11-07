@@ -22241,6 +22241,7 @@ type GroupMutation struct {
 	addvideo_price_720p                     *float64
 	video_price_1080p                       *float64
 	addvideo_price_1080p                    *float64
+	image_quality_prices                    *map[string]map[string]map[string]float64
 	video_model_prices                      *map[string]map[string]float64
 	web_search_price_per_call               *float64
 	addweb_search_price_per_call            *float64
@@ -24165,6 +24166,55 @@ func (m *GroupMutation) ResetVideoPrice1080p() {
 	m.video_price_1080p = nil
 	m.addvideo_price_1080p = nil
 	delete(m.clearedFields, group.FieldVideoPrice1080p)
+}
+
+// SetImageQualityPrices sets the "image_quality_prices" field.
+func (m *GroupMutation) SetImageQualityPrices(value map[string]map[string]map[string]float64) {
+	m.image_quality_prices = &value
+}
+
+// ImageQualityPrices returns the value of the "image_quality_prices" field in the mutation.
+func (m *GroupMutation) ImageQualityPrices() (r map[string]map[string]map[string]float64, exists bool) {
+	v := m.image_quality_prices
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImageQualityPrices returns the old "image_quality_prices" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldImageQualityPrices(ctx context.Context) (v map[string]map[string]map[string]float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImageQualityPrices is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImageQualityPrices requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImageQualityPrices: %w", err)
+	}
+	return oldValue.ImageQualityPrices, nil
+}
+
+// ClearImageQualityPrices clears the value of the "image_quality_prices" field.
+func (m *GroupMutation) ClearImageQualityPrices() {
+	m.image_quality_prices = nil
+	m.clearedFields[group.FieldImageQualityPrices] = struct{}{}
+}
+
+// ImageQualityPricesCleared returns if the "image_quality_prices" field was cleared in this mutation.
+func (m *GroupMutation) ImageQualityPricesCleared() bool {
+	_, ok := m.clearedFields[group.FieldImageQualityPrices]
+	return ok
+}
+
+// ResetImageQualityPrices resets all changes to the "image_quality_prices" field.
+func (m *GroupMutation) ResetImageQualityPrices() {
+	m.image_quality_prices = nil
+	delete(m.clearedFields, group.FieldImageQualityPrices)
 }
 
 // SetVideoModelPrices sets the "video_model_prices" field.
@@ -26484,7 +26534,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 76)
+	fields := make([]string, 0, 77)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -26589,6 +26639,9 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.video_price_1080p != nil {
 		fields = append(fields, group.FieldVideoPrice1080p)
+	}
+	if m.image_quality_prices != nil {
+		fields = append(fields, group.FieldImageQualityPrices)
 	}
 	if m.video_model_prices != nil {
 		fields = append(fields, group.FieldVideoModelPrices)
@@ -26791,6 +26844,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.VideoPrice720p()
 	case group.FieldVideoPrice1080p:
 		return m.VideoPrice1080p()
+	case group.FieldImageQualityPrices:
+		return m.ImageQualityPrices()
 	case group.FieldVideoModelPrices:
 		return m.VideoModelPrices()
 	case group.FieldWebSearchPricePerCall:
@@ -26952,6 +27007,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldVideoPrice720p(ctx)
 	case group.FieldVideoPrice1080p:
 		return m.OldVideoPrice1080p(ctx)
+	case group.FieldImageQualityPrices:
+		return m.OldImageQualityPrices(ctx)
 	case group.FieldVideoModelPrices:
 		return m.OldVideoModelPrices(ctx)
 	case group.FieldWebSearchPricePerCall:
@@ -27287,6 +27344,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetVideoPrice1080p(v)
+		return nil
+	case group.FieldImageQualityPrices:
+		v, ok := value.(map[string]map[string]map[string]float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImageQualityPrices(v)
 		return nil
 	case group.FieldVideoModelPrices:
 		v, ok := value.(map[string]map[string]float64)
@@ -28016,6 +28080,9 @@ func (m *GroupMutation) ClearedFields() []string {
 	if m.FieldCleared(group.FieldVideoPrice1080p) {
 		fields = append(fields, group.FieldVideoPrice1080p)
 	}
+	if m.FieldCleared(group.FieldImageQualityPrices) {
+		fields = append(fields, group.FieldImageQualityPrices)
+	}
 	if m.FieldCleared(group.FieldVideoModelPrices) {
 		fields = append(fields, group.FieldVideoModelPrices)
 	}
@@ -28095,6 +28162,9 @@ func (m *GroupMutation) ClearField(name string) error {
 		return nil
 	case group.FieldVideoPrice1080p:
 		m.ClearVideoPrice1080p()
+		return nil
+	case group.FieldImageQualityPrices:
+		m.ClearImageQualityPrices()
 		return nil
 	case group.FieldVideoModelPrices:
 		m.ClearVideoModelPrices()
@@ -28238,6 +28308,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldVideoPrice1080p:
 		m.ResetVideoPrice1080p()
+		return nil
+	case group.FieldImageQualityPrices:
+		m.ResetImageQualityPrices()
 		return nil
 	case group.FieldVideoModelPrices:
 		m.ResetVideoModelPrices()
@@ -46602,6 +46675,7 @@ type UsageLogMutation struct {
 	video_duration_seconds       *int
 	addvideo_duration_seconds    *int
 	cache_ttl_overridden         *bool
+	image_quality                *string
 	created_at                   *time.Time
 	clearedFields                map[string]struct{}
 	user                         *int64
@@ -49084,6 +49158,55 @@ func (m *UsageLogMutation) ResetCacheTTLOverridden() {
 	m.cache_ttl_overridden = nil
 }
 
+// SetImageQuality sets the "image_quality" field.
+func (m *UsageLogMutation) SetImageQuality(s string) {
+	m.image_quality = &s
+}
+
+// ImageQuality returns the value of the "image_quality" field in the mutation.
+func (m *UsageLogMutation) ImageQuality() (r string, exists bool) {
+	v := m.image_quality
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImageQuality returns the old "image_quality" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldImageQuality(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImageQuality is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImageQuality requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImageQuality: %w", err)
+	}
+	return oldValue.ImageQuality, nil
+}
+
+// ClearImageQuality clears the value of the "image_quality" field.
+func (m *UsageLogMutation) ClearImageQuality() {
+	m.image_quality = nil
+	m.clearedFields[usagelog.FieldImageQuality] = struct{}{}
+}
+
+// ImageQualityCleared returns if the "image_quality" field was cleared in this mutation.
+func (m *UsageLogMutation) ImageQualityCleared() bool {
+	_, ok := m.clearedFields[usagelog.FieldImageQuality]
+	return ok
+}
+
+// ResetImageQuality resets all changes to the "image_quality" field.
+func (m *UsageLogMutation) ResetImageQuality() {
+	m.image_quality = nil
+	delete(m.clearedFields, usagelog.FieldImageQuality)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *UsageLogMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -49289,7 +49412,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 47)
+	fields := make([]string, 0, 48)
 	if m.user != nil {
 		fields = append(fields, usagelog.FieldUserID)
 	}
@@ -49428,6 +49551,9 @@ func (m *UsageLogMutation) Fields() []string {
 	if m.cache_ttl_overridden != nil {
 		fields = append(fields, usagelog.FieldCacheTTLOverridden)
 	}
+	if m.image_quality != nil {
+		fields = append(fields, usagelog.FieldImageQuality)
+	}
 	if m.created_at != nil {
 		fields = append(fields, usagelog.FieldCreatedAt)
 	}
@@ -49531,6 +49657,8 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.VideoDurationSeconds()
 	case usagelog.FieldCacheTTLOverridden:
 		return m.CacheTTLOverridden()
+	case usagelog.FieldImageQuality:
+		return m.ImageQuality()
 	case usagelog.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -49634,6 +49762,8 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldVideoDurationSeconds(ctx)
 	case usagelog.FieldCacheTTLOverridden:
 		return m.OldCacheTTLOverridden(ctx)
+	case usagelog.FieldImageQuality:
+		return m.OldImageQuality(ctx)
 	case usagelog.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	}
@@ -49966,6 +50096,13 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCacheTTLOverridden(v)
+		return nil
+	case usagelog.FieldImageQuality:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImageQuality(v)
 		return nil
 	case usagelog.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -50325,6 +50462,9 @@ func (m *UsageLogMutation) ClearedFields() []string {
 	if m.FieldCleared(usagelog.FieldVideoDurationSeconds) {
 		fields = append(fields, usagelog.FieldVideoDurationSeconds)
 	}
+	if m.FieldCleared(usagelog.FieldImageQuality) {
+		fields = append(fields, usagelog.FieldImageQuality)
+	}
 	return fields
 }
 
@@ -50404,6 +50544,9 @@ func (m *UsageLogMutation) ClearField(name string) error {
 		return nil
 	case usagelog.FieldVideoDurationSeconds:
 		m.ClearVideoDurationSeconds()
+		return nil
+	case usagelog.FieldImageQuality:
+		m.ClearImageQuality()
 		return nil
 	}
 	return fmt.Errorf("unknown UsageLog nullable field %s", name)
@@ -50550,6 +50693,9 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldCacheTTLOverridden:
 		m.ResetCacheTTLOverridden()
+		return nil
+	case usagelog.FieldImageQuality:
+		m.ResetImageQuality()
 		return nil
 	case usagelog.FieldCreatedAt:
 		m.ResetCreatedAt()

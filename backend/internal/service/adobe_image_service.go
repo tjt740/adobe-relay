@@ -45,7 +45,7 @@ type AdobeImageResult struct {
 	// Images 是转码后的原始图片字节，供 Gemini generateContent 信封使用。
 	// Body 可能被对象存储改写成 url，Images 仍保留字节。
 	Images [][]byte
-	// Forward 交给 RecordUsage 记账；计费只认 ImageCount 与 ImageSize 两个字段。
+	// Forward carries image count, resolution and effective quality for billing.
 	Forward *OpenAIForwardResult
 	Timings AdobeImageTimings
 }
@@ -279,6 +279,7 @@ func (s *AdobeImageService) GenerateCall(
 			// 计费档位：adobe 的 OutputResolution 取值就是 "1K"/"2K"/"4K"，
 			// ClassifyImageBillingTier 直接认这三个字面量。
 			ImageSize:        string(conf.OutputResolution),
+			ImageQuality:     adobeImage26BillingQuality(conf, req.Quality),
 			UpstreamModel:    conf.ModelID,
 			UpstreamEndpoint: adobe.ImageSubmitURL,
 			Duration:         time.Since(startTime),

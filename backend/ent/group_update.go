@@ -661,6 +661,18 @@ func (_u *GroupUpdate) ClearVideoPrice1080p() *GroupUpdate {
 	return _u
 }
 
+// SetImageQualityPrices sets the "image_quality_prices" field.
+func (_u *GroupUpdate) SetImageQualityPrices(v map[string]map[string]map[string]float64) *GroupUpdate {
+	_u.mutation.SetImageQualityPrices(v)
+	return _u
+}
+
+// ClearImageQualityPrices clears the value of the "image_quality_prices" field.
+func (_u *GroupUpdate) ClearImageQualityPrices() *GroupUpdate {
+	_u.mutation.ClearImageQualityPrices()
+	return _u
+}
+
 // SetVideoModelPrices sets the "video_model_prices" field.
 func (_u *GroupUpdate) SetVideoModelPrices(v map[string]map[string]float64) *GroupUpdate {
 	_u.mutation.SetVideoModelPrices(v)
@@ -1916,6 +1928,12 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.VideoPrice1080pCleared() {
 		_spec.ClearField(group.FieldVideoPrice1080p, field.TypeFloat64)
 	}
+	if value, ok := _u.mutation.ImageQualityPrices(); ok {
+		_spec.SetField(group.FieldImageQualityPrices, field.TypeJSON, value)
+	}
+	if _u.mutation.ImageQualityPricesCleared() {
+		_spec.ClearField(group.FieldImageQualityPrices, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.VideoModelPrices(); ok {
 		_spec.SetField(group.FieldVideoModelPrices, field.TypeJSON, value)
 	}
@@ -3064,6 +3082,18 @@ func (_u *GroupUpdateOne) AddVideoPrice1080p(v float64) *GroupUpdateOne {
 // ClearVideoPrice1080p clears the value of the "video_price_1080p" field.
 func (_u *GroupUpdateOne) ClearVideoPrice1080p() *GroupUpdateOne {
 	_u.mutation.ClearVideoPrice1080p()
+	return _u
+}
+
+// SetImageQualityPrices sets the "image_quality_prices" field.
+func (_u *GroupUpdateOne) SetImageQualityPrices(v map[string]map[string]map[string]float64) *GroupUpdateOne {
+	_u.mutation.SetImageQualityPrices(v)
+	return _u
+}
+
+// ClearImageQualityPrices clears the value of the "image_quality_prices" field.
+func (_u *GroupUpdateOne) ClearImageQualityPrices() *GroupUpdateOne {
+	_u.mutation.ClearImageQualityPrices()
 	return _u
 }
 
@@ -4351,6 +4381,12 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if _u.mutation.VideoPrice1080pCleared() {
 		_spec.ClearField(group.FieldVideoPrice1080p, field.TypeFloat64)
+	}
+	if value, ok := _u.mutation.ImageQualityPrices(); ok {
+		_spec.SetField(group.FieldImageQualityPrices, field.TypeJSON, value)
+	}
+	if _u.mutation.ImageQualityPricesCleared() {
+		_spec.ClearField(group.FieldImageQualityPrices, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.VideoModelPrices(); ok {
 		_spec.SetField(group.FieldVideoModelPrices, field.TypeJSON, value)

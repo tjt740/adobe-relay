@@ -1136,6 +1136,7 @@ export default {
         searchPricePer1k: 'Search price per 1k calls (USD)',
         pricePlaceholder: 'optional'
       },
+      imageQualityPricing: {"title": "Image 2.6 resolution and quality pricing", "hint": "Set USD per image for each model. Blank cells inherit existing model, group or channel prices; 0 means free. Matching cells take priority and the applicable image multiplier still applies. Auto/omitted quality uses Medium; legacy model aliases share these prices. Pricing never changes generation quality.", "quality": "Quality", "inherit": "Inherit"},
       modelPricing: {
         title: 'Per-model group pricing',
         description: 'Overrides channel and built-in prices for matching models. Long-context tiers come from official presets — do not enter custom intervals. Use per-request tiers such as realtime, tts, and stt for audio.',
