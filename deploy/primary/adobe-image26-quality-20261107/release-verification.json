@@ -1,0 +1,110 @@
+{
+  "application_sha": "2dc7a2a3ae0761d88b2d7e89964c93b2dc86ff06",
+  "application_version": "0.2.19",
+  "application_verified_at": "2026-11-07T06:54:26.015089+00:00",
+  "application_pr": 170,
+  "application_main_merge": "6e3be4943f69536e8dbe1e2168a3d1f0a57c6a5d",
+  "docs_source_sha": "69a5fcccdf9ee4aa35dad442dd24c05af023d3d2",
+  "docs_pr": 171,
+  "docs_main_merge": "80bd549088e9fbd553d33cbef3f92de01eac4b4c",
+  "runs": {
+    "build": 42345092438,
+    "preflight": 42345781171,
+    "prepare": 42345867738,
+    "start": 42345986348,
+    "first_public_test": 42347883003,
+    "remaining_public_tests": 42348430842,
+    "final_application_verification": 42348841216,
+    "docs_checks": 42348937064,
+    "docs_update": 42349123997,
+    "docs_verification": 42349246816
+  },
+  "preserved": {
+    "other_containers": true,
+    "configuration": true,
+    "resources_and_go": true,
+    "environment": true,
+    "okad_settings": true,
+    "sub2_settings_including_smtp": true,
+    "clash_nodes_bindings_and_configuration": true,
+    "alert_rules": true,
+    "retired_route_matches_current_baseline": true
+  },
+  "business_preservation": {
+    "backup_accounts": 1060,
+    "checked_accounts": 1060,
+    "manual_pauses_preserved": true,
+    "manual_proxy_modes_preserved": true,
+    "proxy_bindings_changed_with_event_chain": 42,
+    "cookie_rotations_with_version_advance": 0,
+    "non_source_cookie_credential_changes": 1,
+    "credential_field_names_changed": [
+      "_token_version",
+      "access_token",
+      "adobe_session_cookie",
+      "expires_at"
+    ]
+  },
+  "public_contract": {
+    "models": [
+      "gpt-image-2.6-flare",
+      "gpt-image-2.6-sunburst"
+    ],
+    "cases": 4,
+    "all_passed": true,
+    "actual_levels": [
+      6,
+      7
+    ],
+    "real_4k_pngs": 4,
+    "silent_downgrades": 0,
+    "outer_posts": 4,
+    "replayed_requests": 0
+  },
+  "admin_model_labels": {
+    "gpt-image-2.6-sunburst": "GPT Image 2.6 Sunburst",
+    "gpt-image-2.6-flare": "GPT Image 2.6 Flare"
+  },
+  "locale_bundles_verified": 2,
+  "passive_samples": 13,
+  "cleanup": {
+    "at": "2026-11-07T06:35:18.953188+00:00",
+    "temporary_container_removed": true,
+    "temporary_nat_rule_removed": true,
+    "rolling_lease_removed": true,
+    "nginx_configuration_unchanged": true
+  },
+  "migrations_unchanged": true,
+  "retired_408_empty": true,
+  "retired_1290": {
+    "excluded": false,
+    "status": null,
+    "bindings": 0,
+    "leases": 0
+  },
+  "browser_limitation": "Live authenticated browser verification unavailable; asset and API checks only",
+  "docs_update": {
+    "audit": "/opt/creative-docs/audit/update-20261107T065648Z",
+    "binary_sha256": "ba6865f5fd014d295538651177e19b8d5dc517f69b76bb62e8df41c1d0ceac66",
+    "previous_binary_sha256": "d9ac486d20be91e090b805e9dafb72cbb5feaad50d7f9fa687e7c7b2c1d7f3ec",
+    "service": "active",
+    "existing_containers_and_configs_preserved": true,
+    "referrer_policy": "same-origin",
+    "login_copy_simplified": true
+  },
+  "docs_verification": {
+    "anonymous_content_blocked": true,
+    "existing_sub2_user_login_and_read": true,
+    "protected_markdown_sha256": "be750ff277a4067c2e057237bd1306fd33ba6bfb4d28c840c691645721cd4b0e",
+    "example_blocks": 23,
+    "image26_names_and_quality_contract": true,
+    "logout_invalidates_docs_session": true,
+    "credentials_persisted": false,
+    "adobe_requests": 0,
+    "public_https": true,
+    "source_sha": "69a5fcccdf9ee4aa35dad442dd24c05af023d3d2",
+    "audit": "/opt/creative-docs/audit/verify-69a5fcccdf9ee4aa35dad442dd24c05af023d3d2",
+    "verified_at_utc": "2026-11-07T06:58:23Z"
+  },
+  "emails_sent": 0
+}
