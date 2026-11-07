@@ -28,7 +28,7 @@ func TestBrowserFixture(t *testing.T) {
 			json.NewDecoder(r.Body).Decode(&b)
 			if b["password"] != "fixture-password" {
 				w.WriteHeader(401)
-				w.Write([]byte(`{"code":401}`))
+				w.Write([]byte(`{"code":"INVALID_TOKEN","message":"Invalid token"}`))
 				return
 			}
 			if b["email"] == "2fa@example.com" {
@@ -45,7 +45,7 @@ func TestBrowserFixture(t *testing.T) {
 			json.NewDecoder(r.Body).Decode(&b)
 			if b["temp_token"] != "fixture-challenge" || b["totp_code"] != "123456" {
 				w.WriteHeader(401)
-				w.Write([]byte(`{"code":401}`))
+				w.Write([]byte(`{"code":"INVALID_TOKEN","message":"Invalid token"}`))
 				return
 			}
 			w.Write([]byte(`{"code":0,"data":{"access_token":"user","refresh_token":"browser-refresh","expires_in":1800,"user":{"id":8,"role":"user","status":"active"}}}`))
@@ -55,7 +55,7 @@ func TestBrowserFixture(t *testing.T) {
 			_, reused := usedRefresh.LoadOrStore(body["refresh_token"], true)
 			if !strings.HasPrefix(body["refresh_token"], "valid-refresh-") || reused {
 				w.WriteHeader(401)
-				w.Write([]byte(`{"code":401}`))
+				w.Write([]byte(`{"code":"INVALID_TOKEN","message":"Invalid token"}`))
 				return
 			}
 			json.NewEncoder(w).Encode(map[string]any{"code": 0, "data": map[string]any{"access_token": "user-fresh", "refresh_token": "rotated-" + body["refresh_token"], "expires_in": 1800}})
@@ -71,7 +71,7 @@ func TestBrowserFixture(t *testing.T) {
 			}
 			if r.Header.Get("Authorization") != "Bearer user" && r.Header.Get("Authorization") != "Bearer admin" && r.Header.Get("Authorization") != "Bearer user-fresh" {
 				w.WriteHeader(401)
-				w.Write([]byte(`{"code":401}`))
+				w.Write([]byte(`{"code":"INVALID_TOKEN","message":"Invalid token"}`))
 				return
 			}
 			w.Write([]byte(`{"code":0,"data":{"id":8,"status":"active"}}`))

@@ -25,13 +25,13 @@ func sharedFixture(t *testing.T) (*app, *atomic.Int32, *atomic.Int32) {
 		token := r.Header.Get("Authorization")
 		if token != "Bearer admin-token" && token != "Bearer user-token" && token != "Bearer completed-2fa-token" {
 			w.WriteHeader(401)
-			w.Write([]byte(`{"code":401}`))
+			w.Write([]byte(`{"code":"INVALID_TOKEN","message":"Invalid token"}`))
 			return
 		}
 		switch state.Load() {
 		case 1:
 			w.WriteHeader(401)
-			w.Write([]byte(`{"code":401}`))
+			w.Write([]byte(`{"code":"INVALID_TOKEN","message":"Invalid token"}`))
 		case 2:
 			w.WriteHeader(503)
 			w.Write([]byte(`{"code":503}`))
@@ -92,7 +92,7 @@ func TestSharedSessionRequiresFreshProofForEveryRead(t *testing.T) {
 	}
 	state.Store(1)
 	if sharedRequest(a, "/session", "user-token", origin).Code != 401 {
-		t.Fatal("revoked token accepted")
+		t.Fatal("revoked token must return 401 for renewal")
 	}
 	// Logging out of docs must not revoke the upstream browser session.
 	count := hits.Load()
@@ -118,7 +118,7 @@ func TestSharedSessionRejectsPendingInvalidAndUntrustedSources(t *testing.T) {
 	}
 	for _, token := range []string{"forged-token", "pending-2fa-challenge"} {
 		if sharedRequest(a, "/session", token, origin).Code != 401 {
-			t.Fatal("incomplete/forged login accepted")
+			t.Fatal("incomplete/forged login must return 401")
 		}
 	}
 	for _, path := range []string{"/session?access_token=admin-token", "/session/guide.md?token=admin-token"} {
@@ -159,5 +159,34 @@ func TestSharedLoginFallbackAndManualOverride(t *testing.T) {
 	pending := w.Result().Cookies()[0]
 	if strings.Contains(request(a, "GET", "/login", "", pending).Body.String(), `data-auto-login="true"`) {
 		t.Fatal("automatic login interrupts pending 2FA")
+	}
+}
+
+func TestUpstreamStringErrorsAndStrictSuccessCode(t *testing.T) {
+	for _, tc := range []struct {
+		status int
+		body   string
+		want   int
+	}{
+		{401, `{"code":"TOKEN_EXPIRED","message":"Token expired"}`, 401},
+		{401, `{"code":"INVALID_TOKEN","message":"Invalid token"}`, 401},
+		{401, `{"code":401}`, 401},
+		{429, `{"code":"RATE_LIMITED"}`, 503},
+		{503, `{"code":"UNAVAILABLE"}`, 503},
+		{200, `{"code":0,"data":{"id":8,"status":"active"}}`, 200},
+		{200, `{"code":"0","data":{"id":8,"status":"active"}}`, 503},
+		{200, `{"code":null,"data":{"id":8,"status":"active"}}`, 503},
+		{200, `{"data":{"id":8,"status":"active"}}`, 503},
+	} {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(tc.status); w.Write([]byte(tc.body)) }))
+		a := newApp(upstream.URL, origin)
+		w := sharedRequest(a, "/session", "user-token", origin)
+		upstream.Close()
+		if w.Code != tc.want {
+			t.Fatalf("upstream %d %s: got %d want %d", tc.status, tc.body, w.Code, tc.want)
+		}
+		if tc.want != 200 && strings.Contains(w.Body.String(), "frame_duration_ms") {
+			t.Fatal("unverified content exposed")
+		}
 	}
 }

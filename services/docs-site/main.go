@@ -42,7 +42,7 @@ type app struct {
 	gate             chan struct{}
 }
 type envelope struct {
-	Code int             `json:"code"`
+	Code json.RawMessage `json:"code"`
 	Data json.RawMessage `json:"data"`
 }
 type authData struct {
@@ -101,7 +101,7 @@ func (a *app) api(r *http.Request, method, path, token string, body any) (int, j
 	if err != nil {
 		return res.StatusCode, nil, err
 	}
-	if res.StatusCode == 200 && e.Code != 0 {
+	if res.StatusCode == 200 && !bytes.Equal(bytes.TrimSpace(e.Code), []byte("0")) {
 		return 502, nil, fmt.Errorf("invalid upstream envelope")
 	}
 	return res.StatusCode, e.Data, nil
