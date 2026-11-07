@@ -44,6 +44,7 @@ function highlightCode(code, language) {
   code.replaceChildren(fragment);
 }
 
+function initializePage() {
 const article = document.querySelector('article');
 if (article) {
   const toc = document.querySelector('#toc');
@@ -125,4 +126,7 @@ for (const form of document.querySelectorAll('form')) form.addEventListener('sub
   const b = form.querySelector('button');
   if (b) { b.disabled = true; b.textContent = '请稍候…'; }
 });
+}
+initializePage();
+window.DocsSession.start(initializePage);
 window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });

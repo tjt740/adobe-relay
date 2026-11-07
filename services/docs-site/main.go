@@ -53,10 +53,11 @@ type authData struct {
 	Expires     int    `json:"expires_in"`
 }
 type pageData struct {
-	Base          string
-	Logged, TwoFA bool
-	Error         string
-	Doc           template.HTML
+	Base              string
+	Logged, TwoFA     bool
+	AutoLogin, Shared bool
+	Error             string
+	Doc               template.HTML
 }
 
 func newApp(upstream, origin string) *app {
@@ -207,6 +208,9 @@ func (a *app) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		switch r.URL.Path {
+		case "/session", "/session/guide.md":
+			a.sharedDocument(w, r)
+			return
 		case "/auth/login", "/auth/2fa":
 			a.login(w, r)
 			return
@@ -216,7 +220,7 @@ func (a *app) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if ok && s.Refresh != "" {
 				_, _, _ = a.api(r, "POST", "/api/v1/auth/logout", "", map[string]string{"refresh_token": s.Refresh})
 			}
-			http.Redirect(w, r, basePath+"/login", http.StatusSeeOther)
+			http.Redirect(w, r, basePath+"/login?manual=1", http.StatusSeeOther)
 			return
 		default:
 			http.NotFound(w, r)
@@ -229,7 +233,7 @@ func (a *app) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.URL.Path {
-	case "/assets/site.css", "/assets/site.js":
+	case "/assets/site.css", "/assets/site.js", "/assets/session.js":
 		name := strings.TrimPrefix(r.URL.Path, "/")
 		data, _ := files.ReadFile(name)
 		if strings.HasSuffix(name, ".css") {
@@ -250,37 +254,35 @@ func (a *app) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/login":
 		if r.URL.Query().Get("restart") == "1" {
 			a.clear(w, r)
-			http.Redirect(w, r, basePath+"/login", 303)
+			http.Redirect(w, r, basePath+"/login?manual=1", 303)
 			return
 		}
 		_, s, ok := a.current(r)
-		a.render(w, 200, pageData{TwoFA: ok && s.Pending != ""})
+		two := ok && s.Pending != ""
+		a.render(w, 200, pageData{TwoFA: two, AutoLogin: !two && r.URL.Query().Get("manual") != "1"})
 		return
 	case "/", "/guide.md":
 		_, s, ok := a.current(r)
 		if !ok || s.Token == "" {
-			http.Redirect(w, r, basePath+"/login", 303)
+			target := basePath + "/login"
+			if r.URL.Path == "/guide.md" {
+				target += "?download=1"
+			}
+			http.Redirect(w, r, target, 303)
 			return
 		}
-		status, data, err := a.api(r, "GET", "/api/v1/auth/me", s.Token, nil)
-		if err != nil || status >= 500 || status == 429 {
+		status := a.validateIdentity(r, s.Token)
+		if status == 503 {
 			a.render(w, 503, pageData{Error: "暂时无法验证登录状态，请稍后重试。"})
 			return
 		}
-		var user struct {
-			ID     int64  `json:"id"`
-			Status string `json:"status"`
-		}
-		if status != 200 || json.Unmarshal(data, &user) != nil || user.ID <= 0 || user.Status != "active" {
+		if status != 200 {
 			a.clear(w, r)
 			http.Redirect(w, r, basePath+"/login", 303)
 			return
 		}
 		if r.URL.Path == "/guide.md" {
-			w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-			w.Header().Set("Content-Disposition", "attachment; filename=adobe-image-api.md")
-			b, _ := files.ReadFile("guide.md")
-			w.Write(b)
+			a.download(w)
 			return
 		}
 		a.render(w, 200, pageData{Logged: true, Doc: a.doc})
@@ -288,6 +290,49 @@ func (a *app) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (a *app) validateIdentity(r *http.Request, token string) int {
+	status, data, err := a.api(r, "GET", "/api/v1/auth/me", token, nil)
+	if err != nil || status >= 500 || status == 429 {
+		return http.StatusServiceUnavailable
+	}
+	var user struct {
+		ID     int64  `json:"id"`
+		Status string `json:"status"`
+	}
+	if status != 200 || json.Unmarshal(data, &user) != nil || user.ID <= 0 || user.Status != "active" {
+		return http.StatusUnauthorized
+	}
+	return http.StatusOK
+}
+
+// Read-only reuse of a completed Sub2 login. Never mint a docs cookie or retain
+// the shared token: each document/download requires fresh browser proof and /me.
+func (a *app) sharedDocument(w http.ResponseWriter, r *http.Request) {
+	header := r.Header.Get("Authorization")
+	token, bearer := strings.CutPrefix(header, "Bearer ")
+	if !bearer || token == "" || len(token) > 8192 || strings.ContainsAny(token, " \t\r\n") {
+		http.Error(w, "请登录后查看文档。", http.StatusUnauthorized)
+		return
+	}
+	status := a.validateIdentity(r, token)
+	if status != http.StatusOK {
+		http.Error(w, "暂时无法验证登录状态。", status)
+		return
+	}
+	if r.URL.Path == "/session/guide.md" {
+		a.download(w)
+		return
+	}
+	a.render(w, http.StatusOK, pageData{Logged: true, Shared: true, Doc: a.doc})
+}
+
+func (a *app) download(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=adobe-image-api.md")
+	b, _ := files.ReadFile("guide.md")
+	w.Write(b)
 }
 func (a *app) login(w http.ResponseWriter, r *http.Request) {
 	path := "/api/v1/auth/login"
