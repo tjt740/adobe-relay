@@ -481,6 +481,8 @@ func TestResolveImageAcceptsExternalModelNames(t *testing.T) {
 		"gpt-image-1.5":                  "firefly-gpt-image-1.5",
 		"gpt-image-2.5-flare":            "firefly-gpt-image-2-5-flare",
 		"gpt-image-2.5-sunburst":         "firefly-gpt-image-2-5-prism",
+		"gpt-image-2.6-flare":            "firefly-gpt-image-2-6-flare",
+		"gpt-image-2.6-sunburst":         "firefly-gpt-image-2-6-sunburst",
 		"gpt-image-2.6-star-swirl":       "firefly-gpt-image-2-6-flare",
 		"gpt-image-2.6-aurora":           "firefly-gpt-image-2-6-sunburst",
 		"gemini-3-pro-image":             "firefly-nano-banana-pro",

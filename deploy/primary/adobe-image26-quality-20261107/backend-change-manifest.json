@@ -13,7 +13,7 @@
   },
   "backend/internal/pkg/adobe/catalog_test.go": {
     "before": "29dafcdebbae13ba613c43036d3cda13cd8bbc601bbdba16cad2ed9e5a5f51d5",
-    "candidate": "fb374b1b186149a21a5ed47311ce418afadda8cf3fca65b2da562390df5b6e89"
+    "candidate": "42a21df5fd42dccb6f7a03eaf6d939e1314ade612eb6ca1a81559b687e7fee22"
   },
   "backend/internal/pkg/adobe/client.go": {
     "before": "e13d1a3d30661bb86041694799c305be98a30b867f77be69b43ef0f52b2e9994",
