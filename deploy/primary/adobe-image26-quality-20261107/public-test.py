@@ -1,12 +1,14 @@
 """Four sequential public API generations; preserve every result and never replay."""
 import base64, datetime, hashlib, json, os, pathlib, struct, subprocess, sys, time, urllib.error, urllib.request, zlib
-from public_contract_guard import MODELS, LEVELS, validate, parse_pipeline_line
+from public_contract_guard import MODELS, LEVELS, validate, parse_pipeline_line, pipeline_matches, pipeline_evidence
 os.umask(0o077)
 ROOT = pathlib.Path('/opt/adobe-relay/releases/adobe-image26-quality-20261107')
 PUBLIC = ROOT / 'public'
 PUBLIC.mkdir(mode=0o700, exist_ok=True)
 SHA = (ROOT / 'expected-sha').read_text().strip()
 KEY_ID = int(sys.argv[1])
+REMAINING = len(sys.argv)==3 and sys.argv[2]=='remaining'
+assert len(sys.argv)==2 or REMAINING
 
 def sql(q):
     return subprocess.run(['docker','exec','-i','adobe-relay-postgres-1','psql','-U','sub2api','-d','sub2api','-Atq','-v','ON_ERROR_STOP=1'], input="BEGIN READ ONLY; SET LOCAL statement_timeout='15s'; "+q+'; COMMIT;', capture_output=True,text=True,check=True,timeout=25).stdout.strip()
@@ -41,7 +43,7 @@ def validate_png(data):
     assert all(raw[row*stride]<=4 for row in range(h))
     return {'format':'png','width':w,'height':h,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest(),'png_fully_validated':True}
 
-def pipeline(usage):
+def pipeline(usage, http_request_id):
     for _ in range(10):
         chunks=[]
         for command in [ ['docker','exec','adobe-relay-app-1','tail','-c','16777216','/app/data/logs/sub2api.log'], ['docker','logs','--since','15m','--tail','12000','adobe-relay-app-1'] ]:
@@ -50,13 +52,16 @@ def pipeline(usage):
         for chunk in chunks:
             for line in chunk.splitlines():
                 entry=parse_pipeline_line(line)
-                if entry and entry.get('generation_request_id')==usage['request_id']:
-                    assert entry['account_id']==usage['account_id']
-                    return [{key:row[key] for key in ('submitted_model_version','submitted_detail_level','submit_attempts')} for row in entry['timings']['images']]
+                if pipeline_matches(entry,usage,http_request_id,KEY_ID):
+                    return pipeline_evidence(entry)
         time.sleep(1)
     raise AssertionError('No correlated applied-quality pipeline record; do not repeat generation')
 
-before=runtime();save(ROOT/'public-runtime-before.json',before)
+before=runtime()
+if REMAINING:
+    assert before==json.loads((ROOT/'public-runtime-before.json').read_text())
+    save(ROOT/'public-runtime-remaining-before.json',before)
+else:save(ROOT/'public-runtime-before.json',before)
 key=sql(f"SELECT k.key FROM api_keys k JOIN users u ON u.id=k.user_id WHERE k.id={KEY_ID} AND u.id=1 AND u.role='admin' AND k.status='active' AND k.deleted_at IS NULL AND k.expires_at>now()")
 assert key and '\n' not in key
 headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'}
@@ -64,15 +69,23 @@ with urllib.request.urlopen(urllib.request.Request('https://creative.cheap/v1/mo
     catalog=json.load(r)
 ids={m['id'] for m in catalog['data']}
 assert set(MODELS).issubset(ids) and not set(MODELS.values()).intersection(ids)
-save(ROOT/'public-model-catalog.json',{'new_names_present':True,'old_names_hidden':True,'models':sorted(set(MODELS).intersection(ids))})
+save(ROOT/('public-model-catalog-remaining.json' if REMAINING else 'public-model-catalog.json'),{'new_names_present':True,'old_names_hidden':True,'models':sorted(set(MODELS).intersection(ids))})
 cases=[]
 for model in MODELS:
     for quality in LEVELS:
         name=model.removeprefix('gpt-image-2.6-')+'-'+quality
+        if REMAINING and name=='flare-xhigh':
+            row=json.loads((PUBLIC/'flare-xhigh-reviewed.json').read_text())
+            original=(PUBLIC/'flare-xhigh-result.json').read_bytes()
+            assert row['original_result_sha256']==hashlib.sha256(original).hexdigest() and row['reviewed_without_generation']
+            assert row['success'] and row['model']==model and row['quality']==quality and row['application_sha']==SHA
+            assert row['api_key_id']!=KEY_ID
+            cases.append(row)
+            continue
         started=datetime.datetime.now(datetime.timezone.utc).isoformat()
         payload={'model':model,'quality':quality,'prompt':'A blue ceramic mug on a light wooden table beside an orange, natural window light, product photograph, no text. Release verification '+name+'.','size':'3840x2160','n':1,'response_format':'b64_json','output_format':'png'}
         save(PUBLIC/(name+'-started.json'),{'at':started,'application_sha':SHA,'api_key_id':KEY_ID,'payload':payload,'outer_posts':1,'never_replay':True})
-        row={'at':started,'application_sha':SHA,'model':model,'quality':quality,'outer_posts':1,'success':False};began=time.monotonic()
+        row={'at':started,'application_sha':SHA,'api_key_id':KEY_ID,'model':model,'quality':quality,'outer_posts':1,'success':False};began=time.monotonic()
         try:
             runtime()
             request=urllib.request.Request('https://creative.cheap/v1/images/generations',data=json.dumps(payload).encode(),headers=headers,method='POST')
@@ -88,7 +101,7 @@ for model in MODELS:
                 if usage:break
                 time.sleep(1)
             assert len(usage)==1;row['usage']=usage[0]
-            row['applied_submissions']=pipeline(usage[0]);row['pipeline_correlated']=True
+            row['pipeline']=pipeline(usage[0],row['http_request_id']);row['applied_submissions']=row['pipeline']['applied_submissions'];row['pipeline_correlated']=True
             applied,=row['applied_submissions']
             assert applied['submitted_model_version']==MODELS[model] and applied['submitted_detail_level']==LEVELS[quality] and applied['submit_attempts']==1
             row['success']=True
@@ -105,4 +118,4 @@ for model in MODELS:
         assert row['success'],'Public case failed or outcome unknown; preserve evidence and never replay'
 assert runtime()==before
 contract=validate(cases,SHA)
-save(ROOT/'post-release-tests.json',{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':SHA,'api_key_id':KEY_ID,'cases':cases,'contract':contract})
+save(ROOT/'post-release-tests.json',{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':SHA,'api_key_ids':sorted({row['api_key_id'] for row in cases}),'cases':cases,'contract':contract})

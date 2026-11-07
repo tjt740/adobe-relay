@@ -1,7 +1,7 @@
 """Image 2.6 quality and names release using preserved deployment guards."""
 import base64,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','public-test','status','verify','archive']
+assert phase in ['preflight','prepare','start','public-test','public-test-remaining','status','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-image26-quality-20261107'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -63,6 +63,18 @@ with os.fdopen(os.open(r/'public-test-dispatched.json',os.O_CREAT|os.O_EXCL|os.O
 subprocess.run(['systemd-run','--unit=adobe-image26-quality-public-20261107','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/public-test.log','--property=StandardError=append:{root}/public-test.log','/usr/bin/python3',str(r/'public-test-access.py')],check=True)
 print(json.dumps({{'public_test_dispatched':True,'application_sha':'{sha}'}}))
 """)
+elif phase=='public-test-remaining':
+ copy([pathlib.Path(__file__).parent/name for name in ['public-test.py','public-test-access.py','public_contract_guard.py','review-first-public.py']])
+ remote(f"""import json,os,pathlib,subprocess,sys
+r=pathlib.Path('{root}')
+assert (r/'expected-sha').read_text().strip()=='{sha}'
+assert (r/'rolling-finished.json').exists() and (r/'runtime-verification.json').exists()
+assert not (r/'public-test-remaining-dispatched.json').exists() and not (r/'post-release-tests.json').exists()
+subprocess.run([sys.executable,str(r/'review-first-public.py')],check=True)
+with os.fdopen(os.open(r/'public-test-remaining-dispatched.json',os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600),'w') as f:json.dump({{'application_sha':'{sha}','single_dispatch':True,'new_cases':3,'known_success_replayed':False}},f)
+subprocess.run(['systemd-run','--unit=adobe-image26-quality-public-remaining-20261107','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/public-test-remaining.log','--property=StandardError=append:{root}/public-test-remaining.log','/usr/bin/python3',str(r/'public-test-access.py'),'remaining'],check=True)
+print(json.dumps({{'remaining_test_dispatched':True,'new_generation_requests':3,'application_sha':'{sha}'}}))
+""")
 elif phase=='verify':
  copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','public_contract_guard.py']])
  remote(f"""import pathlib,subprocess,sys
@@ -94,22 +106,67 @@ a.save('release-completion.json',out);print(json.dumps(out))
 """)
 else:
  evidence=pathlib.Path('primary-release-evidence');evidence.mkdir(exist_ok=True)
- script=f"""import json,pathlib,subprocess
+ script=f"""import json,pathlib,re,subprocess
 r=pathlib.Path('{root}');out={{'application_sha':'{sha}','files':{{}},'current_containers':{{}}}}
 for name in ['adobe-relay-app-1','adobe-relay-memory-canary']:
  p=subprocess.run(['docker','inspect',name],text=True,capture_output=True)
  if p.returncode==0:
   d=json.loads(p.stdout)[0];out['current_containers'][name]={{'image':d['Config']['Image'],'health':d['State'].get('Health',{{}}).get('Status'),'oom':d['State']['OOMKilled'],'restarts':d['RestartCount']}}
-for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','post-release-tests.json','business-key-created.json','business-access-cleanup.json','final-verification.json','release-completion.json']:
+for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','post-release-tests.json','business-key-created.json','business-access-cleanup.json','business-remaining-key-created.json','business-remaining-access-cleanup.json','final-verification.json','release-completion.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
  if p.exists():out.setdefault('recent_drain_samples',{{}})[side]=json.loads(p.read_text())['samples'][-6:]
 out['public_cases']=[json.loads(p.read_text()) for p in sorted((r/'public').glob('*-result.json'))]
+out['reviewed_public_cases']=[json.loads(p.read_text()) for p in sorted((r/'public').glob('*-reviewed.json'))]
 if (r/'after.json').exists():out['cutover_backup']=json.loads((r/'after.json').read_text())['backup']
-for name in ['driver.log','public-test.log']:
+for name in ['driver.log','public-test.log','public-test-remaining.log']:
  p=r/name
  if p.exists():out[name+'_errors']=[line for line in p.read_text().splitlines() if line.startswith(('AssertionError:','RuntimeError:','subprocess.CalledProcessError:'))][-8:]
+if (r/'business-key-created.json').exists():
+ import sys
+ sys.path.insert(0,str(r))
+ from public_contract_guard import parse_pipeline_line
+ test_key=json.loads((r/'business-key-created.json').read_text())['id']
+ found=[];seen=set();occurrences=0
+ for command in [['docker','exec','adobe-relay-app-1','tail','-c','67108864','/app/data/logs/sub2api.log'],['docker','logs','--since','60m','--tail','50000','adobe-relay-app-1']]:
+  p=subprocess.run(command,capture_output=True,text=True,timeout=30)
+  for line in (p.stdout+chr(10)+p.stderr).splitlines():
+   if 'adobe_images.pipeline_completed' in line:occurrences+=1
+   d=parse_pipeline_line(line)
+   if d and d.get('api_key_id')==test_key:
+    fields={{k:d[k] for k in ['time','request_id','client_request_id','generation_request_id','api_key_id','account_id','requested_model','requested_quality','processing_ms'] if k in d}}
+    fields['keys']=sorted(d)
+    fields['images']=[{{k:v[k] for k in ['submitted_model_version','submitted_detail_level','submit_attempts'] if k in v}} for v in d.get('timings',{{}}).get('images',[])]
+    fingerprint=json.dumps(fields,sort_keys=True)
+    if fingerprint not in seen:found.append(fields);seen.add(fingerprint)
+ out['test_pipeline_records']=found;out['pipeline_log_occurrences']=occurrences
+ d=json.loads(subprocess.check_output(['docker','inspect','adobe-relay-app-1']))[0];env=dict(v.split('=',1) for v in d['Config']['Env'])
+ out['app_log_settings']={{k:env[k] for k in ['LOG_LEVEL','LOG_FORMAT','LOG_OUTPUT_TO_FILE','LOG_OUTPUT_TO_STDOUT'] if k in env}}
+if 'adobe-relay-memory-canary' in out['current_containers']:
+ p=subprocess.run(['docker','logs','--since','20m','--tail','8000','adobe-relay-memory-canary'],capture_output=True,text=True,timeout=20)
+ events=[]
+ for line in (p.stdout+chr(10)+p.stderr).splitlines():
+  try:d=json.loads(line)
+  except ValueError:
+   match=re.search(r'\\t(adobe_images\\.[a-z_]+)\\t(\\{{.*\\}})$',line)
+   if not match:continue
+   try:d=json.loads(match[2]);d['msg']=match[1];d['time']=line.split(chr(9))[0]
+   except ValueError:continue
+  if isinstance(d,dict) and str(d.get('msg','')).startswith('adobe_images.'):
+   events.append({{k:d[k] for k in ['time','msg','processing_ms','elapsed_ms','stage','upstream_status','image_count'] if k in d}})
+ out['canary_recent_events']=events[-12:]
+ out['canary_info_log_lines']=sum(chr(9)+'INFO'+chr(9) in line for line in (p.stdout+chr(10)+p.stderr).splitlines())
+ d=json.loads(subprocess.check_output(['docker','inspect','adobe-relay-memory-canary']))[0]
+ env=dict(v.split('=',1) for v in d['Config']['Env'])
+ out['canary_log_settings']={{k:env[k] for k in ['LOG_LEVEL','LOG_FORMAT','LOG_OUTPUT_TO_FILE','LOG_OUTPUT_TO_STDOUT'] if k in env}}
+ p=subprocess.run(['nsenter','-t',str(d['State']['Pid']),'-n','ss','-nti','state','established','sport = :8080'],capture_output=True,text=True,timeout=10)
+ out['canary_socket_counters']=[{{k:int(v) for k,v in re.findall(r'(bytes_sent|bytes_received|lastsnd|lastrcv):(\\d+)',block)}} for block in re.split(r'\\n(?=\\S)',p.stdout)[1:]]
+ prefix=json.loads((r/'rolling-prepared.json').read_text())['canary_prefix']+'-'
+ lua="local o={{}};local c='0';repeat local r=redis.call('SCAN',c,'MATCH','concurrency:*','COUNT',300);c=r[1];for _,k in ipairs(r[2]) do if redis.call('TYPE',k).ok=='zset' then local v=redis.call('ZRANGE',k,0,-1,'WITHSCORES');for i=1,#v,2 do if string.sub(v[i],1,string.len(ARGV[1]))==ARGV[1] then table.insert(o,tonumber(v[i+1])) end end end end until c=='0';return cjson.encode(o)"
+ scores=json.loads(subprocess.check_output(['docker','exec','adobe-relay-redis-1','redis-cli','--raw','EVAL',lua,'0',prefix],text=True))
+ import time
+ out['canary_slot_ages_seconds']=[round(time.time()-v) for v in scores]
 print(json.dumps(out))
 """
  p=subprocess.run(['ssh',*options,target,'python3 -'],input=script,text=True,capture_output=True,check=True,timeout=90)

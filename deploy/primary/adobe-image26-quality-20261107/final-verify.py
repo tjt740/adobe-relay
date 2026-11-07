@@ -17,13 +17,19 @@ assert 'Sub2API 0.2.19' in version and sha in version, 'Image version and commit
 live_after=json.loads((ROOT/'post-release-tests.json').read_text())
 assert live_after['application_sha']==sha
 public_contract=validate_public_contract(live_after['cases'],sha)
-test_cleanup=json.loads((ROOT/'business-access-cleanup.json').read_text())
-assert test_cleanup['temporary_key_deleted'] and not test_cleanup['credentials_persisted']
-assert test_cleanup['original_allowed_groups']==test_cleanup['current_allowed_groups']
-test_key=json.loads((ROOT/'business-key-created.json').read_text())
-assert test_key['user_id']==1 and test_key['quota']==2 and test_key['id']==live_after['api_key_id']
-assert a.sql('SELECT count(*) FROM api_keys WHERE id='+str(test_key['id'])+' AND deleted_at IS NULL')=='0'
-usage=json.loads(a.sql("SELECT json_build_object('count',count(*),'image_count',sum(image_count),'models',json_agg(DISTINCT model)) FROM usage_logs WHERE api_key_id="+str(test_key['id'])))
+test_cleanup=[];test_keys=[]
+for prefix in ['business','business-remaining']:
+ clean=json.loads((ROOT/(prefix+'-access-cleanup.json')).read_text())
+ assert clean['temporary_key_deleted'] and not clean['credentials_persisted']
+ assert clean['original_allowed_groups']==clean['current_allowed_groups']
+ test_cleanup.append(clean)
+ key=json.loads((ROOT/(prefix+'-key-created.json')).read_text())
+ assert key['user_id']==1 and key['quota']==2
+ test_keys.append(key['id'])
+assert sorted(test_keys)==live_after['api_key_ids']==sorted({row['api_key_id'] for row in live_after['cases']})
+ids=','.join(str(k) for k in test_keys)
+assert a.sql('SELECT count(*) FROM api_keys WHERE id IN ('+ids+') AND deleted_at IS NULL')=='0'
+usage=json.loads(a.sql("SELECT json_build_object('count',count(*),'image_count',sum(image_count),'models',json_agg(DISTINCT model)) FROM usage_logs WHERE api_key_id IN ("+ids+")"))
 assert usage['count']==4 and usage['image_count']==4 and set(usage['models'])=={'gpt-image-2.6-flare','gpt-image-2.6-sunburst'}
 checks=a.check_preserved(json.loads((ROOT/'before.json').read_text()),a.snapshot())
 heartbeat=json.loads(a.sql("SELECT json_build_object('at',last_success_at,'healthy',last_success_at>now()-interval '5 minutes' AND (last_error_at IS NULL OR last_success_at>last_error_at)) FROM ops_job_heartbeats WHERE job_name='ops_alert_evaluator'"))
@@ -63,6 +69,18 @@ retired=json.loads(a.sql("SELECT json_build_object('holds',(SELECT count(*) FROM
 assert all(value==0 for value in retired.values()),'Retired 408 scheduling gates reappeared'
 
 key=a.sql("SELECT value FROM settings WHERE key='admin_api_key'")
+expected_labels={'gpt-image-2.6-flare':'GPT Image 2.6 Flare','gpt-image-2.6-sunburst':'GPT Image 2.6 Sunburst'}
+admin_labels={}
+for account_id in sorted({row['usage']['account_id'] for row in live_after['cases']}):
+ req=urllib.request.Request('http://127.0.0.1:6666/api/v1/admin/accounts/'+str(account_id)+'/models',headers={'x-api-key':key})
+ with urllib.request.urlopen(req,timeout=20) as response:models=json.load(response)['data']
+ labels={row['id']:row['display_name'] for row in models}
+ assert not {'gpt-image-2.6-star-swirl','gpt-image-2.6-aurora'}.intersection(labels)
+ for row in live_after['cases']:
+  if row['usage']['account_id']==account_id:
+   assert labels.get(row['model'])==expected_labels[row['model']]
+   admin_labels[row['model']]=labels[row['model']]
+assert admin_labels==expected_labels
 req=urllib.request.Request('http://127.0.0.1:6666/api/v1/admin/proxies/clash/health',headers={'x-api-key':key})
 with urllib.request.urlopen(req,timeout=20) as response:health=json.load(response)['data']
 assert len(health['sources'])>=3
@@ -82,5 +100,6 @@ a.save('route-api-verification.json',health_proof)
 route_at=datetime.datetime.fromisoformat(json.loads((ROOT/'rolling-route-canary.json').read_text())['at']);assert route_at.astimezone(datetime.timezone(datetime.timedelta(hours=8))).date().isoformat()=='2026-11-07', 'Release crossed its Beijing date; rebuild notes before claiming success'
 out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'migration_checksums_preserved':True,'migration_set_retained':True,'retired_408_gates_empty':True,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'adobe_custom_business_preserved':True,'route_api_verified':True,'excluded_1290':exclusion,'cutover_route_checks':route_checks,'authorized_live_generation_tests':live_after,'public_contract':public_contract,'temporary_test_access_cleanup':test_cleanup,'public_usage':usage,'active_adobe_probes':False,'test_mail_sent':False}
 out['verified_locale_bundle_count']=len(locale_assets)
+out['verified_admin_model_labels']=admin_labels
 a.save('final-verification.json',out)
 print(json.dumps(out,ensure_ascii=False))

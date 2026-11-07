@@ -44,6 +44,7 @@ Key 必须属于有相应模型权限、可用账号及余额/额度的分组。
 | 参数 / 能力 | 当前支持情况 | 实测结果与限制 |
 | --- | --- | --- |
 | `size=3840x2160 + quality=high` | 两款均支持 4K High 静态 PNG | 2026-11-07 正式接口两次成功，逐文件核验真实 3840×2160 像素与完整性 |
+| `quality=xhigh / max` | 两款均支持 Extra High / Max 4K 静态 PNG | 2026-11-07 上线后正式接口 4/4 成功；实际提交档位分别为 6 / 7，响应和完整 PNG 均核验，零降档 |
 | `background=auto / opaque` | 支持 | auto 请求正常生成；opaque 的 PNG 实际为完全不透明图片 |
 | `background=transparent` | 支持 PNG 透明背景 | 两款返回的 PNG 均有真实透明像素；与 JPEG 组合返回 400 / `incompatible_image_background` |
 | `complexity` | 仅支持 `low / medium / high` | 三档均有成功输出；`none / xhigh / max` 均返回 400 / `invalid_complexity`。不传时沿用上游默认，不等同于关闭规划 |
@@ -85,7 +86,7 @@ Key 必须属于有相应模型权限、可用账号及余额/额度的分组。
 
 两款 2.6 的 **Extra High 与 Max 是独立档位**：`quality=xhigh` 对应 Extra High（上游档位 6），`quality=max` 对应 Max（档位 7），成功响应分别返回 `xhigh`、`max`，不再限制为 High。旧版把两档限制到 High 的行为已修正。
 
-2026-11-07 发布前对两款 2.6 的 `xhigh / max` 各做一次真实上游生成，4/4 成功，逐项核对提交档位并完整解码为 3840×2160 PNG。静态文生图样本不能代表高档位 GIF、图片编辑、全部账号或高峰可靠性。
+2026-11-07 上线后，通过本站正式 `/v1/images/generations` 接口，对两款 2.6 的 `xhigh / max` 各做一次生成，4/4 成功。四张均完整解码为 3840×2160 PNG；逐项关联 HTTP 请求、用量及生成日志，确认 Extra High 实际提交档位 6、Max 实际提交档位 7，响应分别为 `xhigh`、`max`，每项一次上游提交、零降档、零重放。静态文生图样本不能代表高档位 GIF、图片编辑、全部账号或高峰可靠性。
 
 官网的质量菜单对应 `quality`；`complexity` 是独立的构图规划参数，不支持 `xhigh / max`。客户端应使用本站的 `xhigh` 名称，不要直接传官网内部的 `extraHigh` 或显示文字 `Extra High`。
 
