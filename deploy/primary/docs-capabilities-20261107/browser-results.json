@@ -1,0 +1,80 @@
+[
+  {
+    "browser": "chromium",
+    "case": "old-policy-native-form",
+    "status": 403,
+    "origin": "null"
+  },
+  {
+    "browser": "chromium",
+    "width": 1440,
+    "case": "document-ui",
+    "exact_code_and_copy": 21,
+    "exact_table_content": true,
+    "search": true,
+    "current_section": true
+  },
+  {
+    "browser": "chromium",
+    "width": 1440,
+    "case": "admin",
+    "native_login": true,
+    "download": true,
+    "logout": true,
+    "overflow": false
+  },
+  {
+    "browser": "chromium",
+    "width": 1440,
+    "case": "user",
+    "native_login": true,
+    "download": true,
+    "logout": true,
+    "overflow": false
+  },
+  {
+    "browser": "chromium",
+    "width": 1440,
+    "case": "2fa",
+    "native_login": true,
+    "download": true,
+    "logout": true,
+    "overflow": false
+  },
+  {
+    "browser": "chromium",
+    "width": 390,
+    "case": "document-ui",
+    "exact_code_and_copy": 21,
+    "exact_table_content": true,
+    "search": true,
+    "current_section": true
+  },
+  {
+    "browser": "chromium",
+    "width": 390,
+    "case": "admin",
+    "native_login": true,
+    "download": true,
+    "logout": true,
+    "overflow": false
+  },
+  {
+    "browser": "chromium",
+    "width": 390,
+    "case": "user",
+    "native_login": true,
+    "download": true,
+    "logout": true,
+    "overflow": false
+  },
+  {
+    "browser": "chromium",
+    "width": 390,
+    "case": "2fa",
+    "native_login": true,
+    "download": true,
+    "logout": true,
+    "overflow": false
+  }
+]

@@ -1,0 +1,17 @@
+{
+  "sidebar_date": "2026.11.07",
+  "protected_live_content_and_21_exact_copies": true,
+  "shared_login_preserved": true,
+  "chrome_viewports": [
+    1440,
+    390
+  ],
+  "no_page_overflow": true,
+  "markdown_sha256": "7df3d367f4c499075f14460a3ed0dc4931b22f8aac6bd6506d22e878c3d744dc",
+  "main_logout_status": 200,
+  "page_errors": [],
+  "logout_and_download_protection": true,
+  "new_adobe_requests": 0,
+  "credentials_persisted": false,
+  "verified_at_utc": "2026-11-07T03:37:09.628Z"
+}

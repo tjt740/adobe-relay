@@ -1,0 +1,20 @@
+{
+  "verified_at": "2026-11-07T11:08:19.158081+08:00",
+  "production_image": "adobe-relay:da24f5634a0fd332f95a14d666fa2e9cea19db53",
+  "public_endpoint": "https://creative.cheap/v1/images/generations",
+  "new_business_group_requests": 40,
+  "actual_outputs": 14,
+  "expected_parameter_rejections": 26,
+  "prior_test_group_upstream_401": 1,
+  "total_image_api_requests": 41,
+  "never_replayed": true,
+  "models": {
+    "gpt-image-2.6-star-swirl": 7,
+    "gpt-image-2.6-aurora": 7
+  },
+  "runtime_unchanged": true,
+  "temporary_test_access_cleaned": true,
+  "flow_run": "https://github.com/tjt740/adobe-relay/actions/runs/42331871462",
+  "limits": "Small live sample of Adobe-native route; not proof of all accounts, load capacity or every parameter combination.",
+  "decoded_results_sha256": "5173c04a09af46b7905a50b11d436fb0993850506da3422ac66d14e5640c7cf8"
+}

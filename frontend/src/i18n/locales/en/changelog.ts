@@ -18,6 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      docsCapabilities: {"title": "Document verified 2.6 parameters and working examples", "body": "The API guide now includes a live-tested support table for both 2.6 models, transparent PNG, JPEG compression and GIF timing examples, and explicit WebP, SVG, streaming and preview limitations. Shared Sub2 sign-in, green styling, copying and protected downloads remain available."},
       docsSharedLogin: {"title": "Shared documentation sign-in, updated parameters and green navigation", "body": "Signing into Sub2 in the same browser now opens the API documentation without another login. Signed-out visitors still see the login page. Green navigation and softer parameter and code colors accompany the updated parameters and examples, with copying and downloads available."},
       docsColors: {"title": "Coordinated green navigation and softer documentation colors", "body": "The independent /docs site uses green navigation and table headings, soft teal parameters, and subdued status and restriction colors. Mint, blue-grey and warm sand code highlighting preserves complete copying, document content and access rules."},
       adobeGptImage26Gif: { title: 'Adobe 2.6 models, text-only GIFs and planning controls', body: 'Today exposes the actual Adobe gpt-image-2.6-star-swirl and gpt-image-2.6-aurora names, GIF text generation, frame controls and independent complexity planning. Static generation and editing retain the established workflow; GIF reference editing is explicitly unsupported. Image 2/2.5 calls and submission protections remain unchanged.' },
@@ -37,6 +38,36 @@ export default {
       }
     },
     "updates": {
+      docsCapabilities: {
+        "title": "Document live-tested 2.6 parameters and limitations",
+        "body": "Describe verified public-endpoint behavior, including effective controls, explicit rejections and parameters that are accepted without producing the requested feature.",
+        "sections": {
+          "reason": {
+            "title": "Keep other providers’ capabilities separate",
+            "body": "Both 2.6 models were checked through the public image endpoint. The guide covers this Adobe-native channel and does not infer WebP, SVG or streaming support from familiar parameter names."
+          },
+          "parameters": {
+            "title": "Separate planning, rendering and encoding controls",
+            "body": "complexity accepts only low, medium and high, independently of quality and JPEG output_compression. Transparency uses PNG. GIF supports 2–16 frames, defaults to 9 frames and 200ms, requires at least 20ms and rounds 25ms to 30ms. Fixed 896×896 supports at most 9 frames; larger counts use auto."
+          },
+          "examples": {
+            "title": "Add three complete request examples",
+            "body": "New curl examples cover transparent PNG, JPEG encoding quality 25/90 and a 16-frame GIF, with file-saving and model-substitution guidance. The Python format list is corrected. The guide now contains 21 code examples."
+          },
+          "unsupported": {
+            "title": "Make unavailable or ineffective controls explicit",
+            "body": "WebP, SVG, svg.model, stream=true and progressive previews are marked unsupported. Errors are documented for complexity none/xhigh/max, transparent JPEG and custom GIF compression. partial_images=2 on a non-streaming static request still returns only a complete image."
+          },
+          "validation": {
+            "title": "Inspect output bytes and document interactions",
+            "body": "The two models produced 14 real outputs and 26 expected parameter rejections. Checks inspected PNG alpha, JPEG encoding, GIF frame counts and per-frame delays. All 21 examples passed syntax and parameter checks, with Chrome desktop/narrow viewport copying, content, download and sign-in regressions."
+          },
+          "boundary": {
+            "title": "Document existing capabilities only",
+            "body": "An earlier upstream authentication 401 is retained separately and is not counted as a pass. These samples do not prove whole-pool availability or peak capacity. Only the independent documentation service changes; business application, configuration and billing rules remain unchanged. This documentation release submits no new image generations."
+          }
+        }
+      },
       docsSharedLogin: {
         "title": "Open API documentation with your existing Sub2 sign-in",
         "body": "Avoid repeated sign-ins between the console and documentation while keeping document and download access authenticated.",

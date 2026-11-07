@@ -1,0 +1,12 @@
+{
+  "final_public_browser_verification": "2026-11-07T03:37:09.628Z",
+  "final_result": "passed",
+  "retained_earlier_observations": [
+    "Some local SSH credential reads timed out before browser login; no credentials persisted.",
+    "First public content check passed content/copy/viewports but its download action targeted a desktop-only link while at width 390. The checker was corrected to restore width 1440.",
+    "Public main-site logout returned 502 before the separately managed endpoint proxy correction. Content, exact copy and Markdown download had passed.",
+    "Separate logout proxy apply run 42334562039 returned 200 and preserved the current docs binary. Final full browser check passed."
+  ],
+  "new_adobe_requests_during_document_work": 0,
+  "scope": "This record documents verification only; the independent logout correction is not part of the docs content deployment."
+}

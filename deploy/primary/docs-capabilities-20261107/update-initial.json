@@ -1,0 +1,9 @@
+{
+  "audit": "/opt/creative-docs/audit/update-20261107T032513Z",
+  "binary_sha256": "15488921fd149a9902b63035826c3f7866a8dc4ccac3bfb0f9d0f89224b83114",
+  "previous_binary_sha256": "c62719a9ef7875cb95c3823277b42ffd97673cb1b335f68302d141d4b925532d",
+  "service": "active",
+  "existing_containers_and_configs_preserved": true,
+  "referrer_policy": "same-origin",
+  "login_copy_simplified": true
+}
