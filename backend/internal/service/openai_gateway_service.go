@@ -283,6 +283,7 @@ type OpenAIForwardResult struct {
 	// ImageEndpoint 标记请求来自专用图片端点；分组 image_count_billing 开关
 	// 只对这类请求生效，混合 Responses/Chat/WS 请求仍按 token 计费。
 	ImageEndpoint      bool
+	ImageQuality       string // Effective native Adobe Image 2.6 generation quality.
 	ImageSize          string
 	ImageInputSize     string
 	ImageOutputSize    string

@@ -441,6 +441,7 @@ export default {
     imageSizeSourceDefault: '默认计费档位',
     imageSizeSourceLegacy: '历史记录',
     imageSizeSourceMissing: '未记录',
+    imageQuality: '图片质量',
     imageSizeNotRecorded: '未记录',
     imageSizeLegacyUnstandardized: '历史非标准',
     imageSizeUnknown: '未知',

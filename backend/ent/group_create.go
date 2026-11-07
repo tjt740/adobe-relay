@@ -504,6 +504,12 @@ func (_c *GroupCreate) SetNillableVideoPrice1080p(v *float64) *GroupCreate {
 	return _c
 }
 
+// SetImageQualityPrices sets the "image_quality_prices" field.
+func (_c *GroupCreate) SetImageQualityPrices(v map[string]map[string]map[string]float64) *GroupCreate {
+	_c.mutation.SetImageQualityPrices(v)
+	return _c
+}
+
 // SetVideoModelPrices sets the "video_model_prices" field.
 func (_c *GroupCreate) SetVideoModelPrices(v map[string]map[string]float64) *GroupCreate {
 	_c.mutation.SetVideoModelPrices(v)
@@ -1797,6 +1803,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 		_spec.SetField(group.FieldVideoPrice1080p, field.TypeFloat64, value)
 		_node.VideoPrice1080p = &value
 	}
+	if value, ok := _c.mutation.ImageQualityPrices(); ok {
+		_spec.SetField(group.FieldImageQualityPrices, field.TypeJSON, value)
+		_node.ImageQualityPrices = value
+	}
 	if value, ok := _c.mutation.VideoModelPrices(); ok {
 		_spec.SetField(group.FieldVideoModelPrices, field.TypeJSON, value)
 		_node.VideoModelPrices = value
@@ -2672,6 +2682,24 @@ func (u *GroupUpsert) AddVideoPrice1080p(v float64) *GroupUpsert {
 // ClearVideoPrice1080p clears the value of the "video_price_1080p" field.
 func (u *GroupUpsert) ClearVideoPrice1080p() *GroupUpsert {
 	u.SetNull(group.FieldVideoPrice1080p)
+	return u
+}
+
+// SetImageQualityPrices sets the "image_quality_prices" field.
+func (u *GroupUpsert) SetImageQualityPrices(v map[string]map[string]map[string]float64) *GroupUpsert {
+	u.Set(group.FieldImageQualityPrices, v)
+	return u
+}
+
+// UpdateImageQualityPrices sets the "image_quality_prices" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateImageQualityPrices() *GroupUpsert {
+	u.SetExcluded(group.FieldImageQualityPrices)
+	return u
+}
+
+// ClearImageQualityPrices clears the value of the "image_quality_prices" field.
+func (u *GroupUpsert) ClearImageQualityPrices() *GroupUpsert {
+	u.SetNull(group.FieldImageQualityPrices)
 	return u
 }
 
@@ -4013,6 +4041,27 @@ func (u *GroupUpsertOne) UpdateVideoPrice1080p() *GroupUpsertOne {
 func (u *GroupUpsertOne) ClearVideoPrice1080p() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.ClearVideoPrice1080p()
+	})
+}
+
+// SetImageQualityPrices sets the "image_quality_prices" field.
+func (u *GroupUpsertOne) SetImageQualityPrices(v map[string]map[string]map[string]float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetImageQualityPrices(v)
+	})
+}
+
+// UpdateImageQualityPrices sets the "image_quality_prices" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateImageQualityPrices() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateImageQualityPrices()
+	})
+}
+
+// ClearImageQualityPrices clears the value of the "image_quality_prices" field.
+func (u *GroupUpsertOne) ClearImageQualityPrices() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearImageQualityPrices()
 	})
 }
 
@@ -5627,6 +5676,27 @@ func (u *GroupUpsertBulk) UpdateVideoPrice1080p() *GroupUpsertBulk {
 func (u *GroupUpsertBulk) ClearVideoPrice1080p() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.ClearVideoPrice1080p()
+	})
+}
+
+// SetImageQualityPrices sets the "image_quality_prices" field.
+func (u *GroupUpsertBulk) SetImageQualityPrices(v map[string]map[string]map[string]float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetImageQualityPrices(v)
+	})
+}
+
+// UpdateImageQualityPrices sets the "image_quality_prices" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateImageQualityPrices() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateImageQualityPrices()
+	})
+}
+
+// ClearImageQualityPrices clears the value of the "image_quality_prices" field.
+func (u *GroupUpsertBulk) ClearImageQualityPrices() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearImageQualityPrices()
 	})
 }
 

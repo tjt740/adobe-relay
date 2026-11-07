@@ -623,6 +623,20 @@ func (_c *UsageLogCreate) SetNillableCacheTTLOverridden(v *bool) *UsageLogCreate
 	return _c
 }
 
+// SetImageQuality sets the "image_quality" field.
+func (_c *UsageLogCreate) SetImageQuality(v string) *UsageLogCreate {
+	_c.mutation.SetImageQuality(v)
+	return _c
+}
+
+// SetNillableImageQuality sets the "image_quality" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableImageQuality(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetImageQuality(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *UsageLogCreate) SetCreatedAt(v time.Time) *UsageLogCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -928,6 +942,11 @@ func (_c *UsageLogCreate) check() error {
 	if _, ok := _c.mutation.CacheTTLOverridden(); !ok {
 		return &ValidationError{Name: "cache_ttl_overridden", err: errors.New(`ent: missing required field "UsageLog.cache_ttl_overridden"`)}
 	}
+	if v, ok := _c.mutation.ImageQuality(); ok {
+		if err := usagelog.ImageQualityValidator(v); err != nil {
+			return &ValidationError{Name: "image_quality", err: fmt.Errorf(`ent: validator failed for field "UsageLog.image_quality": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "UsageLog.created_at"`)}
 	}
@@ -1130,6 +1149,10 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.CacheTTLOverridden(); ok {
 		_spec.SetField(usagelog.FieldCacheTTLOverridden, field.TypeBool, value)
 		_node.CacheTTLOverridden = value
+	}
+	if value, ok := _c.mutation.ImageQuality(); ok {
+		_spec.SetField(usagelog.FieldImageQuality, field.TypeString, value)
+		_node.ImageQuality = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(usagelog.FieldCreatedAt, field.TypeTime, value)
@@ -2079,6 +2102,24 @@ func (u *UsageLogUpsert) SetCacheTTLOverridden(v bool) *UsageLogUpsert {
 // UpdateCacheTTLOverridden sets the "cache_ttl_overridden" field to the value that was provided on create.
 func (u *UsageLogUpsert) UpdateCacheTTLOverridden() *UsageLogUpsert {
 	u.SetExcluded(usagelog.FieldCacheTTLOverridden)
+	return u
+}
+
+// SetImageQuality sets the "image_quality" field.
+func (u *UsageLogUpsert) SetImageQuality(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldImageQuality, v)
+	return u
+}
+
+// UpdateImageQuality sets the "image_quality" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateImageQuality() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldImageQuality)
+	return u
+}
+
+// ClearImageQuality clears the value of the "image_quality" field.
+func (u *UsageLogUpsert) ClearImageQuality() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldImageQuality)
 	return u
 }
 
@@ -3069,6 +3110,27 @@ func (u *UsageLogUpsertOne) SetCacheTTLOverridden(v bool) *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) UpdateCacheTTLOverridden() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateCacheTTLOverridden()
+	})
+}
+
+// SetImageQuality sets the "image_quality" field.
+func (u *UsageLogUpsertOne) SetImageQuality(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetImageQuality(v)
+	})
+}
+
+// UpdateImageQuality sets the "image_quality" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateImageQuality() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateImageQuality()
+	})
+}
+
+// ClearImageQuality clears the value of the "image_quality" field.
+func (u *UsageLogUpsertOne) ClearImageQuality() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearImageQuality()
 	})
 }
 
@@ -4225,6 +4287,27 @@ func (u *UsageLogUpsertBulk) SetCacheTTLOverridden(v bool) *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) UpdateCacheTTLOverridden() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateCacheTTLOverridden()
+	})
+}
+
+// SetImageQuality sets the "image_quality" field.
+func (u *UsageLogUpsertBulk) SetImageQuality(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetImageQuality(v)
+	})
+}
+
+// UpdateImageQuality sets the "image_quality" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateImageQuality() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateImageQuality()
+	})
+}
+
+// ClearImageQuality clears the value of the "image_quality" field.
+func (u *UsageLogUpsertBulk) ClearImageQuality() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearImageQuality()
 	})
 }
 

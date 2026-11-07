@@ -153,6 +153,7 @@
             </svg>
             <span class="font-medium text-gray-900 dark:text-white">{{ row.image_count }}{{ t('usage.imageUnit') }}</span>
             <span class="text-gray-400">({{ formatImageBillingSize(row, t) }})</span>
+            <span v-if="row.image_quality" class="text-gray-500 dark:text-gray-400"> · {{ formatImageQuality(row.image_quality) }}</span>
           </div>
           <!-- Token 请求 -->
           <div v-else class="flex items-center gap-1.5">
@@ -561,6 +562,7 @@ import {
   imageUnitPrice,
 } from '@/utils/billingMode'
 import {
+  formatImageQuality,
   formatImageBillingSize,
   formatImageInputSize,
   formatImageOutputSize,

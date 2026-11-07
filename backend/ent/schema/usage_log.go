@@ -182,6 +182,7 @@ func (UsageLog) Fields() []ent.Field {
 			Default(false),
 
 		// 时间戳（只有 created_at，日志不可修改）
+		field.String("image_quality").Optional().Nillable().MaxLen(16),
 		field.Time("created_at").
 			Default(time.Now).
 			Immutable().

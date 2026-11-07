@@ -198,6 +198,7 @@ type UsageLog struct {
 
 	// 图片生成字段
 	ImageCount         int
+	ImageQuality       *string
 	ImageSize          *string
 	ImageInputSize     *string
 	ImageOutputSize    *string

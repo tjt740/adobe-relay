@@ -544,6 +544,8 @@ export interface PaginationConfig {
  */
 export type GroupPlatform = AccountPlatform | 'composite'
 
+export type ImageQualityPrices = Record<string, Record<string, Record<string, number>>>
+
 export type VideoModelPrices = Record<string, Record<string, number>>
 
 export type SubscriptionType = 'standard' | 'subscription'
@@ -608,6 +610,7 @@ export interface Group {
   video_price_720p: number | null
   video_price_1080p: number | null
   // Optional model-family x resolution overrides for Grok video pricing.
+  image_quality_prices?: ImageQualityPrices
   video_model_prices?: VideoModelPrices
   // Codex 网页搜索单次价格（USD/次）；null 表示使用默认价 0.01
   web_search_price_per_call: number | null
@@ -841,6 +844,7 @@ export interface CreateGroupRequest {
   video_price_480p?: number | null
   video_price_720p?: number | null
   video_price_1080p?: number | null
+  image_quality_prices?: ImageQualityPrices
   video_model_prices?: VideoModelPrices
   web_search_price_per_call?: number | null
   search_price_per_1k?: number | null
@@ -917,6 +921,7 @@ export interface UpdateGroupRequest {
   video_price_480p?: number | null
   video_price_720p?: number | null
   video_price_1080p?: number | null
+  image_quality_prices?: ImageQualityPrices
   video_model_prices?: VideoModelPrices
   web_search_price_per_call?: number | null
   search_price_per_1k?: number | null
@@ -1922,6 +1927,7 @@ export interface UsageLog {
 
   // 图片生成字段
   image_count: number
+  image_quality?: string | null
   image_size: string | null
   image_input_size: string | null
   image_output_size: string | null

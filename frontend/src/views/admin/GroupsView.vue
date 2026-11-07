@@ -1074,6 +1074,7 @@
               </div>
             </div>
           </div>
+          <ImageQualityPricing v-if="createForm.platform === 'adobe'" v-model="createForm.image_quality_prices" />
           <div v-if="createForm.platform === 'gemini' && createForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
             <label
               class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -2818,6 +2819,7 @@
               </div>
             </div>
           </div>
+          <ImageQualityPricing v-if="editForm.platform === 'adobe'" v-model="editForm.image_quality_prices" />
           <div v-if="editForm.platform === 'gemini' && editForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
             <label
               class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -4504,6 +4506,8 @@ import {
   toNullableNumber,
   validateReasoningEffortMultipliers,
 } from "@/components/admin/channel/types";
+import ImageQualityPricing from "@/components/admin/group/ImageQualityPricing.vue";
+import type { ImageQualityPrices } from "@/types";
 import type { ChannelModelPricing } from "@/api/admin/channels";
 import { VueDraggable } from "vue-draggable-plus";
 import { createStableObjectKeyResolver } from "@/utils/stableObjectKey";
@@ -5190,6 +5194,7 @@ const createForm = reactive({
   video_price_480p: null as number | null,
   video_price_720p: null as number | null,
   video_price_1080p: null as number | null,
+  image_quality_prices: {} as ImageQualityPrices,
   video_model_prices: createVideoModelPricesForm(),
   // Codex 网页搜索按次计费（仅 openai 平台使用）；null = 使用默认价 0.01
   web_search_price_per_call: null as number | null,
@@ -5566,6 +5571,7 @@ const editForm = reactive({
   video_price_480p: null as number | null,
   video_price_720p: null as number | null,
   video_price_1080p: null as number | null,
+  image_quality_prices: {} as ImageQualityPrices,
   video_model_prices: createVideoModelPricesForm(),
   // Codex 网页搜索按次计费（仅 openai 平台使用）；null = 使用默认价 0.01
   web_search_price_per_call: null as number | null,
@@ -6045,6 +6051,7 @@ const closeCreateModal = () => {
   createForm.video_price_480p = null;
   createForm.video_price_720p = null;
   createForm.video_price_1080p = null;
+  createForm.image_quality_prices = {};
   createForm.video_model_prices = createVideoModelPricesForm();
   createForm.long_context_pricing_enabled = true;
   createForm.force_openai_fast = false;
@@ -6204,6 +6211,7 @@ const handleCreateGroup = async () => {
     // 构建请求数据，包含模型路由配置
     const requestData = {
       ...createGroupForm,
+      image_quality_prices: createForm.platform === "adobe" ? createForm.image_quality_prices : {},
       force_openai_fast: normalizeGroupOpenAIFast(
         createForm.platform,
         createForm.force_openai_fast,
@@ -6390,6 +6398,7 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.video_price_480p = group.video_price_480p;
   editForm.video_price_720p = group.video_price_720p;
   editForm.video_price_1080p = group.video_price_1080p;
+  editForm.image_quality_prices = JSON.parse(JSON.stringify(group.image_quality_prices || {}));
   editForm.video_model_prices = createVideoModelPricesForm(
     group.video_model_prices,
   );
@@ -6518,6 +6527,7 @@ const closeEditModal = () => {
   editForm.video_price_480p = null;
   editForm.video_price_720p = null;
   editForm.video_price_1080p = null;
+  editForm.image_quality_prices = {};
   editForm.video_model_prices = createVideoModelPricesForm();
   editForm.long_context_pricing_enabled = true;
   editForm.force_openai_fast = false;
@@ -6598,6 +6608,7 @@ const handleUpdateGroup = async () => {
       monthly_limit_usd: normalizeOptionalLimit(
         editForm.monthly_limit_usd as number | string | null,
       ),
+      image_quality_prices: editForm.platform === "adobe" ? editForm.image_quality_prices : {},
       video_model_prices: serializeVideoModelPrices(
         editForm.video_model_prices,
       ),

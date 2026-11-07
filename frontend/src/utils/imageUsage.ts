@@ -42,6 +42,10 @@ export const textInputTokens = (row: ImageInputTokenRow | null | undefined): num
 export const hasImageInputCost = (row: ImageInputCostRow | null | undefined): boolean =>
   (row?.image_input_cost ?? 0) > 0
 
+export const formatImageQuality = (quality: string | null | undefined): string => ({
+  low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra High', max: 'Max',
+}[quality ?? ''] ?? quality ?? '')
+
 // --- Image size / billing helpers ---
 
 const knownImageSizeSources = new Set(['output', 'input', 'default', 'legacy'])

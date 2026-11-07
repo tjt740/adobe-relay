@@ -1133,6 +1133,7 @@ export default {
         searchPricePer1k: '搜索每千次价格（USD）',
         pricePlaceholder: '可选'
       },
+      imageQualityPricing: {"title": "Image 2.6 分辨率与质量定价", "hint": "两款模型独立设置 USD/张。空白沿用已有模型、分组或渠道收费；0 表示免费。匹配的价格优先，仍乘以适用的图片倍率。auto/未传质量按 Medium；旧模型别名共用对应价格。只改收费，不改变生成质量。", "quality": "质量", "inherit": "沿用原价"},
       modelPricing: {
         title: '分组逐模型定价',
         description: '匹配模型后覆盖渠道和内置价格。长上下文阶梯沿用官方/预设价卡，无需再手填区间。音频可用按次层级配置 realtime、tts、stt。',
