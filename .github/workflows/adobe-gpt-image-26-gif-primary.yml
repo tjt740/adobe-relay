@@ -4,7 +4,7 @@ on:
     inputs:
       phase:
         type: choice
-        options: [preflight, run, business]
+        options: [preflight, run, business, status]
         required: true
         default: preflight
       key_id:
@@ -13,7 +13,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: adobe-relay-production
+  group: ${{ inputs.phase == 'status' && format('image26-readonly-{0}', github.run_id) || 'adobe-relay-production' }}
   cancel-in-progress: false
 jobs:
   inspect:
@@ -30,7 +30,17 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+      - name: Inspect current progress without new requests
+        if: inputs.phase == 'status'
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o ConnectTimeout=20 root@173.234.15.150 python3 - <<'PYREMOTE'
+          import json,pathlib
+          p=pathlib.Path('/opt/adobe-relay/diagnostics/image26-capability-20261107/business-group15')
+          r=json.loads((p/'results.json').read_text()) if (p/'results.json').exists() else []
+          print(json.dumps({'completed':len(r),'recent':[{'case':v['case'],'status':v.get('http_status'),'seconds':v.get('duration_seconds'),'images':v.get('images',[]),'error':v.get('error')} for v in r[-6:]],'started':len(list(p.glob('*-started.json')))}))
+          PYREMOTE
       - name: Run capability inspection only
+        if: inputs.phase != 'status'
         env:
           PHASE: ${{ inputs.phase }}
           TEST_KEY_ID: ${{ inputs.key_id }}
