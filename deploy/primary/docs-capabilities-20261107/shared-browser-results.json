@@ -1,0 +1,104 @@
+[
+  {
+    "case": "existing-admin",
+    "width": 1440,
+    "no_second_login": true,
+    "no_shared_cookie": true,
+    "download": true,
+    "docs_logout_keeps_sub2": true,
+    "sub2_logout_closes_docs": true
+  },
+  {
+    "case": "existing-user",
+    "width": 1440,
+    "no_second_login": true,
+    "no_shared_cookie": true,
+    "download": true,
+    "docs_logout_keeps_sub2": true,
+    "sub2_logout_closes_docs": true
+  },
+  {
+    "case": "existing-2fa",
+    "width": 1440,
+    "no_second_login": true,
+    "no_shared_cookie": true,
+    "download": true,
+    "docs_logout_keeps_sub2": true,
+    "sub2_logout_closes_docs": true
+  },
+  {
+    "case": "existing-admin",
+    "width": 390,
+    "no_second_login": true,
+    "no_shared_cookie": true,
+    "download": true,
+    "docs_logout_keeps_sub2": true,
+    "sub2_logout_closes_docs": true
+  },
+  {
+    "case": "existing-user",
+    "width": 390,
+    "no_second_login": true,
+    "no_shared_cookie": true,
+    "download": true,
+    "docs_logout_keeps_sub2": true,
+    "sub2_logout_closes_docs": true
+  },
+  {
+    "case": "existing-2fa",
+    "width": 390,
+    "no_second_login": true,
+    "no_shared_cookie": true,
+    "download": true,
+    "docs_logout_keeps_sub2": true,
+    "sub2_logout_closes_docs": true
+  },
+  {
+    "case": "forged-token",
+    "denied": true
+  },
+  {
+    "case": "fixture-challenge",
+    "denied": true
+  },
+  {
+    "case": "inactive-token",
+    "denied": true
+  },
+  {
+    "case": "outage-token",
+    "denied": true
+  },
+  {
+    "case": "concurrent-expired-session",
+    "single_refresh": true,
+    "automatic_entry": true
+  },
+  {
+    "case": "main-tab-refresh-lock",
+    "round": 0,
+    "adopts_peer": true,
+    "no_duplicate_refresh": true
+  },
+  {
+    "case": "no-web-locks-refresh-race",
+    "adopts_delayed_winner": true,
+    "no_session_loss": true
+  },
+  {
+    "case": "late-refresh-logout",
+    "no_session_restore": true
+  },
+  {
+    "case": "late-refresh-account-switch",
+    "no_session_restore": true
+  },
+  {
+    "case": "direct-markdown-entry",
+    "authenticated_download": true
+  },
+  {
+    "case": "blocked-storage",
+    "manual_login_available": true
+  }
+]

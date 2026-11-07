@@ -1,0 +1,11 @@
+{
+  "blocks": 21,
+  "languages": {
+    "bash": 13,
+    "json": 6,
+    "python": 2
+  },
+  "curl_json_payloads": 9,
+  "syntax_and_parameter_combinations_valid": true,
+  "new_adobe_requests": 0
+}

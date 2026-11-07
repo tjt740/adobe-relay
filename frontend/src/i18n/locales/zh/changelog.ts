@@ -18,6 +18,7 @@ export default {
     },
     measurements: "发布准备实测与样本范围",
     overviews: {
+      docsCapabilities: {"title": "补充 2.6 接口实测参数与调用示例", "body": "接口文档新增两款 2.6 的实测支持表、透明 PNG、JPEG 压缩和 GIF 时长示例，明确标出 WebP、SVG、流式及渐进预览等限制。保留 Sub2 共享登录、绿色配色、复制和受保护下载。"},
       docsSharedLogin: {"title": "文档共享登录、参数更新与绿色配色", "body": "在同一浏览器登录 Sub2 后可直接查看接口文档，未登录时仍显示登录页。文档沿用绿色导航、柔和参数和代码配色，并补齐最新参数与调用示例，支持复制和下载。"},
       docsColors: {"title": "接口文档统一绿色导航与柔和配色", "body": "独立 /docs 文档统一绿色导航和表头，参数使用浅青绿，状态与提示降低饱和度。代码示例采用薄荷绿、灰蓝和暖沙色，保留完整复制、原有内容与登录权限。"},
       adobeGptImage26Gif: { title: 'Adobe 2.6 模型、GIF 文生图与构图规划', body: '今天接入 Adobe 实际版本名 gpt-image-2.6-star-swirl 和 gpt-image-2.6-aurora，并增加 GIF 文生图、帧参数与独立 complexity 构图规划。静态生成和编辑沿用既有流程；GIF 参考编辑明确报不支持。Image 2、2.5 的原调用方式与提交保护保持。' },
@@ -37,6 +38,36 @@ export default {
       }
     },
     "updates": {
+      docsCapabilities: {
+        "title": "用线上实测补齐 2.6 参数与限制",
+        "body": "将正式接口验证结果写入文档，区分真正生效、明确拒绝和接受但不产生效果的参数。",
+        "sections": {
+          "reason": {
+            "title": "避免把其他平台文档当作本站能力",
+            "body": "两款 2.6 均通过本站正式图片接口验证，文档以当前 Adobe 原生通道为范围。不会因参数名称相同而承诺 WebP、SVG 或流式等尚未开放的功能。"
+          },
+          "parameters": {
+            "title": "写清三种不同的质量控制与 GIF 边界",
+            "body": "complexity 仅 low、medium、high，与 quality 和 JPEG 的 output_compression 独立。透明背景明确使用 PNG，GIF 标明 2–16 帧、默认 9 帧、至少 20ms、默认 200ms 和 25→30ms 取整；固定 896×896 最多 9 帧，更多帧使用 auto。"
+          },
+          "examples": {
+            "title": "新增三套完整调用示例",
+            "body": "新增透明 PNG、JPEG 25/90 编码质量和 16 帧 GIF 的完整 curl 示例，说明保存真实文件和替换另一款 2.6 的方法。同步修正 Python 保存格式清单，文档共 21 段代码示例。"
+          },
+          "unsupported": {
+            "title": "明确列出不支持或不生效的参数",
+            "body": "WebP、SVG、svg.model、stream=true 和渐进预览明确标为不支持。complexity 的 none/xhigh/max、透明 JPEG 和 GIF 自定义压缩等列出错误；静态非流式 partial_images=2 只返回完整图片，不应宣传为渐进出图。"
+          },
+          "validation": {
+            "title": "核对实际文件和文档交互",
+            "body": "两款模型共得到 14 个真实输出与 26 次预期参数拒绝，逐文件检查透明通道、JPEG 编码、GIF 帧数及每帧时长。21 段示例语法和参数组合、Chrome 桌面/窄屏复制、内容、下载与登录回归通过。"
+          },
+          "boundary": {
+            "title": "仅更新已验证能力的说明",
+            "body": "此前测试组的一次上游认证 401 单独保留，不计为通过；小范围样本不代表全账号池或高峰。仅独立更新文档，业务应用、配置与计费规则不变；本次文档发布没有重新提交生成请求。"
+          }
+        }
+      },
       docsSharedLogin: {
         "title": "登录 Sub2 后直接进入接口文档",
         "body": "减少控制台与接口文档之间的重复登录，同时保持文档和下载的身份验证。",
