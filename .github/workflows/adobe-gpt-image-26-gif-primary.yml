@@ -1,12 +1,12 @@
-name: Guarded Adobe GPT Image 2.6 GIF primary release
+name: Read-only Image 2.6 quality verification
 on:
   workflow_dispatch:
     inputs:
       phase:
         type: choice
-        options: [preflight, prepare, start, resume, public-test, customer-test, selected-test, inspect-clash, status, verify, archive]
-        required: true
+        options: [status]
         default: status
+        required: true
       application_sha:
         type: string
         required: true
@@ -15,67 +15,42 @@ on:
         required: true
 permissions:
   contents: read
-  actions: read
-concurrency:
-  group: adobe-relay-production
-  cancel-in-progress: false
 jobs:
-  operate:
+  inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 6
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Verify exact checked application source
-        env:
-          GH_TOKEN: ${{ github.token }}
-          APP_SHA: ${{ inputs.application_sha }}
-          BUILD_RUN: ${{ inputs.build_run }}
-        run: |
-          set -euo pipefail
-          [[ "$APP_SHA" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$BUILD_RUN" =~ ^[0-9]+$ ]]
-          if [ "${{ inputs.phase }}" != "preflight" ]; then
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN" > /tmp/ci-run.json
-          python3 - "$APP_SHA" /tmp/ci-run.json <<'PY'
-          import json,sys
-          r=json.load(open(sys.argv[2]))
-          assert r['head_sha']==sys.argv[1] and r['conclusion']=='success' and r['status']=='completed'
-          assert r['path']=='.github/workflows/deploy-adobe-relay.yml'
-          PY
-          fi
-          git diff --exit-code "$APP_SHA" -- backend frontend Dockerfile deploy/docker-entrypoint.sh docs/legal .github/workflows/deploy-adobe-relay.yml
-          python3 deploy/primary/adobe-gpt-image-26-gif-20261106/source_guard.py "$APP_SHA"
-      - name: Validate guarded release helpers
-        run: python3 -m unittest discover -s deploy/primary/adobe-gpt-image-26-gif-20261106 -p 'test_*.py'
-      - uses: actions/download-artifact@v4
-        if: inputs.phase == 'prepare'
-        with:
-          name: release-images
-          path: release-artifact
-          run-id: ${{ inputs.build_run }}
-          github-token: ${{ github.token }}
-      - name: Operate guarded primary release
+      - name: Read existing diagnostic results without running generation
         env:
           SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
-          APP_SHA: ${{ inputs.application_sha }}
-          BUILD_RUN: ${{ inputs.build_run }}
-          PHASE: ${{ inputs.phase }}
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
-          python3 deploy/primary/adobe-gpt-image-26-gif-20261106/operations.py "$PHASE" "$APP_SHA" "$BUILD_RUN"
+          mkdir -p evidence
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 root@173.234.15.150 'python3 -' > evidence/readback.tar.gz <<'PY'
+          import io,pathlib,tarfile,sys,json,subprocess,datetime
+          root=pathlib.Path('/opt/adobe-relay/diagnostics/image26-quality-20261107')
+          names=list(root.glob('*.json'))+list((root/'public-baseline').glob('*.json'))+list((root/'native').glob('*.json'))
+          names += [p for p in [root/'native.log',root/'public.log'] if p.is_file()]
+          c=json.loads(subprocess.check_output(['docker','inspect','adobe-relay-app-1']))[0]
+          state={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'image':c['Config']['Image'],'container_id':c['Id'],'health':c['State']['Health']['Status'],'restarts':c['RestartCount'],'oom':c['State']['OOMKilled'],'native_complete':(root/'native/run-complete.json').exists()}
+          with tarfile.open(fileobj=sys.stdout.buffer,mode='w|gz') as t:
+              for p in names:
+                  assert p.is_file() and p.stat().st_size<2000000
+                  t.add(p,arcname=str(p.relative_to(root)),recursive=False)
+              b=json.dumps(state,indent=2).encode();info=tarfile.TarInfo('readback-state.json');info.size=len(b);t.addfile(info,io.BytesIO(b))
+          PY
+          tar -xzf evidence/readback.tar.gz -C evidence
+          cat evidence/readback-state.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: primary-release-evidence
-          path: primary-release-evidence/
-          if-no-files-found: ignore
+          name: image26-quality-readback
+          path: evidence/
           retention-days: 7
       - name: Remove runner SSH key
         if: always()
