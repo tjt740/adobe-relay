@@ -6,6 +6,10 @@ on:
         description: Exact merged helper source
         required: true
         type: string
+      expected_docs_sha:
+        description: Exact currently installed docs binary SHA256
+        required: true
+        type: string
       phase:
         type: choice
         options: [check, apply]
@@ -38,15 +42,17 @@ jobs:
           SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
           PHASE: ${{ inputs.phase }}
+          DOCS_SHA: ${{ inputs.expected_docs_sha }}
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/docs_key
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/docs_key ~/.ssh/known_hosts
+          [[ "$DOCS_SHA" =~ ^[0-9a-f]{64}$ ]]
           arg=''
           if [ "$PHASE" = apply ]; then arg='--apply'; else [ "$PHASE" = check ]; fi
-          ssh -i ~/.ssh/docs_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 root@173.234.15.150 "python3 - $arg" < deploy/primary/docs-session-logout-proxy-20261107.py
+          ssh -i ~/.ssh/docs_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 root@173.234.15.150 "python3 - --expected-docs-sha $DOCS_SHA $arg" < deploy/primary/docs-session-logout-proxy-20261107.py
       - name: Remove runner SSH key
         if: always()
         run: rm -f ~/.ssh/docs_key
