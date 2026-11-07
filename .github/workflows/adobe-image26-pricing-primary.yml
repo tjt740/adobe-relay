@@ -4,7 +4,7 @@ on:
     inputs:
       phase:
         type: choice
-        options: [preflight, prepare, start, public-test, confirmation, status, verify, archive]
+        options: [preflight, prepare, start, public-test, confirmation, status, verify, verify-deployment, archive, archive-pending]
         required: true
         default: status
       application_sha:
