@@ -71,7 +71,7 @@ try{
      }
      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'page overflow');
      const md=await ctx.request.get(url+'/docs/guide.md');assert.equal(md.status(),200);assert((await md.text()).includes('frame_duration_ms'));
-     await page.getByRole('button',{name:'退出登录'}).click();await page.waitForURL(url+'/docs/login');
+     await page.getByRole('button',{name:'退出登录'}).click();await page.waitForURL(url+'/docs/login?manual=1');
      const denied=await ctx.request.get(url+'/docs/guide.md',{maxRedirects:0});assert.equal(denied.status(),303);
      results.push({browser:kind,width,case:email.split('@')[0],native_login:true,download:true,logout:true,overflow:false});
     }

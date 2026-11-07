@@ -24,6 +24,9 @@ jobs:
           cmp guide.md ../../docs/ADOBE_IMAGE_CLIENT_GUIDE.md
           go test -race ./...
           go vet ./...
+          node --check assets/session.js
+          node --check assets/site.js
+          node --check browser-shared-check.mjs
           python3 -m py_compile install.py update.py verify-live.py
           bash -n build.sh
           CGO_ENABLED=0 go build -trimpath -o docs-server .
