@@ -1,7 +1,7 @@
 """Image 2.6 quality and names release using preserved deployment guards."""
 import base64,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','public-test','status','verify','archive']
+assert phase in ['preflight','prepare','start','public-test','public-test-remaining','status','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-image26-quality-20261107'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -63,6 +63,18 @@ with os.fdopen(os.open(r/'public-test-dispatched.json',os.O_CREAT|os.O_EXCL|os.O
 subprocess.run(['systemd-run','--unit=adobe-image26-quality-public-20261107','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/public-test.log','--property=StandardError=append:{root}/public-test.log','/usr/bin/python3',str(r/'public-test-access.py')],check=True)
 print(json.dumps({{'public_test_dispatched':True,'application_sha':'{sha}'}}))
 """)
+elif phase=='public-test-remaining':
+ copy([pathlib.Path(__file__).parent/name for name in ['public-test.py','public-test-access.py','public_contract_guard.py','review-first-public.py']])
+ remote(f"""import json,os,pathlib,subprocess,sys
+r=pathlib.Path('{root}')
+assert (r/'expected-sha').read_text().strip()=='{sha}'
+assert (r/'rolling-finished.json').exists() and (r/'runtime-verification.json').exists()
+assert not (r/'public-test-remaining-dispatched.json').exists() and not (r/'post-release-tests.json').exists()
+subprocess.run([sys.executable,str(r/'review-first-public.py')],check=True)
+with os.fdopen(os.open(r/'public-test-remaining-dispatched.json',os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600),'w') as f:json.dump({{'application_sha':'{sha}','single_dispatch':True,'new_cases':3,'known_success_replayed':False}},f)
+subprocess.run(['systemd-run','--unit=adobe-image26-quality-public-remaining-20261107','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/public-test-remaining.log','--property=StandardError=append:{root}/public-test-remaining.log','/usr/bin/python3',str(r/'public-test-access.py'),'remaining'],check=True)
+print(json.dumps({{'remaining_test_dispatched':True,'new_generation_requests':3,'application_sha':'{sha}'}}))
+""")
 elif phase=='verify':
  copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','public_contract_guard.py']])
  remote(f"""import pathlib,subprocess,sys
@@ -100,14 +112,15 @@ for name in ['adobe-relay-app-1','adobe-relay-memory-canary']:
  p=subprocess.run(['docker','inspect',name],text=True,capture_output=True)
  if p.returncode==0:
   d=json.loads(p.stdout)[0];out['current_containers'][name]={{'image':d['Config']['Image'],'health':d['State'].get('Health',{{}}).get('Status'),'oom':d['State']['OOMKilled'],'restarts':d['RestartCount']}}
-for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','post-release-tests.json','business-key-created.json','business-access-cleanup.json','final-verification.json','release-completion.json']:
+for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','post-release-tests.json','business-key-created.json','business-access-cleanup.json','business-remaining-key-created.json','business-remaining-access-cleanup.json','final-verification.json','release-completion.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
  if p.exists():out.setdefault('recent_drain_samples',{{}})[side]=json.loads(p.read_text())['samples'][-6:]
 out['public_cases']=[json.loads(p.read_text()) for p in sorted((r/'public').glob('*-result.json'))]
+out['reviewed_public_cases']=[json.loads(p.read_text()) for p in sorted((r/'public').glob('*-reviewed.json'))]
 if (r/'after.json').exists():out['cutover_backup']=json.loads((r/'after.json').read_text())['backup']
-for name in ['driver.log','public-test.log']:
+for name in ['driver.log','public-test.log','public-test-remaining.log']:
  p=r/name
  if p.exists():out[name+'_errors']=[line for line in p.read_text().splitlines() if line.startswith(('AssertionError:','RuntimeError:','subprocess.CalledProcessError:'))][-8:]
 if (r/'business-key-created.json').exists():

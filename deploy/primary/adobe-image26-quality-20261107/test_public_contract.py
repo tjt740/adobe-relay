@@ -1,7 +1,7 @@
 import copy
 import json
 from unittest import TestCase
-from public_contract_guard import MODELS, LEVELS, validate, parse_pipeline_line
+from public_contract_guard import MODELS, LEVELS, validate, parse_pipeline_line, pipeline_matches
 
 class PipelineLogTests(TestCase):
     def test_json_and_existing_console_encoding(self):
@@ -14,6 +14,14 @@ class PipelineLogTests(TestCase):
         for line in ['{}', '[]', 'broken', '{"msg":"other"}', 'INFO\tother\t{"message":"adobe_images.pipeline_completed"}', 'INFO\tadobe_images.pipeline_completed\t{broken}']:
             with self.subTest(line=line): self.assertIsNone(parse_pipeline_line(line))
 
+    def test_distinct_generation_http_and_billing_ids_correlate(self):
+        entry=dict(msg='adobe_images.pipeline_completed',request_id='http-1',client_request_id='client-1',generation_request_id='generation-1',api_key_id=171,account_id=2206)
+        usage=dict(request_id='client:client-1',account_id=2206)
+        self.assertTrue(pipeline_matches(entry,usage,'http-1',171))
+        for field,value in [('request_id','wrong'),('client_request_id','wrong'),('api_key_id',172),('account_id',99)]:
+            with self.subTest(field=field):self.assertFalse(pipeline_matches(dict(entry,**{field:value}),usage,'http-1',171))
+        self.assertFalse(pipeline_matches(entry,dict(usage,request_id='generation-1'),'http-1',171))
+
 class PublicQualityContractTests(TestCase):
     def setUp(self):
         self.cases=[]
@@ -22,7 +30,8 @@ class PublicQualityContractTests(TestCase):
                 self.cases.append(dict(application_sha='a'*40,model=model,quality=quality,success=True,http_status=200,outer_posts=1,response_quality=quality,
                     images=[dict(format='png',width=3840,height=2160,png_fully_validated=True,bytes=2000,sha256='b'*64)],
                     applied_submissions=[dict(submitted_model_version=version,submitted_detail_level=level,submit_attempts=1)],
-                    pipeline_correlated=True,usage=dict(model=model,image_count=1)))
+                    api_key_id=171,http_request_id='http-1',pipeline=dict(request_id='http-1',client_request_id='client-1',api_key_id=171,account_id=2206),
+                    pipeline_correlated=True,usage=dict(model=model,image_count=1,request_id='client:client-1',account_id=2206)))
 
     def test_distinct_verified_levels_pass(self):
         self.assertTrue(validate(self.cases,'a'*40)['all_passed'])

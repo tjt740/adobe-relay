@@ -17,13 +17,19 @@ assert 'Sub2API 0.2.19' in version and sha in version, 'Image version and commit
 live_after=json.loads((ROOT/'post-release-tests.json').read_text())
 assert live_after['application_sha']==sha
 public_contract=validate_public_contract(live_after['cases'],sha)
-test_cleanup=json.loads((ROOT/'business-access-cleanup.json').read_text())
-assert test_cleanup['temporary_key_deleted'] and not test_cleanup['credentials_persisted']
-assert test_cleanup['original_allowed_groups']==test_cleanup['current_allowed_groups']
-test_key=json.loads((ROOT/'business-key-created.json').read_text())
-assert test_key['user_id']==1 and test_key['quota']==2 and test_key['id']==live_after['api_key_id']
-assert a.sql('SELECT count(*) FROM api_keys WHERE id='+str(test_key['id'])+' AND deleted_at IS NULL')=='0'
-usage=json.loads(a.sql("SELECT json_build_object('count',count(*),'image_count',sum(image_count),'models',json_agg(DISTINCT model)) FROM usage_logs WHERE api_key_id="+str(test_key['id'])))
+test_cleanup=[];test_keys=[]
+for prefix in ['business','business-remaining']:
+ clean=json.loads((ROOT/(prefix+'-access-cleanup.json')).read_text())
+ assert clean['temporary_key_deleted'] and not clean['credentials_persisted']
+ assert clean['original_allowed_groups']==clean['current_allowed_groups']
+ test_cleanup.append(clean)
+ key=json.loads((ROOT/(prefix+'-key-created.json')).read_text())
+ assert key['user_id']==1 and key['quota']==2
+ test_keys.append(key['id'])
+assert sorted(test_keys)==live_after['api_key_ids']==sorted({row['api_key_id'] for row in live_after['cases']})
+ids=','.join(str(k) for k in test_keys)
+assert a.sql('SELECT count(*) FROM api_keys WHERE id IN ('+ids+') AND deleted_at IS NULL')=='0'
+usage=json.loads(a.sql("SELECT json_build_object('count',count(*),'image_count',sum(image_count),'models',json_agg(DISTINCT model)) FROM usage_logs WHERE api_key_id IN ("+ids+")"))
 assert usage['count']==4 and usage['image_count']==4 and set(usage['models'])=={'gpt-image-2.6-flare','gpt-image-2.6-sunburst'}
 checks=a.check_preserved(json.loads((ROOT/'before.json').read_text()),a.snapshot())
 heartbeat=json.loads(a.sql("SELECT json_build_object('at',last_success_at,'healthy',last_success_at>now()-interval '5 minutes' AND (last_error_at IS NULL OR last_success_at>last_error_at)) FROM ops_job_heartbeats WHERE job_name='ops_alert_evaluator'"))
