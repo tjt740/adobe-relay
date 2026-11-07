@@ -18,7 +18,8 @@ live_after=json.loads((ROOT/'post-release-tests.json').read_text())
 assert live_after['application_sha']==sha
 public_contract=validate_public_contract(live_after['cases'],sha)
 test_cleanup=[];test_keys=[]
-for prefix in ['business']:
+confirmation=(ROOT/'explicit-rejection-review.json').exists()
+for prefix in (['business','business-confirmation'] if confirmation else ['business']):
  clean=json.loads((ROOT/(prefix+'-access-cleanup.json')).read_text())
  assert clean['temporary_key_deleted'] and clean['temporary_group_deleted'] and not clean['credentials_persisted']
  assert clean['original_allowed_groups']==clean['current_allowed_groups']
@@ -26,7 +27,15 @@ for prefix in ['business']:
  key=json.loads((ROOT/(prefix+'-key-created.json')).read_text())
  assert key['user_id']==1 and key['quota']==2
  test_keys.append(key['id'])
-assert sorted(test_keys)==live_after['api_key_ids']==sorted({row['api_key_id'] for row in live_after['cases']})
+assert live_after['api_key_ids']==sorted({row['api_key_id'] for row in live_after['cases']})
+assert set(live_after['api_key_ids']).issubset(test_keys)
+if confirmation:
+ review=json.loads((ROOT/'explicit-rejection-review.json').read_text())
+ assert review['explicit_preacceptance_rejection'] and not review['accepted_or_unknown'] and review['usage_count']==0
+ assert hashlib.sha256((ROOT/'public/flare-xhigh-result.json').read_bytes()).hexdigest()==review['original_result_sha256']
+ assert a.sql('SELECT count(*) FROM usage_logs WHERE api_key_id='+str(review['api_key_id']))=='0'
+ public_contract.update(prior_explicitly_rejected_outer_posts=1,prior_rejected_submit_attempts=48,total_outer_posts=7,bounded_rechecks=1,accepted_or_unknown_replays=0)
+else:assert sorted(test_keys)==live_after['api_key_ids']
 ids=','.join(str(k) for k in test_keys)
 assert a.sql('SELECT count(*) FROM api_keys WHERE id IN ('+ids+') AND deleted_at IS NULL')=='0'
 usage=json.loads(a.sql("SELECT json_build_object('count',count(*),'image_count',sum(image_count),'models',json_agg(DISTINCT model)) FROM usage_logs WHERE api_key_id IN ("+ids+")"))

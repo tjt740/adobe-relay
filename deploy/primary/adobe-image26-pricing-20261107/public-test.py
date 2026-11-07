@@ -1,13 +1,15 @@
-"""Four sequential public API generations; preserve every result and never replay."""
+"""Six sequential public API generations; preserve every result and never replay."""
 import base64, datetime, hashlib, json, os, pathlib, struct, subprocess, sys, time, urllib.error, urllib.request, zlib
 from public_contract_guard import MODELS, LEVELS, CASES, validate, parse_pipeline_line, pipeline_matches, pipeline_evidence
 os.umask(0o077)
 ROOT = pathlib.Path('/opt/adobe-relay/releases/adobe-image26-pricing-20261107')
-PUBLIC = ROOT / 'public'
+CONFIRMATION=len(sys.argv)==3 and sys.argv[2]=='confirmation'
+assert len(sys.argv)==2 or CONFIRMATION
+PUBLIC = ROOT / ('public-confirmation' if CONFIRMATION else 'public')
 PUBLIC.mkdir(mode=0o700, exist_ok=True)
 SHA = (ROOT / 'expected-sha').read_text().strip()
 KEY_ID = int(sys.argv[1])
-assert len(sys.argv)==2
+assert len(sys.argv)==2 or CONFIRMATION
 
 def sql(q):
     return subprocess.run(['docker','exec','-i','adobe-relay-postgres-1','psql','-U','sub2api','-d','sub2api','-Atq','-v','ON_ERROR_STOP=1'], input="BEGIN READ ONLY; SET LOCAL statement_timeout='15s'; "+q+'; COMMIT;', capture_output=True,text=True,check=True,timeout=25).stdout.strip()
@@ -57,7 +59,7 @@ def pipeline(usage, http_request_id):
     raise AssertionError('No correlated applied-quality pipeline record; do not repeat generation')
 
 before=runtime()
-save(ROOT/'public-runtime-before.json',before)
+save(ROOT/('public-confirmation-runtime-before.json' if CONFIRMATION else 'public-runtime-before.json'),before)
 key=sql(f"SELECT k.key FROM api_keys k JOIN users u ON u.id=k.user_id WHERE k.id={KEY_ID} AND u.id=1 AND u.role='admin' AND k.status='active' AND k.deleted_at IS NULL AND k.expires_at>now()")
 assert key and '\n' not in key
 headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'}
@@ -65,12 +67,14 @@ with urllib.request.urlopen(urllib.request.Request('https://creative.cheap/v1/mo
     catalog=json.load(r)
 ids={m['id'] for m in catalog['data']}
 assert set(MODELS).issubset(ids) and not set(MODELS.values()).intersection(ids)
-save(ROOT/'public-model-catalog.json',{'new_names_present':True,'old_names_hidden':True,'models':sorted(set(MODELS).intersection(ids))})
+save(ROOT/('public-confirmation-model-catalog.json' if CONFIRMATION else 'public-model-catalog.json'),{'new_names_present':True,'old_names_hidden':True,'models':sorted(set(MODELS).intersection(ids))})
 cases=[]
-for case in CASES:
+# Run the five untouched combinations first; recheck the proven rejection last.
+ordered=[CASES[i] for i in [5,4,1,2,3,0]] if CONFIRMATION else CASES
+for case in ordered:
     model=case['model'];quality=case['quality'];name=case['name']
     started=datetime.datetime.now(datetime.timezone.utc).isoformat()
-    payload={'model':model,'quality':quality,'prompt':'A blue ceramic mug on a light wooden table beside an orange, natural window light, product photograph, no text. Release verification '+name+'.','size':case['size'],'n':1,'response_format':'b64_json','output_format':'png'}
+    payload={'model':model,'quality':quality,'prompt':('Confirmation. ' if CONFIRMATION else '')+'A blue ceramic mug on a light wooden table beside an orange, natural window light, product photograph, no text. Release verification '+name+'.','size':case['size'],'n':1,'response_format':'b64_json','output_format':'png'}
     save(PUBLIC/(name+'-started.json'),{'at':started,'application_sha':SHA,'api_key_id':KEY_ID,'payload':payload,'outer_posts':1,'never_replay':True})
     row={'at':started,'application_sha':SHA,'api_key_id':KEY_ID,'name':name,'model':model,'quality':quality,'outer_posts':1,'success':False};began=time.monotonic()
     try:
