@@ -110,6 +110,26 @@ if (r/'after.json').exists():out['cutover_backup']=json.loads((r/'after.json').r
 for name in ['driver.log','public-test.log']:
  p=r/name
  if p.exists():out[name+'_errors']=[line for line in p.read_text().splitlines() if line.startswith(('AssertionError:','RuntimeError:','subprocess.CalledProcessError:'))][-8:]
+if (r/'business-key-created.json').exists():
+ import sys
+ sys.path.insert(0,str(r))
+ from public_contract_guard import parse_pipeline_line
+ test_key=json.loads((r/'business-key-created.json').read_text())['id']
+ found=[];seen=set();occurrences=0
+ for command in [['docker','exec','adobe-relay-app-1','tail','-c','67108864','/app/data/logs/sub2api.log'],['docker','logs','--since','60m','--tail','50000','adobe-relay-app-1']]:
+  p=subprocess.run(command,capture_output=True,text=True,timeout=30)
+  for line in (p.stdout+chr(10)+p.stderr).splitlines():
+   if 'adobe_images.pipeline_completed' in line:occurrences+=1
+   d=parse_pipeline_line(line)
+   if d and d.get('api_key_id')==test_key:
+    fields={{k:d[k] for k in ['time','request_id','client_request_id','generation_request_id','api_key_id','account_id','requested_model','requested_quality','processing_ms'] if k in d}}
+    fields['keys']=sorted(d)
+    fields['images']=[{{k:v[k] for k in ['submitted_model_version','submitted_detail_level','submit_attempts'] if k in v}} for v in d.get('timings',{{}}).get('images',[])]
+    fingerprint=json.dumps(fields,sort_keys=True)
+    if fingerprint not in seen:found.append(fields);seen.add(fingerprint)
+ out['test_pipeline_records']=found;out['pipeline_log_occurrences']=occurrences
+ d=json.loads(subprocess.check_output(['docker','inspect','adobe-relay-app-1']))[0];env=dict(v.split('=',1) for v in d['Config']['Env'])
+ out['app_log_settings']={{k:env[k] for k in ['LOG_LEVEL','LOG_FORMAT','LOG_OUTPUT_TO_FILE','LOG_OUTPUT_TO_STDOUT'] if k in env}}
 if 'adobe-relay-memory-canary' in out['current_containers']:
  p=subprocess.run(['docker','logs','--since','20m','--tail','8000','adobe-relay-memory-canary'],capture_output=True,text=True,timeout=20)
  events=[]
