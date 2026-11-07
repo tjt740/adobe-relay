@@ -123,9 +123,17 @@ if 'adobe-relay-memory-canary' in out['current_containers']:
   if isinstance(d,dict) and str(d.get('msg','')).startswith('adobe_images.'):
    events.append({{k:d[k] for k in ['time','msg','processing_ms','elapsed_ms','stage','upstream_status','image_count'] if k in d}})
  out['canary_recent_events']=events[-12:]
+ out['canary_info_log_lines']=sum(chr(9)+'INFO'+chr(9) in line for line in (p.stdout+chr(10)+p.stderr).splitlines())
  d=json.loads(subprocess.check_output(['docker','inspect','adobe-relay-memory-canary']))[0]
+ env=dict(v.split('=',1) for v in d['Config']['Env'])
+ out['canary_log_settings']={{k:env[k] for k in ['LOG_LEVEL','LOG_FORMAT','LOG_OUTPUT_TO_FILE','LOG_OUTPUT_TO_STDOUT'] if k in env}}
  p=subprocess.run(['nsenter','-t',str(d['State']['Pid']),'-n','ss','-nti','state','established','sport = :8080'],capture_output=True,text=True,timeout=10)
  out['canary_socket_counters']=[{{k:int(v) for k,v in re.findall(r'(bytes_sent|bytes_received|lastsnd|lastrcv):(\\d+)',block)}} for block in re.split(r'\\n(?=\\S)',p.stdout)[1:]]
+ prefix=json.loads((r/'rolling-prepared.json').read_text())['canary_prefix']+'-'
+ lua="local o={{}};local c='0';repeat local r=redis.call('SCAN',c,'MATCH','concurrency:*','COUNT',300);c=r[1];for _,k in ipairs(r[2]) do if redis.call('TYPE',k).ok=='zset' then local v=redis.call('ZRANGE',k,0,-1,'WITHSCORES');for i=1,#v,2 do if string.sub(v[i],1,string.len(ARGV[1]))==ARGV[1] then table.insert(o,tonumber(v[i+1])) end end end end until c=='0';return cjson.encode(o)"
+ scores=json.loads(subprocess.check_output(['docker','exec','adobe-relay-redis-1','redis-cli','--raw','EVAL',lua,'0',prefix],text=True))
+ import time
+ out['canary_slot_ages_seconds']=[round(time.time()-v) for v in scores]
 print(json.dumps(out))
 """
  p=subprocess.run(['ssh',*options,target,'python3 -'],input=script,text=True,capture_output=True,check=True,timeout=90)
