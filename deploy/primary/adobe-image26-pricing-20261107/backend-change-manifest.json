@@ -73,7 +73,7 @@
   },
   "backend/internal/repository/adobe_image_quality_pricing_test.go": {
     "before": null,
-    "candidate": "13b03f87a6e097daf5ebde1242f80bbde503fe98b9f150ffc5fc383ea89e7657"
+    "candidate": "672aeb99ed4d18277f35317ab3db4c4a8578339df776e95f4ee3aa926d6ddbd7"
   },
   "backend/internal/repository/api_key_repo.go": {
     "before": "b8286efb890330cd5811d963bd633d99d03d37438f364f323d364eae411cd5b4",
