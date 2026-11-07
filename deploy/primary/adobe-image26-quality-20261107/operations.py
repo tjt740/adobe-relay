@@ -94,7 +94,7 @@ a.save('release-completion.json',out);print(json.dumps(out))
 """)
 else:
  evidence=pathlib.Path('primary-release-evidence');evidence.mkdir(exist_ok=True)
- script=f"""import json,pathlib,subprocess
+ script=f"""import json,pathlib,re,subprocess
 r=pathlib.Path('{root}');out={{'application_sha':'{sha}','files':{{}},'current_containers':{{}}}}
 for name in ['adobe-relay-app-1','adobe-relay-memory-canary']:
  p=subprocess.run(['docker','inspect',name],text=True,capture_output=True)
@@ -110,6 +110,22 @@ if (r/'after.json').exists():out['cutover_backup']=json.loads((r/'after.json').r
 for name in ['driver.log','public-test.log']:
  p=r/name
  if p.exists():out[name+'_errors']=[line for line in p.read_text().splitlines() if line.startswith(('AssertionError:','RuntimeError:','subprocess.CalledProcessError:'))][-8:]
+if 'adobe-relay-memory-canary' in out['current_containers']:
+ p=subprocess.run(['docker','logs','--since','20m','--tail','8000','adobe-relay-memory-canary'],capture_output=True,text=True,timeout=20)
+ events=[]
+ for line in (p.stdout+chr(10)+p.stderr).splitlines():
+  try:d=json.loads(line)
+  except ValueError:
+   match=re.search(r'\\t(adobe_images\\.[a-z_]+)\\t(\\{{.*\\}})$',line)
+   if not match:continue
+   try:d=json.loads(match[2]);d['msg']=match[1];d['time']=line.split(chr(9))[0]
+   except ValueError:continue
+  if isinstance(d,dict) and str(d.get('msg','')).startswith('adobe_images.'):
+   events.append({{k:d[k] for k in ['time','msg','processing_ms','elapsed_ms','stage','upstream_status','image_count'] if k in d}})
+ out['canary_recent_events']=events[-12:]
+ d=json.loads(subprocess.check_output(['docker','inspect','adobe-relay-memory-canary']))[0]
+ p=subprocess.run(['nsenter','-t',str(d['State']['Pid']),'-n','ss','-nti','state','established','sport = :8080'],capture_output=True,text=True,timeout=10)
+ out['canary_socket_counters']=[{{k:int(v) for k,v in re.findall(r'(bytes_sent|bytes_received|lastsnd|lastrcv):(\\d+)',block)}} for block in re.split(r'\\n(?=\\S)',p.stdout)[1:]]
 print(json.dumps(out))
 """
  p=subprocess.run(['ssh',*options,target,'python3 -'],input=script,text=True,capture_output=True,check=True,timeout=90)
