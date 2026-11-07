@@ -2,6 +2,7 @@
 import base64, datetime, hashlib, json, os, pathlib, subprocess, sys, time, urllib.error, urllib.request
 os.umask(0o077)
 ROOT = pathlib.Path('/opt/adobe-relay/diagnostics/image26-capability-20261107')
+if sys.argv[1]=='business': ROOT=ROOT/'business-group15'
 ROOT.mkdir(parents=True, exist_ok=True, mode=0o700)
 SHA = 'da24f5634a0fd332f95a14d666fa2e9cea19db53'
 def sql(q):
@@ -13,7 +14,7 @@ def save(name,data):
 def runtime():
     c=json.loads(subprocess.check_output(['docker','inspect','adobe-relay-app-1']))[0]
     return {'image':c['Config']['Image'],'container_id':c['Id'],'health':c['State'].get('Health',{}).get('Status'),'restarts':c['RestartCount'],'oom_killed':c['State']['OOMKilled']}
-phase = sys.argv[1]
+phase = 'run' if sys.argv[1]=='business' else sys.argv[1]
 state=runtime()
 assert state['image']=='adobe-relay:'+SHA and state['health']=='healthy', 'Review changed production version first'
 if phase=='preflight':
@@ -33,7 +34,7 @@ for model in ['gpt-image-2.6-star-swirl','gpt-image-2.6-aurora']:
     stem=model.removeprefix('gpt-image-2.6-')
     base={'model':model,'prompt':'A single orange ceramic teapot, isolated, no text.','n':1,'quality':'low','size':'1024x1024','response_format':'b64_json','output_format':'png'}
     def add(name,extra):
-        p=dict(base,**extra);p['prompt'] += ' Test reference '+stem+' '+name+' November seven.'
+        p=dict(base,**extra);p['prompt'] += ' Test reference '+ROOT.name+' '+stem+' '+name+' November seven.'
         cases.append((stem+'-'+name,p))
     for name,extra in [
         ('transparent-low',{'background':'transparent','complexity':'low'}),
@@ -54,6 +55,7 @@ for model in ['gpt-image-2.6-star-swirl','gpt-image-2.6-aurora']:
         ('reject-gif-compression',{'size':'auto','output_format':'gif','output_compression':50}),
         ('reject-gif-partials',{'size':'auto','output_format':'gif','partial_images':1}),
     ]:add(name,extra)
+cases.sort(key=lambda case: 'reject-' not in case[0])
 results=[]
 for name,payload in cases:
     marker=ROOT/(name+'-started.json'); target=ROOT/(name+'-result.json')

@@ -4,7 +4,7 @@ on:
     inputs:
       phase:
         type: choice
-        options: [preflight, run]
+        options: [preflight, run, business]
         required: true
         default: preflight
       key_id:
@@ -36,17 +36,23 @@ jobs:
           TEST_KEY_ID: ${{ inputs.key_id }}
         run: |
           set -euo pipefail
-          [[ "$PHASE" == preflight || "$PHASE" == run ]]
+          [[ "$PHASE" == preflight || "$PHASE" == run || "$PHASE" == business ]]
           [[ "$TEST_KEY_ID" =~ ^[0-9]+$ ]]
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o ConnectTimeout=20 root@173.234.15.150 'umask 077; mkdir -p /opt/adobe-relay/diagnostics/image26-capability-20261107'
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes deploy/diagnostics/image26-capability-20261107/probe.py root@173.234.15.150:/opt/adobe-relay/diagnostics/image26-capability-20261107/probe.py
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o ServerAliveInterval=10 root@173.234.15.150 "python3 /opt/adobe-relay/diagnostics/image26-capability-20261107/probe.py $PHASE $TEST_KEY_ID"
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes deploy/diagnostics/image26-capability-20261107/business.py root@173.234.15.150:/opt/adobe-relay/diagnostics/image26-capability-20261107/business.py
+          if [ "$PHASE" == business ]; then
+            ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o ServerAliveInterval=10 root@173.234.15.150 'python3 /opt/adobe-relay/diagnostics/image26-capability-20261107/business.py'
+          else
+            ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o ServerAliveInterval=10 root@173.234.15.150 "python3 /opt/adobe-relay/diagnostics/image26-capability-20261107/probe.py $PHASE $TEST_KEY_ID"
+          fi
       - name: Download sanitized evidence
         if: always()
         run: |
           mkdir -p evidence
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes 'root@173.234.15.150:/opt/adobe-relay/diagnostics/image26-capability-20261107/*.json' evidence/ || true
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes 'root@173.234.15.150:/opt/adobe-relay/diagnostics/image26-capability-20261107/*-0.*' evidence/ || true
+          scp -r -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes 'root@173.234.15.150:/opt/adobe-relay/diagnostics/image26-capability-20261107/business-group15' evidence/ || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
