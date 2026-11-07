@@ -1,0 +1,149 @@
+{
+  "application_sha": "2dc7a2a3ae0761d88b2d7e89964c93b2dc86ff06",
+  "build_run": 42345092438,
+  "feature_pr": 170,
+  "verified_at": "2026-11-07T06:49:57.176189+00:00",
+  "server_evidence": "/opt/adobe-relay/releases/adobe-image26-quality-20261107/",
+  "contract": {
+    "models": [
+      "gpt-image-2.6-flare",
+      "gpt-image-2.6-sunburst"
+    ],
+    "cases": 4,
+    "all_passed": true,
+    "actual_levels": [
+      6,
+      7
+    ],
+    "real_4k_pngs": 4,
+    "silent_downgrades": 0,
+    "outer_posts": 4,
+    "replayed_requests": 0
+  },
+  "cases": [
+    {
+      "model": "gpt-image-2.6-flare",
+      "quality": "xhigh",
+      "http_status": 200,
+      "response_quality": "xhigh",
+      "outer_posts": 1,
+      "images": [
+        {
+          "format": "png",
+          "width": 3840,
+          "height": 2160,
+          "bytes": 10171732,
+          "sha256": "6589568e44f8f47a06dfa0be2e4f0d637abb46c08bc3b09e80fc0be8d19f175d",
+          "png_fully_validated": true
+        }
+      ],
+      "applied_submissions": [
+        {
+          "submitted_model_version": "gpt-image-2.6-star-swirl",
+          "submitted_detail_level": 6,
+          "submit_attempts": 1
+        }
+      ],
+      "pipeline_correlated": true,
+      "duration_seconds": 55.22,
+      "processing_ms": 30691,
+      "billing_model": "gpt-image-2.6-flare",
+      "billed_image_count": 1
+    },
+    {
+      "model": "gpt-image-2.6-flare",
+      "quality": "max",
+      "http_status": 200,
+      "response_quality": "max",
+      "outer_posts": 1,
+      "images": [
+        {
+          "format": "png",
+          "width": 3840,
+          "height": 2160,
+          "bytes": 10504768,
+          "sha256": "98e185f481f4880dc6d7dff827a0911cf0d7cac20d0b5b2287fa944b30381211",
+          "png_fully_validated": true
+        }
+      ],
+      "applied_submissions": [
+        {
+          "submitted_model_version": "gpt-image-2.6-star-swirl",
+          "submitted_detail_level": 7,
+          "submit_attempts": 1
+        }
+      ],
+      "pipeline_correlated": true,
+      "duration_seconds": 45.114,
+      "processing_ms": 36934,
+      "billing_model": "gpt-image-2.6-flare",
+      "billed_image_count": 1
+    },
+    {
+      "model": "gpt-image-2.6-sunburst",
+      "quality": "xhigh",
+      "http_status": 200,
+      "response_quality": "xhigh",
+      "outer_posts": 1,
+      "images": [
+        {
+          "format": "png",
+          "width": 3840,
+          "height": 2160,
+          "bytes": 11038612,
+          "sha256": "fdbdede3fafc3cafb0b3a7fe5154e38bd28ffffe0b6f34d55c1bdea3a1e1b119",
+          "png_fully_validated": true
+        }
+      ],
+      "applied_submissions": [
+        {
+          "submitted_model_version": "gpt-image-2.6-aurora",
+          "submitted_detail_level": 6,
+          "submit_attempts": 1
+        }
+      ],
+      "pipeline_correlated": true,
+      "duration_seconds": 63.589,
+      "processing_ms": 56217,
+      "billing_model": "gpt-image-2.6-sunburst",
+      "billed_image_count": 1
+    },
+    {
+      "model": "gpt-image-2.6-sunburst",
+      "quality": "max",
+      "http_status": 200,
+      "response_quality": "max",
+      "outer_posts": 1,
+      "images": [
+        {
+          "format": "png",
+          "width": 3840,
+          "height": 2160,
+          "bytes": 11799698,
+          "sha256": "a2938c5306596134ed4f541b18acbcbe8c3dbad2d8ad84f7a21ec5c435dd323a",
+          "png_fully_validated": true
+        }
+      ],
+      "applied_submissions": [
+        {
+          "submitted_model_version": "gpt-image-2.6-aurora",
+          "submitted_detail_level": 7,
+          "submit_attempts": 1
+        }
+      ],
+      "pipeline_correlated": true,
+      "duration_seconds": 104.248,
+      "processing_ms": 96939,
+      "billing_model": "gpt-image-2.6-sunburst",
+      "billed_image_count": 1
+    }
+  ],
+  "initial_audit_failure": {
+    "cause": "Billing request_id uses client:<client_request_id>, not generation_request_id. Reconciled the same HTTP request, client ID, dedicated API key and account without regenerating.",
+    "original_result_preserved": true,
+    "original_result_sha256": "c728e351a0f1b5d2172f0d99552d40a74a4520a57a1560f91d1bac237f6712b8",
+    "reviewed_without_generation": true
+  },
+  "temporary_access_cleaned": true,
+  "temporary_keys": 2
+}
