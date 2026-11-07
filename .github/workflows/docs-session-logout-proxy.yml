@@ -1,0 +1,52 @@
+name: Check or correct primary Sub2 logout response headers
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact merged helper source
+        required: true
+        type: string
+      phase:
+        type: choice
+        options: [check, apply]
+        default: check
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: adobe-relay-production
+  cancel-in-progress: false
+jobs:
+  proxy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select exact merged source
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          git checkout --detach "$SOURCE_SHA"
+          python3 -m py_compile deploy/primary/docs-session-logout-proxy-20261107.py
+      - name: Guarded endpoint-only operation
+        env:
+          SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
+          PHASE: ${{ inputs.phase }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/docs_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/docs_key ~/.ssh/known_hosts
+          arg=''
+          if [ "$PHASE" = apply ]; then arg='--apply'; else [ "$PHASE" = check ]; fi
+          ssh -i ~/.ssh/docs_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 root@173.234.15.150 "python3 - $arg" < deploy/primary/docs-session-logout-proxy-20261107.py
+      - name: Remove runner SSH key
+        if: always()
+        run: rm -f ~/.ssh/docs_key
