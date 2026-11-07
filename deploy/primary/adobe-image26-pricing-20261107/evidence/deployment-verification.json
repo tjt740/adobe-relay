@@ -1,0 +1,179 @@
+{
+  "at": "2026-11-07T12:36:12.167925+00:00",
+  "application_sha": "683404c7f2e9cc713d2b68f6bd204b7b85d05fe3",
+  "application_version": "2026-11-07T20:36:10.048+0800\tINFO\tstdlog\tSub2API 0.2.19 (commit: 683404c7f2e9cc713d2b68f6bd204b7b85d05fe3, built: 2026-11-07T11:50:25Z)\t{\"service\": \"sub2api\", \"env\": \"bootstrap\", \"legacy_stdlog\": true}",
+  "preserved": {
+    "existing_groups_and_prices": true,
+    "other_containers": true,
+    "configuration": true,
+    "resources_and_go": true,
+    "environment": true,
+    "okad_settings": true,
+    "sub2_settings_including_smtp": true,
+    "clash_nodes_bindings_and_configuration": true,
+    "alert_rules": true,
+    "retired_route_matches_current_baseline": true
+  },
+  "business_preservation": {
+    "backup_accounts": 1060,
+    "checked_accounts": 1060,
+    "manual_pauses_preserved": true,
+    "manual_proxy_modes_preserved": true,
+    "proxy_bindings_changed_with_event_chain": 41,
+    "cookie_rotations_with_version_advance": 0,
+    "non_source_cookie_credential_changes": 1,
+    "credential_field_names_changed": [
+      "access_token",
+      "expires_at"
+    ]
+  },
+  "migration_checksums_preserved": true,
+  "migration_set_retained": true,
+  "retired_408_gates_empty": true,
+  "canonical_assets": {
+    "/assets/index-C6kOkyoD.js": "6524c9519470c168f809791d4eab68784b039f316ad75e4cff6a452f5608dfaf",
+    "/assets/index-eandzqQ7.js": "e708c7d06565fdb9d76684b36d6fcf61f2d190d8873e70f8a266f065e48251a6",
+    "/assets/ProxiesView-DzEdZJ3D.js": "23b4816efb119de8299db129e712d93cd841e8d2245fe7bed6908ef8769b9d31",
+    "/assets/index-_avzTz3M.js": "cd24ad6af9bc1112b98834104e8680f808e9f7244dad2b3aedd8bba518e2b672",
+    "/assets/AccountsView-HkgVMK8L.js": "ea07f2dbc1660b5d125ac1a242f012543a43fb8ea77f79b08b71e4bca7d4608a",
+    "/assets/GroupsView-Do8BZ2Gj.js": "5b83d5ae1675f3012f8a4a7b4bdae55cd7a1b5a2eb701531a7e94cc5f169f44a",
+    "/assets/ChangelogView-8LYaCRpu.js": "b5a61cbc5ccada39fcc4fdcd9991b27e5e683b3af89311d120f0004e8dcbb706"
+  },
+  "live_browser_cases": 0,
+  "browser_limitation": "Live authenticated browser verification unavailable; asset and API checks only",
+  "heartbeat_after_temporary_process_cleanup": {
+    "at": "2026-11-07T20:35:50.292693+08:00",
+    "healthy": true
+  },
+  "passive_sample_count": 13,
+  "temporary_cleanup": {
+    "at": "2026-11-07T12:14:11.108255+00:00",
+    "temporary_container_removed": true,
+    "temporary_nat_rule_removed": true,
+    "rolling_lease_removed": true,
+    "nginx_configuration_unchanged": true
+  },
+  "adobe_custom_business_preserved": true,
+  "new_migration": {
+    "256_adobe_image_quality_pricing.sql": "a685a4ebfe7a21e2826dd78118e83bf10b0a7104e07a65dad1fc2aa9a524c67e"
+  },
+  "pricing_api_roundtrip": {
+    "models": 2,
+    "configured_cells": 29,
+    "omit_preserves": true,
+    "empty_object_clears": true,
+    "zero_preserved": true,
+    "reload_matches": true,
+    "group_id": 38
+  },
+  "route_api_verified": true,
+  "excluded_1290": {
+    "excluded": false,
+    "status": null,
+    "bindings": 0,
+    "leases": 0
+  },
+  "cutover_route_checks": {
+    "retired_proxy_absence_preserved": true,
+    "no_bindings_or_test_leases": true
+  },
+  "authorized_live_generation_tests": {
+    "application_sha": "683404c7f2e9cc713d2b68f6bd204b7b85d05fe3",
+    "api_key_ids": [
+      177,
+      178
+    ],
+    "cases": [
+      {
+        "at": "2026-11-07T12:15:26.689720+00:00",
+        "application_sha": "683404c7f2e9cc713d2b68f6bd204b7b85d05fe3",
+        "api_key_id": 177,
+        "name": "flare-xhigh",
+        "model": "gpt-image-2.6-flare",
+        "quality": "xhigh",
+        "outer_posts": 1,
+        "success": false,
+        "http_status": 408,
+        "error": {
+          "type": "adobe_upstream",
+          "code": "upstream_unavailable",
+          "stage": "submit",
+          "source": "upstream",
+          "upstream_status": 408,
+          "request_id": "94b51d40-5f1a-448d-9edf-6d1ce29ee896"
+        },
+        "duration_seconds": 107.0
+      },
+      {
+        "at": "2026-11-07T12:25:59.020531+00:00",
+        "application_sha": "683404c7f2e9cc713d2b68f6bd204b7b85d05fe3",
+        "api_key_id": 178,
+        "name": "sunburst-auto-inherit",
+        "model": "gpt-image-2.6-sunburst",
+        "quality": "auto",
+        "outer_posts": 1,
+        "success": false,
+        "http_status": 408,
+        "error": {
+          "type": "adobe_upstream",
+          "code": "upstream_unavailable",
+          "stage": "submit",
+          "source": "upstream",
+          "upstream_status": 408,
+          "request_id": "8e487031-425b-47eb-8551-b04b8672298e"
+        },
+        "duration_seconds": 108.608
+      }
+    ],
+    "verified": false
+  },
+  "public_contract": {
+    "all_passed": false,
+    "attempted_cases": 2,
+    "successful_cases": 0,
+    "outer_posts": 2,
+    "upstream_statuses": [
+      408
+    ],
+    "live_billing_verified": false,
+    "reason": "Both submitted test combinations were rejected by upstream; successful generation and billing validation remain pending.",
+    "first_request_explicit_rejection_reviewed": true,
+    "bounded_rechecks_executed": 0
+  },
+  "temporary_test_access_cleanup": [
+    {
+      "at": "2026-11-07T12:17:14.468985+00:00",
+      "temporary_key_deleted": true,
+      "temporary_group_deleted": true,
+      "temporary_grant_removed": true,
+      "original_allowed_groups": [],
+      "current_allowed_groups": [],
+      "credentials_persisted": false,
+      "customer_prices_changed": false
+    },
+    {
+      "at": "2026-11-07T12:27:48.364857+00:00",
+      "temporary_key_deleted": true,
+      "temporary_group_deleted": true,
+      "temporary_grant_removed": true,
+      "original_allowed_groups": [],
+      "current_allowed_groups": [],
+      "credentials_persisted": false,
+      "customer_prices_changed": false
+    }
+  ],
+  "public_usage": {
+    "count": 0,
+    "image_count": null,
+    "models": null
+  },
+  "active_adobe_probes": false,
+  "test_mail_sent": false,
+  "verified_locale_bundle_count": 2,
+  "verified_admin_model_labels": {
+    "gpt-image-2.6-flare": "GPT Image 2.6 Flare",
+    "gpt-image-2.6-sunburst": "GPT Image 2.6 Sunburst"
+  },
+  "live_billing_verified": false,
+  "status": "deployed_live_billing_pending_upstream"
+}

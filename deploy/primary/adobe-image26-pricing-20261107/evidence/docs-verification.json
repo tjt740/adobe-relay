@@ -1,0 +1,14 @@
+{
+  "anonymous_content_blocked": true,
+  "existing_sub2_user_login_and_read": true,
+  "protected_markdown_sha256": "13fbaf210011596a6490facdc35b9804821480e44b1209f2774003aae9a49013",
+  "example_blocks": 23,
+  "image26_names_and_quality_contract": true,
+  "logout_invalidates_docs_session": true,
+  "credentials_persisted": false,
+  "adobe_requests": 0,
+  "public_https": true,
+  "source_sha": "683404c7f2e9cc713d2b68f6bd204b7b85d05fe3",
+  "audit": "/opt/creative-docs/audit/verify-683404c7f2e9cc713d2b68f6bd204b7b85d05fe3",
+  "verified_at_utc": "2026-11-07T12:18:12Z"
+}
