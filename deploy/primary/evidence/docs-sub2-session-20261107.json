@@ -1,0 +1,301 @@
+{
+  "auth_source": "be98b50cd865f07e6d00874e4d0153300bb517d0",
+  "current_docs_binary_sha256": "8cbc68cc0f7b779494f9c4a2cce9f4355563faca44b1b60a07c495aa5d2c5fe7",
+  "live": {
+    "anonymous_shows_login": true,
+    "native_sub2_login": true,
+    "no_second_login": true,
+    "no_shared_docs_cookie": true,
+    "chrome_viewports": [
+      1440,
+      390
+    ],
+    "markdown_sha256": "7df3d367f4c499075f14460a3ed0dc4931b22f8aac6bd6506d22e878c3d744dc",
+    "docs_logout_keeps_sub2": true,
+    "real_refresh_after_controlled_invalid_proof": true,
+    "refresh_requests": 1,
+    "native_logout_status": 200,
+    "sub2_logout_closes_shared_docs": true,
+    "anonymous_document_and_download_denied": true,
+    "trace": [
+      {
+        "stage": "sub2-native-login",
+        "path": "/api/v1/auth/login",
+        "status": 200,
+        "page": "main"
+      },
+      {
+        "stage": "automatic-docs-entry",
+        "path": "/docs/session",
+        "status": 200,
+        "page": "docs"
+      },
+      {
+        "stage": "shared-download",
+        "path": "/docs/session/guide.md",
+        "status": 200,
+        "page": "docs"
+      },
+      {
+        "stage": "docs-logout-scope",
+        "path": "/docs/session",
+        "status": 200,
+        "page": "docs"
+      },
+      {
+        "stage": "owned-session-renewal",
+        "path": "/docs/session",
+        "status": 401
+      },
+      {
+        "stage": "owned-session-renewal",
+        "path": "/docs/session",
+        "status": 401,
+        "page": "docs"
+      },
+      {
+        "stage": "owned-session-renewal",
+        "path": "/api/v1/auth/refresh",
+        "status": 200,
+        "page": "docs",
+        "code": 0,
+        "data_keys": [
+          "access_token",
+          "refresh_token",
+          "expires_in",
+          "token_type"
+        ],
+        "expires_type": "number",
+        "has_access": true,
+        "has_refresh": true
+      },
+      {
+        "stage": "owned-session-renewal",
+        "path": "/docs/session",
+        "status": 200,
+        "page": "docs"
+      },
+      {
+        "stage": "sub2-native-logout",
+        "path": "/api/v1/auth/logout",
+        "status": 200,
+        "page": "main"
+      },
+      {
+        "stage": "sub2-native-logout",
+        "path": "/docs/session",
+        "status": 401
+      },
+      {
+        "stage": "sub2-native-logout",
+        "path": "/docs/session",
+        "status": 401,
+        "page": "docs"
+      }
+    ],
+    "verified_at_utc": "2026-11-07T03:36:16.140Z",
+    "password_or_tokens_in_artifacts": false,
+    "adobe_requests": 0
+  },
+  "shared_local": [
+    {
+      "case": "existing-admin",
+      "width": 1440,
+      "no_second_login": true,
+      "no_shared_cookie": true,
+      "download": true,
+      "docs_logout_keeps_sub2": true,
+      "sub2_logout_closes_docs": true
+    },
+    {
+      "case": "existing-user",
+      "width": 1440,
+      "no_second_login": true,
+      "no_shared_cookie": true,
+      "download": true,
+      "docs_logout_keeps_sub2": true,
+      "sub2_logout_closes_docs": true
+    },
+    {
+      "case": "existing-2fa",
+      "width": 1440,
+      "no_second_login": true,
+      "no_shared_cookie": true,
+      "download": true,
+      "docs_logout_keeps_sub2": true,
+      "sub2_logout_closes_docs": true
+    },
+    {
+      "case": "existing-admin",
+      "width": 390,
+      "no_second_login": true,
+      "no_shared_cookie": true,
+      "download": true,
+      "docs_logout_keeps_sub2": true,
+      "sub2_logout_closes_docs": true
+    },
+    {
+      "case": "existing-user",
+      "width": 390,
+      "no_second_login": true,
+      "no_shared_cookie": true,
+      "download": true,
+      "docs_logout_keeps_sub2": true,
+      "sub2_logout_closes_docs": true
+    },
+    {
+      "case": "existing-2fa",
+      "width": 390,
+      "no_second_login": true,
+      "no_shared_cookie": true,
+      "download": true,
+      "docs_logout_keeps_sub2": true,
+      "sub2_logout_closes_docs": true
+    },
+    {
+      "case": "forged-token",
+      "denied": true
+    },
+    {
+      "case": "fixture-challenge",
+      "denied": true
+    },
+    {
+      "case": "inactive-token",
+      "denied": true
+    },
+    {
+      "case": "outage-token",
+      "denied": true
+    },
+    {
+      "case": "concurrent-expired-session",
+      "single_refresh": true,
+      "automatic_entry": true
+    },
+    {
+      "case": "main-tab-refresh-lock",
+      "round": 0,
+      "adopts_peer": true,
+      "no_duplicate_refresh": true
+    },
+    {
+      "case": "no-web-locks-refresh-race",
+      "adopts_delayed_winner": true,
+      "no_session_loss": true
+    },
+    {
+      "case": "late-refresh-logout",
+      "no_session_restore": true
+    },
+    {
+      "case": "late-refresh-account-switch",
+      "no_session_restore": true
+    },
+    {
+      "case": "direct-markdown-entry",
+      "authenticated_download": true
+    },
+    {
+      "case": "blocked-storage",
+      "manual_login_available": true
+    }
+  ],
+  "manual_local": [
+    {
+      "browser": "chromium",
+      "case": "old-policy-native-form",
+      "status": 403,
+      "origin": "null"
+    },
+    {
+      "browser": "chromium",
+      "width": 1440,
+      "case": "document-ui",
+      "exact_code_and_copy": 21,
+      "exact_table_content": true,
+      "search": true,
+      "current_section": true
+    },
+    {
+      "browser": "chromium",
+      "width": 1440,
+      "case": "admin",
+      "native_login": true,
+      "download": true,
+      "logout": true,
+      "overflow": false
+    },
+    {
+      "browser": "chromium",
+      "width": 1440,
+      "case": "user",
+      "native_login": true,
+      "download": true,
+      "logout": true,
+      "overflow": false
+    },
+    {
+      "browser": "chromium",
+      "width": 1440,
+      "case": "2fa",
+      "native_login": true,
+      "download": true,
+      "logout": true,
+      "overflow": false
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "case": "document-ui",
+      "exact_code_and_copy": 21,
+      "exact_table_content": true,
+      "search": true,
+      "current_section": true
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "case": "admin",
+      "native_login": true,
+      "download": true,
+      "logout": true,
+      "overflow": false
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "case": "user",
+      "native_login": true,
+      "download": true,
+      "logout": true,
+      "overflow": false
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "case": "2fa",
+      "native_login": true,
+      "download": true,
+      "logout": true,
+      "overflow": false
+    }
+  ],
+  "proxy_check": 42334486759,
+  "proxy_apply": 42334562039,
+  "proxy_result": {
+    "docs_binary_sha256": "8cbc68cc0f7b779494f9c4a2cce9f4355563faca44b1b60a07c495aa5d2c5fe7",
+    "audit": "/opt/creative-docs/audit/update-20261107T031739Z/logout-proxy-fix",
+    "logout_status": 200,
+    "cleared_cookies": 23,
+    "existing_containers_preserved": true,
+    "only_config_changes": [
+      "/etc/nginx/conf.d/creative.cheap-https.conf",
+      "/etc/nginx/snippets/creative-logout-proxy.conf"
+    ],
+    "before_main_sha256": "0d7d1bb58b389198e0ce2a9aaad1474d556cd998e7febb37f97ab3883341108e",
+    "after_main_sha256": "db3ff4fa51cc2fa941557325de0184b631919688cd8ad5a83c556ec2083edfe8",
+    "snippet_sha256": "5080e3c7b617b749f859dcd8f3acb365f346e5e839ba6d0e7ca29a0852b06a0a",
+    "docs_binary_preserved": true
+  }
+}

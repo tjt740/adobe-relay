@@ -18,6 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      docsSharedLogin: {"title": "Shared documentation sign-in, updated parameters and green navigation", "body": "Signing into Sub2 in the same browser now opens the API documentation without another login. Signed-out visitors still see the login page. Green navigation and softer parameter and code colors accompany the updated parameters and examples, with copying and downloads available."},
       docsColors: {"title": "Coordinated green navigation and softer documentation colors", "body": "The independent /docs site uses green navigation and table headings, soft teal parameters, and subdued status and restriction colors. Mint, blue-grey and warm sand code highlighting preserves complete copying, document content and access rules."},
       adobeGptImage26Gif: { title: 'Adobe 2.6 models, text-only GIFs and planning controls', body: 'Today exposes the actual Adobe gpt-image-2.6-star-swirl and gpt-image-2.6-aurora names, GIF text generation, frame controls and independent complexity planning. Static generation and editing retain the established workflow; GIF reference editing is explicitly unsupported. Image 2/2.5 calls and submission protections remain unchanged.' },
       adobeGptImage26: { title: 'Add Adobe gpt-image-2.6-star-swirl and gpt-image-2.6-aurora', body: 'Expose Adobe’s actual GPT Image 2.6 interface versions gpt-image-2.6-star-swirl and gpt-image-2.6-aurora through the same image workflow as 2.5, with exact upstream routing, 2.6 size validation and explicit quality limits. Legacy Flare and Sunburst aliases remain accepted without appearing in the model directory or UI. Existing models, defaults, checks and submission protections remain unchanged.' },
@@ -36,6 +37,36 @@ export default {
       }
     },
     "updates": {
+      docsSharedLogin: {
+        "title": "Open API documentation with your existing Sub2 sign-in",
+        "body": "Avoid repeated sign-ins between the console and documentation while keeping document and download access authenticated.",
+        "sections": {
+          "reason": {
+            "title": "Reuse an existing sign-in",
+            "body": "Opening /docs after using the console reuses a valid Sub2 session in the same browser and origin. Without a session, email/password login, registration and recovery links remain available."
+          },
+          "access": {
+            "title": "Administrator and regular-user access",
+            "body": "Active administrators, regular users and completed two-factor sign-ins are supported. The server validates each document read and Markdown download. Pending verification, invalid sessions and disabled accounts cannot gain access from browser profile data."
+          },
+          "refresh": {
+            "title": "Renew an expired session",
+            "body": "Expired access credentials can be renewed when a valid refresh session remains, coordinated with the console and other documentation tabs. Late responses cannot restore a signed-out or replaced account. Failed authentication returns to login."
+          },
+          "logout": {
+            "title": "Defined sign-out scope",
+            "body": "Documentation opened through Sub2 responds to Sub2 sign-out or account switching in the same browser. Signing out of documentation displays its login page while retaining the console session; reopening can reuse it again. Independent email/password sign-in retains its own documentation session. A 502 error during console sign-out has also been corrected."
+          },
+          "validation": {
+            "title": "Sign-in, download and renewal checks",
+            "body": "Local Chrome checks passed administrator, regular-user, two-factor, multi-tab renewal, sign-out and account-switch flows. Public Chrome verified real administrator console sign-in, automatic entry, exact Markdown download, one controlled renewal and both sign-out scopes. Widths of 1440 and 390 had no page overflow."
+          },
+          "boundary": {
+            "title": "A valid session in the same browser",
+            "body": "Private windows, other browsers and unavailable browser storage still require sign-in. The live renewal check replaced access credentials in an isolated test session rather than waiting for natural expiry. Regular-user and two-factor checks used a local simulated upstream; a 390-pixel viewport is not a physical-phone test."
+          }
+        }
+      },
       docsColors: {
         "title": "Coordinate API documentation around green navigation",
         "body": "Color distinguishes sections, parameters and model capabilities while reading the reference.",
