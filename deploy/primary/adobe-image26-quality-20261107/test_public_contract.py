@@ -1,6 +1,18 @@
 import copy
+import json
 from unittest import TestCase
-from public_contract_guard import MODELS, LEVELS, validate
+from public_contract_guard import MODELS, LEVELS, validate, parse_pipeline_line
+
+class PipelineLogTests(TestCase):
+    def test_json_and_existing_console_encoding(self):
+        fields = {'generation_request_id': 'request-1', 'account_id': 42, 'timings': {'images': [{'submitted_detail_level': 6}]}}
+        expected = dict(fields, msg='adobe_images.pipeline_completed')
+        self.assertEqual(parse_pipeline_line(json.dumps(expected)), expected)
+        self.assertEqual(parse_pipeline_line('2026-11-07T06:00:00Z\tINFO\thandler/adobe_images.go:800\tadobe_images.pipeline_completed\t' + json.dumps(fields)), expected)
+
+    def test_unrelated_or_malformed_lines_never_correlate(self):
+        for line in ['{}', '[]', 'broken', '{"msg":"other"}', 'INFO\tother\t{"message":"adobe_images.pipeline_completed"}', 'INFO\tadobe_images.pipeline_completed\t{broken}']:
+            with self.subTest(line=line): self.assertIsNone(parse_pipeline_line(line))
 
 class PublicQualityContractTests(TestCase):
     def setUp(self):

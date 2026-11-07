@@ -1,6 +1,26 @@
 """Assert real, distinct quality levels; a 200 response alone never passes."""
+import json
+import re
 MODELS = {'gpt-image-2.6-flare': 'gpt-image-2.6-star-swirl', 'gpt-image-2.6-sunburst': 'gpt-image-2.6-aurora'}
 LEVELS = {'xhigh': 6, 'max': 7}
+
+def parse_pipeline_line(line):
+    """Accept the existing Zap JSON or console encoder without changing logging."""
+    try:
+        entry = json.loads(line)
+        return entry if isinstance(entry, dict) and entry.get('msg') == 'adobe_images.pipeline_completed' else None
+    except (ValueError, TypeError):
+        match = re.search(r'(?:^|\t)adobe_images\.pipeline_completed\t(\{.*\})$', line)
+        if not match:
+            return None
+        try:
+            entry = json.loads(match.group(1))
+        except ValueError:
+            return None
+        if not isinstance(entry, dict):
+            return None
+        entry['msg'] = 'adobe_images.pipeline_completed'
+        return entry
 
 def validate(cases, sha):
     expected = {(model, quality) for model in MODELS for quality in LEVELS}

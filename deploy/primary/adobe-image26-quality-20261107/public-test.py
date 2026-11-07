@@ -1,6 +1,6 @@
 """Four sequential public API generations; preserve every result and never replay."""
 import base64, datetime, hashlib, json, os, pathlib, struct, subprocess, sys, time, urllib.error, urllib.request, zlib
-from public_contract_guard import MODELS, LEVELS, validate
+from public_contract_guard import MODELS, LEVELS, validate, parse_pipeline_line
 os.umask(0o077)
 ROOT = pathlib.Path('/opt/adobe-relay/releases/adobe-image26-quality-20261107')
 PUBLIC = ROOT / 'public'
@@ -49,9 +49,8 @@ def pipeline(usage):
             if p.returncode==0:chunks.extend([p.stdout,p.stderr])
         for chunk in chunks:
             for line in chunk.splitlines():
-                try:entry=json.loads(line)
-                except (ValueError,TypeError):continue
-                if entry.get('msg')=='adobe_images.pipeline_completed' and entry.get('generation_request_id')==usage['request_id']:
+                entry=parse_pipeline_line(line)
+                if entry and entry.get('generation_request_id')==usage['request_id']:
                     assert entry['account_id']==usage['account_id']
                     return [{key:row[key] for key in ('submitted_model_version','submitted_detail_level','submit_attempts')} for row in entry['timings']['images']]
         time.sleep(1)
