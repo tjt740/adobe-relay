@@ -1,7 +1,7 @@
 """Image 2.6 quality and names release using preserved deployment guards."""
 import base64,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','public-test','status','verify','archive']
+assert phase in ['preflight','prepare','start','public-test','confirmation','status','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-image26-pricing-20261107'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -51,14 +51,18 @@ assert not (r/'progress.json').exists(), 'Already started; inspect existing evid
 subprocess.run(['systemd-run','--unit=adobe-image26-pricing-release-20261107','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/driver.log','--property=StandardError=append:{root}/driver.log','/usr/bin/python3',str(r/'driver.py')],check=True)
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 """)
-elif phase=='public-test':
- copy([pathlib.Path(__file__).parent/name for name in ['public-test.py','public-test-access.py','public_contract_guard.py']])
+elif phase in ['public-test','confirmation']:
+ confirmation=phase=='confirmation'
+ copy([pathlib.Path(__file__).parent/name for name in ['public-test.py','public-test-access.py','public_contract_guard.py','review-rejection.py']])
  remote(f"""import json,os,pathlib,subprocess
 r=pathlib.Path('{root}')
 assert (r/'expected-sha').read_text().strip()=='{sha}'
 assert (r/'rolling-finished.json').exists() and (r/'runtime-verification.json').exists()
-with os.fdopen(os.open(r/'public-test-dispatched.json',os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600),'w') as f:json.dump({{'application_sha':'{sha}','single_dispatch':True,'cases':6}},f)
-subprocess.run(['systemd-run','--unit=adobe-image26-pricing-public-20261107','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/public-test.log','--property=StandardError=append:{root}/public-test.log','/usr/bin/python3',str(r/'public-test-access.py')],check=True)
+if {confirmation!r}:
+ assert not (r/'public-confirmation').exists()
+ if not (r/'explicit-rejection-review.json').exists():subprocess.run(['python3',str(r/'review-rejection.py')],check=True)
+with os.fdopen(os.open(r/'{'public-confirmation-dispatched.json' if confirmation else 'public-test-dispatched.json'}',os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600),'w') as f:json.dump({{'application_sha':'{sha}','single_dispatch':True,'cases':6}},f)
+subprocess.run(['systemd-run','--unit=adobe-image26-pricing-{'confirmation' if confirmation else 'public'}-20261107','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/{'public-confirmation' if confirmation else 'public-test'}.log','--property=StandardError=append:{root}/{'public-confirmation' if confirmation else 'public-test'}.log','/usr/bin/python3',str(r/'public-test-access.py')]+(['confirmation'] if {confirmation!r} else []),check=True)
 print(json.dumps({{'public_test_dispatched':True,'application_sha':'{sha}'}}))
 """)
 elif phase=='verify':
@@ -98,15 +102,16 @@ for name in ['adobe-relay-app-1','adobe-relay-memory-canary']:
  p=subprocess.run(['docker','inspect',name],text=True,capture_output=True)
  if p.returncode==0:
   d=json.loads(p.stdout)[0];out['current_containers'][name]={{'image':d['Config']['Image'],'health':d['State'].get('Health',{{}}).get('Status'),'oom':d['State']['OOMKilled'],'restarts':d['RestartCount']}}
-for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','post-release-tests.json','business-key-created.json','business-access-cleanup.json','business-remaining-key-created.json','business-remaining-access-cleanup.json','final-verification.json','release-completion.json']:
+for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','post-release-tests.json','business-key-created.json','business-access-cleanup.json','business-confirmation-key-created.json','business-confirmation-access-cleanup.json','explicit-rejection-review.json','business-remaining-key-created.json','business-remaining-access-cleanup.json','final-verification.json','release-completion.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
  if p.exists():out.setdefault('recent_drain_samples',{{}})[side]=json.loads(p.read_text())['samples'][-6:]
 out['public_cases']=[json.loads(p.read_text()) for p in sorted((r/'public').glob('*-result.json'))]
+out['confirmation_cases']=[json.loads(p.read_text()) for p in sorted((r/'public-confirmation').glob('*-result.json'))]
 out['reviewed_public_cases']=[json.loads(p.read_text()) for p in sorted((r/'public').glob('*-reviewed.json'))]
 if (r/'after.json').exists():out['cutover_backup']=json.loads((r/'after.json').read_text())['backup']
-for name in ['driver.log','public-test.log','public-test-remaining.log']:
+for name in ['driver.log','public-test.log','public-confirmation.log','public-test-remaining.log']:
  p=r/name
  if p.exists():out[name+'_errors']=[line for line in p.read_text().splitlines() if line.startswith(('AssertionError:','RuntimeError:','subprocess.CalledProcessError:'))][-8:]
 if (r/'business-key-created.json').exists():

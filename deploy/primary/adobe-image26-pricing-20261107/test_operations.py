@@ -10,7 +10,7 @@ from unittest import TestCase, mock
 class OperationsTests(TestCase):
     def test_supported_remote_programs_are_valid(self):
         path = Path(__file__).with_name('operations.py')
-        for phase in ['preflight', 'start', 'public-test', 'verify', 'archive', 'status']:
+        for phase in ['preflight', 'start', 'public-test', 'confirmation', 'verify', 'archive', 'status']:
             with self.subTest(phase), mock.patch.object(sys, 'argv', [str(path), phase, 'a' * 40, '123']), mock.patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, stdout='{}')) as run, mock.patch.object(Path, 'mkdir'), mock.patch.object(Path, 'write_text'):
                 runpy.run_path(str(path), run_name='__main__')
                 scripts = [call.kwargs['input'] for call in run.call_args_list if 'input' in call.kwargs]
