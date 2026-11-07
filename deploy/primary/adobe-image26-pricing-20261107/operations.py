@@ -1,7 +1,7 @@
 """Image 2.6 quality and names release using preserved deployment guards."""
 import base64,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','public-test','confirmation','status','verify','archive']
+assert phase in ['preflight','prepare','start','public-test','confirmation','status','verify','verify-deployment','archive','archive-pending']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-image26-pricing-20261107'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -65,15 +65,17 @@ with os.fdopen(os.open(r/'{'public-confirmation-dispatched.json' if confirmation
 subprocess.run(['systemd-run','--unit=adobe-image26-pricing-{'confirmation' if confirmation else 'public'}-20261107','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/{'public-confirmation' if confirmation else 'public-test'}.log','--property=StandardError=append:{root}/{'public-confirmation' if confirmation else 'public-test'}.log','/usr/bin/python3',str(r/'public-test-access.py')]+(['confirmation'] if {confirmation!r} else []),check=True)
 print(json.dumps({{'public_test_dispatched':True,'application_sha':'{sha}'}}))
 """)
-elif phase=='verify':
- copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','public_contract_guard.py']])
+elif phase in ['verify','verify-deployment']:
+ deployment_only=phase=='verify-deployment'
+ copy([pathlib.Path(__file__).parent/name for name in ['final-verify.py','public_contract_guard.py','verify-deployment.py','blocked_contract_guard.py']])
  remote(f"""import pathlib,subprocess,sys
 r=pathlib.Path('{root}');assert (r/'expected-sha').read_text().strip()=='{sha}'
 assert (r/'rolling-finished.json').exists()
-for script,output in [('route-guard-review.py','route-guard-review.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('observe.py','observation.json'),('final-verify.py','final-verification.json')]:
+for script,output in [('route-guard-review.py','route-guard-review.json'),('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('observe.py','observation.json'),({'verify-deployment.py' if deployment_only else 'final-verify.py'!r},{'deployment-verification.json' if deployment_only else 'final-verification.json'!r})]:
  if not (r/output).exists():subprocess.run([sys.executable,str(r/script)],check=True)
 """)
-elif phase=='archive':
+elif phase in ['archive','archive-pending']:
+ pending=phase=='archive-pending'
  documents={'release-notes.md':pathlib.Path('deploy/primary/adobe-image26-pricing-20261107.md'),'primary-README.md':pathlib.Path('deploy/primary/README.md')}
  payload={name:base64.b64encode(path.read_bytes()).decode() for name,path in documents.items()}
  remote(f"""import base64,datetime,fcntl,importlib.util,json,pathlib
@@ -83,7 +85,11 @@ for path in ['/opt/adobe-relay/shared/.adobe-deploy.lock','/opt/adobe-relay/.rel
 spec=importlib.util.spec_from_file_location('audit',r/'audit.py');a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
 container=a.inspect(a.APP);assert container['Config']['Image']=='adobe-relay:{sha}'
 assert container['Image']==json.loads((r/'image-loaded.json').read_text())['image_id']
-core=json.loads((r/'final-verification.json').read_text());assert core['application_sha']=='{sha}'
+core=json.loads((r/'{'deployment-verification.json' if pending else 'final-verification.json'}').read_text());assert core['application_sha']=='{sha}'
+if {pending!r}:
+ assert core['status']=='deployed_live_billing_pending_upstream' and core['live_billing_verified'] is False
+ assert core['public_contract']['all_passed'] is False and not (r/'final-verification.json').exists()
+else:assert core['public_contract']['all_passed']
 before=json.loads((r/'before.json').read_text());current=a.snapshot()
 checks=a.check_preserved(before,current);a.validate_rollback(before,current,'{sha}',a.inspect(a.ROLLBACK_IMAGE)['Id'])
 files={{}}
@@ -92,7 +98,8 @@ for name,value in {payload!r}.items():
  path=r/name;path.write_bytes(data);path.chmod(0o600);files[name]=a.digest(data)
  if name=='primary-README.md':pathlib.Path('/opt/adobe-relay/deploy/primary/README.md').write_bytes(data)
 out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':'{sha}','image_id':container['Image'],'core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'public_contract':core['public_contract'],'mail_sent':False}}
-a.save('release-completion.json',out);print(json.dumps(out))
+out['status']='deployed_live_billing_pending_upstream' if {pending!r} else 'complete'
+a.save('{'release-pending-upstream.json' if pending else 'release-completion.json'}',out);print(json.dumps(out))
 """)
 else:
  evidence=pathlib.Path('primary-release-evidence');evidence.mkdir(exist_ok=True)
@@ -102,7 +109,7 @@ for name in ['adobe-relay-app-1','adobe-relay-memory-canary']:
  p=subprocess.run(['docker','inspect',name],text=True,capture_output=True)
  if p.returncode==0:
   d=json.loads(p.stdout)[0];out['current_containers'][name]={{'image':d['Config']['Image'],'health':d['State'].get('Health',{{}}).get('Status'),'oom':d['State']['OOMKilled'],'restarts':d['RestartCount']}}
-for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','post-release-tests.json','business-key-created.json','business-access-cleanup.json','business-confirmation-key-created.json','business-confirmation-access-cleanup.json','explicit-rejection-review.json','business-remaining-key-created.json','business-remaining-access-cleanup.json','final-verification.json','release-completion.json']:
+for name in ['progress.json','image-loaded.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','runtime-verification.json','business-verification.json','credential-change-review.json','post-release-tests.json','business-key-created.json','business-access-cleanup.json','business-confirmation-key-created.json','business-confirmation-access-cleanup.json','explicit-rejection-review.json','business-remaining-key-created.json','business-remaining-access-cleanup.json','final-verification.json','deployment-verification.json','release-pending-upstream.json','release-completion.json']:
  if (r/name).exists():out['files'][name]=json.loads((r/name).read_text())
 for side in ['old','canary']:
  p=r/('rolling-'+side+'-drain-progress.json')
