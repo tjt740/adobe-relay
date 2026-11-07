@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Exact, endpoint-only Nginx header-buffer correction; default is read-only."""
-import difflib, fcntl, hashlib, json, os, pathlib, re, subprocess, sys, time
+import argparse, difflib, fcntl, hashlib, json, os, pathlib, re, subprocess, sys, time
+parser = argparse.ArgumentParser()
+parser.add_argument('--expected-docs-sha', required=True)
+parser.add_argument('--apply', action='store_true')
+args = parser.parse_args()
+assert re.fullmatch(r'[0-9a-f]{64}', args.expected_docs_sha)
 P = pathlib.Path
 nginx = P('/etc/nginx/conf.d/creative.cheap-https.conf')
 snippet = P('/etc/nginx/snippets/creative-logout-proxy.conf')
@@ -25,7 +30,7 @@ def logout(direct=False):
     return {'status': int(headers.splitlines()[0].split()[1]), 'cleared_cookies': sum(x.lower().startswith(b'set-cookie:') for x in headers.splitlines()), 'body': body.decode()}
 lock = open('/opt/adobe-relay/.release.lock', 'a')
 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-assert sha(P('/opt/creative-docs/current/docs-server').read_bytes()) == '15488921fd149a9902b63035826c3f7866a8dc4ccac3bfb0f9d0f89224b83114'
+assert sha(P('/opt/creative-docs/current/docs-server').read_bytes()) == args.expected_docs_sha
 old = nginx.read_text(); assert sha(old.encode()) == expected
 assert not snippet.exists()
 match = re.search(r'^    location / \{\n(.*?)^    \}', old, re.M | re.S)
@@ -39,9 +44,8 @@ new = old.replace(anchor, anchor + addition)
 assert new.replace(addition, '', 1) == old
 print(''.join(difflib.unified_diff(old.splitlines(True), new.splitlines(True), fromfile=str(nginx), tofile=str(nginx))))
 print(new_snippet)
-if '--apply' not in sys.argv:
+if not args.apply:
     print(json.dumps({'dry_run': True, 'config_sha256': expected})); sys.exit(0)
-assert sys.argv[1:] == ['--apply']
 run('nginx', '-t')
 baseline_direct, baseline_proxy = logout(True), logout()
 assert baseline_direct['status'] == 200 and baseline_direct['cleared_cookies'] == 23
@@ -72,5 +76,6 @@ after = state(); (audit / 'after.json').write_text(json.dumps(after, indent=2))
 expected_after = dict(before['configs']); expected_after[str(nginx)] = sha(new.encode()); expected_after[str(snippet)] = sha(new_snippet.encode())
 assert after['containers'] == before['containers'] and after['configs'] == expected_after, 'Review concurrent changes; do not restore other configuration'
 assert run('systemctl', 'is-active', 'creative-docs') == 'active'
-result = {'audit': str(audit), 'logout_status': verified['status'], 'cleared_cookies': verified['cleared_cookies'], 'existing_containers_preserved': True, 'only_config_changes': [str(nginx), str(snippet)], 'before_main_sha256': expected, 'after_main_sha256': sha(new.encode()), 'snippet_sha256': sha(new_snippet.encode()), 'docs_binary_preserved': True}
+assert sha(P('/opt/creative-docs/current/docs-server').read_bytes()) == args.expected_docs_sha
+result = {'docs_binary_sha256': args.expected_docs_sha, 'audit': str(audit), 'logout_status': verified['status'], 'cleared_cookies': verified['cleared_cookies'], 'existing_containers_preserved': True, 'only_config_changes': [str(nginx), str(snippet)], 'before_main_sha256': expected, 'after_main_sha256': sha(new.encode()), 'snippet_sha256': sha(new_snippet.encode()), 'docs_binary_preserved': True}
 (audit / 'result.json').write_text(json.dumps(result, indent=2));print(json.dumps(result))
