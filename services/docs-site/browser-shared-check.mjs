@@ -22,6 +22,7 @@ try {
  async function setup(width=1440){
   const ctx=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width,height:950}});const page=await ctx.newPage();
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  page.fixtureTrace=[];page.on('response',r=>{if(r.url().includes('/docs/session')||r.url().includes('/auth/refresh'))page.fixtureTrace.push({path:new URL(r.url()).pathname,status:r.status()})});
   await page.goto(url+'/docs/login?manual=1');
   return {ctx,page,errors};
  }
@@ -31,7 +32,13 @@ try {
    localStorage.setItem('token_expires_at',String(Date.now()-1000));localStorage.setItem('refresh_token',refresh);
   },{access,refresh,id});
  }
- async function visible(page){await page.waitForURL(url+'/docs/');await page.locator('article h1').waitFor();assert.equal(await page.locator('body').getAttribute('data-shared'),'true')}
+ async function visible(page){
+  try{await page.waitForURL(url+'/docs/');await page.locator('article h1').waitFor();assert.equal(await page.locator('body').getAttribute('data-shared'),'true')}
+  catch(error){
+   const info={url:page.url(),trace:page.fixtureTrace,ui:(await page.locator('body').innerText()).slice(0,300),state:await page.evaluate(()=>({hasToken:!!localStorage.getItem('auth_token'),fresh:localStorage.getItem('auth_token')==='user-fresh',rotated:localStorage.getItem('refresh_token')?.startsWith('rotated-')}))};
+   await fs.writeFile(path.join(out,'failed-shared-entry.json'),JSON.stringify(info,null,2));throw new Error('Shared entry failed: '+JSON.stringify(info),{cause:error});
+  }
+ }
  for(const width of [1440,390]){
   for(const role of ['admin','user','2fa']){
    const {ctx,page,errors}=await setup(width);
@@ -83,8 +90,8 @@ try {
   assert.equal(await page.evaluate(()=>localStorage.getItem('refresh_token')),'rotated-valid-refresh-concurrent');
   await ctx.close();results.push({case:'concurrent-expired-session',single_refresh:true,automatic_entry:true});
  }
- {
-  const {ctx,page}=await setup();await store(page,'expired','valid-refresh-main-peer');
+ for(let round=0;round<Number(process.env.DOCS_REFRESH_RACE_ROUNDS||1);round++){
+  const {ctx,page}=await setup();await store(page,'expired','valid-refresh-main-peer-'+round);
   const peer=await ctx.newPage();await peer.goto(url+'/docs/login?manual=1');
   await peer.evaluate(()=>{window.peerLocked=false;window.peerTask=navigator.locks.request('sub2api-auth-token-refresh',async()=>{window.peerLocked=true;await new Promise(resolve=>window.finishPeer=resolve)})});
   await peer.waitForFunction(()=>window.peerLocked);
@@ -95,7 +102,7 @@ try {
    const r=await fetch('/api/v1/auth/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:localStorage.getItem('refresh_token')})});const {data}=await r.json();
    localStorage.setItem('auth_token',data.access_token);localStorage.setItem('token_expires_at',String(Date.now()+data.expires_in*1000));localStorage.setItem('refresh_token',data.refresh_token);window.finishPeer();
   });
-  await visible(page);assert.equal(refreshes,1);await ctx.close();results.push({case:'main-tab-refresh-lock',adopts_peer:true,no_duplicate_refresh:true});
+  await visible(page);assert.equal(refreshes,1);await ctx.close();results.push({case:'main-tab-refresh-lock',round,adopts_peer:true,no_duplicate_refresh:true});
  }
  {
   const {ctx,page}=await setup();await store(page,'expired','valid-refresh-no-lock');
