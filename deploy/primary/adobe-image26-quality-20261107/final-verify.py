@@ -69,6 +69,18 @@ retired=json.loads(a.sql("SELECT json_build_object('holds',(SELECT count(*) FROM
 assert all(value==0 for value in retired.values()),'Retired 408 scheduling gates reappeared'
 
 key=a.sql("SELECT value FROM settings WHERE key='admin_api_key'")
+expected_labels={'gpt-image-2.6-flare':'GPT Image 2.6 Flare','gpt-image-2.6-sunburst':'GPT Image 2.6 Sunburst'}
+admin_labels={}
+for account_id in sorted({row['usage']['account_id'] for row in live_after['cases']}):
+ req=urllib.request.Request('http://127.0.0.1:6666/api/v1/admin/accounts/'+str(account_id)+'/models',headers={'x-api-key':key})
+ with urllib.request.urlopen(req,timeout=20) as response:models=json.load(response)['data']
+ labels={row['id']:row['display_name'] for row in models}
+ assert not {'gpt-image-2.6-star-swirl','gpt-image-2.6-aurora'}.intersection(labels)
+ for row in live_after['cases']:
+  if row['usage']['account_id']==account_id:
+   assert labels.get(row['model'])==expected_labels[row['model']]
+   admin_labels[row['model']]=labels[row['model']]
+assert admin_labels==expected_labels
 req=urllib.request.Request('http://127.0.0.1:6666/api/v1/admin/proxies/clash/health',headers={'x-api-key':key})
 with urllib.request.urlopen(req,timeout=20) as response:health=json.load(response)['data']
 assert len(health['sources'])>=3
@@ -88,5 +100,6 @@ a.save('route-api-verification.json',health_proof)
 route_at=datetime.datetime.fromisoformat(json.loads((ROOT/'rolling-route-canary.json').read_text())['at']);assert route_at.astimezone(datetime.timezone(datetime.timedelta(hours=8))).date().isoformat()=='2026-11-07', 'Release crossed its Beijing date; rebuild notes before claiming success'
 out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'migration_checksums_preserved':True,'migration_set_retained':True,'retired_408_gates_empty':True,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'adobe_custom_business_preserved':True,'route_api_verified':True,'excluded_1290':exclusion,'cutover_route_checks':route_checks,'authorized_live_generation_tests':live_after,'public_contract':public_contract,'temporary_test_access_cleanup':test_cleanup,'public_usage':usage,'active_adobe_probes':False,'test_mail_sent':False}
 out['verified_locale_bundle_count']=len(locale_assets)
+out['verified_admin_model_labels']=admin_labels
 a.save('final-verification.json',out)
 print(json.dumps(out,ensure_ascii=False))
