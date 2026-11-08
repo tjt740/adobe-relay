@@ -1,3 +1,4 @@
+import { parseAdobeWebsiteModelOptions } from '@/utils/adobeModelOptions'
 /**
  * Admin Groups API endpoints
  * Handles API key group management for administrators
@@ -36,6 +37,7 @@ export async function list(
     status?: 'active' | 'inactive'
     is_exclusive?: boolean
     search?: string
+    adobe_model?: string
     sort_by?: string
     sort_order?: 'asc' | 'desc'
   },
@@ -124,6 +126,20 @@ export async function getEffectiveModels(id: number): Promise<string[]> {
     `/admin/groups/${id}/effective-models`
   )
   return data.models || []
+}
+
+export interface GroupModelOption {
+  id: string
+  display_name: string
+}
+
+/** Sub2 relays the public Adobe website directory; no local catalog is used here. */
+export async function getAdobeWebsiteModelOptions(): Promise<GroupModelOption[]> {
+  const { data } = await apiClient.get<{ source?: string; models?: unknown }>(
+    '/admin/groups/adobe-models', { timeout: 10000 }
+  )
+  if (data?.source !== 'adobe') throw new Error('Missing Adobe discovery source')
+  return parseAdobeWebsiteModelOptions(data.models)
 }
 
 /**
@@ -486,6 +502,7 @@ export const groupsAPI = {
   getById,
   getModelAllowlistCandidates,
   getEffectiveModels,
+  getAdobeWebsiteModelOptions,
   create,
   duplicate,
   update,

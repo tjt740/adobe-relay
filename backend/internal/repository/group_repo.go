@@ -11,6 +11,7 @@ import (
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/group"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -501,6 +502,17 @@ func (r *groupRepository) ListBindableWithFilters(ctx context.Context, params pa
 
 func (r *groupRepository) listWithFiltersQuery(ctx context.Context, q *dbent.GroupQuery, params pagination.PaginationParams, platform, status, search string, isExclusive *bool) ([]service.Group, *pagination.PaginationResult, error) {
 
+	if model := domain.GroupAdobeModelFilter(ctx); model != "" {
+		pattern, valid := domain.AdobeGroupModelPattern(model)
+		if !valid {
+			return nil, nil, fmt.Errorf("invalid Adobe group model filter: %q", model)
+		}
+		q = q.Where(group.PlatformEQ(service.PlatformAdobe), func(s *entsql.Selector) {
+			s.Where(entsql.P(func(b *entsql.Builder) {
+				b.Ident(s.C(group.FieldName)).WriteString(" ~* ").Arg(pattern)
+			}))
+		})
+	}
 	if platform != "" {
 		q = q.Where(group.PlatformEQ(platform))
 	}

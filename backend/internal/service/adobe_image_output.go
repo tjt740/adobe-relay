@@ -207,8 +207,7 @@ func hasAdobeGIFReferenceInput(req *OpenAIImagesRequest) bool {
 }
 
 // adobeImageResponseQuality 返回网关采用的质量标签，复用 payload 映射处理默认值和模型上限。
-// 2.5 的 xhigh / max 仍提交 detailLevel=7，对外分别保留规范化的请求名称。
-// 2.6 的 xhigh / max 分别提交 6 / 7，响应保留各自档位。
+// 2.5 / 2.6 的 xhigh / max 按官网分别提交 6 / 7，响应记录实际档位。
 // 非 GPT Image 模型没有这个生成控制，不回显请求值，以免声称未生效的参数已生效。
 func adobeImageResponseQuality(conf adobe.ImageModelConf, requested string) string {
 	if !conf.IsGPTImage() {
@@ -216,9 +215,6 @@ func adobeImageResponseQuality(conf adobe.ImageModelConf, requested string) stri
 	}
 	switch adobe.GPTImageDetailLevelFromQualityForVersion(requested, conf.UpstreamModelVersion) {
 	case 7:
-		if strings.EqualFold(strings.TrimSpace(requested), "xhigh") {
-			return "xhigh"
-		}
 		return "max"
 	case 6:
 		return "xhigh"

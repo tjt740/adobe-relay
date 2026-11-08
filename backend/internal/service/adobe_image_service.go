@@ -279,7 +279,7 @@ func (s *AdobeImageService) GenerateCall(
 			// 计费档位：adobe 的 OutputResolution 取值就是 "1K"/"2K"/"4K"，
 			// ClassifyImageBillingTier 直接认这三个字面量。
 			ImageSize:        string(conf.OutputResolution),
-			ImageQuality:     adobeImage26BillingQuality(conf, req.Quality),
+			ImageQuality:     adobeImageBillingQuality(conf, req.Quality),
 			UpstreamModel:    conf.ModelID,
 			UpstreamEndpoint: adobe.ImageSubmitURL,
 			Duration:         time.Since(startTime),

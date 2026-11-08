@@ -39,6 +39,7 @@ vi.mock('@/api/admin', () => ({
       getUsageSummary,
       getCapacitySummary,
       getLiveCapability,
+      getAdobeWebsiteModelOptions: vi.fn().mockResolvedValue([]),
       getAll: vi.fn(),
       create: vi.fn(),
       update: updateGroup,
@@ -177,6 +178,7 @@ function mountView() {
 
 describe('GroupsView duplicate action', () => {
   beforeEach(() => {
+    vi.mocked(adminAPI.groups.getAdobeWebsiteModelOptions).mockReset().mockResolvedValue([])
     authState.isSimpleMode = false
     localStorage.clear()
     vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -215,6 +217,228 @@ describe('GroupsView duplicate action', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('uses API display names and retains newer models in the filter', async () => {
+    vi.mocked(adminAPI.groups.getAdobeWebsiteModelOptions).mockResolvedValue([{ id: 'future', display_name: 'Future Image Pro' }])
+    const wrapper = mountView()
+    await flushPromises()
+    const options = wrapper.findComponent('[data-testid="adobe-model-filter"]').props('options')
+    expect(options).toContainEqual({ value: 'Future Image Pro', label: 'Future Image Pro' })
+    expect(options).not.toContainEqual({ value: 'GPT Image 2', label: 'GPT Image 2' })
+    wrapper.unmount()
+  })
+
+  it('falls back to website names on API failure', async () => {
+    vi.mocked(adminAPI.groups.getAdobeWebsiteModelOptions).mockRejectedValue(new Error('unavailable'))
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.findComponent('[data-testid="adobe-model-filter"]').props('options')).toContainEqual({ value: 'GPT Image 2.6 Flare', label: 'GPT Image 2.6 Flare' })
+    wrapper.unmount()
+  })
+
+  it.each([false, true])('only submits new quality prices when the editor remains enabled (%s)', async enabled => {
+    const wrapper = mountView()
+    await flushPromises()
+    const filter = wrapper.findComponent('[data-testid="adobe-model-filter"]')
+    filter.vm.$emit('update:modelValue', 'GPT Image 2.6 Flare')
+    await wrapper.get('[data-tour="groups-create-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('#adobe-name-customer').setValue('preview')
+    expect(wrapper.find('[data-testid="image-quality-pricing"]').exists()).toBe(false)
+    const mode = wrapper.findComponent({ name: 'AdobePricingModeSwitch' })
+    mode.vm.$emit('update:modelValue', true)
+    await flushPromises()
+    await wrapper.get('input[aria-label="GPT Image 2.6 Flare 4K Max"]').setValue('0')
+    if (!enabled) mode.vm.$emit('update:modelValue', false)
+    await flushPromises()
+    vi.mocked(adminAPI.groups.create).mockResolvedValue({ ...sourceGroup, platform: 'adobe' })
+    await wrapper.get('#create-group-form').trigger('submit')
+    await flushPromises()
+    const payload = vi.mocked(adminAPI.groups.create).mock.calls.at(-1)![0]
+    expect(payload.image_quality_prices).toEqual(enabled ? { 'gpt-image-2.6-flare': { '4K': { max: 0 } } } : undefined)
+    expect(payload.image_price_1k).toBeNull()
+    expect(payload.image_price_2k).toBeNull()
+    expect(payload.image_price_4k).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('defaults to the legacy editor even with saved prices and preserves them', async () => {
+    const prices = { 'gpt-image-2.6-flare': { '4K': { max: 0.5 } } }
+    listGroups.mockResolvedValue({ items: [{ ...sourceGroup, name: 'Adobe GPT Image 2.6 Flare - preview', platform: 'adobe', image_price_1k: 0.05, image_quality_prices: prices }], total: 1, page: 1, page_size: 20, pages: 1 })
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(b => b.text() === 'common.edit')!.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="image-quality-pricing"]').exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'AdobePricingModeSwitch' }).props('modelValue')).toBe(false)
+    await flushPromises()
+    expect(wrapper.text()).toContain('admin.groups.adobePricingMode.savedNotice')
+    updateGroup.mockResolvedValue({ ...sourceGroup, platform: 'adobe', image_quality_prices: prices })
+    await wrapper.get('#edit-group-form').trigger('submit')
+    await flushPromises()
+    const payload = updateGroup.mock.calls.at(-1)![1]
+    expect(payload.image_quality_prices).toBeUndefined()
+    expect(payload.image_price_1k).toBe(0.05)
+    wrapper.unmount()
+  })
+
+  it.each(['Custom Image'])('hides the 2.6 editor and omits its draft after switching to %s', async model => {
+    const wrapper = mountView()
+    await flushPromises()
+    wrapper.findComponent('[data-testid="adobe-model-filter"]').vm.$emit('update:modelValue', 'GPT Image 2.6 Flare')
+    await wrapper.get('[data-tour="groups-create-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('#adobe-name-customer').setValue('preview')
+    wrapper.findComponent({ name: 'AdobePricingModeSwitch' }).vm.$emit('update:modelValue', true)
+    await flushPromises()
+    await wrapper.get('input[aria-label="GPT Image 2.6 Flare 4K Max"]').setValue('0.8')
+    wrapper.findComponent('#adobe-name-model').vm.$emit('update:modelValue', model)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="image-quality-pricing"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="adobe-pricing-mode"]').exists()).toBe(false)
+    vi.mocked(adminAPI.groups.create).mockResolvedValue({ ...sourceGroup, platform: 'adobe' })
+    await wrapper.get('#create-group-form').trigger('submit')
+    await flushPromises()
+    expect(vi.mocked(adminAPI.groups.create).mock.calls.at(-1)![0].image_quality_prices).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it.each([
+    ['GPT Image 2', 'gpt-image-2', 9],
+    ['GPT Image 2.5 Flare', 'gpt-image-2.5-flare', 15],
+    ['GPT Image 2.5 Sunburst', 'gpt-image-2.5-sunburst', 15],
+    ['GPT Image 2.6 Flare', 'gpt-image-2.6-flare', 15],
+    ['GPT Image 2.6 Sunburst', 'gpt-image-2.6-sunburst', 15],
+  ])('defaults %s to legacy and saves its matching quality table', async (label, id, cells) => {
+    const wrapper = mountView()
+    await flushPromises()
+    wrapper.findComponent('[data-testid="adobe-model-filter"]').vm.$emit('update:modelValue', label)
+    await wrapper.get('[data-tour="groups-create-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('#adobe-name-customer').setValue('preview')
+    const mode = wrapper.findComponent({ name: 'AdobePricingModeSwitch' })
+    expect(mode.props('modelValue')).toBe(false)
+    expect(wrapper.find('[data-testid="image-quality-pricing"]').exists()).toBe(false)
+    mode.vm.$emit('update:modelValue', true)
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="image-quality-pricing"] input')).toHaveLength(Number(cells))
+    await wrapper.get(`input[aria-label="${label} 2K Medium"]`).setValue('0')
+    vi.mocked(adminAPI.groups.create).mockResolvedValue({ ...sourceGroup, platform: 'adobe' })
+    await wrapper.get('#create-group-form').trigger('submit')
+    await flushPromises()
+    expect(vi.mocked(adminAPI.groups.create).mock.calls.at(-1)![0].image_quality_prices).toEqual({ [String(id)]: { '2K': { medium: 0 } } })
+    wrapper.unmount()
+  })
+
+  it('keeps the quality table locked to the name and saves only the final selected model', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    wrapper.findComponent('[data-testid="adobe-model-filter"]').vm.$emit('update:modelValue', 'GPT Image 2.6 Flare')
+    await wrapper.get('[data-tour="groups-create-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('#adobe-name-customer').setValue('preview')
+    wrapper.findComponent({ name: 'AdobePricingModeSwitch' }).vm.$emit('update:modelValue', true)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="image-quality-pricing"] select').exists()).toBe(false)
+    await wrapper.get('input[aria-label="GPT Image 2.6 Flare 4K Max"]').setValue('0')
+    const select = wrapper.findComponent('#adobe-name-model')
+    select.vm.$emit('update:modelValue', 'gpt-image-2.6-sunburst')
+    await flushPromises()
+    expect(wrapper.find('input[aria-label="GPT Image 2.6 Flare 4K Max"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid="image-quality-pricing"] input')).toHaveLength(15)
+    await wrapper.get('input[aria-label="GPT Image 2.6 Sunburst 4K Max"]').setValue('0.3')
+    select.vm.$emit('update:modelValue', 'gpt-image-2.6-flare')
+    await flushPromises()
+    expect((wrapper.get('input[aria-label="GPT Image 2.6 Flare 4K Max"]').element as HTMLInputElement).value).toBe('0')
+    select.vm.$emit('update:modelValue', 'gpt-image-2.6-sunburst')
+    await flushPromises()
+    vi.mocked(adminAPI.groups.create).mockResolvedValue({ ...sourceGroup, platform: 'adobe' })
+    await wrapper.get('#create-group-form').trigger('submit')
+    await flushPromises()
+    expect(vi.mocked(adminAPI.groups.create).mock.calls.at(-1)![0]).toMatchObject({
+      name: 'Adobe GPT Image 2.6 Sunburst - preview',
+      image_quality_prices: { 'gpt-image-2.6-sunburst': { '4K': { max: 0.3 } } },
+    })
+    expect(Object.keys(vi.mocked(adminAPI.groups.create).mock.calls.at(-1)![0].image_quality_prices!)).toEqual(['gpt-image-2.6-sunburst'])
+    wrapper.unmount()
+  })
+
+  it('follows edited group names and retains other saved prices without saving their drafts', async () => {
+    const prices = { 'gpt-image-2.6-flare': { '4K': { max: 0.5 } }, 'gpt-image-2.6-sunburst': { '4K': { max: 0.3 } } }
+    listGroups.mockResolvedValue({ items: [{ ...sourceGroup, name: 'Adobe GPT Image 2.6 Sunburst - preview', platform: 'adobe', image_quality_prices: prices }], total: 1, page: 1, page_size: 20, pages: 1 })
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(b => b.text() === 'common.edit')!.trigger('click')
+    await flushPromises()
+    wrapper.findComponent({ name: 'AdobePricingModeSwitch' }).vm.$emit('update:modelValue', true)
+    await flushPromises()
+    expect(wrapper.find('input[aria-label="GPT Image 2.6 Flare 4K Max"]').exists()).toBe(false)
+    await wrapper.get('input[aria-label="GPT Image 2.6 Sunburst 4K Max"]').setValue('9')
+    await wrapper.get('[data-tour="edit-group-form-name"]').setValue('Adobe GPT Image 2.6 Flare - preview')
+    await flushPromises()
+    expect(wrapper.find('input[aria-label="GPT Image 2.6 Sunburst 4K Max"]').exists()).toBe(false)
+    await wrapper.get('input[aria-label="GPT Image 2.6 Flare 4K Max"]').setValue('0')
+    updateGroup.mockResolvedValue(sourceGroup)
+    await wrapper.get('#edit-group-form').trigger('submit')
+    await flushPromises()
+    expect(updateGroup.mock.calls.at(-1)![1].image_quality_prices).toEqual({
+      'gpt-image-2.6-flare': { '4K': { max: 0 } }, 'gpt-image-2.6-sunburst': { '4K': { max: 0.3 } },
+    })
+    wrapper.unmount()
+  })
+
+  it('does not choose a quality model for ambiguous old names or erase saved prices', async () => {
+    const prices = { 'gpt-image-2.6-sunburst': { '4K': { max: 0.3 } } }
+    listGroups.mockResolvedValue({ items: [{ ...sourceGroup, name: 'Adobe 2.6 - Flare/Sunburst - preview', platform: 'adobe', image_quality_prices: prices }], total: 1, page: 1, page_size: 20, pages: 1 })
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(b => b.text() === 'common.edit')!.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="image-quality-pricing"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('admin.groups.adobePricingMode.savedUnmatched')
+    updateGroup.mockResolvedValue(sourceGroup)
+    await wrapper.get('#edit-group-form').trigger('submit')
+    await flushPromises()
+    expect(updateGroup.mock.calls.at(-1)![1].image_quality_prices).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('sends model filtering before pagination and resets the page', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    wrapper.findComponent({ name: 'Pagination' }).vm.$emit('update:page', 3)
+    await flushPromises()
+    const filter = wrapper.findComponent('[data-testid="adobe-model-filter"]')
+    filter.vm.$emit('update:modelValue', '2.6')
+    filter.vm.$emit('change', '2.6')
+    await flushPromises()
+    expect(listGroups).toHaveBeenLastCalledWith(1, expect.any(Number), expect.objectContaining({ adobe_model: '2.6' }), expect.any(Object))
+    const platform = wrapper.findAllComponents({ name: 'Select' })[0]
+    platform.vm.$emit('update:modelValue', 'openai')
+    platform.vm.$emit('change', 'openai')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="adobe-model-filter"]').exists()).toBe(false)
+    expect(listGroups).toHaveBeenLastCalledWith(1, expect.any(Number), expect.objectContaining({ platform: 'openai', adobe_model: undefined }), expect.any(Object))
+    wrapper.unmount()
+  })
+
+  it('creates a canonical Adobe name using the selected model filter', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    const filter = wrapper.findComponent('[data-testid="adobe-model-filter"]')
+    filter.vm.$emit('update:modelValue', 'GPT Image 2.5 Flare')
+    filter.vm.$emit('change', 'GPT Image 2.5 Flare')
+    await flushPromises()
+    await wrapper.get('[data-tour="groups-create-btn"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findComponent('#adobe-name-model').props('modelValue')).toBe('gpt-image-2.5-flare')
+    await wrapper.get('#adobe-name-customer').setValue(' 杂乱无章 ')
+    vi.mocked(adminAPI.groups.create).mockResolvedValue({ ...sourceGroup, platform: 'adobe', name: 'Adobe GPT Image 2.5 Flare - 杂乱无章' })
+    await wrapper.get('#create-group-form').trigger('submit')
+    await flushPromises()
+    expect(adminAPI.groups.create).toHaveBeenCalledWith(expect.objectContaining({ platform: 'adobe', name: 'Adobe GPT Image 2.5 Flare - 杂乱无章' }))
+    wrapper.unmount()
   })
 
   it('duplicates the selected group, reports success, and refreshes the list', async () => {

@@ -3,7 +3,7 @@
     <TablePageLayout>
       <template #filters>
         <div
-          class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start"
+          class="flex flex-col justify-between gap-4 2xl:flex-row 2xl:items-start"
         >
           <!-- Left: fuzzy search + filters (can wrap to multiple lines) -->
           <div class="flex flex-1 flex-wrap items-center gap-3">
@@ -26,14 +26,28 @@
               :options="platformFilterOptions"
               :placeholder="t('admin.groups.allPlatforms')"
               class="w-44"
-              @change="loadGroups"
+              @change="handlePlatformFilter"
+            />
+            <Select
+              v-if="!filters.platform || filters.platform === 'adobe'"
+              v-model="filters.adobe_model"
+              :options="adobeModelFilterOptions"
+              :placeholder="t('admin.groups.adobeNaming.allModels')"
+              :aria-label="t('admin.groups.adobeNaming.modelFilter')"
+              class="w-64"
+              :searchable="true"
+              creatable
+              :creatable-prefix="t('admin.groups.adobeNaming.useCustom')"
+              :search-placeholder="t('admin.groups.adobeNaming.modelSearch')"
+              data-testid="adobe-model-filter"
+              @change="handleFilterChange"
             />
             <Select
               v-model="filters.status"
               :options="statusOptions"
               :placeholder="t('admin.groups.allStatus')"
               class="w-40"
-              @change="loadGroups"
+              @change="handleFilterChange"
             />
             <Select
               v-if="!authStore.isSimpleMode"
@@ -41,13 +55,13 @@
               :options="exclusiveOptions"
               :placeholder="t('admin.groups.allGroups')"
               class="w-44"
-              @change="loadGroups"
+              @change="handleFilterChange"
             />
           </div>
 
           <!-- Right: actions -->
           <div
-            class="flex w-full flex-shrink-0 flex-wrap items-center justify-end gap-3 lg:w-auto"
+            class="flex w-full flex-shrink-0 flex-wrap items-center justify-end gap-3 2xl:w-auto"
           >
             <button
               @click="loadGroups"
@@ -470,6 +484,18 @@
         class="space-y-5"
       >
         <div>
+          <label class="input-label">{{
+            t("admin.groups.form.platform")
+          }}</label>
+          <Select
+            v-model="createForm.platform"
+            :options="platformOptions"
+            data-tour="group-form-platform"
+            @change="createForm.copy_accounts_from_group_ids = []"
+          />
+          <p class="input-hint">{{ t("admin.groups.platformHint") }}</p>
+        </div>
+        <div>
           <GroupI18nField
             v-model="createForm.name"
             v-model:i18n="createForm.i18n"
@@ -478,7 +504,18 @@
             required
             :placeholder="t('admin.groups.enterGroupName')"
             data-tour="group-form-name"
-          />
+          >
+            <template v-if="createForm.platform === 'adobe'" #default-input>
+              <AdobeGroupNameFields
+                v-model="createForm.name"
+                :initial-model="filters.adobe_model"
+                :model-options="adobeModelOptions"
+                :model-source="adobeModelOptionsSource"
+                @update:selected-model="createAdobeModel = $event"
+                data-tour="group-form-name"
+              />
+            </template>
+          </GroupI18nField>
         </div>
         <div>
           <GroupI18nField
@@ -490,18 +527,6 @@
             rows="3"
             :placeholder="t('admin.groups.optionalDescription')"
           />
-        </div>
-        <div>
-          <label class="input-label">{{
-            t("admin.groups.form.platform")
-          }}</label>
-          <Select
-            v-model="createForm.platform"
-            :options="platformOptions"
-            data-tour="group-form-platform"
-            @change="createForm.copy_accounts_from_group_ids = []"
-          />
-          <p class="input-hint">{{ t("admin.groups.platformHint") }}</p>
         </div>
         <!-- 从分组复制账号 -->
         <div v-if="!authStore.isSimpleMode && copyAccountsGroupOptions.length > 0">
@@ -975,6 +1000,10 @@
           <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
             {{ t(imagePricingI18nKey(createForm.platform, "description")) }}
           </p>
+          <p v-if="createForm.platform === 'adobe'" class="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300" data-testid="create-adobe-pricing-model">
+            {{ t('admin.groups.adobePricingMode.followsName', { model: adobeModelOptions.find(model => model.id === createAdobeModel)?.display_name || createAdobeModel }) }}
+          </p>
+          <AdobePricingModeSwitch v-if="createForm.platform === 'adobe' && createAdobePricingModel" v-model="createNewAdobePricing" />
           <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
@@ -1063,7 +1092,7 @@
           </p>
           <div class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
             <div class="mb-1 font-medium">
-              {{ t(imagePricingI18nKey(createForm.platform, "finalPricePreview")) }}
+              {{ t(createForm.platform === "adobe" && (createNewAdobePricing) ? "admin.groups.adobePricingMode.basePreview" : imagePricingI18nKey(createForm.platform, "finalPricePreview")) }}
             </div>
             <div class="grid grid-cols-3 gap-2">
               <div
@@ -1074,7 +1103,7 @@
               </div>
             </div>
           </div>
-          <ImageQualityPricing v-if="createForm.platform === 'adobe'" v-model="createForm.image_quality_prices" />
+          <ImageQualityPricing v-if="createForm.platform === 'adobe' && createNewAdobePricing && createAdobePricingModel" v-model="createForm.image_quality_prices" :model="createAdobePricingModel.id" :model-label="createAdobePricingModel.display_name" />
           <div v-if="createForm.platform === 'gemini' && createForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
             <label
               class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -2720,6 +2749,13 @@
           <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
             {{ t(imagePricingI18nKey(editForm.platform, "description")) }}
           </p>
+          <p v-if="editForm.platform === 'adobe' && editAdobePricingModel" class="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300" data-testid="edit-adobe-pricing-model">
+            {{ t('admin.groups.adobePricingMode.followsName', { model: editAdobePricingModel.display_name }) }}
+          </p>
+          <AdobePricingModeSwitch v-if="editForm.platform === 'adobe' && editAdobePricingModel" v-model="editNewAdobePricing" :has-saved-prices="editHasSavedQualityPrices" />
+          <p v-if="editForm.platform === 'adobe' && !editAdobePricingModel && editHasSavedQualityPrices" class="mb-3 text-xs text-gray-500">
+            {{ t('admin.groups.adobePricingMode.savedUnmatched') }}
+          </p>
           <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
@@ -2808,7 +2844,7 @@
           </p>
           <div class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
             <div class="mb-1 font-medium">
-              {{ t(imagePricingI18nKey(editForm.platform, "finalPricePreview")) }}
+              {{ t(editForm.platform === "adobe" && (editNewAdobePricing || editHasSavedQualityPrices) ? "admin.groups.adobePricingMode.basePreview" : imagePricingI18nKey(editForm.platform, "finalPricePreview")) }}
             </div>
             <div class="grid grid-cols-3 gap-2">
               <div
@@ -2819,7 +2855,7 @@
               </div>
             </div>
           </div>
-          <ImageQualityPricing v-if="editForm.platform === 'adobe'" v-model="editForm.image_quality_prices" />
+          <ImageQualityPricing v-if="editForm.platform === 'adobe' && editNewAdobePricing && editAdobePricingModel" v-model="editForm.image_quality_prices" :model="editAdobePricingModel.id" :model-label="editAdobePricingModel.display_name" />
           <div v-if="editForm.platform === 'gemini' && editForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
             <label
               class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -4488,6 +4524,11 @@ import PlatformIcon from "@/components/common/PlatformIcon.vue";
 import { platformLabel } from "@/utils/platformColors";
 import Icon from "@/components/icons/Icon.vue";
 import GroupI18nField from "@/components/admin/group/GroupI18nField.vue";
+import AdobeGroupNameFields from "@/components/admin/group/AdobeGroupNameFields.vue";
+import AdobePricingModeSwitch from "@/components/admin/group/AdobePricingModeSwitch.vue";
+import { adobeQualityModel, adobeGroupQualityModel, adobeQualityPricePayload } from "@/utils/adobeGroupPricing";
+import { adobeFallbackModelOptions, normalizeAdobeModelOptions } from "@/utils/adobeModelOptions";
+import type { GroupModelOption } from "@/api/admin/groups";
 import GroupRateMultipliersModal from "@/components/admin/group/GroupRateMultipliersModal.vue";
 import GroupRPMOverridesModal from "@/components/admin/group/GroupRPMOverridesModal.vue";
 import GroupCapacityBadge from "@/components/common/GroupCapacityBadge.vue";
@@ -5027,9 +5068,33 @@ const capacityMap = ref<
 const searchQuery = ref("");
 const filters = reactive({
   platform: "",
+  adobe_model: "",
   status: "",
   is_exclusive: "",
 });
+const adobeModelOptions = ref<GroupModelOption[]>(adobeFallbackModelOptions);
+const adobeModelOptionsSource = ref<"loading" | "adobe" | "fallback">("loading");
+const loadAdobeModelOptions = async () => {
+  adobeModelOptionsSource.value = "loading";
+  try {
+    const models = normalizeAdobeModelOptions(await adminAPI.groups.getAdobeWebsiteModelOptions());
+    if (!models.length) throw new Error("Empty Adobe model list");
+    adobeModelOptions.value = models;
+    adobeModelOptionsSource.value = "adobe";
+  } catch {
+    adobeModelOptions.value = adobeFallbackModelOptions;
+    adobeModelOptionsSource.value = "fallback";
+  }
+};
+const createAdobeModel = ref("gpt-image-2");
+const createNewAdobePricing = ref(false);
+const createAdobePricingModel = computed(() => adobeQualityModel(createAdobeModel.value, adobeModelOptions.value));
+const editNewAdobePricing = ref(false);
+const editHasSavedQualityPrices = ref(false);
+const adobeModelFilterOptions = computed(() => [
+  { value: "", label: t("admin.groups.adobeNaming.allModels") },
+  ...adobeModelOptions.value.map((model) => ({ value: model.display_name, label: model.display_name })),
+]);
 const pagination = reactive({
   page: 1,
   page_size: getPersistedPageSize(),
@@ -5538,6 +5603,8 @@ const convertApiFormatToRoutingRules = async (
   return rules;
 };
 
+const editAdobePricingModel = computed(() => adobeGroupQualityModel(editForm.name, adobeModelOptions.value));
+
 const editForm = reactive({
   name: "",
   description: "",
@@ -5866,6 +5933,7 @@ const loadGroups = async () => {
       pagination.page_size,
       {
         platform: (filters.platform as GroupPlatform) || undefined,
+        adobe_model: filters.adobe_model || undefined,
         status: filters.status as any,
         is_exclusive: !authStore.isSimpleMode && filters.is_exclusive
           ? filters.is_exclusive === "true"
@@ -5997,6 +6065,17 @@ const handleSearch = () => {
   }, 300);
 };
 
+const handleFilterChange = () => {
+  pagination.page = 1;
+  loadGroups();
+};
+
+const handlePlatformFilter = () => {
+  if (filters.platform && filters.platform !== "adobe") filters.adobe_model = "";
+  pagination.page = 1;
+  loadGroups();
+};
+
 const handlePageChange = (page: number) => {
   pagination.page = page;
   loadGroups();
@@ -6016,6 +6095,10 @@ const handleSort = (key: string, order: 'asc' | 'desc') => {
 };
 
 const openCreateModal = () => {
+  if (filters.adobe_model || filters.platform === "adobe" ||
+    (groups.value.length > 0 && groups.value.every((group) => group.platform === "adobe"))) {
+    createForm.platform = "adobe";
+  }
   showCreateModal.value = true;
   loadModelAllowlistCandidates("create", 0, createForm.platform);
 };
@@ -6052,6 +6135,8 @@ const closeCreateModal = () => {
   createForm.video_price_720p = null;
   createForm.video_price_1080p = null;
   createForm.image_quality_prices = {};
+  createNewAdobePricing.value = false;
+  createAdobeModel.value = "gpt-image-2";
   createForm.video_model_prices = createVideoModelPricesForm();
   createForm.long_context_pricing_enabled = true;
   createForm.force_openai_fast = false;
@@ -6211,7 +6296,7 @@ const handleCreateGroup = async () => {
     // 构建请求数据，包含模型路由配置
     const requestData = {
       ...createGroupForm,
-      image_quality_prices: createForm.platform === "adobe" ? createForm.image_quality_prices : {},
+      image_quality_prices: createForm.platform === "adobe" ? adobeQualityPricePayload(createForm.image_quality_prices, createAdobePricingModel.value, createNewAdobePricing.value) : {},
       force_openai_fast: normalizeGroupOpenAIFast(
         createForm.platform,
         createForm.force_openai_fast,
@@ -6399,6 +6484,8 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.video_price_720p = group.video_price_720p;
   editForm.video_price_1080p = group.video_price_1080p;
   editForm.image_quality_prices = JSON.parse(JSON.stringify(group.image_quality_prices || {}));
+  editHasSavedQualityPrices.value = Object.keys(editForm.image_quality_prices).length > 0;
+  editNewAdobePricing.value = false;
   editForm.video_model_prices = createVideoModelPricesForm(
     group.video_model_prices,
   );
@@ -6528,6 +6615,8 @@ const closeEditModal = () => {
   editForm.video_price_720p = null;
   editForm.video_price_1080p = null;
   editForm.image_quality_prices = {};
+  editNewAdobePricing.value = false;
+  editHasSavedQualityPrices.value = false;
   editForm.video_model_prices = createVideoModelPricesForm();
   editForm.long_context_pricing_enabled = true;
   editForm.force_openai_fast = false;
@@ -6608,7 +6697,7 @@ const handleUpdateGroup = async () => {
       monthly_limit_usd: normalizeOptionalLimit(
         editForm.monthly_limit_usd as number | string | null,
       ),
-      image_quality_prices: editForm.platform === "adobe" ? editForm.image_quality_prices : {},
+      image_quality_prices: editForm.platform === "adobe" ? adobeQualityPricePayload(editForm.image_quality_prices, editAdobePricingModel.value, editNewAdobePricing.value, editingGroup.value?.image_quality_prices || {}) : {},
       video_model_prices: serializeVideoModelPrices(
         editForm.video_model_prices,
       ),
@@ -7234,6 +7323,7 @@ const saveSortOrder = async () => {
 };
 
 onMounted(() => {
+  loadAdobeModelOptions();
   loadGroups();
   if (!authStore.isSimpleMode) {
     void loadLiveCapability();

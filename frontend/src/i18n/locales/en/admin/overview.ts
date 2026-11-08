@@ -850,6 +850,42 @@ export default {
 
     // Groups
     groups: {
+      adobeNaming: {
+        "customerPreview": "Customer name",
+        "modelFilter": "Adobe model",
+        "allModels": "All Adobe models",
+        "model": "Model name",
+        "category": "Category / specification",
+        "lowMedium": "Low/medium 124K full parameters",
+        "lowMediumSeven": "Low/medium 124K full parameters (7 cents)",
+        "sixCent": "6-cent group",
+        "noCategory": "Ordinary group (no category)",
+        "custom": "Custom category",
+        "customCategory": "Custom category / specification",
+        "customPlaceholder": "e.g. High quality 4K",
+        "customer": "Customer / group name",
+        "optional": "Optional",
+        "customerPlaceholder": "e.g. blue",
+        "preview": "Final name",
+        "hint": "Creates Adobe model name - category - customer. The name is used for filtering; available models and prices are configured separately.",
+        "useCustom": "Use custom model",
+        "modelSearch": "Search models or enter a custom name…",
+        "source": {
+          "loading": "Loading models from Adobe…",
+          "adobe": "Image models loaded from Adobe’s website API. Custom names are still available.",
+          "fallback": "Adobe’s list is unavailable. Using backup names; custom input is still available."
+        }
+      },
+      adobePricingMode: {
+        "basePreview": "Base price preview (when no quality price matches)",
+        "title": "New quality price table",
+        "followsName": "Pricing model: {model} (follows the group model name)",
+        "savedUnmatched": "Existing quality prices are retained. Specify a single supported model in the group name to edit its table.",
+        "oldDescription": "Legacy entry: base prices and existing per-model pricing.",
+        "newDescription": "The resolution and quality table follows the model name above. Its model cannot be changed here.",
+        "safeNotice": "Enabling this editor does not populate prices. Entered prices apply after saving. Blank inherits the existing rate; zero is free.",
+        "savedNotice": "Saved quality prices remain active. Turning this off only hides the editor; it does not disable or clear prices. To restore inheritance, expand the editor, clear the relevant cells and save."
+      },
       title: 'Group Management',
       description: 'Manage API key groups and rate multipliers',
       searchGroups: 'Search groups...',
@@ -1136,7 +1172,7 @@ export default {
         searchPricePer1k: 'Search price per 1k calls (USD)',
         pricePlaceholder: 'optional'
       },
-      imageQualityPricing: {"title": "Image 2.6 resolution and quality pricing", "hint": "Set USD per image for each model. Blank cells inherit existing model, group or channel prices; 0 means free. Matching cells take priority and the applicable image multiplier still applies. Auto/omitted quality uses Medium; legacy model aliases share these prices. Pricing never changes generation quality.", "quality": "Quality", "inherit": "Inherit"},
+      imageQualityPricing: {"title": "Model resolution and quality pricing", "hint": "Set USD per image for the current model and quality. Blank cells inherit existing model, group or channel prices; 0 means free. Matching cells take priority and the applicable image multiplier still applies. Auto/omitted quality uses Medium; legacy model aliases share these prices. Pricing never changes generation quality.", "quality": "Quality", "inherit": "Inherit"},
       modelPricing: {
         title: 'Per-model group pricing',
         description: 'Overrides channel and built-in prices for matching models. Long-context tiers come from official presets — do not enter custom intervals. Use per-request tiers such as realtime, tts, and stt for audio.',

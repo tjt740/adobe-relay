@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, reactive } from 'vue'
 
 import GroupI18nField from '../GroupI18nField.vue'
+import AdobeGroupNameFields from '../AdobeGroupNameFields.vue'
 import type { GroupI18n } from '@/types'
 
 vi.mock('vue-i18n', async () => {
@@ -56,6 +57,33 @@ const choose = async (wrapper: Wrapper, locale: string) => {
 }
 
 describe('GroupI18nField', () => {
+  it('keeps a partially completed Adobe name draft when editing translations', async () => {
+    const state = reactive({ name: '', i18n: {} as GroupI18n })
+    const host = defineComponent({
+      setup: () => () => h(GroupI18nField, {
+        label: 'Name', field: 'name', modelValue: state.name, i18n: state.i18n,
+        'onUpdate:i18n': value => { state.i18n = value },
+      }, {
+        'default-input': () => h(AdobeGroupNameFields, {
+          modelValue: state.name,
+          'onUpdate:modelValue': value => { state.name = value },
+        }),
+      }),
+    })
+    const wrapper = mount(host, { attachTo: document.body })
+    await wrapper.get('#adobe-name-category').setValue('custom')
+    await wrapper.get('#adobe-name-custom').setValue('高质量 4K')
+    expect(state.name).toBe('')
+    await choose(wrapper, 'en')
+    expect(wrapper.get('fieldset').attributes('disabled')).toBeDefined()
+    await wrapper.get('input:not(#adobe-name-customer):not(#adobe-name-custom)').setValue('Translated name')
+    await choose(wrapper, 'default')
+    expect((wrapper.get('#adobe-name-custom').element as HTMLInputElement).value).toBe('高质量 4K')
+    await wrapper.get('#adobe-name-customer').setValue('blue')
+    expect(state.name).toBe('Adobe GPT Image 2 - 高质量 4K - blue')
+    expect(state.i18n.en?.name).toBe('Translated name')
+  })
+
   it('renders the label and the switcher on one row above a single input', () => {
     const { wrapper } = mountField({ text: '标准', i18n: { en: { name: 'Standard' } } })
 

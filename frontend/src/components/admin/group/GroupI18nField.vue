@@ -43,8 +43,11 @@
         </div>
       </div>
     </div>
+    <fieldset v-if="$slots['default-input']" v-show="!activeLocale" :disabled="!!activeLocale">
+      <slot name="default-input" />
+    </fieldset>
     <textarea
-      v-if="multiline"
+      v-if="multiline && (activeLocale || !$slots['default-input'])"
       v-bind="$attrs"
       ref="controlRef"
       class="input"
@@ -54,7 +57,7 @@
       @input="onInput"
     ></textarea>
     <input
-      v-else
+      v-else-if="activeLocale || !$slots['default-input']"
       v-bind="$attrs"
       ref="controlRef"
       type="text"
