@@ -1,0 +1,202 @@
+{
+  ".github/workflows/deploy-adobe-relay.yml": {
+    "before": "84c006b402a9fc9e96332f0bd23ec8e5eb8c7a170e10238eff0ce5d83ef3b03d",
+    "candidate": "54fa9d34f889bdfc6ce07a230daea0c8f8bc1346f97f23b92f4eda9b0b46cf57"
+  },
+  "backend/internal/domain/group_adobe_model.go": {
+    "before": null,
+    "candidate": "37896ad039925d13bb7cd2b0e3ac35396677c17a7784b79350f03f1716119c80"
+  },
+  "backend/internal/domain/group_adobe_model_custom_test.go": {
+    "before": null,
+    "candidate": "9c7ec025d81c97a2cc33204d092162862dbc6efbf30d2d14dc9159415335aa51"
+  },
+  "backend/internal/domain/group_adobe_model_test.go": {
+    "before": null,
+    "candidate": "d042122b4fec4ce9bf873740f9eeddeef1d10395e3bee1b862e86bd1c5a1d7a8"
+  },
+  "backend/internal/handler/admin/group_handler.go": {
+    "before": "0f90a789c3d5ca97093b6226fa907ee4332b53a97fc1c0427bb2c8c0a8d10dcf",
+    "candidate": "c5742a285c7257e451dfac4198f71ae212c1985eef89333d20bc852268ef5122"
+  },
+  "backend/internal/handler/admin/group_handler_adobe_model_test.go": {
+    "before": null,
+    "candidate": "1df3ee2a7211f5ab48b99d0c0e52cd28ee1157ce2eee109afbdbc8bcc3b2f17a"
+  },
+  "backend/internal/handler/admin/group_website_models.go": {
+    "before": null,
+    "candidate": "c35d6a489cdae88ced74005269d6d13a60fea222ce6f0fef9a60a42a7c669e78"
+  },
+  "backend/internal/pkg/adobe/payloads.go": {
+    "before": "8cfae136134710009b648dbd98fb37084dafdc9a33b8bae53493b30cfb5b8115",
+    "candidate": "bf664c7782a6db0e36cfb4040289647219a898f5cba407f553f019699f1913ae"
+  },
+  "backend/internal/pkg/adobe/payloads_test.go": {
+    "before": "36153d737fbc50238bda8b63f07184b2a5a5d61e872843d0dd771881b516a7cc",
+    "candidate": "44a42a8895e9b1c0446e31a7970e839f1c4bfe0d8e63598714f518b51ef7ac62"
+  },
+  "backend/internal/pkg/adobe/website_models.go": {
+    "before": null,
+    "candidate": "d1fbab5ebc30e433d0bbcac89208d5fbc005c5687a1edcb4a6d911d12dcd5e81"
+  },
+  "backend/internal/pkg/adobe/website_models_test.go": {
+    "before": null,
+    "candidate": "75b48ada0b19f608ef53c8d6ffb0eea68743949ecb0b781d74fbcf40e7f11eeb"
+  },
+  "backend/internal/repository/group_repo.go": {
+    "before": "04f867830d8a9adda81bbaa90d766259650f2580f421a10792826c99a4d86018",
+    "candidate": "c01de9ecd6d736ab7a94edb4ac8e5ae84663c22788b4b58eeba1543425d3767d"
+  },
+  "backend/internal/repository/group_repo_adobe_model_test.go": {
+    "before": null,
+    "candidate": "1c138516eac7f14807fb7c5eeb4e7800ecd74f4ef066a331650474f90483adf9"
+  },
+  "backend/internal/server/routes/admin.go": {
+    "before": "f26e182bfe1224c081d6398f4e42bce808b9c6549a3b0573f653f3f13b5c6da3",
+    "candidate": "4532936fd51725786c5368d699ace00a519edb5145c301c04f5647a8ec487a4c"
+  },
+  "backend/internal/service/adobe_image_output.go": {
+    "before": "c3074b86c87a2328954a2d0be7e922215bc456c609f0a2211c3ac5d955f0c0fa",
+    "candidate": "cf3d6b6cf835f19d315170b661f3d3752258d86ea58f7beba67f20a609706718"
+  },
+  "backend/internal/service/adobe_image_quality_test.go": {
+    "before": "c21fad23a2ba6c32d7c48b37a9359fd76dd1378363e45178ddb2a3399579e6b4",
+    "candidate": "82f3e0f19f963c4049311d2dc8ac6e2ae05a238a1caa82ee2b13453296c2d6f8"
+  },
+  "backend/internal/service/adobe_image_service.go": {
+    "before": "927210299c667f819d5d1e65c28a015403a0ce613d5b1d796128ef7f9675c4ff",
+    "candidate": "7aca21454ae8db904bcd871b1a3d9bae8fe9aa8da30638057edd00e55e58e962"
+  },
+  "backend/internal/service/image_quality_pricing.go": {
+    "before": "190b3b9a01856f6fdf196b36ec5105e0f68d451d8cd43969e31d19d158725479",
+    "candidate": "56cf4cbe6257dfff970d516af8db04a60db8cae940679a450f7991267d0861ee"
+  },
+  "backend/internal/service/image_quality_pricing_test.go": {
+    "before": "e40a1b09b74a77b8290d3026751ddedf69d529b73c25647617f391570ab3d61f",
+    "candidate": "f9ef5f66973ceba48c9a0c4b364e2f485465aec22b6d5232d5ec79ff0420a97a"
+  },
+  "docs/ADOBE_IMAGE_CLIENT_GUIDE.md": {
+    "before": "13fbaf210011596a6490facdc35b9804821480e44b1209f2774003aae9a49013",
+    "candidate": "58a5f5a80c6c5980f884c5cea42284b28f08b3c1c1ed86fc8526cdbfa64c1363"
+  },
+  "frontend/dev/adobe-groups-data.ts": {
+    "before": null,
+    "candidate": "5619419ab19cf21fa9c99d3b15d50de2e679ed25eaf51ea8e878ae08372651d6"
+  },
+  "frontend/dev/adobe-groups.html": {
+    "before": null,
+    "candidate": "128b71c403e9b6b4aaf812ac1c7e72dc6c93f54f078ac8bebd798ce3c48ab02e"
+  },
+  "frontend/dev/adobe-groups.md": {
+    "before": null,
+    "candidate": "50c5252d0670b5a606dd3116bf37c141bb5abc571b3f7af164df90a987995560"
+  },
+  "frontend/dev/adobe-groups.ts": {
+    "before": null,
+    "candidate": "ebe4ab360b837f9f30b6f837240f1d1faeb178d327afd9cadaee9767302f1a7c"
+  },
+  "frontend/dev/adobe-groups.vite.ts": {
+    "before": null,
+    "candidate": "fb6ddb038c28bed23aa0425fa7b5606d47e208c8cf2e63c1ba28ddfa07255fe7"
+  },
+  "frontend/dev/adobe-model-capabilities-20261109.json": {
+    "before": null,
+    "candidate": "0daf4cb8d502c385756c74ecddf9ade911ee13baa99b48cefc004b48b7ab2896"
+  },
+  "frontend/package.json": {
+    "before": "27601e405e796c0b0542895f036ba2907a03fd7d624e3a1e32bc2e98af89793f",
+    "candidate": "9eb1973991790599590c32b87c2b2990f9d53da85502a02aa2341117d434ce0e"
+  },
+  "frontend/src/api/__tests__/admin.groups.model-options.spec.ts": {
+    "before": null,
+    "candidate": "0b35a7eaf4c4253ed84646b7ddaa102ef386c1c153a7cc54a750c9643b127abf"
+  },
+  "frontend/src/api/admin/groups.ts": {
+    "before": "ac13822990a7d1795a17697fe82227859f58c871562931d99c0e125a1f250bc6",
+    "candidate": "d313ec396303612541976cb2468cfe4036fc135f400cb69104a3b20feffbe716"
+  },
+  "frontend/src/components/admin/group/AdobeGroupNameFields.vue": {
+    "before": null,
+    "candidate": "03e1671f34fabb3f3a4707d803f2826a28c69f9db40d7f060ce155ac50c8f95e"
+  },
+  "frontend/src/components/admin/group/AdobePricingModeSwitch.vue": {
+    "before": null,
+    "candidate": "bf5b187d8a5089db42f863b5a17009d28628c4b436a7220d3ef037c5f90b3382"
+  },
+  "frontend/src/components/admin/group/GroupI18nField.vue": {
+    "before": "d3114d78e985ae6b89e3ddaa037970cca28d91a9aed0f8deae0e739d58ae3ed0",
+    "candidate": "897993912a0793d9810a611a1928f5990d3738e43422f5401bd350076bf711de"
+  },
+  "frontend/src/components/admin/group/ImageQualityPricing.vue": {
+    "before": "7d14243e09ffb3b4359ef4fe9762cfcb6599c76cc8904220c84db87fbae32694",
+    "candidate": "7652094c6a29fd1961bab17fbaaac6ea079e04602e2c5931d40b5cd1ebf44935"
+  },
+  "frontend/src/components/admin/group/__tests__/AdobeGroupNameFields.spec.ts": {
+    "before": null,
+    "candidate": "07dbec4437cd932189cab5171254dde6ef98acb0d57b741ee15c6838718813f8"
+  },
+  "frontend/src/components/admin/group/__tests__/GroupI18nField.spec.ts": {
+    "before": "d7a364b63892aa468511f42b5085ec619b42f9b952ddf4012e92fa5494f2f71f",
+    "candidate": "59520e42156ee7c93c4ce02fdcbe5a40f5bd3e86a3b4bc32bd401db33acf8878"
+  },
+  "frontend/src/components/admin/group/__tests__/ImageQualityPricing.spec.ts": {
+    "before": "1b8b9d76b369df6370253bd8e87e1ff70036928352d4a2ea312276b3efe04f77",
+    "candidate": "f44b9274b8ca2916ccdfebfbb9354a96c739e52682214220bf52b44fc81c8822"
+  },
+  "frontend/src/content/changelog/daily.ts": {
+    "before": "08327c154b5f02039ffbb2c1dd8b15db68cda098f52f794a8589ba2257a06337",
+    "candidate": "abdb763eff9870f7b1fd4d78cf68169e4a7ff2e9d51b5628ecb41298226aac32"
+  },
+  "frontend/src/i18n/locales/en/admin/overview.ts": {
+    "before": "0012c30508da8deb3cab101783fc66981494965de76ba64d8b1a43c3671276bc",
+    "candidate": "b8e7314dad2b41d0c538993359b6981dc3ef6301837510e118869912a817c247"
+  },
+  "frontend/src/i18n/locales/en/changelog.ts": {
+    "before": "8b9bead942e707a4b2c91f088f2e6c3673b1dbba9794346034b8deda2204125e",
+    "candidate": "549e29c2818793aae0b0bf8887321c6f8b8abe0a463f986fa72a21e4b946a3e1"
+  },
+  "frontend/src/i18n/locales/zh/admin/overview.ts": {
+    "before": "ca12b6a00f4ccc06fa87153aaff9e91cd35cab2728470bae375508c40a926fb7",
+    "candidate": "28b0df8848e78f4e3f3d0c4c7f9afd77c95cc4eed6d7d0245474483f34dd2f3a"
+  },
+  "frontend/src/i18n/locales/zh/changelog.ts": {
+    "before": "e30454b6f237e1b95db9f503cb0bccae6186a1fe95566de524c06399822974e8",
+    "candidate": "b80a8e79a2c327094c8b22c52b9cc97037caae604330fe41075809646de3baed"
+  },
+  "frontend/src/utils/__tests__/adobeGroupName.spec.ts": {
+    "before": null,
+    "candidate": "bc69767185480794329e84e4368afba1d855c9a31fc58dca256c94cf3ca8a5b7"
+  },
+  "frontend/src/utils/__tests__/adobeGroupPricing.spec.ts": {
+    "before": null,
+    "candidate": "77d45673a0d09b9fd82cca56d1b5ea6696c2cfa8551911bbfc56eec052ecccd0"
+  },
+  "frontend/src/utils/__tests__/adobeModelOptions.spec.ts": {
+    "before": null,
+    "candidate": "955c5c1ebd07bf857b65736720b2f70c194a798ac7efb52b7bfc4e8dc92948f4"
+  },
+  "frontend/src/utils/adobeGroupName.ts": {
+    "before": null,
+    "candidate": "d0742eda8ed8b0d4f568e820b73a8d263221a3f4275efb3070629ac8db02cd97"
+  },
+  "frontend/src/utils/adobeGroupPricing.ts": {
+    "before": null,
+    "candidate": "3055a59af17c18e9c83088ae4c58cf3d6b0b243487b2f86336758fbfb51e6387"
+  },
+  "frontend/src/utils/adobeModelOptions.ts": {
+    "before": null,
+    "candidate": "67d3068772e7f550bde46123e3549b1536ececbb56d8d9e0acc1a6ff72eed4b8"
+  },
+  "frontend/src/views/admin/GroupsView.vue": {
+    "before": "95d7f146f14f1e3ceef69d09ac97577535c1b7d25d21c52998c94e9c62adcad6",
+    "candidate": "6350cfb31117f274eedddcab5ac896109618ca42a36d49bfc7783f72b5f1d16e"
+  },
+  "frontend/src/views/admin/__tests__/GroupsView.duplicate.spec.ts": {
+    "before": "249a5963d80229f340ce9c9b9e0887597615a18bfe5a89fad398dd17e1574cef",
+    "candidate": "d860b266880cea6740aed1efa494e5d6b9a1a6f691acb8fc25b9fe7d00d5bd55"
+  },
+  "services/docs-site/guide.md": {
+    "before": "13fbaf210011596a6490facdc35b9804821480e44b1209f2774003aae9a49013",
+    "candidate": "58a5f5a80c6c5980f884c5cea42284b28f08b3c1c1ed86fc8526cdbfa64c1363"
+  }
+}

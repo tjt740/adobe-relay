@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/platform/liveattestation"
@@ -22,6 +24,7 @@ import (
 
 // GroupHandler handles admin group management
 type GroupHandler struct {
+	adobeWebsiteModels   adobeWebsiteModelProvider
 	adminService         service.AdminService
 	dashboardService     *service.DashboardService
 	groupCapacityService *service.GroupCapacityService
@@ -97,6 +100,7 @@ func NewGroupHandler(adminService service.AdminService, dashboardService *servic
 
 func NewGroupHandlerWithConfig(adminService service.AdminService, dashboardService *service.DashboardService, groupCapacityService *service.GroupCapacityService, cfg *config.Config) *GroupHandler {
 	return &GroupHandler{
+		adobeWebsiteModels:   adobe.NewWebsiteModelsClient(),
 		adminService:         adminService,
 		dashboardService:     dashboardService,
 		groupCapacityService: groupCapacityService,
@@ -380,6 +384,15 @@ func (h *GroupHandler) List(c *gin.Context) {
 	}
 	page, pageSize := response.ParsePagination(c)
 	platform := c.Query("platform")
+	adobeModel := strings.TrimSpace(c.Query("adobe_model"))
+	ctx := c.Request.Context()
+	if adobeModel != "" {
+		if _, valid := domain.AdobeGroupModelPattern(adobeModel); !valid {
+			response.BadRequest(c, "adobe_model must be a model name of at most 128 characters without control characters")
+			return
+		}
+		ctx = domain.WithGroupAdobeModelFilter(ctx, adobeModel)
+	}
 	status := c.Query("status")
 	search := c.Query("search")
 	// 标准化和验证 search 参数
@@ -397,7 +410,7 @@ func (h *GroupHandler) List(c *gin.Context) {
 		isExclusive = &val
 	}
 
-	groups, total, err := h.adminService.ListGroups(c.Request.Context(), page, pageSize, platform, status, search, isExclusive, sortBy, sortOrder)
+	groups, total, err := h.adminService.ListGroups(ctx, page, pageSize, platform, status, search, isExclusive, sortBy, sortOrder)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

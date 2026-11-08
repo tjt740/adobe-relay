@@ -1,0 +1,430 @@
+{
+  "checked_date": "2026-11-09",
+  "website": "https://firefly.adobe.com/",
+  "discovery_url": "https://gateway.ff.adobe.io/v2/models/discovery?resolveSchema=true&includeFirstParty=true",
+  "release": "6ac3bff29a3249ef34d1d14442db6eb2b452d25b",
+  "quality_mapping": {
+    "low": 1,
+    "medium": 3,
+    "high": 5,
+    "extraHigh": 6,
+    "max": 7
+  },
+  "models": [
+    {
+      "version": "2",
+      "name": "GPT Image 2",
+      "size": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "integer",
+            "minimum": 480,
+            "maximum": 3840,
+            "description": "Must be a multiple of 16. Total pixels (width x height) must be between 655,360 and 8,294,400, with an aspect ratio no greater than 3:1."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 480,
+            "maximum": 3840,
+            "description": "Must be a multiple of 16. Total pixels (width x height) must be between 655,360 and 8,294,400, with an aspect ratio no greater than 3:1."
+          }
+        },
+        "required": [
+          "width",
+          "height"
+        ]
+      },
+      "generationSettings": {
+        "anyOf": [
+          {
+            "properties": {
+              "detailLevel": {
+                "anyOf": [
+                  {
+                    "maximum": 5,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": 3,
+                "description": "Controls the detail level of the generated image",
+                "title": "The detail level"
+              },
+              "contentPolicy": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "faceSwapRedline",
+                      "family",
+                      "general",
+                      "redline"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Content Guard Service (CGS) safety policy ('redline', 'general', 'family', or 'faceSwapRedline'). The first three set CGS params.run_usc.nsfw_mode directly; 'faceSwapRedline' uses nsfw_mode='redline' and custom_block_rule_codes=['FS-CHILD-ADULT'] to enable face-swap checks alongside redline safety. Opts any model into CGS: the model-configured workflow is used when present, otherwise the configured default ('prompt_forge'). An explicit policy enforces every CGS block; CGS errors fail open. CGS screens prompts, input images and generated images; video is not screened. Not supported for upsampling or batch requests. Available to user- and service-token callers. Omission preserves existing behavior.",
+                "title": "Content policy"
+              }
+            },
+            "title": "GenerationSettings",
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "The common settings parameters for the generation process",
+        "title": "Common generation settings"
+      }
+    },
+    {
+      "version": "gpt-image-2.5-flare",
+      "name": "GPT Image 2.5 Flare",
+      "size": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "integer",
+            "minimum": 480,
+            "maximum": 3840,
+            "description": "Must be a multiple of 16. Total pixels (width x height) must be between 655,360 and 8,294,400, with an aspect ratio no greater than 3:1."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 480,
+            "maximum": 3840,
+            "description": "Must be a multiple of 16. Total pixels (width x height) must be between 655,360 and 8,294,400, with an aspect ratio no greater than 3:1."
+          }
+        },
+        "required": [
+          "width",
+          "height"
+        ]
+      },
+      "generationSettings": {
+        "anyOf": [
+          {
+            "properties": {
+              "detailLevel": {
+                "anyOf": [
+                  {
+                    "maximum": 7,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": 3,
+                "description": "Controls the detail level of the generated image",
+                "title": "The detail level"
+              },
+              "transparentBackground": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Transparentbackground"
+              },
+              "contentPolicy": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "faceSwapRedline",
+                      "family",
+                      "general",
+                      "redline"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Content Guard Service (CGS) safety policy ('redline', 'general', 'family', or 'faceSwapRedline'). The first three set CGS params.run_usc.nsfw_mode directly; 'faceSwapRedline' uses nsfw_mode='redline' and custom_block_rule_codes=['FS-CHILD-ADULT'] to enable face-swap checks alongside redline safety. Opts any model into CGS: the model-configured workflow is used when present, otherwise the configured default ('prompt_forge'). An explicit policy enforces every CGS block; CGS errors fail open. CGS screens prompts, input images and generated images; video is not screened. Not supported for upsampling or batch requests. Available to user- and service-token callers. Omission preserves existing behavior.",
+                "title": "Content policy"
+              }
+            },
+            "title": "GenerationSettings",
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "The common settings parameters for the generation process",
+        "title": "Common generation settings"
+      }
+    },
+    {
+      "version": "gpt-image-2.5-prism",
+      "name": "GPT Image 2.5 Sunburst",
+      "size": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "integer",
+            "minimum": 480,
+            "maximum": 3840,
+            "description": "Must be a multiple of 16. Total pixels (width x height) must be between 655,360 and 8,294,400, with an aspect ratio no greater than 3:1."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 480,
+            "maximum": 3840,
+            "description": "Must be a multiple of 16. Total pixels (width x height) must be between 655,360 and 8,294,400, with an aspect ratio no greater than 3:1."
+          }
+        },
+        "required": [
+          "width",
+          "height"
+        ]
+      },
+      "generationSettings": {
+        "anyOf": [
+          {
+            "properties": {
+              "detailLevel": {
+                "anyOf": [
+                  {
+                    "maximum": 7,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": 3,
+                "description": "Controls the detail level of the generated image",
+                "title": "The detail level"
+              },
+              "transparentBackground": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Transparentbackground"
+              },
+              "contentPolicy": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "faceSwapRedline",
+                      "family",
+                      "general",
+                      "redline"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Content Guard Service (CGS) safety policy ('redline', 'general', 'family', or 'faceSwapRedline'). The first three set CGS params.run_usc.nsfw_mode directly; 'faceSwapRedline' uses nsfw_mode='redline' and custom_block_rule_codes=['FS-CHILD-ADULT'] to enable face-swap checks alongside redline safety. Opts any model into CGS: the model-configured workflow is used when present, otherwise the configured default ('prompt_forge'). An explicit policy enforces every CGS block; CGS errors fail open. CGS screens prompts, input images and generated images; video is not screened. Not supported for upsampling or batch requests. Available to user- and service-token callers. Omission preserves existing behavior.",
+                "title": "Content policy"
+              }
+            },
+            "title": "GenerationSettings",
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "The common settings parameters for the generation process",
+        "title": "Common generation settings"
+      }
+    },
+    {
+      "version": "gpt-image-2.6-star-swirl",
+      "name": "GPT Image 2.6 Flare",
+      "size": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "integer",
+            "minimum": 480,
+            "maximum": 3840,
+            "description": "Must be a multiple of 16. Total pixels (width x height) must be between 655,360 and 8,294,400, with an aspect ratio no greater than 3:1."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 480,
+            "maximum": 3840,
+            "description": "Must be a multiple of 16. Total pixels (width x height) must be between 655,360 and 8,294,400, with an aspect ratio no greater than 3:1."
+          }
+        },
+        "required": [
+          "width",
+          "height"
+        ]
+      },
+      "generationSettings": {
+        "anyOf": [
+          {
+            "properties": {
+              "detailLevel": {
+                "anyOf": [
+                  {
+                    "maximum": 7,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": 3,
+                "description": "Controls the detail level of the generated image",
+                "title": "The detail level"
+              },
+              "transparentBackground": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Transparentbackground"
+              },
+              "contentPolicy": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "faceSwapRedline",
+                      "family",
+                      "general",
+                      "redline"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Content Guard Service (CGS) safety policy ('redline', 'general', 'family', or 'faceSwapRedline'). The first three set CGS params.run_usc.nsfw_mode directly; 'faceSwapRedline' uses nsfw_mode='redline' and custom_block_rule_codes=['FS-CHILD-ADULT'] to enable face-swap checks alongside redline safety. Opts any model into CGS: the model-configured workflow is used when present, otherwise the configured default ('prompt_forge'). An explicit policy enforces every CGS block; CGS errors fail open. CGS screens prompts, input images and generated images; video is not screened. Not supported for upsampling or batch requests. Available to user- and service-token callers. Omission preserves existing behavior.",
+                "title": "Content policy"
+              }
+            },
+            "title": "GenerationSettings",
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "The common settings parameters for the generation process",
+        "title": "Common generation settings"
+      }
+    },
+    {
+      "version": "gpt-image-2.6-aurora",
+      "name": "GPT Image 2.6 Sunburst",
+      "size": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "integer",
+            "minimum": 480,
+            "maximum": 3840,
+            "description": "Must be a multiple of 16. Total pixels (width x height) must be between 655,360 and 8,294,400, with an aspect ratio no greater than 3:1."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 480,
+            "maximum": 3840,
+            "description": "Must be a multiple of 16. Total pixels (width x height) must be between 655,360 and 8,294,400, with an aspect ratio no greater than 3:1."
+          }
+        },
+        "required": [
+          "width",
+          "height"
+        ]
+      },
+      "generationSettings": {
+        "anyOf": [
+          {
+            "properties": {
+              "detailLevel": {
+                "anyOf": [
+                  {
+                    "maximum": 7,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": 3,
+                "description": "Controls the detail level of the generated image",
+                "title": "The detail level"
+              },
+              "transparentBackground": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Transparentbackground"
+              },
+              "contentPolicy": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "faceSwapRedline",
+                      "family",
+                      "general",
+                      "redline"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Content Guard Service (CGS) safety policy ('redline', 'general', 'family', or 'faceSwapRedline'). The first three set CGS params.run_usc.nsfw_mode directly; 'faceSwapRedline' uses nsfw_mode='redline' and custom_block_rule_codes=['FS-CHILD-ADULT'] to enable face-swap checks alongside redline safety. Opts any model into CGS: the model-configured workflow is used when present, otherwise the configured default ('prompt_forge'). An explicit policy enforces every CGS block; CGS errors fail open. CGS screens prompts, input images and generated images; video is not screened. Not supported for upsampling or batch requests. Available to user- and service-token callers. Omission preserves existing behavior.",
+                "title": "Content policy"
+              }
+            },
+            "title": "GenerationSettings",
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "The common settings parameters for the generation process",
+        "title": "Common generation settings"
+      }
+    }
+  ],
+  "asset_sha256": {
+    "convert-discovery-inputs-AzJx1QFg.js": "b993f9e1f098d0e150e18bdab994a925dac0827fb4b034d547f724fcb6638293",
+    "resolve-request-model-version-BB54Ux3Q.js": "06c593b57509cf1f9e8b3d37681f1a7db9649070fa92ccc10d319177cddb2818",
+    "size-schema-functions-BM4cLvBH.js": "c726a97bc7b91965b0032601f3802691d083dcfd1ee0f651856776f37dc00f60"
+  },
+  "limits": "Public discovery and current website conversion rules; not account entitlement or successful image generation evidence. Image 2 website uses default aspect sizes without a resolution selector; its public size schema covers the relay 1K/2K/4K billing tiers. 2.5/2.6 website explicitly derives all three resolution options."
+}

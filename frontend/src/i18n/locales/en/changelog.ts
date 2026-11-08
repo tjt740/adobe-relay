@@ -18,6 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      adobeGroupNaming: {"title": "Adobe model filters and quality tables for three generations", "body": "Model names prefer Adobe discovery and allow custom input. Image 2, 2.5 and 2.6 prices follow the selected model, with the legacy editor selected by default."},
       adobeImage26Pricing: {"title": "Separate resolution and quality prices for both Image 2.6 models", "body": "Adobe groups now have independent Flare and Sunburst quality price tables. Extra High and Max can be priced separately; blank cells inherit existing rates. Today’s generation quality, official names, documentation reading theme and shared login remain available."},
       adobeImage26Quality: {"title": "Image 2.6 quality, website names and API documentation updated", "body": "2.6 Flare / Sunburst support distinct Extra High and Max levels without silent downgrades. Model lists, previous-name compatibility and examples are updated, alongside today’s documentation reading theme, shared login and protected downloads."},
       docsReadingTheme: {"title": "More readable docs with updated parameters and shared sign-in", "body": "Stronger body/table contrast and dark syntax-highlighted code improve reading, with the same tab icon as the main site. Green navigation, Sub2 shared sign-in and the latest 2.6 parameters/examples remain; original downloads and copied text stay intact."},
@@ -41,6 +42,40 @@ export default {
       }
     },
     "updates": {
+      adobeGroupNaming: {
+        "title": "Adobe website model filters, structured names and quality prices for all three generations",
+        "body": "Model names prefer Adobe’s public website API with fallback names and custom entry. Image 2, 2.5 and 2.6 offer legacy/new pricing editors, defaulting to legacy; the new table follows the group model.",
+        "sections": {
+          "reason": {
+            "title": "Prefer model names from the API",
+            "body": "Sub2 relays the public discovery API used by Firefly, fetching current image model names on each load rather than presenting its built-in catalog as live data. Disabled, deprecated and non-image entries are excluded, while new models remain available. Failed or unusable responses use five backup names with an explicit source label. Custom input is always available."
+          },
+          "filter": {
+            "title": "Apply filters before pagination",
+            "body": "The server combines model, platform, status, search and exclusivity before counting, sorting and pagination. Official names and legacy version or Flare/Sunburst names are recognized. Custom names match a literal fixed name segment rather than a regular expression."
+          },
+          "naming": {
+            "title": "Compose names with full model labels",
+            "body": "Select or enter a model, category and customer to preview Adobe GPT Image 2.6 Flare - category - customer. Ordinary groups omit category, and the 6-cent category may omit customer. Names do not configure model availability."
+          },
+          "pricing": {
+            "title": "Retain legacy entry with an optional quality table",
+            "body": "Creation and editing default to legacy base and per-model pricing. The new table follows the named model: three qualities for Image 2 and five for 2.5/2.6 across 1K/2K/4K. Image 2.5 Extra High now submits website level 6 separately from Max level 7. Switching models preserves drafts; saving changes only the current model and preserves other stored prices. Closing the editor retains stored prices. Blank inherits; zero is free."
+          },
+          "compatibility": {
+            "title": "Normalize only unambiguous names",
+            "body": "Only names with a single identifiable model receive a normalization preview. Mixed Flare/Sunburst names, ambiguous groups and utility groups are skipped, including ordinary Image 2.6 names the user asked to retain. Naming does not change account bindings, model access or existing rates."
+          },
+          "validation": {
+            "title": "Isolated preview and focused regression checks",
+            "body": "Adobe public schemas and current website quality conversion were checked. Regression coverage includes five-model submission, usage and cost matching, zero/inheritance, model switching, legacy defaults, pagination and API fallback. Mock preview writes do not affect production groups; automated checks are not live upstream generation or billing evidence."
+          },
+          "boundary": {
+            "title": "Scope and verification limits",
+            "body": "The public directory is not an account entitlement list or a promise that Sub2 supports every listed model. Unknown or ambiguous models receive no guessed price table. No prefilled customer prices or new database migrations. November 7 live billing verification remains pending upstream recovery."
+          }
+        }
+      },
       adobeImage26Pricing: {"title": "Separate resolution and quality prices for both Image 2.6 models", "body": "Adobe groups now have independent Flare and Sunburst quality price tables. Extra High and Max can be priced separately; blank cells inherit existing rates. Today’s generation quality, official names, documentation reading theme and shared login remain available.", "sections": {"reason": {"title": "Independent prices for higher image qualities", "body": "Image billing previously distinguished models and resolutions but could not price Extra High and Max separately. Adobe group image billing now includes dedicated price tables for both Image 2.6 variants."}, "pricing": {"title": "Fifteen price cells per model", "body": "Set a per-image USD price for each combination of 1K, 2K or 4K and Low, Medium, High, Extra High or Max. A matching cell takes priority; the applicable image billing multiplier still applies."}, "fallback": {"title": "Blank inherits; zero is free", "body": "Deployment does not populate prices or change existing customer rates. Unset cells retain the existing model, group, channel and built-in pricing order. Clearing restores inheritance; explicit zero means free. Legacy model names share the corresponding variant prices."}, "usage": {"title": "Record effective image quality", "body": "New usage records include effective image quality alongside resolution, image count and costs. Auto and omitted quality use Medium. Historical records are not guessed or rebilled; the API guide explains the settings and rules."}, "validation": {"title": "Check billing, persistence and retrieval", "body": "Regression checks cover both models, current and legacy names, three resolutions, five qualities and defaults, correlating submitted quality with usage and cost. Coverage includes blank cells, zero, multipliers, fallback, auth cache and group copying."}, "boundary": {"title": "Pricing preserves generation quality", "body": "Extra High and Max retain their actual requested quality even when a price is unset. This applies to supported native Adobe Image 2.6 paths, without expanding GIF editing or other capabilities. Relay responses without effective quality retain existing billing."}}},
       adobeImage26Quality: {
         "title": "Distinct Extra High / Max quality and Adobe website names for Image 2.6",
