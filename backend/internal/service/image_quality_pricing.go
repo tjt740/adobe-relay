@@ -10,14 +10,8 @@ import (
 )
 
 // Missing cells inherit existing billing. Pricing never changes generation quality.
-func adobeImagePriceModel(model string) string {
+func image26PriceModel(model string) string {
 	switch strings.ToLower(strings.TrimSpace(model)) {
-	case "gpt-image-2", "firefly-gpt-image-2":
-		return "gpt-image-2"
-	case "gpt-image-2.5-flare", "firefly-gpt-image-2-5-flare":
-		return "gpt-image-2.5-flare"
-	case "gpt-image-2.5-sunburst", "gpt-image-2.5-prism", "firefly-gpt-image-2-5-prism", "firefly-gpt-image-2-5-sunburst":
-		return "gpt-image-2.5-sunburst"
 	case "gpt-image-2.6-flare", "gpt-image-2.6-star-swirl", "firefly-gpt-image-2-6-flare":
 		return "gpt-image-2.6-flare"
 	case "gpt-image-2.6-sunburst", "gpt-image-2.6-aurora", "firefly-gpt-image-2-6-sunburst":
@@ -55,17 +49,14 @@ func validateImageQualityPrices(platform string, in map[string]map[string]map[st
 		return invalid("image_quality_prices requires an Adobe group")
 	}
 	for model, sizes := range in {
-		if adobeImagePriceModel(model) != model {
-			return invalid("image_quality_prices requires a canonical GPT Image 2, 2.5 or 2.6 model")
+		if image26PriceModel(model) != model {
+			return invalid("image_quality_prices model must be gpt-image-2.6-flare or gpt-image-2.6-sunburst")
 		}
 		for size, qualities := range sizes {
 			if size != "1K" && size != "2K" && size != "4K" {
 				return invalid("image_quality_prices resolution must be 1K, 2K or 4K")
 			}
 			for quality, price := range qualities {
-				if model == "gpt-image-2" && (quality == "xhigh" || quality == "max") {
-					return invalid("GPT Image 2 quality must be low, medium or high")
-				}
 				switch quality {
 				case "low", "medium", "high", "xhigh", "max":
 				default:
@@ -81,7 +72,7 @@ func validateImageQualityPrices(platform string, in map[string]map[string]map[st
 }
 
 func lookupImageQualityPrice(prices map[string]map[string]map[string]float64, model, size, quality string) (float64, bool) {
-	model = adobeImagePriceModel(model)
+	model = image26PriceModel(model)
 	if model == "" {
 		return 0, false
 	}
@@ -89,8 +80,8 @@ func lookupImageQualityPrice(prices map[string]map[string]map[string]float64, mo
 	return price, ok && price >= 0 && !math.IsNaN(price) && !math.IsInf(price, 0)
 }
 
-func adobeImageBillingQuality(conf adobe.ImageModelConf, requested string) string {
-	if !conf.IsGPTImage() || (conf.UpstreamModelVersion != "2" && adobeImagePriceModel(conf.UpstreamModelVersion) == "") {
+func adobeImage26BillingQuality(conf adobe.ImageModelConf, requested string) string {
+	if image26PriceModel(conf.UpstreamModelVersion) == "" {
 		return ""
 	}
 	return adobeImageResponseQuality(conf, requested)

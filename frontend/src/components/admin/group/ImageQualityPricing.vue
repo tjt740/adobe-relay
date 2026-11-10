@@ -1,16 +1,20 @@
 <template>
-  <section v-if="visibleModels.length" class="mt-4 border-t border-gray-200 pt-4 dark:border-dark-700" data-testid="image-quality-pricing">
+  <section class="mt-4 border-t border-gray-200 pt-4 dark:border-dark-700" data-testid="image-quality-pricing">
     <h4 class="text-sm font-medium text-gray-800 dark:text-gray-100">{{ t('admin.groups.imageQualityPricing.title') }}</h4>
     <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('admin.groups.imageQualityPricing.hint') }}</p>
+    <label :for="selectId" class="input-label mt-3">{{ t('admin.groups.imageQualityPricing.model') }}</label>
+    <select :id="selectId" v-model="selectedModel" class="input" data-testid="quality-pricing-model">
+      <option v-for="model in models" :key="model.id" :value="model.id">{{ model.label }}</option>
+    </select>
     <div v-for="model in visibleModels" :key="model.id" class="mt-4">
       <h5 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">{{ model.label }}</h5>
       <div class="overflow-x-auto">
         <table class="w-full min-w-[360px] text-left text-sm">
-          <thead><tr><th class="py-2 font-medium">{{ t('admin.groups.imageQualityPricing.quality') }}</th><th v-for="size in model.sizes" :key="size" class="px-1 py-2 font-medium">{{ size }} ($)</th></tr></thead>
+          <thead><tr><th class="py-2 font-medium">{{ t('admin.groups.imageQualityPricing.quality') }}</th><th v-for="size in sizes" :key="size" class="px-1 py-2 font-medium">{{ size }} ($)</th></tr></thead>
           <tbody>
-            <tr v-for="quality in model.qualities" :key="quality.id">
+            <tr v-for="quality in qualities" :key="quality.id">
               <th class="py-1 pr-2 font-normal">{{ quality.label }}</th>
-              <td v-for="size in model.sizes" :key="size" class="px-1 py-1">
+              <td v-for="size in sizes" :key="size" class="px-1 py-1">
                 <input type="number" min="0" max="100000000" step="any" class="input w-full min-w-0 text-sm"
                   :value="modelValue[model.id]?.[size]?.[quality.id] ?? ''"
                   :aria-label="`${model.label} ${size} ${quality.label}`"
@@ -26,21 +30,24 @@
 </template>
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { computed } from 'vue'
+import { computed, ref, useId } from 'vue'
 import type { ImageQualityPrices } from '@/types'
-import { adobeModels } from '@/utils/adobeGroupName'
-const props = defineProps<{ modelValue: ImageQualityPrices; model: string; modelLabel?: string }>()
+const props = defineProps<{ modelValue: ImageQualityPrices }>()
 const emit = defineEmits<{ 'update:modelValue': [value: ImageQualityPrices] }>()
 const { t } = useI18n()
-// Verified against Firefly discovery and its detailLevel converter on 2026-11-09.
-// Unknown/custom models deliberately have no guessed quality table.
+// Pricing selection is independent of the group's model/name.
+const models = [
+  { id: 'gpt-image-2.6-flare', label: 'GPT Image 2.6 Flare' },
+  { id: 'gpt-image-2.6-sunburst', label: 'GPT Image 2.6 Sunburst' },
+]
+const sizes = ['1K', '2K', '4K']
+const selectId = useId()
+const selectedModel = ref(models[0].id)
 const qualities = [
   { id: 'low', label: 'Low' }, { id: 'medium', label: 'Medium' },
   { id: 'high', label: 'High' }, { id: 'xhigh', label: 'Extra High' }, { id: 'max', label: 'Max' },
 ]
-const visibleModels = computed(() => adobeModels.filter(model => model.id === props.model)
-  .map(model => ({ ...model, label: props.modelLabel || model.label,
-    sizes: ['1K', '2K', '4K'], qualities: model.version === '2' ? qualities.slice(0, 3) : qualities })))
+const visibleModels = computed(() => models.filter(model => model.id === selectedModel.value))
 function setPrice(model: string, size: string, quality: string, raw: string) {
   const prices = { ...props.modelValue }
   prices[model] = { ...prices[model] }

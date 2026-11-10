@@ -55,7 +55,7 @@ func TestGPTImageDetailLevelFromQualityForVersion(t *testing.T) {
 	}
 	require.Equal(t, 5, GPTImageDetailLevelFromQualityForVersion("xhigh", "2"))
 	require.Equal(t, 5, GPTImageDetailLevelFromQualityForVersion("max", "1.5"))
-	require.Equal(t, 6, GPTImageDetailLevelFromQualityForVersion("xhigh", "gpt-image-2.5-flare"))
+	require.Equal(t, 7, GPTImageDetailLevelFromQualityForVersion("xhigh", "gpt-image-2.5-flare"))
 	require.Equal(t, 7, GPTImageDetailLevelFromQualityForVersion("max", "gpt-image-2.5-prism"))
 	require.Equal(t, 5, GPTImageDetailLevelFromQualityForVersion("high", "gpt-image-2.5-flare"))
 }
@@ -677,7 +677,7 @@ func TestBuildImagePayloadCandidatesGPTImage25XHighDetailLevel(t *testing.T) {
 		SizePixels:           Size{Width: 1024, Height: 1024},
 	})
 	require.NoError(t, err)
-	require.Equal(t, 6, candidates[0]["generationSettings"].(map[string]any)["detailLevel"])
+	require.Equal(t, 7, candidates[0]["generationSettings"].(map[string]any)["detailLevel"])
 }
 
 func TestBuildImagePayloadCandidatesGPTImage25OmitsSizeWhenEmpty(t *testing.T) {

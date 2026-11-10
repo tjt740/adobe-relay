@@ -875,14 +875,12 @@ export default {
       },
       adobePricingMode: {
         "basePreview": "基础价格预览（未命中质量价格时）",
-        "title": "新版质量价格表",
-        "followsName": "当前定价模型：{model}（跟随分组模型名称）",
-        "savedUnmatched": "已有质量价格保持不变。分组名称明确为某款受支持模型后，可编辑对应价格表。",
+        "title": "新版 2.6 质量价格表",
         "oldDescription": "当前使用旧版填写方式：基础价格与原逐模型价格配置。",
-        "newDescription": "按上方模型名称展开对应的分辨率与质量价格表，模型在此处不可更改。",
+        "newDescription": "独立选择 GPT Image 2.6 Flare 或 Sunburst 填写价格，不与分组名称关联。",
         "safeNotice": "开启开关不会自动填价。填写并保存后，对应价格才生效；空白沿用原价，0 表示免费。",
         "savedNotice": "已保存的新价格仍然生效。关闭仅收起填写区，不停用或清空价格；恢复原价请展开、清空对应格并保存。"
-      },
+},
       title: '分组管理',
       description: '管理 API 密钥分组和费率配置',
       searchGroups: '搜索分组...',
@@ -1169,7 +1167,7 @@ export default {
         searchPricePer1k: '搜索每千次价格（USD）',
         pricePlaceholder: '可选'
       },
-      imageQualityPricing: {"title": "模型分辨率与质量定价", "hint": "当前模型按分辨率和质量设置 USD/张。空白沿用已有模型、分组或渠道收费；0 表示免费。匹配的价格优先，仍乘以适用的图片倍率。auto/未传质量按 Medium；旧模型别名共用对应价格。只改收费，不改变生成质量。", "quality": "质量", "inherit": "沿用原价"},
+      imageQualityPricing: {"title": "Image 2.6 分辨率与质量定价", "model": "定价模型", "hint": "两款模型独立设置 USD/张，可切换填写并一起保存。空白沿用已有模型、分组或渠道收费；0 表示免费。匹配的价格优先，仍乘以适用的图片倍率。auto/未传质量按 Medium；旧模型别名共用对应价格。只改收费，不改变生成质量。", "quality": "质量", "inherit": "沿用原价"},
       modelPricing: {
         title: '分组逐模型定价',
         description: '匹配模型后覆盖渠道和内置价格。长上下文阶梯沿用官方/预设价卡，无需再手填区间。音频可用按次层级配置 realtime、tts、stt。',

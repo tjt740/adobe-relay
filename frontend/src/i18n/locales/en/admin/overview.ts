@@ -878,14 +878,12 @@ export default {
       },
       adobePricingMode: {
         "basePreview": "Base price preview (when no quality price matches)",
-        "title": "New quality price table",
-        "followsName": "Pricing model: {model} (follows the group model name)",
-        "savedUnmatched": "Existing quality prices are retained. Specify a single supported model in the group name to edit its table.",
-        "oldDescription": "Legacy entry: base prices and existing per-model pricing.",
-        "newDescription": "The resolution and quality table follows the model name above. Its model cannot be changed here.",
-        "safeNotice": "Enabling this editor does not populate prices. Entered prices apply after saving. Blank inherits the existing rate; zero is free.",
-        "savedNotice": "Saved quality prices remain active. Turning this off only hides the editor; it does not disable or clear prices. To restore inheritance, expand the editor, clear the relevant cells and save."
-      },
+        "title": "New Image 2.6 quality pricing",
+        "oldDescription": "Legacy editor: base prices and existing per-model pricing.",
+        "newDescription": "Choose GPT Image 2.6 Flare or Sunburst independently of the group name.",
+        "safeNotice": "Enabling the editor does not fill prices. Saved entries apply; blank inherits existing pricing and 0 is free.",
+        "savedNotice": "Saved quality prices remain active. Closing the editor does not disable or clear them; open it, clear the cells and save to restore inherited prices."
+},
       title: 'Group Management',
       description: 'Manage API key groups and rate multipliers',
       searchGroups: 'Search groups...',
@@ -1172,7 +1170,7 @@ export default {
         searchPricePer1k: 'Search price per 1k calls (USD)',
         pricePlaceholder: 'optional'
       },
-      imageQualityPricing: {"title": "Model resolution and quality pricing", "hint": "Set USD per image for the current model and quality. Blank cells inherit existing model, group or channel prices; 0 means free. Matching cells take priority and the applicable image multiplier still applies. Auto/omitted quality uses Medium; legacy model aliases share these prices. Pricing never changes generation quality.", "quality": "Quality", "inherit": "Inherit"},
+      imageQualityPricing: {"title": "Image 2.6 resolution and quality pricing", "model": "Pricing model", "hint": "Set USD/image independently for both models; switch between tables and save both drafts together. Blank inherits existing model, group or channel pricing; 0 is free. Matching prices take priority and applicable image multipliers still apply. Auto/omitted quality uses Medium; aliases share prices. Pricing does not change generation quality.", "quality": "Quality", "inherit": "Inherit existing price"},
       modelPricing: {
         title: 'Per-model group pricing',
         description: 'Overrides channel and built-in prices for matching models. Long-context tiers come from official presets — do not enter custom intervals. Use per-request tiers such as realtime, tts, and stt for audio.',

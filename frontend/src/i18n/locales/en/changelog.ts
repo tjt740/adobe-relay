@@ -18,6 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      adobePricingRevert: {"title": "Restore independent Image 2.6 pricing tables", "body": "Choose the 2.6 pricing model independently, retaining the legacy/new editor switch and saved prices. Withdraw 2/2.5 quality pricing while retaining the website model directory, naming and filters."},
       adobeGroupNaming: {"title": "Adobe model filters and quality tables for three generations", "body": "Model names prefer Adobe discovery and allow custom input. Image 2, 2.5 and 2.6 prices follow the selected model, with the legacy editor selected by default."},
       adobeImage26Pricing: {"title": "Separate resolution and quality prices for both Image 2.6 models", "body": "Adobe groups now have independent Flare and Sunburst quality price tables. Extra High and Max can be priced separately; blank cells inherit existing rates. Today’s generation quality, official names, documentation reading theme and shared login remain available."},
       adobeImage26Quality: {"title": "Image 2.6 quality, website names and API documentation updated", "body": "2.6 Flare / Sunburst support distinct Extra High and Max levels without silent downgrades. Model lists, previous-name compatibility and examples are updated, alongside today’s documentation reading theme, shared login and protected downloads."},
@@ -42,6 +43,32 @@ export default {
       }
     },
     "updates": {
+      adobePricingRevert: {
+        "title": "Restore independent Image 2.6 pricing tables",
+        "body": "Choose the 2.6 pricing model independently, retaining the legacy/new editor switch and saved prices. Withdraw 2/2.5 quality pricing while retaining the website model directory, naming and filters.",
+        "sections": {
+                "reason": {
+                        "title": "Withdraw the model-bound pricing change",
+                        "body": "Withdraw the November 9 group-name lock and its subsequent pricing extensions. Historical release entries remain; this entry describes current behavior."
+                },
+                "editor": {
+                        "title": "Edit both 2.6 models independently",
+                        "body": "Any Adobe group can open the new editor and independently select Flare or Sunburst, including groups with ordinary, custom or mixed names. Switching retains both drafts and saves them together. The default is legacy; closing only collapses the editor and preserves saved prices."
+                },
+                "billing": {
+                        "title": "Restore the earlier billing and parameter behavior",
+                        "body": "Quality prices apply only to the two 2.6 models again; Image 2/2.5 use their earlier base and per-model rules. For 2.5, xhigh/max again submit tier 7 and retain their request labels. The 2.6 tiers remain 6/7 with their existing generation and billing capabilities."
+                },
+                "preservation": {
+                        "title": "Keep unrelated features and customer data",
+                        "body": "Keep the Adobe website API, fallback names, custom entry, structured naming and filtering before pagination. Retain saved 2.6 prices, group names, account bindings and historical usage. Do not restore an old database or rebill past usage."
+                },
+                "boundary": {
+                        "title": "Verification scope",
+                        "body": "Check independent selection, saving both models, preservation when closed, blank inheritance and zero pricing; restore backend behavior to the prior source. Real upstream generation and billing acceptance remains a separate result, not implied by configuration or simulated checks."
+                }
+        }
+},
       adobeGroupNaming: {
         "title": "Adobe website model filters, structured names and quality prices for all three generations",
         "body": "Model names prefer Adobe’s public website API with fallback names and custom entry. Image 2, 2.5 and 2.6 offer legacy/new pricing editors, defaulting to legacy; the new table follows the group model.",

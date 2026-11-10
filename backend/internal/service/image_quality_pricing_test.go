@@ -12,7 +12,7 @@ import (
 )
 
 func TestAdobeImageQualityPricingGenerateAndBillMatrix(t *testing.T) {
-	for mi, model := range []string{"gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2.5-prism", "gpt-image-2.6-flare", "gpt-image-2.6-sunburst", "gpt-image-2.6-star-swirl", "gpt-image-2.6-aurora"} {
+	for mi, model := range []string{"gpt-image-2.6-flare", "gpt-image-2.6-sunburst", "gpt-image-2.6-star-swirl", "gpt-image-2.6-aurora"} {
 		for si, size := range []string{"1024x1024", "2048x2048", "3840x2160"} {
 			for qi, quality := range []string{"low", "medium", "high", "xhigh", "max", "auto", ""} {
 				t.Run(model+"/"+size+"/"+quality, func(t *testing.T) {
@@ -23,9 +23,6 @@ func TestAdobeImageQualityPricingGenerateAndBillMatrix(t *testing.T) {
 					effective := quality
 					if quality == "auto" || quality == "" {
 						effective = "medium"
-					}
-					if model == "gpt-image-2" && (quality == "xhigh" || quality == "max") {
-						effective = "high"
 					}
 					require.Equal(t, effective, output.Forward.ImageQuality)
 					tier := []string{"1K", "2K", "4K"}[si]
@@ -39,7 +36,7 @@ func TestAdobeImageQualityPricingGenerateAndBillMatrix(t *testing.T) {
 					svc := newOpenAIRecordUsageServiceForTest(repo, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{}, nil)
 					flat := 9.0
 					group := &Group{ID: 12, Platform: PlatformAdobe, RateMultiplier: 7, ImageRateIndependent: true, ImageRateMultiplier: 1.5, ImagePrice1K: &flat, ImagePrice2K: &flat, ImagePrice4K: &flat,
-						ImageQualityPrices: map[string]map[string]map[string]float64{adobeImagePriceModel(model): {tier: {effective: price}}}}
+						ImageQualityPrices: map[string]map[string]map[string]float64{image26PriceModel(model): {tier: {effective: price}}}}
 					err = svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{Result: output.Forward, APIKey: &APIKey{ID: 11, GroupID: &group.ID, Group: group}, User: &User{ID: 10}, Account: adobeTestAccount()})
 					require.NoError(t, err)
 					require.NotNil(t, repo.lastLog)
@@ -105,7 +102,7 @@ func TestAdobeImageQualityPricingValidationAndNull(t *testing.T) {
 		model, size, quality string
 		price                float64
 	}{
-		{"gpt-image-2", "4K", "max", 1}, {"gpt-image-2.6-flare", "8K", "max", 1}, {"gpt-image-2.6-flare", "4K", "auto", 1}, {"gpt-image-2.6-flare", "4K", "max", -1}, {"gpt-image-2.6-flare", "4K", "max", math.Inf(1)},
+		{"gpt-image-2.5-flare", "4K", "max", 1}, {"gpt-image-2.6-flare", "8K", "max", 1}, {"gpt-image-2.6-flare", "4K", "auto", 1}, {"gpt-image-2.6-flare", "4K", "max", -1}, {"gpt-image-2.6-flare", "4K", "max", math.Inf(1)},
 	} {
 		_, err := validateImageQualityPrices(PlatformAdobe, map[string]map[string]map[string]float64{tc.model: {tc.size: {tc.quality: tc.price}}})
 		require.Error(t, err)

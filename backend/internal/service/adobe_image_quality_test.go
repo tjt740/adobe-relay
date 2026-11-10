@@ -22,10 +22,10 @@ func TestAdobeImageServiceResponseQualityMatchesSubmittedDetailLevel(t *testing.
 		detailLevel int
 	}{
 		{"flare_max", "gpt-image-2.5-flare", "max", "max", 7},
-		{"flare_xhigh", "gpt-image-2.5-flare", "xhigh", "xhigh", 6},
+		{"flare_xhigh", "gpt-image-2.5-flare", "xhigh", "xhigh", 7},
 		{"sunburst_max", "gpt-image-2.5-sunburst", "max", "max", 7},
-		{"sunburst_xhigh", "gpt-image-2.5-sunburst", "xhigh", "xhigh", 6},
-		{"prism_xhigh", "gpt-image-2.5-prism", "xhigh", "xhigh", 6},
+		{"sunburst_xhigh", "gpt-image-2.5-sunburst", "xhigh", "xhigh", 7},
+		{"prism_xhigh", "gpt-image-2.5-prism", "xhigh", "xhigh", 7},
 		{"high", "gpt-image-2.5-flare", "high", "high", 5},
 		{"medium", "gpt-image-2.5-flare", "medium", "medium", 3},
 		{"low", "gpt-image-2.5-flare", "low", "low", 1},
@@ -39,7 +39,7 @@ func TestAdobeImageServiceResponseQualityMatchesSubmittedDetailLevel(t *testing.
 		{"sunburst_auto", "gpt-image-2.5-sunburst", "auto", "medium", 3},
 		{"unknown_uses_existing_default", "gpt-image-2.5-flare", "ultra", "low", 1},
 		{"case_and_whitespace", "gpt-image-2.5-flare", " MAX ", "max", 7},
-		{"xhigh_case_and_whitespace", "gpt-image-2.5-flare", " XHIGH ", "xhigh", 6},
+		{"xhigh_case_and_whitespace", "gpt-image-2.5-flare", " XHIGH ", "xhigh", 7},
 		{"v2_max_clamped", "gpt-image-2", "max", "high", 5},
 		{"v2_xhigh_clamped", "gpt-image-2", "xhigh", "high", 5},
 		{"v15_xhigh_clamped", "gpt-image-1.5", "xhigh", "high", 5},
@@ -90,8 +90,8 @@ func TestAdobeImageServiceResponseQualityUsesMappedModel(t *testing.T) {
 		detailLevel                                           int
 	}{
 		{"max_to_flare", "gpt-image-2", "firefly-gpt-image-2-5-flare", "max", "max", "gpt-image-2.5-flare", 7},
-		{"xhigh_to_flare", "gpt-image-2", "firefly-gpt-image-2-5-flare", "xhigh", "xhigh", "gpt-image-2.5-flare", 6},
-		{"xhigh_to_sunburst", "gpt-image-2", "firefly-gpt-image-2-5-prism", "xhigh", "xhigh", "gpt-image-2.5-prism", 6},
+		{"xhigh_to_flare", "gpt-image-2", "firefly-gpt-image-2-5-flare", "xhigh", "xhigh", "gpt-image-2.5-flare", 7},
+		{"xhigh_to_sunburst", "gpt-image-2", "firefly-gpt-image-2-5-prism", "xhigh", "xhigh", "gpt-image-2.5-prism", 7},
 		{"xhigh_to_v2", "gpt-image-2.5-flare", "firefly-gpt-image-2", "xhigh", "high", "2", 5},
 		{"auto_to_flare", "gpt-image-2", "firefly-gpt-image-2-5-flare", "auto", "medium", "gpt-image-2.5-flare", 3},
 		{"default_to_v2", "gpt-image-2.5-flare", "firefly-gpt-image-2", "", "medium", "2", 3},
@@ -144,7 +144,7 @@ func TestAdobeImageServiceQualityResponseAcrossDeliveryPaths(t *testing.T) {
 		{"auto", "auto", "medium", "gpt-image-2.5-sunburst", 3},
 		{"default", "", "medium", "gpt-image-2.5-sunburst", 3},
 		{"low", "low", "low", "gpt-image-2.5-sunburst", 1},
-		{"xhigh", "xhigh", "xhigh", "gpt-image-2.5-sunburst", 6},
+		{"xhigh", "xhigh", "xhigh", "gpt-image-2.5-sunburst", 7},
 		{"v26_flare_xhigh", "xhigh", "xhigh", "gpt-image-2.6-star-swirl", 6},
 		{"v26_flare_max", "max", "max", "gpt-image-2.6-star-swirl", 7},
 		{"v26_aurora_xhigh", "xhigh", "xhigh", "gpt-image-2.6-aurora", 6},
