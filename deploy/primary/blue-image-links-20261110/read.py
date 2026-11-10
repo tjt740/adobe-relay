@@ -12,38 +12,33 @@ def scrub(v):
   v=re.sub(r'sk-[A-Za-z0-9_-]{8,}','[KEY]',v)
   return v[:3500]
  return v
-window="group_id IN (28,51) AND ((created_at >= '2026-11-09T23:10:00Z' AND created_at < '2026-11-09T23:40:00Z') OR (created_at >= '2026-11-10T07:10:00Z' AND created_at < '2026-11-10T07:40:00Z'))"
-queries={
- 'usage_window':"SELECT coalesce(json_agg(t),'[]') FROM (SELECT id,created_at,created_at-duration_ms*interval '1 millisecond' estimated_start,request_id,upstream_request_id,user_id,api_key_id,group_id,account_id,model,image_count,image_size,image_quality,total_cost,actual_cost,duration_ms FROM usage_logs WHERE "+window+" ORDER BY created_at LIMIT 240) t",
- 'errors_window':"SELECT coalesce(json_agg(t),'[]') FROM (SELECT id,created_at,created_at-duration_ms*interval '1 millisecond' estimated_start,request_id,client_request_id,user_id,api_key_id,group_id,account_id,model,request_path,status_code,error_phase,error_type,error_message,error_body,upstream_status_code,upstream_error_message,upstream_error_detail,upstream_errors,duration_ms FROM ops_error_logs WHERE "+window+" ORDER BY created_at LIMIT 160) t",
- 'relevant_tables':"SELECT coalesce(json_agg(table_name),'[]') FROM information_schema.tables WHERE table_schema='public' AND (table_name LIKE '%log%' OR table_name LIKE '%task%' OR table_name LIKE '%image%')",
- 'daily_count':"SELECT coalesce(json_agg(t),'[]') FROM (SELECT group_id,count(*) n,min(created_at) first_at,max(created_at) last_at FROM usage_logs WHERE group_id IN (28,51) AND created_at>='2026-11-09T16:00:00Z' GROUP BY group_id) t"
-}
-ids=set();out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat()}
-for k,q in queries.items():
- value=sql(q);out[k]=scrub(value)
- if k in ('usage_window','errors_window') and isinstance(value,list):
-  for row in value:
-   for field in ('request_id','client_request_id'):
-    if row.get(field):ids.add(row[field].removeprefix('client:'))
-print(json.dumps(out,ensure_ascii=False),flush=True)
+
+ids=('14a3ccc8-e8d7-4a0e-b721-62062bd73ee8','c4a2dfa3-c7b4-428b-aafb-3b1ca1adfc32','7792ed46-03df-412f-9c90-f3a2a3eb0616')
 prefixes=('20261110071951','20261110071329','20261110071401')
-files=sorted(pathlib.Path('/opt/adobe-relay/shared/data/logs').glob('sub2api*'))
-files=[p for p in files if p.is_file()]
-print(json.dumps({'log_files':[{'name':p.name,'bytes':p.stat().st_size,'mtime':p.stat().st_mtime} for p in files]},ensure_ascii=False),flush=True)
-matches=0;scanned=0
+pattern=re.compile('|'.join(re.escape(x) for x in ids+prefixes))
+files=[p for p in sorted(pathlib.Path('/opt/adobe-relay/shared/data/logs').glob('sub2api*')) if p.is_file() and p.stat().st_mtime>=1794240000]
+out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'read_only':True,'exact_external_id_hits':0,'candidate_events':[],'near_start_events':[],'files_scanned':[],'scanned_lines':0}
 for p in files:
- if p.stat().st_mtime < 1794240000:continue
+ out['files_scanned'].append(p.name)
  op=gzip.open if p.suffix=='.gz' else open
  with op(p,'rt',errors='replace') as f:
   for line in f:
-   scanned+=1
+   out['scanned_lines']+=1
    exact=any(x in line for x in prefixes)
-   if exact or any(x in line for x in ids):
-    try:v=json.loads(line)
-    except:
-     try:v={'prefix':line[:line.index('{')],'fields':json.loads(line[line.index('{'):])}
-     except:v={'line':line.strip()}
-    matches+=1
-    if matches<=700:print(json.dumps({'log_file':p.name,'exact_external_id':exact,'match':scrub(v)},ensure_ascii=False),flush=True)
-print(json.dumps({'scanned_lines':scanned,'matches':matches,'emitted_limit':700}),flush=True)
+   if exact:out['exact_external_id_hits']+=1
+   near=any(line.startswith('2026-11-10T'+t) for t in ('15:13:29','15:13:30','15:14:01','15:14:02','15:19:51','15:19:52','15:19:53','07:13:29','07:14:01','07:19:51'))
+   if not pattern.search(line) and not near:continue
+   try:
+    j=line.index('{');entry={'prefix':line[:j],'fields':json.loads(line[j:])}
+   except:continue
+   fields=entry['fields']
+   if 'timings' in fields:
+    timing=fields['timings']
+    for im in timing.get('images',[]):
+     polls=im.pop('polls',[])
+     im['last_poll']=polls[-1] if polls else None
+   if exact or fields.get('client_request_id') in ids:out['candidate_events'].append(scrub(entry))
+   elif near and fields.get('group_id') in (28,51) and 'gateway_check_start' in entry['prefix']:out['near_start_events'].append(scrub(entry))
+q="SELECT coalesce(json_agg(t),'[]') FROM (SELECT id,created_at,request_id,group_id,model,image_count,image_size,image_quality,actual_cost FROM usage_logs WHERE api_key_id=107 AND request_id IN ("+','.join("'client:"+x+"'" for x in ids)+")) t"
+out['usage']=sql(q)
+print(json.dumps(out,ensure_ascii=False,indent=2))
