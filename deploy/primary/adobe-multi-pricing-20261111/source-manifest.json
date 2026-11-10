@@ -125,7 +125,7 @@
   },
   "docs/ADOBE_IMAGE_CLIENT_GUIDE.md": {
     "before": "58a5f5a80c6c5980f884c5cea42284b28f08b3c1c1ed86fc8526cdbfa64c1363",
-    "candidate": "a132f442c0caccc692fad810bceb69c86ec96127709bd83e962fbe356d437059"
+    "candidate": "d45bcaa1ad50daf72c946cb8bdcf06944ae38b5ebd543c193745787680ba52d3"
   },
   "frontend/dev/adobe-groups.md": {
     "before": "50c5252d0670b5a606dd3116bf37c141bb5abc571b3f7af164df90a987995560",
@@ -189,7 +189,7 @@
   },
   "frontend/src/i18n/locales/zh/changelog.ts": {
     "before": "b80a8e79a2c327094c8b22c52b9cc97037caae604330fe41075809646de3baed",
-    "candidate": "5e810700e0bf5c01a681c4d9d7e4fb7198dbdfc9bb319fad1a4286c395dbc36d"
+    "candidate": "d759b3bbb6ab6df9c6764508229fec4f73462a6809e38c01fa7d72d8d0407606"
   },
   "frontend/src/types/index.ts": {
     "before": "1f658c336eb07c2fc24ed44b7b7ff6bd91d1fcfd62965a3b9851e388bbde0c71",
@@ -237,6 +237,6 @@
   },
   "services/docs-site/guide.md": {
     "before": "58a5f5a80c6c5980f884c5cea42284b28f08b3c1c1ed86fc8526cdbfa64c1363",
-    "candidate": "a132f442c0caccc692fad810bceb69c86ec96127709bd83e962fbe356d437059"
+    "candidate": "d45bcaa1ad50daf72c946cb8bdcf06944ae38b5ebd543c193745787680ba52d3"
   }
 }
