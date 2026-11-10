@@ -51,3 +51,13 @@ class AutomaticSettingReviewTests(TestCase):
             self.assertTrue(all(m.check_preserved(before,current).values()))
             current['group_modes']['3']['mode']=True
             with self.assertRaises(AssertionError):m.check_preserved(before,current)
+
+    def test_before_migration_null_is_allowed_only_while_column_is_absent(self):
+        before={'containers':{},'config_hashes':{},'env_without_image_hash':'same','okad_settings_hash':'same','settings_hashes':{},'clash_contract_hash':'same','rules_hash':'same','billing_mode_schema_present':False,'group_modes':{'1':{'platform':'adobe','mode':None}}}
+        current=copy.deepcopy(before)
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(m,'ROOT',Path(directory)):
+            self.assertTrue(all(m.check_preserved(before,current).values()))
+            current['billing_mode_schema_present']=True
+            with self.assertRaises(AssertionError):m.check_preserved(before,current)
+            current['group_modes']['1']['mode']=True
+            self.assertTrue(all(m.check_preserved(before,current).values()))
