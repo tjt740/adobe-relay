@@ -1,7 +1,7 @@
 """Operate the authorized release with exact CI artifacts and preserved guards."""
 import datetime,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','status','verify']
+assert phase in ['preflight','prepare','start','status','verify','live-billing']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-multi-pricing-20261111'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -74,4 +74,15 @@ r=pathlib.Path('{root}')
 assert (r/'expected-sha').read_text().strip()=='{sha}'
 for script,out in [('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('route-guard-review.py','route-guard-review.json'),('api-verify.py','api-verification.json'),('observe.py','observation.json'),('verify-deployment.py','deployment-verification.json')]:
  if not (r/out).exists():subprocess.run([sys.executable,str(r/script)],check=True,timeout=240)
+""")
+
+elif phase=='live-billing':
+ copy([pathlib.Path(__file__).with_name(n) for n in ['live-billing.py','live_validation.py']])
+ remote(f"""import pathlib,subprocess,json
+r=pathlib.Path('{root}')
+assert (r/'expected-sha').read_text().strip()=='{sha}'
+assert (r/'deployment-verification.json').exists()
+assert not (r/'live-billing-started.json').exists(), 'Already started; no replay'
+subprocess.run(['systemd-run','--unit=adobe-multi-pricing-billing-20261111','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/live-billing.log','--property=StandardError=append:{root}/live-billing.log','/usr/bin/python3',str(r/'live-billing.py')],check=True)
+print(json.dumps({{'single_live_billing_dispatch':True}}))
 """)
