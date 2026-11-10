@@ -181,7 +181,7 @@
   },
   "frontend/src/i18n/locales/en/changelog.ts": {
     "before": "549e29c2818793aae0b0bf8887321c6f8b8abe0a463f986fa72a21e4b946a3e1",
-    "candidate": "f3e0c8cfa6a245310a1ded9ae69cc0816458e602a64fa5628bb6a351398bcb48"
+    "candidate": "55bde77c99cc64689230fbe4338dbc186a76c099557344b810ec3b325a9f2948"
   },
   "frontend/src/i18n/locales/zh/admin/overview.ts": {
     "before": "28b0df8848e78f4e3f3d0c4c7f9afd77c95cc4eed6d7d0245474483f34dd2f3a",
