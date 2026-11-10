@@ -72,7 +72,7 @@ describe('GroupI18nField', () => {
       }),
     })
     const wrapper = mount(host, { attachTo: document.body })
-    wrapper.findComponent(Select).vm.$emit('update:modelValue', 'gpt-image-2')
+    wrapper.findComponent(Select).vm.$emit('change', 'gpt-image-2')
     await wrapper.get('#adobe-name-customer').setValue('高质量 4K - blue')
     expect(state.name).toBe('')
     await choose(wrapper, 'en')
@@ -80,7 +80,7 @@ describe('GroupI18nField', () => {
     await wrapper.get('input:not(#adobe-name-customer)').setValue('Translated name')
     await choose(wrapper, 'default')
     expect((wrapper.get('#adobe-name-customer').element as HTMLInputElement).value).toBe('高质量 4K - blue')
-    wrapper.findComponent(Select).vm.$emit('update:modelValue', 'gpt-image-2.5-flare')
+    wrapper.findComponent(Select).vm.$emit('change', 'gpt-image-2.5-flare')
     await wrapper.vm.$nextTick()
     expect(state.name).toBe('Adobe GPT Image 2.5 Flare - 高质量 4K - blue')
     expect(state.i18n.en?.name).toBe('Translated name')

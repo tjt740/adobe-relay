@@ -165,7 +165,7 @@
   },
   "frontend/src/components/admin/group/__tests__/GroupI18nField.spec.ts": {
     "before": "59520e42156ee7c93c4ce02fdcbe5a40f5bd3e86a3b4bc32bd401db33acf8878",
-    "candidate": "3c2d68f43b96845956e0e46de301de19a8d912efd877af76af947a00a954a207"
+    "candidate": "8fb925a1d5030448c82c57924125882b353ed6f23f4c5e36c17f77af40681550"
   },
   "frontend/src/components/admin/group/__tests__/ImageQualityPricing.spec.ts": {
     "before": "f44b9274b8ca2916ccdfebfbb9354a96c739e52682214220bf52b44fc81c8822",

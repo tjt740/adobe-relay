@@ -42,3 +42,12 @@ class AutomaticSettingReviewTests(TestCase):
         review={**self.review,'key':'openai_codex_client_version_synced','old_value':'0.172.0','new_value':'0.174.0','old_hash':old['openai_codex_client_version_synced'],'new_hash':hashlib.md5(b'0.174.0').hexdigest(),'sync_source_path':'backend/internal/service/openai_codex_version_sync_service.go','sync_source_before':'677845f2ce6082ca3c9a651669efda3e6db43f3f7140dc29e715f71cd5625b83','sync_source_candidate':'677845f2ce6082ca3c9a651669efda3e6db43f3f7140dc29e715f71cd5625b83','event':'openai_codex_version_synced'}
         self.assertEqual(m.reviewed_setting_hashes(old,review)['openai_codex_client_version_synced'],review['new_hash'])
         with self.assertRaises(AssertionError):m.reviewed_setting_hashes(old,{**review,'event':'claude_code_version_synced'})
+
+    def test_new_mode_initialization_preserves_platform_and_saved_choices(self):
+        before={'containers':{},'config_hashes':{},'env_without_image_hash':'same','okad_settings_hash':'same','settings_hashes':{},'clash_contract_hash':'same','rules_hash':'same','group_modes':{'1':{'platform':'adobe','mode':None},'2':{'platform':'openai','mode':None},'3':{'platform':'adobe','mode':False}}}
+        current=copy.deepcopy(before)
+        for gid,value in [('1',True),('2',False),('3',False)]:current['group_modes'][gid]['mode']=value
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(m,'ROOT',Path(directory)):
+            self.assertTrue(all(m.check_preserved(before,current).values()))
+            current['group_modes']['3']['mode']=True
+            with self.assertRaises(AssertionError):m.check_preserved(before,current)
