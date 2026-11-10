@@ -86,6 +86,8 @@ const (
 	FieldVideoPrice720p = "video_price_720p"
 	// FieldVideoPrice1080p holds the string denoting the video_price_1080p field in the database.
 	FieldVideoPrice1080p = "video_price_1080p"
+	// FieldImageQualityPricingEnabled holds the string denoting the image_quality_pricing_enabled field in the database.
+	FieldImageQualityPricingEnabled = "image_quality_pricing_enabled"
 	// FieldImageQualityPrices holds the string denoting the image_quality_prices field in the database.
 	FieldImageQualityPrices = "image_quality_prices"
 	// FieldVideoModelPrices holds the string denoting the video_model_prices field in the database.
@@ -280,6 +282,7 @@ var Columns = []string{
 	FieldVideoPrice480p,
 	FieldVideoPrice720p,
 	FieldVideoPrice1080p,
+	FieldImageQualityPricingEnabled,
 	FieldImageQualityPrices,
 	FieldVideoModelPrices,
 	FieldWebSearchPricePerCall,
@@ -411,6 +414,8 @@ var (
 	DefaultVideoRateIndependent bool
 	// DefaultVideoRateMultiplier holds the default value on creation for the "video_rate_multiplier" field.
 	DefaultVideoRateMultiplier float64
+	// DefaultImageQualityPricingEnabled holds the default value on creation for the "image_quality_pricing_enabled" field.
+	DefaultImageQualityPricingEnabled bool
 	// SearchPricePer1kValidator is a validator for the "search_price_per_1k" field. It is called by the builders before save.
 	SearchPricePer1kValidator func(float64) error
 	// AudioRealtimePricePerMinValidator is a validator for the "audio_realtime_price_per_min" field. It is called by the builders before save.
@@ -669,6 +674,11 @@ func ByVideoPrice720p(opts ...sql.OrderTermOption) OrderOption {
 // ByVideoPrice1080p orders the results by the video_price_1080p field.
 func ByVideoPrice1080p(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldVideoPrice1080p, opts...).ToFunc()
+}
+
+// ByImageQualityPricingEnabled orders the results by the image_quality_pricing_enabled field.
+func ByImageQualityPricingEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldImageQualityPricingEnabled, opts...).ToFunc()
 }
 
 // ByWebSearchPricePerCall orders the results by the web_search_price_per_call field.

@@ -14,11 +14,10 @@ export const changelogPreviews = [
 
 // Prepared release notes have no deployment date and are not rendered as shipped.
 // Move the entry into dailyUpdates on its actual Asia/Shanghai deployment date.
-export const pendingDailyUpdates: readonly Omit<DailyUpdate, 'date'>[] = [
-]
+export const pendingDailyUpdates: readonly Omit<DailyUpdate, 'date'>[] = []
 
 export const dailyOverviews: Readonly<Record<string, string>> = {
-  '2026-11-10': 'adobePricingRevert',
+  '2026-11-11': 'adobeGroupMultiPricing',
   '2026-11-09': 'adobeGroupNaming',
   '2026-11-07': 'adobeImage26Pricing',
   '2026-11-06': 'adobeGptImage26Gif',
@@ -34,7 +33,8 @@ export const dailyOverviews: Readonly<Record<string, string>> = {
 
 // Use the actual release date in Asia/Shanghai; multiple releases share one day.
 export const dailyUpdates: readonly DailyUpdate[] = [
-  { date: '2026-11-10', id: 'adobePricingRevert', type: 'fixed', sections: ['reason', 'editor', 'billing', 'preservation', 'boundary'] },
+  { date: '2026-11-11', id: 'adobeGroupMultiPricing', type: 'improved', sections: ['selection', 'pricing', 'mode', 'billing', 'boundary'] },
+  { date: '2026-11-11', id: 'adobeGroupNameLayout', type: 'improved', sections: ['layout', 'preservation', 'boundary'] },
   { date: '2026-11-09', id: 'adobeGroupNaming', type: 'added', sections: ['reason', 'filter', 'naming', 'pricing', 'compatibility', 'validation', 'boundary'] },
   { date: '2026-11-07', id: 'adobeImage26Pricing', type: 'added', sections: ['reason', 'pricing', 'fallback', 'usage', 'validation', 'boundary'] },
   { date: '2026-11-07', id: 'adobeImage26Quality', type: 'fixed', sections: ['reason', 'mapping', 'names', 'usage', 'compatibility', 'validation', 'boundary'] },

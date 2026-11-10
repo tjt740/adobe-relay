@@ -1,10 +1,11 @@
 import type { ImageQualityPrices } from '@/types'
 
-// The independent editor saves both 2.6 model drafts together. When collapsed,
-// omit the field so that an ordinary group edit preserves all stored prices.
+// Store the price draft independently of the billing switch. Disabling quality
+// billing must preserve edited prices so that enabling it later restores them.
 export function adobeQualityPricePayload(
   draft: ImageQualityPrices,
-  enabled: boolean,
-): ImageQualityPrices | undefined {
-  return enabled ? JSON.parse(JSON.stringify(draft)) : undefined
+  selectedIds?: string[],
+): ImageQualityPrices {
+  const prices = selectedIds ? Object.fromEntries(Object.entries(draft).filter(([id]) => selectedIds.includes(id))) : draft
+  return JSON.parse(JSON.stringify(prices))
 }

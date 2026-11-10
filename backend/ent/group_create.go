@@ -504,6 +504,20 @@ func (_c *GroupCreate) SetNillableVideoPrice1080p(v *float64) *GroupCreate {
 	return _c
 }
 
+// SetImageQualityPricingEnabled sets the "image_quality_pricing_enabled" field.
+func (_c *GroupCreate) SetImageQualityPricingEnabled(v bool) *GroupCreate {
+	_c.mutation.SetImageQualityPricingEnabled(v)
+	return _c
+}
+
+// SetNillableImageQualityPricingEnabled sets the "image_quality_pricing_enabled" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableImageQualityPricingEnabled(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetImageQualityPricingEnabled(*v)
+	}
+	return _c
+}
+
 // SetImageQualityPrices sets the "image_quality_prices" field.
 func (_c *GroupCreate) SetImageQualityPrices(v map[string]map[string]map[string]float64) *GroupCreate {
 	_c.mutation.SetImageQualityPrices(v)
@@ -1265,6 +1279,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultVideoRateMultiplier
 		_c.mutation.SetVideoRateMultiplier(v)
 	}
+	if _, ok := _c.mutation.ImageQualityPricingEnabled(); !ok {
+		v := group.DefaultImageQualityPricingEnabled
+		_c.mutation.SetImageQualityPricingEnabled(v)
+	}
 	if _, ok := _c.mutation.LongContextPricingEnabled(); !ok {
 		v := group.DefaultLongContextPricingEnabled
 		_c.mutation.SetLongContextPricingEnabled(v)
@@ -1497,6 +1515,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.VideoRateMultiplier(); !ok {
 		return &ValidationError{Name: "video_rate_multiplier", err: errors.New(`ent: missing required field "Group.video_rate_multiplier"`)}
+	}
+	if _, ok := _c.mutation.ImageQualityPricingEnabled(); !ok {
+		return &ValidationError{Name: "image_quality_pricing_enabled", err: errors.New(`ent: missing required field "Group.image_quality_pricing_enabled"`)}
 	}
 	if v, ok := _c.mutation.SearchPricePer1k(); ok {
 		if err := group.SearchPricePer1kValidator(v); err != nil {
@@ -1802,6 +1823,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.VideoPrice1080p(); ok {
 		_spec.SetField(group.FieldVideoPrice1080p, field.TypeFloat64, value)
 		_node.VideoPrice1080p = &value
+	}
+	if value, ok := _c.mutation.ImageQualityPricingEnabled(); ok {
+		_spec.SetField(group.FieldImageQualityPricingEnabled, field.TypeBool, value)
+		_node.ImageQualityPricingEnabled = value
 	}
 	if value, ok := _c.mutation.ImageQualityPrices(); ok {
 		_spec.SetField(group.FieldImageQualityPrices, field.TypeJSON, value)
@@ -2682,6 +2707,18 @@ func (u *GroupUpsert) AddVideoPrice1080p(v float64) *GroupUpsert {
 // ClearVideoPrice1080p clears the value of the "video_price_1080p" field.
 func (u *GroupUpsert) ClearVideoPrice1080p() *GroupUpsert {
 	u.SetNull(group.FieldVideoPrice1080p)
+	return u
+}
+
+// SetImageQualityPricingEnabled sets the "image_quality_pricing_enabled" field.
+func (u *GroupUpsert) SetImageQualityPricingEnabled(v bool) *GroupUpsert {
+	u.Set(group.FieldImageQualityPricingEnabled, v)
+	return u
+}
+
+// UpdateImageQualityPricingEnabled sets the "image_quality_pricing_enabled" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateImageQualityPricingEnabled() *GroupUpsert {
+	u.SetExcluded(group.FieldImageQualityPricingEnabled)
 	return u
 }
 
@@ -4041,6 +4078,20 @@ func (u *GroupUpsertOne) UpdateVideoPrice1080p() *GroupUpsertOne {
 func (u *GroupUpsertOne) ClearVideoPrice1080p() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.ClearVideoPrice1080p()
+	})
+}
+
+// SetImageQualityPricingEnabled sets the "image_quality_pricing_enabled" field.
+func (u *GroupUpsertOne) SetImageQualityPricingEnabled(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetImageQualityPricingEnabled(v)
+	})
+}
+
+// UpdateImageQualityPricingEnabled sets the "image_quality_pricing_enabled" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateImageQualityPricingEnabled() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateImageQualityPricingEnabled()
 	})
 }
 
@@ -5676,6 +5727,20 @@ func (u *GroupUpsertBulk) UpdateVideoPrice1080p() *GroupUpsertBulk {
 func (u *GroupUpsertBulk) ClearVideoPrice1080p() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.ClearVideoPrice1080p()
+	})
+}
+
+// SetImageQualityPricingEnabled sets the "image_quality_pricing_enabled" field.
+func (u *GroupUpsertBulk) SetImageQualityPricingEnabled(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetImageQualityPricingEnabled(v)
+	})
+}
+
+// UpdateImageQualityPricingEnabled sets the "image_quality_pricing_enabled" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateImageQualityPricingEnabled() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateImageQualityPricingEnabled()
 	})
 }
 

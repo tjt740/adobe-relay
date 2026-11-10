@@ -1,3 +1,4 @@
+import type { AdobeModelCapabilities } from '@/utils/adobeModelCapabilities'
 import { parseAdobeWebsiteModelOptions } from '@/utils/adobeModelOptions'
 /**
  * Admin Groups API endpoints
@@ -129,17 +130,18 @@ export async function getEffectiveModels(id: number): Promise<string[]> {
 }
 
 export interface GroupModelOption {
+  capabilities?: AdobeModelCapabilities
   id: string
   display_name: string
 }
 
 /** Sub2 relays the public Adobe website directory; no local catalog is used here. */
 export async function getAdobeWebsiteModelOptions(): Promise<GroupModelOption[]> {
-  const { data } = await apiClient.get<{ source?: string; models?: unknown }>(
+  const { data } = await apiClient.get<{ source?: string; models?: unknown; fetched_at?: string; commonRequestSchema?: unknown }>(
     '/admin/groups/adobe-models', { timeout: 10000 }
   )
   if (data?.source !== 'adobe') throw new Error('Missing Adobe discovery source')
-  return parseAdobeWebsiteModelOptions(data.models)
+  return parseAdobeWebsiteModelOptions(data.models, data.fetched_at, data.commonRequestSchema)
 }
 
 /**

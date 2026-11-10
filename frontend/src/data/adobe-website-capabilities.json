@@ -1,0 +1,2008 @@
+{
+  "checked_at": "2026-11-11",
+  "website": "https://firefly.adobe.com/",
+  "discovery_url": "https://gateway.ff.adobe.io/v2/models/discovery?resolveSchema=true&includeFirstParty=true",
+  "release": "7fa7d8b0d8f076d90fef423803dda98c51832c01",
+  "models": [
+    {
+      "modelId": "flux",
+      "modelVersions": {
+        "fluxPro": {
+          "modelDisplayName": "Flux 1.1 Pro",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "enum": [
+                  {
+                    "width": 1024,
+                    "height": 768
+                  },
+                  {
+                    "width": 1440,
+                    "height": 1440
+                  },
+                  {
+                    "width": 768,
+                    "height": 1024
+                  },
+                  {
+                    "width": 576,
+                    "height": 1024
+                  },
+                  {
+                    "width": 1024,
+                    "height": 576
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "fluxUltra": {
+          "modelDisplayName": "Flux 1.1 Ultra",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "enum": [
+                  {
+                    "width": 1024,
+                    "height": 768
+                  },
+                  {
+                    "width": 1440,
+                    "height": 1440
+                  },
+                  {
+                    "width": 768,
+                    "height": 1024
+                  },
+                  {
+                    "width": 576,
+                    "height": 1024
+                  },
+                  {
+                    "width": 1024,
+                    "height": 576
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "fluxKontextPro": {
+          "modelDisplayName": "Flux Kontext Pro",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "enum": [
+                  {
+                    "width": 1024,
+                    "height": 768
+                  },
+                  {
+                    "width": 1440,
+                    "height": 1440
+                  },
+                  {
+                    "width": 768,
+                    "height": 1024
+                  },
+                  {
+                    "width": 576,
+                    "height": 1024
+                  },
+                  {
+                    "width": 1024,
+                    "height": 576
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "2": {
+          "modelDisplayName": "Flux 2",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 256,
+                    "maximum": 1920
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 256,
+                    "maximum": 1920
+                  }
+                }
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "flex-2": {
+          "modelDisplayName": "Flux 2 Flex",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 256,
+                    "maximum": 1920
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 256,
+                    "maximum": 1920
+                  }
+                }
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "fluxPro-2": {
+          "modelDisplayName": "Flux 2 Pro",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 256,
+                    "maximum": 1920
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 256,
+                    "maximum": 1920
+                  }
+                }
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "fluxKontextMax": {
+          "modelDisplayName": "Flux Kontext Max",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "enum": [
+                  {
+                    "width": 1024,
+                    "height": 768
+                  },
+                  {
+                    "width": 1440,
+                    "height": 1440
+                  },
+                  {
+                    "width": 768,
+                    "height": 1024
+                  },
+                  {
+                    "width": 576,
+                    "height": 1024
+                  },
+                  {
+                    "width": 1024,
+                    "height": 576
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "fluxFillPro": {
+          "modelDisplayName": "Flux 1.1 Pro Fill",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "1.1": {
+          "modelDisplayName": "Flux 1.1 Pro",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "enum": [
+                  {
+                    "width": 1024,
+                    "height": 768
+                  },
+                  {
+                    "width": 1440,
+                    "height": 1440
+                  },
+                  {
+                    "width": 768,
+                    "height": 1024
+                  },
+                  {
+                    "width": 576,
+                    "height": 1024
+                  },
+                  {
+                    "width": 1024,
+                    "height": 576
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "modelId": "fluxPro",
+      "modelVersions": {
+        "1.1": {
+          "modelDisplayName": "Flux 1.1 Pro",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "enum": [
+                  {
+                    "width": 1024,
+                    "height": 768
+                  },
+                  {
+                    "width": 1440,
+                    "height": 1440
+                  },
+                  {
+                    "width": 768,
+                    "height": 1024
+                  },
+                  {
+                    "width": 576,
+                    "height": 1024
+                  },
+                  {
+                    "width": 1024,
+                    "height": 576
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "modelId": "fluxUltra",
+      "modelVersions": {
+        "1.1": {
+          "modelDisplayName": "Flux 1.1 Ultra",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "enum": [
+                  {
+                    "width": 1024,
+                    "height": 768
+                  },
+                  {
+                    "width": 1440,
+                    "height": 1440
+                  },
+                  {
+                    "width": 768,
+                    "height": 1024
+                  },
+                  {
+                    "width": 576,
+                    "height": 1024
+                  },
+                  {
+                    "width": 1024,
+                    "height": 576
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "modelId": "firefly-image",
+      "modelVersions": {
+        "image4_standard": {
+          "modelDisplayName": "Firefly Image 4",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              },
+              "resolution": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "1K",
+                      "2K"
+                    ],
+                    "default": "2K"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "image4_ultra": {
+          "modelDisplayName": "Firefly Image 4 Ultra",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              },
+              "resolution": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "1K",
+                      "2K"
+                    ],
+                    "default": "2K"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "image5": {
+          "modelDisplayName": "Firefly Image 5",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "enum": [
+                  {
+                    "width": 2688,
+                    "height": 1536
+                  },
+                  {
+                    "width": 720,
+                    "height": 1280
+                  },
+                  {
+                    "width": 1080,
+                    "height": 1920
+                  },
+                  {
+                    "width": 1344,
+                    "height": 768
+                  },
+                  {
+                    "width": 1792,
+                    "height": 2304
+                  },
+                  {
+                    "width": 1536,
+                    "height": 1536
+                  },
+                  {
+                    "width": 2048,
+                    "height": 2048
+                  },
+                  {
+                    "width": 2304,
+                    "height": 1792
+                  },
+                  {
+                    "width": 1152,
+                    "height": 896
+                  },
+                  {
+                    "width": 1440,
+                    "height": 2560
+                  },
+                  {
+                    "width": 1344,
+                    "height": 1728
+                  },
+                  {
+                    "width": 2016,
+                    "height": 1152
+                  },
+                  {
+                    "width": 1728,
+                    "height": 1344
+                  },
+                  {
+                    "width": 896,
+                    "height": 1152
+                  },
+                  {
+                    "width": 1024,
+                    "height": 1024
+                  }
+                ]
+              },
+              "resolution": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "1K",
+                      "1.5K",
+                      "2K"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "modelId": "flux2-klein",
+      "modelVersions": {
+        "klein_4b": {
+          "modelDisplayName": "FLUX.2 Klein 4B",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "modelId": "humain",
+      "modelVersions": {
+        "humain_image": {
+          "modelDisplayName": "HUMAIN Image 1",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "resolution": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "2K"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "modelId": "gemini-flash",
+      "modelVersions": {
+        "nano-banana-2": {
+          "modelDisplayName": "Gemini 3.0 (Nano Banana Pro)",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "enum": [
+                  {
+                    "width": 1024,
+                    "height": 1024
+                  },
+                  {
+                    "width": 1264,
+                    "height": 848
+                  },
+                  {
+                    "width": 848,
+                    "height": 1264
+                  },
+                  {
+                    "width": 1200,
+                    "height": 896
+                  },
+                  {
+                    "width": 896,
+                    "height": 1200
+                  },
+                  {
+                    "width": 1152,
+                    "height": 928
+                  },
+                  {
+                    "width": 928,
+                    "height": 1152
+                  },
+                  {
+                    "width": 768,
+                    "height": 1376
+                  },
+                  {
+                    "width": 1376,
+                    "height": 768
+                  },
+                  {
+                    "width": 1584,
+                    "height": 672
+                  },
+                  {
+                    "width": 2048,
+                    "height": 2048
+                  },
+                  {
+                    "width": 2528,
+                    "height": 1696
+                  },
+                  {
+                    "width": 1696,
+                    "height": 2528
+                  },
+                  {
+                    "width": 2400,
+                    "height": 1792
+                  },
+                  {
+                    "width": 1792,
+                    "height": 2400
+                  },
+                  {
+                    "width": 2304,
+                    "height": 1856
+                  },
+                  {
+                    "width": 1856,
+                    "height": 2304
+                  },
+                  {
+                    "width": 1536,
+                    "height": 2752
+                  },
+                  {
+                    "width": 2752,
+                    "height": 1536
+                  },
+                  {
+                    "width": 3168,
+                    "height": 1344
+                  },
+                  {
+                    "width": 4096,
+                    "height": 4096
+                  },
+                  {
+                    "width": 5056,
+                    "height": 3392
+                  },
+                  {
+                    "width": 3392,
+                    "height": 5056
+                  },
+                  {
+                    "width": 4800,
+                    "height": 3584
+                  },
+                  {
+                    "width": 3584,
+                    "height": 4800
+                  },
+                  {
+                    "width": 4608,
+                    "height": 3712
+                  },
+                  {
+                    "width": 3712,
+                    "height": 4608
+                  },
+                  {
+                    "width": 3072,
+                    "height": 5504
+                  },
+                  {
+                    "width": 5504,
+                    "height": 3072
+                  },
+                  {
+                    "width": 6336,
+                    "height": 2688
+                  }
+                ]
+              },
+              "resolution": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "1K",
+                      "2K",
+                      "4K"
+                    ],
+                    "default": "1K"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "nano-banana-3": {
+          "modelDisplayName": "Gemini 3.1 (with Nano Banana 2)",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "enum": [
+                  {
+                    "width": 512,
+                    "height": 512
+                  },
+                  {
+                    "width": 1024,
+                    "height": 1024
+                  },
+                  {
+                    "width": 1264,
+                    "height": 848
+                  },
+                  {
+                    "width": 848,
+                    "height": 1264
+                  },
+                  {
+                    "width": 1200,
+                    "height": 896
+                  },
+                  {
+                    "width": 896,
+                    "height": 1200
+                  },
+                  {
+                    "width": 1152,
+                    "height": 928
+                  },
+                  {
+                    "width": 928,
+                    "height": 1152
+                  },
+                  {
+                    "width": 768,
+                    "height": 1376
+                  },
+                  {
+                    "width": 1376,
+                    "height": 768
+                  },
+                  {
+                    "width": 1584,
+                    "height": 672
+                  },
+                  {
+                    "width": 2048,
+                    "height": 2048
+                  },
+                  {
+                    "width": 2528,
+                    "height": 1696
+                  },
+                  {
+                    "width": 1696,
+                    "height": 2528
+                  },
+                  {
+                    "width": 2400,
+                    "height": 1792
+                  },
+                  {
+                    "width": 1792,
+                    "height": 2400
+                  },
+                  {
+                    "width": 2304,
+                    "height": 1856
+                  },
+                  {
+                    "width": 1856,
+                    "height": 2304
+                  },
+                  {
+                    "width": 1536,
+                    "height": 2752
+                  },
+                  {
+                    "width": 2752,
+                    "height": 1536
+                  },
+                  {
+                    "width": 3168,
+                    "height": 1344
+                  },
+                  {
+                    "width": 4096,
+                    "height": 4096
+                  },
+                  {
+                    "width": 5056,
+                    "height": 3392
+                  },
+                  {
+                    "width": 3392,
+                    "height": 5056
+                  },
+                  {
+                    "width": 4800,
+                    "height": 3584
+                  },
+                  {
+                    "width": 3584,
+                    "height": 4800
+                  },
+                  {
+                    "width": 4608,
+                    "height": 3712
+                  },
+                  {
+                    "width": 3712,
+                    "height": 4608
+                  },
+                  {
+                    "width": 3072,
+                    "height": 5504
+                  },
+                  {
+                    "width": 5504,
+                    "height": 3072
+                  },
+                  {
+                    "width": 6336,
+                    "height": 2688
+                  }
+                ]
+              },
+              "resolution": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "512",
+                      "1K",
+                      "2K",
+                      "4K"
+                    ],
+                    "default": "1K"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "nano-banana-2026-09": {
+          "modelDisplayName": "Gemini Nano Banana 2.1",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "enum": [
+                  {
+                    "width": 1024,
+                    "height": 1024
+                  },
+                  {
+                    "width": 1264,
+                    "height": 848
+                  },
+                  {
+                    "width": 848,
+                    "height": 1264
+                  },
+                  {
+                    "width": 1200,
+                    "height": 896
+                  },
+                  {
+                    "width": 896,
+                    "height": 1200
+                  },
+                  {
+                    "width": 1152,
+                    "height": 928
+                  },
+                  {
+                    "width": 928,
+                    "height": 1152
+                  },
+                  {
+                    "width": 768,
+                    "height": 1376
+                  },
+                  {
+                    "width": 1376,
+                    "height": 768
+                  },
+                  {
+                    "width": 1584,
+                    "height": 672
+                  },
+                  {
+                    "width": 2048,
+                    "height": 2048
+                  },
+                  {
+                    "width": 2528,
+                    "height": 1696
+                  },
+                  {
+                    "width": 1696,
+                    "height": 2528
+                  },
+                  {
+                    "width": 2400,
+                    "height": 1792
+                  },
+                  {
+                    "width": 1792,
+                    "height": 2400
+                  },
+                  {
+                    "width": 2304,
+                    "height": 1856
+                  },
+                  {
+                    "width": 1856,
+                    "height": 2304
+                  },
+                  {
+                    "width": 1536,
+                    "height": 2752
+                  },
+                  {
+                    "width": 2752,
+                    "height": 1536
+                  },
+                  {
+                    "width": 3168,
+                    "height": 1344
+                  },
+                  {
+                    "width": 4096,
+                    "height": 4096
+                  },
+                  {
+                    "width": 5056,
+                    "height": 3392
+                  },
+                  {
+                    "width": 3392,
+                    "height": 5056
+                  },
+                  {
+                    "width": 4800,
+                    "height": 3584
+                  },
+                  {
+                    "width": 3584,
+                    "height": 4800
+                  },
+                  {
+                    "width": 4608,
+                    "height": 3712
+                  },
+                  {
+                    "width": 3712,
+                    "height": 4608
+                  },
+                  {
+                    "width": 3072,
+                    "height": 5504
+                  },
+                  {
+                    "width": 5504,
+                    "height": 3072
+                  },
+                  {
+                    "width": 6336,
+                    "height": 2688
+                  }
+                ]
+              },
+              "resolution": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "1K",
+                      "2K",
+                      "4K"
+                    ],
+                    "default": "1K"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "modelId": "gpt-image",
+      "modelVersions": {
+        "1.5": {
+          "modelDisplayName": "GPT Image 1.5",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "enum": [
+                  {
+                    "width": 1024,
+                    "height": 1024
+                  },
+                  {
+                    "width": 1536,
+                    "height": 1024
+                  },
+                  {
+                    "width": 1024,
+                    "height": 1536
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "detailLevel": {
+                        "default": 3,
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 5
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "2": {
+          "modelDisplayName": "GPT Image 2",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 480,
+                    "maximum": 3840
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 480,
+                    "maximum": 3840
+                  }
+                }
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "detailLevel": {
+                        "default": 3,
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 5
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "gpt-image-2.5-flare": {
+          "modelDisplayName": "GPT Image 2.5 Flare",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 480,
+                    "maximum": 3840
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 480,
+                    "maximum": 3840
+                  }
+                }
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "detailLevel": {
+                        "default": 3,
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 7
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "gpt-image-2.5-prism": {
+          "modelDisplayName": "GPT Image 2.5 Sunburst",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 480,
+                    "maximum": 3840
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 480,
+                    "maximum": 3840
+                  }
+                }
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "detailLevel": {
+                        "default": 3,
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 7
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "gpt-image-2.6-aurora": {
+          "modelDisplayName": "GPT Image 2.6 Sunburst",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 480,
+                    "maximum": 3840
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 480,
+                    "maximum": 3840
+                  }
+                }
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "detailLevel": {
+                        "default": 3,
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 7
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "gpt-image-2.6-star-swirl": {
+          "modelDisplayName": "GPT Image 2.6 Flare",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 480,
+                    "maximum": 3840
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 480,
+                    "maximum": 3840
+                  }
+                }
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "detailLevel": {
+                        "default": 3,
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 7
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "modelId": "runway",
+      "modelVersions": {
+        "gen4_image": {
+          "modelDisplayName": "Runway Gen-4 Image",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "enum": [
+                  {
+                    "width": 1920,
+                    "height": 1080
+                  },
+                  {
+                    "width": 1080,
+                    "height": 1920
+                  },
+                  {
+                    "width": 1024,
+                    "height": 1024
+                  },
+                  {
+                    "width": 1360,
+                    "height": 768
+                  },
+                  {
+                    "width": 1080,
+                    "height": 1080
+                  },
+                  {
+                    "width": 1168,
+                    "height": 880
+                  },
+                  {
+                    "width": 1440,
+                    "height": 1080
+                  },
+                  {
+                    "width": 1080,
+                    "height": 1440
+                  },
+                  {
+                    "width": 1808,
+                    "height": 768
+                  },
+                  {
+                    "width": 2112,
+                    "height": 912
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "modelId": "runway-gen4-image",
+      "modelVersions": {
+        "default": {
+          "modelDisplayName": "Runway Gen-4 Image",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "enum": [
+                  {
+                    "width": 1920,
+                    "height": 1080
+                  },
+                  {
+                    "width": 1080,
+                    "height": 1920
+                  },
+                  {
+                    "width": 1024,
+                    "height": 1024
+                  },
+                  {
+                    "width": 1360,
+                    "height": 768
+                  },
+                  {
+                    "width": 1080,
+                    "height": 1080
+                  },
+                  {
+                    "width": 1168,
+                    "height": 880
+                  },
+                  {
+                    "width": 1440,
+                    "height": 1080
+                  },
+                  {
+                    "width": 1080,
+                    "height": 1440
+                  },
+                  {
+                    "width": 1808,
+                    "height": 768
+                  },
+                  {
+                    "width": 2112,
+                    "height": 912
+                  }
+                ]
+              },
+              "generationSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "modelId": "topaz",
+      "modelVersions": {
+        "default": {
+          "modelDisplayName": "Topaz",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "standard": {
+          "modelDisplayName": "Topaz",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "reimagine": {
+          "modelDisplayName": "Topaz Bloom",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "auto_sharpen": {
+          "modelDisplayName": "Topaz",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "denoise_normal": {
+          "modelDisplayName": "Topaz",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "denoise_extreme": {
+          "modelDisplayName": "Topaz",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "sharpen_standard": {
+          "modelDisplayName": "Topaz",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "sharpen_lens_blur": {
+          "modelDisplayName": "Topaz",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "sharpen_motion_blur": {
+          "modelDisplayName": "Topaz",
+          "enabled": true,
+          "outputModality": [
+            "image"
+          ],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32000
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "assets": {
+    "resolve-request-model-version-DEibkMPN.js": "a495a140906c03c1b16591e0a787d6cb2182c4c8590cf8b71f1ab76996ad8de1",
+    "convert-discovery-inputs-BB9PTLY4.js": "8dd8a649b0ec3a876eee00829ade6f9a7e5e7158295714a5365a28d4d5b291c2",
+    "size-schema-functions-BDws_SSb.js": "66a00241ec736deb747c37301c9a9d38db076789fa55f3de7523a652de5a9636"
+  },
+  "limits": "Public discovery and website conversion code; not account-specific entitlements or browser verification. GPT Image 2 uses a default aspect-size map (1K billing tier) with no resolution selector. GPT Image 2.5 / 2.6 use the website sizeRangeDerivation profile. Unknown continuous ranges do not imply discrete resolution choices."
+}

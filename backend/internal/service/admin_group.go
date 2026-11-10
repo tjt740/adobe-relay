@@ -562,6 +562,13 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	if normalizeCodexModelsManifestConfig(platform, input.CodexModelsManifestConfig).Enabled {
 		return nil, infraerrors.New(http.StatusBadRequest, "INVALID_CODEX_MODELS_MANIFEST_CONFIG", "codex models manifest config cannot be enabled at group creation; configure it after creation in the group editor")
 	}
+	imageQualityPricingEnabled := platform == PlatformAdobe
+	if input.ImageQualityPricingEnabled != nil {
+		imageQualityPricingEnabled = *input.ImageQualityPricingEnabled
+	}
+	if imageQualityPricingEnabled && platform != PlatformAdobe {
+		return nil, infraerrors.BadRequest("INVALID_IMAGE_QUALITY_PRICING_MODE", "quality billing requires an Adobe group")
+	}
 	imageQualityPrices, err := validateImageQualityPrices(platform, input.ImageQualityPrices)
 	if err != nil {
 		return nil, err
@@ -788,6 +795,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		VideoPrice720P:                  videoPrice720P,
 		VideoPrice1080P:                 videoPrice1080P,
 		VideoModelPrices:                NormalizeVideoModelPrices(input.VideoModelPrices),
+		ImageQualityPricingEnabled:      imageQualityPricingEnabled,
 		ImageQualityPrices:              imageQualityPrices,
 		WebSearchPricePerCall:           webSearchPricePerCall,
 		SearchPricePer1k:                searchPricePer1k,
@@ -1139,6 +1147,13 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.VideoPrice1080P != nil {
 		group.VideoPrice1080P = normalizePrice(input.VideoPrice1080P)
 	}
+	if input.ImageQualityPricingEnabled != nil {
+		if *input.ImageQualityPricingEnabled && group.Platform != PlatformAdobe {
+			return nil, infraerrors.BadRequest("INVALID_IMAGE_QUALITY_PRICING_MODE", "quality billing requires an Adobe group")
+		}
+		group.ImageQualityPricingEnabled = *input.ImageQualityPricingEnabled
+	}
+	// The billing switch never clears stored prices.
 	// nil = leave unchanged; empty map = clear per-model prices.
 	if input.ImageQualityPrices != nil {
 		prices, err := validateImageQualityPrices(group.Platform, input.ImageQualityPrices)

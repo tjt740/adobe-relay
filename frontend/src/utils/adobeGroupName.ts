@@ -10,13 +10,22 @@ export type AdobeGroupModel = typeof adobeModels[number]['id']
 export const adobeGroupModels = ['2', '2.5', '2.6'] as const
 export type AdobeGroupVersion = typeof adobeGroupModels[number]
 
+export function adobeGroupModelNames(name: string): string[] {
+  if (!/^adobe\s+/i.test(name.trim())) return []
+  return name.trim().replace(/^adobe\s+/i, '').split(' - ')[0].split(' + ').map(s => s.trim()).filter(Boolean)
+}
+
 // Retain legacy version filters for existing API callers.
 export function adobeGroupNameModels(name: string): AdobeGroupVersion[] {
+  const names = adobeGroupModelNames(name)
+  if (names.length > 1) return [...new Set(names.flatMap(model => adobeGroupNameModels('Adobe ' + model)))]
   const match = name.trim().match(/^adobe\s*(?:gpt\s+image\s+)?(2(?:\.[56])?)(?=$|[\s/&-])(?:\s*(?:and|&|\/)\s*(2(?:\.[56])?)(?=$|[\s-]))?/i)
   return match ? [...new Set([match[1], match[2]].filter(Boolean))] as AdobeGroupVersion[] : []
 }
 
 export function adobeGroupNameModelIds(name: string): AdobeGroupModel[] {
+  const names = adobeGroupModelNames(name)
+  if (names.length > 1) return [...new Set(names.flatMap(model => adobeGroupNameModelIds('Adobe ' + model)))]
   const versions = adobeGroupNameModels(name)
   const result: AdobeGroupModel[] = versions.includes('2') ? ['gpt-image-2'] : []
   // A variant must be next to the version, never inferred from a customer name.

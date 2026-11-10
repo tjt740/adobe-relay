@@ -854,7 +854,9 @@ export default {
         "customerPreview": "Customer name",
         "modelFilter": "Adobe model",
         "allModels": "All Adobe models",
-        "model": "Model name",
+        "model": "Model names (multiple)",
+        "chooseModels": "Choose models",
+        "tooLong": "The combined name is too long. Choose fewer models or shorten the name.",
         "category": "Category / specification",
         "lowMedium": "Low/medium 124K full parameters",
         "lowMediumSeven": "Low/medium 124K full parameters (7 cents)",
@@ -866,8 +868,8 @@ export default {
         "customer": "Customer / group name",
         "optional": "Optional",
         "customerPlaceholder": "e.g. blue",
-        "preview": "Final name",
-        "hint": "Creates Adobe model name - category - customer. The name is used for filtering; available models and prices are configured separately.",
+        "preview": "Name preview",
+        "hint": "Creates Adobe model name - customer / group name; multiple models are joined with +. The name is used for filtering; available models and prices are configured separately.",
         "useCustom": "Use custom model",
         "modelSearch": "Search models or enter a custom name…",
         "source": {
@@ -877,12 +879,13 @@ export default {
         }
       },
       adobePricingMode: {
+        "help": "View billing details",
         "basePreview": "Base price preview (when no quality price matches)",
-        "title": "New Image 2.6 quality pricing",
-        "oldDescription": "Legacy editor: base prices and existing per-model pricing.",
-        "newDescription": "Choose GPT Image 2.6 Flare or Sunburst independently of the group name.",
-        "safeNotice": "Enabling the editor does not fill prices. Saved entries apply; blank inherits existing pricing and 0 is free.",
-        "savedNotice": "Saved quality prices remain active. Closing the editor does not disable or clear them; open it, clear the cells and save to restore inherited prices."
+        "title": "Enable quality-based billing",
+        "oldDescription": "Legacy billing: use existing per-model, base and default pricing rules. Saved quality prices are not used.",
+        "newDescription": "Quality billing: matching model, resolution and quality prices take priority. Empty cells use legacy pricing.",
+        "safeNotice": "Takes effect after saving. Turning this off restores legacy billing and retains entered quality prices for later use. A quality price of 0 is free.",
+        "savedNotice": "Entered quality prices are retained. Turn off and save to use legacy billing; turn on and save to use quality pricing again."
 },
       title: 'Group Management',
       description: 'Manage API key groups and rate multipliers',
@@ -1170,7 +1173,7 @@ export default {
         searchPricePer1k: 'Search price per 1k calls (USD)',
         pricePlaceholder: 'optional'
       },
-      imageQualityPricing: {"title": "Image 2.6 resolution and quality pricing", "model": "Pricing model", "hint": "Set USD/image independently for both models; switch between tables and save both drafts together. Blank inherits existing model, group or channel pricing; 0 is free. Matching prices take priority and applicable image multipliers still apply. Auto/omitted quality uses Medium; aliases share prices. Pricing does not change generation quality.", "quality": "Quality", "inherit": "Inherit existing price"},
+      imageQualityPricing: {"title": "Resolution and quality pricing (USD / image)", "model": "Pricing model", "hint": "Enter prices separately for each model. Switching tabs preserves drafts. Supports four decimal places; blank inherits existing pricing, 0 is free, and image multipliers still apply. Auto / omitted quality is billed as Medium.", "resolution": "Resolution", "quality": "Quality", "inherit": "Inherit existing price", "unsupported": "Independent quality pricing is not available for this model. Base or existing per-model pricing still applies.", "chooseModels": "Choose a model in the name section first.", "officialSource": "Tiers from Adobe website parameters; UI tier rules checked on 2026-11-11.", "fallbackSource": "Using website fallback tiers verified on {date}.", "defaultResolution": "The website has no resolution selector. Only pricing for its default size tier (1K) is shown.", "unknownResolution": "Website resolution tiers are not confirmed. No price rows are generated.", "noQuality": "The website does not offer a quality selector.", "unknownQuality": "Website quality tiers are not confirmed. No quality columns are generated.", "unavailableCell": "Pricing unavailable"},
       modelPricing: {
         title: 'Per-model group pricing',
         description: 'Overrides channel and built-in prices for matching models. Long-context tiers come from official presets — do not enter custom intervals. Use per-request tiers such as realtime, tts, and stt for audio.',
