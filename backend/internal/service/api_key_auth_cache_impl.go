@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 27 // v27: include optional Adobe Image 2.6 quality prices.
+const apiKeyAuthSnapshotVersion = 28 // v28: include the explicit, default-off Adobe quality billing switch.
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -409,6 +409,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			VideoPrice720P:                  groupForSnapshot.VideoPrice720P,
 			VideoPrice1080P:                 groupForSnapshot.VideoPrice1080P,
 			VideoModelPrices:                NormalizeVideoModelPrices(groupForSnapshot.VideoModelPrices),
+			ImageQualityPricingEnabled:      groupForSnapshot.ImageQualityPricingEnabled,
 			ImageQualityPrices:              CloneImageQualityPrices(groupForSnapshot.ImageQualityPrices),
 			WebSearchPricePerCall:           groupForSnapshot.WebSearchPricePerCall,
 			SearchPricePer1k:                groupForSnapshot.SearchPricePer1k,
@@ -521,6 +522,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			VideoPrice720P:                  snapshot.Group.VideoPrice720P,
 			VideoPrice1080P:                 snapshot.Group.VideoPrice1080P,
 			VideoModelPrices:                NormalizeVideoModelPrices(snapshot.Group.VideoModelPrices),
+			ImageQualityPricingEnabled:      snapshot.Group.ImageQualityPricingEnabled,
 			ImageQualityPrices:              CloneImageQualityPrices(snapshot.Group.ImageQualityPrices),
 			WebSearchPricePerCall:           snapshot.Group.WebSearchPricePerCall,
 			SearchPricePer1k:                snapshot.Group.SearchPricePer1k,

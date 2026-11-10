@@ -851,7 +851,9 @@ export default {
         "customerPreview": "客户名称",
         "modelFilter": "Adobe 模型",
         "allModels": "全部 Adobe 模型",
-        "model": "模型名称",
+        "model": "模型名称（可多选）",
+        "chooseModels": "请选择模型",
+        "tooLong": "模型和客户名称过长，请减少模型选项或缩短名称。",
         "category": "类型 / 规格",
         "lowMedium": "低中质量 124K 全参分组",
         "lowMediumSeven": "低中质量 124K 全参分组（7分）",
@@ -863,8 +865,8 @@ export default {
         "customer": "客户 / 分组名称",
         "optional": "选填",
         "customerPlaceholder": "例如：杂乱无章",
-        "preview": "最终名称",
-        "hint": "按「Adobe 模型名称 - 类型 / 规格 - 客户名称」生成。名称用于分组筛选，可用模型和价格仍由对应配置决定。",
+        "preview": "预览名称",
+        "hint": "按「Adobe 模型名称 - 客户 / 分组名称」生成；多选模型以 + 连接。名称用于分组筛选，可用模型和价格仍由对应配置决定。",
         "useCustom": "使用自定义模型",
         "modelSearch": "搜索模型，或输入自定义名称…",
         "source": {
@@ -874,15 +876,14 @@ export default {
         }
       },
       adobePricingMode: {
+        "help": "查看计费说明",
         "basePreview": "基础价格预览（未命中质量价格时）",
-        "title": "新版质量价格表",
-        "followsName": "当前定价模型：{model}（跟随分组模型名称）",
-        "savedUnmatched": "已有质量价格保持不变。分组名称明确为某款受支持模型后，可编辑对应价格表。",
-        "oldDescription": "当前使用旧版填写方式：基础价格与原逐模型价格配置。",
-        "newDescription": "按上方模型名称展开对应的分辨率与质量价格表，模型在此处不可更改。",
-        "safeNotice": "开启开关不会自动填价。填写并保存后，对应价格才生效；空白沿用原价，0 表示免费。",
-        "savedNotice": "已保存的新价格仍然生效。关闭仅收起填写区，不停用或清空价格；恢复原价请展开、清空对应格并保存。"
-      },
+        "title": "启用新版质量计费",
+        "oldDescription": "旧版计费：使用原逐模型价格、基础价格及默认价格规则。质量价格暂不参与计费。",
+        "newDescription": "新版计费：优先使用对应模型、分辨率和质量的价格；未填写的组合沿用旧版价格。",
+        "safeNotice": "保存后生效。关闭开关恢复旧版计费，并保留已填质量价格；再次开启可继续使用。质量价格填 0 表示免费。",
+        "savedNotice": "已填写的质量价格会保留。关闭并保存后使用旧版计费，再次开启并保存即可恢复质量计费。"
+},
       title: '分组管理',
       description: '管理 API 密钥分组和费率配置',
       searchGroups: '搜索分组...',
@@ -1169,7 +1170,7 @@ export default {
         searchPricePer1k: '搜索每千次价格（USD）',
         pricePlaceholder: '可选'
       },
-      imageQualityPricing: {"title": "模型分辨率与质量定价", "hint": "当前模型按分辨率和质量设置 USD/张。空白沿用已有模型、分组或渠道收费；0 表示免费。匹配的价格优先，仍乘以适用的图片倍率。auto/未传质量按 Medium；旧模型别名共用对应价格。只改收费，不改变生成质量。", "quality": "质量", "inherit": "沿用原价"},
+      imageQualityPricing: {"title": "分辨率与质量定价（USD / 张）", "model": "定价模型", "hint": "各模型分别填写，切换标签页保留草稿。支持四位小数；空白沿用原价，0 表示免费，仍乘适用图片倍率。auto / 未传质量按 Medium 计费。", "resolution": "分辨率", "quality": "质量", "inherit": "沿用原价", "unsupported": "该模型暂未接入独立质量价格表，继续沿用基础价或已有逐模型价格。", "chooseModels": "请先在名称区域选择模型。", "officialSource": "档位来自 Adobe 官网参数；页面档位规则核对于 2026-11-11。", "fallbackSource": "使用 {date} 核对的官网备用档位。", "defaultResolution": "官网没有分辨率下拉；下方仅显示官网默认尺寸对应的 1K 价格。", "unknownResolution": "尚未确认官网分辨率档位，暂不生成价格行。", "noQuality": "官网未提供质量选择。", "unknownQuality": "尚未确认官网质量档位，暂不生成质量列。", "unavailableCell": "暂未接入定价"},
       modelPricing: {
         title: '分组逐模型定价',
         description: '匹配模型后覆盖渠道和内置价格。长上下文阶梯沿用官方/预设价卡，无需再手填区间。音频可用按次层级配置 realtime、tts、stt。',

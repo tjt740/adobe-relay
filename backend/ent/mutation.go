@@ -22241,6 +22241,7 @@ type GroupMutation struct {
 	addvideo_price_720p                     *float64
 	video_price_1080p                       *float64
 	addvideo_price_1080p                    *float64
+	image_quality_pricing_enabled           *bool
 	image_quality_prices                    *map[string]map[string]map[string]float64
 	video_model_prices                      *map[string]map[string]float64
 	web_search_price_per_call               *float64
@@ -24166,6 +24167,42 @@ func (m *GroupMutation) ResetVideoPrice1080p() {
 	m.video_price_1080p = nil
 	m.addvideo_price_1080p = nil
 	delete(m.clearedFields, group.FieldVideoPrice1080p)
+}
+
+// SetImageQualityPricingEnabled sets the "image_quality_pricing_enabled" field.
+func (m *GroupMutation) SetImageQualityPricingEnabled(b bool) {
+	m.image_quality_pricing_enabled = &b
+}
+
+// ImageQualityPricingEnabled returns the value of the "image_quality_pricing_enabled" field in the mutation.
+func (m *GroupMutation) ImageQualityPricingEnabled() (r bool, exists bool) {
+	v := m.image_quality_pricing_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImageQualityPricingEnabled returns the old "image_quality_pricing_enabled" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldImageQualityPricingEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImageQualityPricingEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImageQualityPricingEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImageQualityPricingEnabled: %w", err)
+	}
+	return oldValue.ImageQualityPricingEnabled, nil
+}
+
+// ResetImageQualityPricingEnabled resets all changes to the "image_quality_pricing_enabled" field.
+func (m *GroupMutation) ResetImageQualityPricingEnabled() {
+	m.image_quality_pricing_enabled = nil
 }
 
 // SetImageQualityPrices sets the "image_quality_prices" field.
@@ -26534,7 +26571,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 77)
+	fields := make([]string, 0, 78)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -26639,6 +26676,9 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.video_price_1080p != nil {
 		fields = append(fields, group.FieldVideoPrice1080p)
+	}
+	if m.image_quality_pricing_enabled != nil {
+		fields = append(fields, group.FieldImageQualityPricingEnabled)
 	}
 	if m.image_quality_prices != nil {
 		fields = append(fields, group.FieldImageQualityPrices)
@@ -26844,6 +26884,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.VideoPrice720p()
 	case group.FieldVideoPrice1080p:
 		return m.VideoPrice1080p()
+	case group.FieldImageQualityPricingEnabled:
+		return m.ImageQualityPricingEnabled()
 	case group.FieldImageQualityPrices:
 		return m.ImageQualityPrices()
 	case group.FieldVideoModelPrices:
@@ -27007,6 +27049,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldVideoPrice720p(ctx)
 	case group.FieldVideoPrice1080p:
 		return m.OldVideoPrice1080p(ctx)
+	case group.FieldImageQualityPricingEnabled:
+		return m.OldImageQualityPricingEnabled(ctx)
 	case group.FieldImageQualityPrices:
 		return m.OldImageQualityPrices(ctx)
 	case group.FieldVideoModelPrices:
@@ -27344,6 +27388,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetVideoPrice1080p(v)
+		return nil
+	case group.FieldImageQualityPricingEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImageQualityPricingEnabled(v)
 		return nil
 	case group.FieldImageQualityPrices:
 		v, ok := value.(map[string]map[string]map[string]float64)
@@ -28308,6 +28359,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldVideoPrice1080p:
 		m.ResetVideoPrice1080p()
+		return nil
+	case group.FieldImageQualityPricingEnabled:
+		m.ResetImageQualityPricingEnabled()
 		return nil
 	case group.FieldImageQualityPrices:
 		m.ResetImageQualityPrices()

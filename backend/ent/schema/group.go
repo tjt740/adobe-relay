@@ -38,7 +38,7 @@ func (Group) Fields() []ent.Field {
 		// 唯一约束通过部分索引实现（WHERE deleted_at IS NULL），支持软删除后重用
 		// 见迁移文件 016_soft_delete_partial_unique_indexes.sql
 		field.String("name").
-			MaxLen(100).
+			MaxLen(512).
 			NotEmpty(),
 		field.String("description").
 			Optional().
@@ -158,6 +158,9 @@ func (Group) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+		field.Bool("image_quality_pricing_enabled").
+			Default(false).
+			Comment("Adobe quality billing switch; false uses legacy billing while retaining saved quality prices"),
 		field.JSON("image_quality_prices", map[string]map[string]map[string]float64{}).
 			Optional().
 			SchemaType(map[string]string{dialect.Postgres: "jsonb"}),

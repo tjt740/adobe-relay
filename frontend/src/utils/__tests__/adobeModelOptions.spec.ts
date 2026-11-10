@@ -21,7 +21,7 @@ describe('Adobe model options', () => {
       { id: 'my-model', display_name: 'my-model' },
     ])
     expect(normalizeAdobeModelOptions(null)).toEqual([])
-    expect(adobeFallbackModelOptions.map(m => m.display_name)).toEqual([
+    expect(adobeFallbackModelOptions.slice(0, 5).map(m => m.display_name)).toEqual([
       'GPT Image 2', 'GPT Image 2.5 Flare', 'GPT Image 2.5 Sunburst', 'GPT Image 2.6 Flare', 'GPT Image 2.6 Sunburst',
     ])
   })
@@ -57,10 +57,10 @@ describe('Adobe public discovery parsing', () => {
       { modelId: 'gemini-flash', modelVersions: { next: image('Gemini Latest') } },
     ])
     expect(options).toHaveLength(7)
-    expect(options).toContainEqual({ id: 'gpt-image-2.6-flare', display_name: 'Adobe Latest Flare Name' })
-    expect(options).toContainEqual({ id: 'gpt-image-2.5-sunburst', display_name: 'GPT Image 2.5 Sunburst' })
-    expect(options).toContainEqual({ id: 'gpt-image@future', display_name: 'GPT Image Future' })
-    expect(options).toContainEqual({ id: 'gemini-flash@next', display_name: 'Gemini Latest' })
+    expect(options.map(({ id, display_name }) => ({ id, display_name }))).toContainEqual({ id: 'gpt-image-2.6-flare', display_name: 'Adobe Latest Flare Name' })
+    expect(options.map(({ id, display_name }) => ({ id, display_name }))).toContainEqual({ id: 'gpt-image-2.5-sunburst', display_name: 'GPT Image 2.5 Sunburst' })
+    expect(options.map(({ id, display_name }) => ({ id, display_name }))).toContainEqual({ id: 'gpt-image@future', display_name: 'GPT Image Future' })
+    expect(options.map(({ id, display_name }) => ({ id, display_name }))).toContainEqual({ id: 'gemini-flash@next', display_name: 'Gemini Latest' })
   })
   it('excludes disabled, deprecated, non-image and malformed entries, and deduplicates labels', () => {
     expect(parseAdobeWebsiteModelOptions([
@@ -73,6 +73,6 @@ describe('Adobe public discovery parsing', () => {
         missing: { modelDisplayName: 'Missing flags' }, invalid: null,
         blank: image(' '),
       } },
-    ])).toEqual([{ id: 'family@current', display_name: 'Current Image' }])
+    ] ).map(({ id, display_name }) => ({ id, display_name }))).toEqual([{ id: 'family@current', display_name: 'Current Image' }])
   })
 })

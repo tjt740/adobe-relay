@@ -508,10 +508,10 @@
             <template v-if="createForm.platform === 'adobe'" #default-input>
               <AdobeGroupNameFields
                 v-model="createForm.name"
+                @update:selected-models="createAdobeModels = $event"
                 :initial-model="filters.adobe_model"
                 :model-options="adobeModelOptions"
                 :model-source="adobeModelOptionsSource"
-                @update:selected-model="createAdobeModel = $event"
                 data-tour="group-form-name"
               />
             </template>
@@ -1000,10 +1000,7 @@
           <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
             {{ t(imagePricingI18nKey(createForm.platform, "description")) }}
           </p>
-          <p v-if="createForm.platform === 'adobe'" class="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300" data-testid="create-adobe-pricing-model">
-            {{ t('admin.groups.adobePricingMode.followsName', { model: adobeModelOptions.find(model => model.id === createAdobeModel)?.display_name || createAdobeModel }) }}
-          </p>
-          <AdobePricingModeSwitch v-if="createForm.platform === 'adobe' && createAdobePricingModel" v-model="createNewAdobePricing" />
+          <AdobePricingModeSwitch v-if="createForm.platform === 'adobe'" v-model="createNewAdobePricing" :has-saved-prices="Object.keys(createForm.image_quality_prices).length > 0" />
           <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
@@ -1058,7 +1055,7 @@
               <input
                 v-model.number="createForm.image_price_1k"
                 type="number"
-                step="0.001"
+                step="0.0001"
                 min="0"
                 class="input"
                 :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_1k')"
@@ -1069,7 +1066,7 @@
               <input
                 v-model.number="createForm.image_price_2k"
                 type="number"
-                step="0.001"
+                step="0.0001"
                 min="0"
                 class="input"
                 :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_2k')"
@@ -1080,7 +1077,7 @@
               <input
                 v-model.number="createForm.image_price_4k"
                 type="number"
-                step="0.001"
+                step="0.0001"
                 min="0"
                 class="input"
                 :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_4k')"
@@ -1103,7 +1100,7 @@
               </div>
             </div>
           </div>
-          <ImageQualityPricing v-if="createForm.platform === 'adobe' && createNewAdobePricing && createAdobePricingModel" v-model="createForm.image_quality_prices" :model="createAdobePricingModel.id" :model-label="createAdobePricingModel.display_name" />
+          <ImageQualityPricing v-if="createForm.platform === 'adobe' && createNewAdobePricing" v-model="createForm.image_quality_prices" :models="createAdobeModels" />
           <div v-if="createForm.platform === 'gemini' && createForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
             <label
               class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -2749,13 +2746,7 @@
           <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
             {{ t(imagePricingI18nKey(editForm.platform, "description")) }}
           </p>
-          <p v-if="editForm.platform === 'adobe' && editAdobePricingModel" class="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300" data-testid="edit-adobe-pricing-model">
-            {{ t('admin.groups.adobePricingMode.followsName', { model: editAdobePricingModel.display_name }) }}
-          </p>
-          <AdobePricingModeSwitch v-if="editForm.platform === 'adobe' && editAdobePricingModel" v-model="editNewAdobePricing" :has-saved-prices="editHasSavedQualityPrices" />
-          <p v-if="editForm.platform === 'adobe' && !editAdobePricingModel && editHasSavedQualityPrices" class="mb-3 text-xs text-gray-500">
-            {{ t('admin.groups.adobePricingMode.savedUnmatched') }}
-          </p>
+          <AdobePricingModeSwitch v-if="editForm.platform === 'adobe'" v-model="editNewAdobePricing" :has-saved-prices="editHasSavedQualityPrices" />
           <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
@@ -2810,7 +2801,7 @@
               <input
                 v-model.number="editForm.image_price_1k"
                 type="number"
-                step="0.001"
+                step="0.0001"
                 min="0"
                 class="input"
                 :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_1k')"
@@ -2821,7 +2812,7 @@
               <input
                 v-model.number="editForm.image_price_2k"
                 type="number"
-                step="0.001"
+                step="0.0001"
                 min="0"
                 class="input"
                 :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_2k')"
@@ -2832,7 +2823,7 @@
               <input
                 v-model.number="editForm.image_price_4k"
                 type="number"
-                step="0.001"
+                step="0.0001"
                 min="0"
                 class="input"
                 :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_4k')"
@@ -2844,7 +2835,7 @@
           </p>
           <div class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
             <div class="mb-1 font-medium">
-              {{ t(editForm.platform === "adobe" && (editNewAdobePricing || editHasSavedQualityPrices) ? "admin.groups.adobePricingMode.basePreview" : imagePricingI18nKey(editForm.platform, "finalPricePreview")) }}
+              {{ t(editForm.platform === "adobe" && editNewAdobePricing ? "admin.groups.adobePricingMode.basePreview" : imagePricingI18nKey(editForm.platform, "finalPricePreview")) }}
             </div>
             <div class="grid grid-cols-3 gap-2">
               <div
@@ -2855,7 +2846,7 @@
               </div>
             </div>
           </div>
-          <ImageQualityPricing v-if="editForm.platform === 'adobe' && editNewAdobePricing && editAdobePricingModel" v-model="editForm.image_quality_prices" :model="editAdobePricingModel.id" :model-label="editAdobePricingModel.display_name" />
+          <ImageQualityPricing v-if="editForm.platform === 'adobe' && editNewAdobePricing" v-model="editForm.image_quality_prices" :models="editAdobePricingModels" />
           <div v-if="editForm.platform === 'gemini' && editForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
             <label
               class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -4526,7 +4517,8 @@ import Icon from "@/components/icons/Icon.vue";
 import GroupI18nField from "@/components/admin/group/GroupI18nField.vue";
 import AdobeGroupNameFields from "@/components/admin/group/AdobeGroupNameFields.vue";
 import AdobePricingModeSwitch from "@/components/admin/group/AdobePricingModeSwitch.vue";
-import { adobeQualityModel, adobeGroupQualityModel, adobeQualityPricePayload } from "@/utils/adobeGroupPricing";
+import { adobeQualityPricePayload } from "@/utils/adobeGroupPricing";
+import { adobePricingModelsForName } from "@/utils/adobePricingModels";
 import { adobeFallbackModelOptions, normalizeAdobeModelOptions } from "@/utils/adobeModelOptions";
 import type { GroupModelOption } from "@/api/admin/groups";
 import GroupRateMultipliersModal from "@/components/admin/group/GroupRateMultipliersModal.vue";
@@ -5086,10 +5078,10 @@ const loadAdobeModelOptions = async () => {
     adobeModelOptionsSource.value = "fallback";
   }
 };
-const createAdobeModel = ref("gpt-image-2");
-const createNewAdobePricing = ref(false);
-const createAdobePricingModel = computed(() => adobeQualityModel(createAdobeModel.value, adobeModelOptions.value));
-const editNewAdobePricing = ref(false);
+const createAdobeModels = ref<GroupModelOption[]>([]);
+const editAdobePricingModels = computed(() => adobePricingModelsForName(editForm.name, adobeModelOptions.value, editForm.image_quality_prices));
+const createNewAdobePricing = ref(true);
+const editNewAdobePricing = ref(true);
 const editHasSavedQualityPrices = ref(false);
 const adobeModelFilterOptions = computed(() => [
   { value: "", label: t("admin.groups.adobeNaming.allModels") },
@@ -5602,8 +5594,6 @@ const convertApiFormatToRoutingRules = async (
   }
   return rules;
 };
-
-const editAdobePricingModel = computed(() => adobeGroupQualityModel(editForm.name, adobeModelOptions.value));
 
 const editForm = reactive({
   name: "",
@@ -6135,8 +6125,8 @@ const closeCreateModal = () => {
   createForm.video_price_720p = null;
   createForm.video_price_1080p = null;
   createForm.image_quality_prices = {};
-  createNewAdobePricing.value = false;
-  createAdobeModel.value = "gpt-image-2";
+  createNewAdobePricing.value = true;
+  createAdobeModels.value = [];
   createForm.video_model_prices = createVideoModelPricesForm();
   createForm.long_context_pricing_enabled = true;
   createForm.force_openai_fast = false;
@@ -6296,7 +6286,8 @@ const handleCreateGroup = async () => {
     // 构建请求数据，包含模型路由配置
     const requestData = {
       ...createGroupForm,
-      image_quality_prices: createForm.platform === "adobe" ? adobeQualityPricePayload(createForm.image_quality_prices, createAdobePricingModel.value, createNewAdobePricing.value) : {},
+      image_quality_pricing_enabled: createForm.platform === "adobe" && createNewAdobePricing.value,
+      image_quality_prices: createForm.platform === "adobe" ? adobeQualityPricePayload(createForm.image_quality_prices, createAdobeModels.value.map(m => m.id)) : {},
       force_openai_fast: normalizeGroupOpenAIFast(
         createForm.platform,
         createForm.force_openai_fast,
@@ -6485,7 +6476,7 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.video_price_1080p = group.video_price_1080p;
   editForm.image_quality_prices = JSON.parse(JSON.stringify(group.image_quality_prices || {}));
   editHasSavedQualityPrices.value = Object.keys(editForm.image_quality_prices).length > 0;
-  editNewAdobePricing.value = false;
+  editNewAdobePricing.value = group.image_quality_pricing_enabled ?? true;
   editForm.video_model_prices = createVideoModelPricesForm(
     group.video_model_prices,
   );
@@ -6615,7 +6606,7 @@ const closeEditModal = () => {
   editForm.video_price_720p = null;
   editForm.video_price_1080p = null;
   editForm.image_quality_prices = {};
-  editNewAdobePricing.value = false;
+  editNewAdobePricing.value = true;
   editHasSavedQualityPrices.value = false;
   editForm.video_model_prices = createVideoModelPricesForm();
   editForm.long_context_pricing_enabled = true;
@@ -6697,7 +6688,8 @@ const handleUpdateGroup = async () => {
       monthly_limit_usd: normalizeOptionalLimit(
         editForm.monthly_limit_usd as number | string | null,
       ),
-      image_quality_prices: editForm.platform === "adobe" ? adobeQualityPricePayload(editForm.image_quality_prices, editAdobePricingModel.value, editNewAdobePricing.value, editingGroup.value?.image_quality_prices || {}) : {},
+      image_quality_pricing_enabled: editForm.platform === "adobe" && editNewAdobePricing.value,
+      image_quality_prices: editForm.platform === "adobe" ? adobeQualityPricePayload(editForm.image_quality_prices) : {},
       video_model_prices: serializeVideoModelPrices(
         editForm.video_model_prices,
       ),

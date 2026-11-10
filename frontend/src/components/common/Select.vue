@@ -56,6 +56,7 @@
           :class="[instanceId, size === 'sm' && 'select-dropdown-sm']"
           :style="dropdownStyle"
           role="listbox"
+          :aria-multiselectable="selectedValues ? true : undefined"
           tabindex="-1"
           @click.stop
           @mousedown.stop
@@ -141,6 +142,8 @@ export interface SelectOption {
 
 interface Props {
   modelValue: string | number | boolean | null | undefined
+  selectedValues?: Array<string | number | boolean | null>
+  closeOnSelect?: boolean
   options: SelectOption[] | Array<Record<string, unknown>>
   placeholder?: string
   disabled?: boolean
@@ -172,6 +175,7 @@ interface Emits {
 
 const props = withDefaults(defineProps<Props>(), {
   disabled: false,
+  closeOnSelect: true,
   error: false,
   searchable: 'auto',
   creatable: false,
@@ -317,6 +321,7 @@ const filteredOptions = computed(() => {
 })
 
 const isSelected = (option: any): boolean => {
+  if (props.selectedValues) return props.selectedValues.includes(getOptionValue(option))
   return getOptionValue(option) === props.modelValue
 }
 
@@ -434,8 +439,12 @@ const selectOption = (option: any) => {
   const value = getOptionValue(option) ?? null
   emit('update:modelValue', value)
   emit('change', value, option)
-  isOpen.value = false
-  triggerRef.value?.focus()
+  if (props.closeOnSelect) {
+    isOpen.value = false
+    triggerRef.value?.focus()
+  } else {
+    nextTick(() => searchInputRef.value?.focus())
+  }
 }
 
 const clearSelection = () => {

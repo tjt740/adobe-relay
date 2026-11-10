@@ -11,7 +11,7 @@ describe('Adobe website model directory API', () => {
     get.mockResolvedValue({ data: { source: 'adobe', models: [{ modelId: 'future', modelVersions: {
       next: { enabled: true, outputModality: ['image'], modelDisplayName: 'Adobe Latest Name' }
     } }] } })
-    expect(await getAdobeWebsiteModelOptions()).toEqual([{ id: 'future@next', display_name: 'Adobe Latest Name' }])
+    expect(await getAdobeWebsiteModelOptions()).toEqual([{ id: 'future@next', display_name: 'Adobe Latest Name', capabilities: { source: 'adobe', checkedAt: '', resolutions: [], resolutionMode: 'unknown', qualities: [], qualityMode: 'unknown' } }])
     expect(get).toHaveBeenCalledWith('/admin/groups/adobe-models', { timeout: 10000 })
   })
 

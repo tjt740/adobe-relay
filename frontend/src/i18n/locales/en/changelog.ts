@@ -18,6 +18,8 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      adobeGroupMultiPricing: {title: 'Adobe model selection and quality billing modes', body: 'Select multiple models, edit four-decimal prices in model tabs, and switch real billing modes. Quality billing defaults on; disabling retains saved prices and restores legacy billing. Website model tiers and custom names remain available.'},
+      adobePricingRevert: {"title": "Restore independent Image 2.6 pricing tables", "body": "Choose the 2.6 pricing model independently, retaining the legacy/new editor switch and saved prices. Withdraw 2/2.5 quality pricing while retaining the website model directory, naming and filters."},
       adobeGroupNaming: {"title": "Adobe model filters and quality tables for three generations", "body": "Model names prefer Adobe discovery and allow custom input. Image 2, 2.5 and 2.6 prices follow the selected model, with the legacy editor selected by default."},
       adobeImage26Pricing: {"title": "Separate resolution and quality prices for both Image 2.6 models", "body": "Adobe groups now have independent Flare and Sunburst quality price tables. Extra High and Max can be priced separately; blank cells inherit existing rates. Today’s generation quality, official names, documentation reading theme and shared login remain available."},
       adobeImage26Quality: {"title": "Image 2.6 quality, website names and API documentation updated", "body": "2.6 Flare / Sunburst support distinct Extra High and Max levels without silent downgrades. Model lists, previous-name compatibility and examples are updated, alongside today’s documentation reading theme, shared login and protected downloads."},
@@ -42,6 +44,42 @@ export default {
       }
     },
     "updates": {
+      adobeGroupMultiPricing: {"title": "Adobe model selection and pricing tabs", "body": "Select multiple website or custom model names and edit prices in model tabs with four decimal places.", "sections": {"selection": {"title": "Multiple models and a name preview", "body": "Choose models without closing the list. Names are joined with +, retain website and fallback discovery and custom input, and can be filtered by any selected model."}, "pricing": {"title": "Separate prices with preserved drafts", "body": "The new editor uses model tabs, resolution rows and quality columns in USD. Switching tabs or reselecting models preserves drafts; creation saves only selected models. Editing retains access to other saved model prices. Blank inherits and zero is free. Rows and columns follow website model parameters: Image 2 uses the website default size and three qualities, while 2.5/2.6 expose three resolutions and five qualities. Other model tiers are not invented, and hidden saved prices remain intact."}, "billing": {"title": "Restore Image 2 / 2.5 quality billing", "body": "Billing matches GPT Image 2, 2.5 and 2.6 prices by model, resolution and quality, with applicable multipliers. Image 2.5 Extra High / Max use tiers 6/7 to match billing. Unknown model quality tables are not guessed."}, "boundary": {"title": "Validation and scope", "body": "New and unset Adobe groups default to quality billing; saved off states remain. Website discovery is not an entitlement list or support promise. Billing regressions and two local real generations passed; this does not verify the full pool, every tier or production debits."}, "mode": {"title": "Switch actual billing modes", "body": "New and unset Adobe groups default to quality billing; saved choices are retained. Click the exclamation icon beside the title for details. Enabled quality prices take priority, blank cells inherit legacy rates, and disabling preserves prices while using legacy billing after saving."}}},
+      adobeGroupNameLayout: {
+        title: 'Simplify Adobe group naming',
+        body: 'Hide the category selector, place the customer / group name next to the model, and rename Final name to Name preview.',
+        sections: {
+          layout: { title: 'Enter the model and group name side by side', body: 'Creating an Adobe group requires a model and customer / group name, with a live name preview below. The fields stack on narrow screens.' },
+          preservation: { title: 'Retain drafts and model input', body: 'Category text from existing drafts remains editable within the name field. Website model discovery, fallback names, custom models and group filters remain available.' },
+          boundary: { title: 'Compatibility', body: 'Existing group prices and account bindings are retained. Names organize and filter groups; they do not grant model access.' },
+        },
+      },
+      adobePricingRevert: {
+        "title": "Restore independent Image 2.6 pricing tables",
+        "body": "Choose the 2.6 pricing model independently, retaining the legacy/new editor switch and saved prices. Withdraw 2/2.5 quality pricing while retaining the website model directory, naming and filters.",
+        "sections": {
+                "reason": {
+                        "title": "Withdraw the model-bound pricing change",
+                        "body": "Withdraw the November 9 group-name lock and its subsequent pricing extensions. Historical release entries remain; this entry describes current behavior."
+                },
+                "editor": {
+                        "title": "Edit both 2.6 models independently",
+                        "body": "Any Adobe group can open the new editor and independently select Flare or Sunburst, including groups with ordinary, custom or mixed names. Switching retains both drafts and saves them together. The default is legacy; closing only collapses the editor and preserves saved prices."
+                },
+                "billing": {
+                        "title": "Restore the earlier billing and parameter behavior",
+                        "body": "Quality prices apply only to the two 2.6 models again; Image 2/2.5 use their earlier base and per-model rules. For 2.5, xhigh/max again submit tier 7 and retain their request labels. The 2.6 tiers remain 6/7 with their existing generation and billing capabilities."
+                },
+                "preservation": {
+                        "title": "Keep unrelated features and customer data",
+                        "body": "Keep the Adobe website API, fallback names, custom entry, structured naming and filtering before pagination. Retain saved 2.6 prices, group names, account bindings and historical usage. Do not restore an old database or rebill past usage."
+                },
+                "boundary": {
+                        "title": "Verification scope",
+                        "body": "Check independent selection, saving both models, preservation when closed, blank inheritance and zero pricing; restore backend behavior to the prior source. Real upstream generation and billing acceptance remains a separate result, not implied by configuration or simulated checks."
+                }
+        }
+},
       adobeGroupNaming: {
         "title": "Adobe website model filters, structured names and quality prices for all three generations",
         "body": "Model names prefer Adobe’s public website API with fallback names and custom entry. Image 2, 2.5 and 2.6 offer legacy/new pricing editors, defaulting to legacy; the new table follows the group model.",

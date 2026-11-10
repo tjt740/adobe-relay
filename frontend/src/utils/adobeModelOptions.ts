@@ -1,7 +1,7 @@
 import { adobeModels } from './adobeGroupName'
+import { readAdobeModelCapabilities, adobeWebsiteSnapshot } from './adobeModelCapabilities'
 import type { GroupModelOption } from '@/api/admin/groups'
 
-export const adobeFallbackModelOptions: GroupModelOption[] = adobeModels.map(m => ({ id: m.id, display_name: m.label }))
 
 // Compatibility IDs only connect known variants to the existing pricing editor.
 // Display names always come from Adobe; unknown future models stay selectable.
@@ -18,7 +18,7 @@ function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
 }
 
-export function parseAdobeWebsiteModelOptions(value: unknown): GroupModelOption[] {
+export function parseAdobeWebsiteModelOptions(value: unknown, checkedAt = '', common?: unknown, source: 'adobe' | 'verified-fallback' = 'adobe'): GroupModelOption[] {
   if (!Array.isArray(value)) return []
   const names = new Set<string>()
   const options: GroupModelOption[] = []
@@ -31,7 +31,7 @@ export function parseAdobeWebsiteModelOptions(value: unknown): GroupModelOption[
       if (!name || names.has(name.toLowerCase())) continue
       names.add(name.toLowerCase())
       const id = (family.modelId === 'gpt-image' && Object.prototype.hasOwnProperty.call(gptCompatibilityIds, version) && gptCompatibilityIds[version]) || family.modelId + '@' + version
-      options.push({ id, display_name: name })
+      options.push({ id, display_name: name, capabilities: readAdobeModelCapabilities(model.requestSchema, family.modelId, version, common, checkedAt, source) })
     }
   }
   // Keep the familiar GPT Image variants first without excluding newer entries.
@@ -54,6 +54,11 @@ export function normalizeAdobeModelOptions(value: unknown): GroupModelOption[] {
     seen.add(id)
     const apiName = typeof item.display_name === 'string' ? item.display_name.trim() : ''
     const fallback = adobeModels.find(m => m.id === id)?.label
-    return [{ id, display_name: apiName && apiName !== id ? apiName : fallback || apiName || id }]
+    return [{ ...(item.capabilities ? { capabilities: item.capabilities } : {}), id, display_name: apiName && apiName !== id ? apiName : fallback || apiName || id }]
   })
 }
+
+// Dated official snapshot is used only when the public lookup is unavailable.
+export const adobeFallbackModelOptions: GroupModelOption[] = parseAdobeWebsiteModelOptions(
+  adobeWebsiteSnapshot.models, adobeWebsiteSnapshot.checked_at, undefined, 'verified-fallback'
+)

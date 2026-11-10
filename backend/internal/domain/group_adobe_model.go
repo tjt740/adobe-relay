@@ -37,7 +37,9 @@ func AdobeGroupModelPattern(model string) (string, bool) {
 	if value, ok := known[normalized]; ok {
 		normalized = value
 	}
-	prefix := "^[[:space:]]*adobe[[:space:]]*(gpt[[:space:]]+image[[:space:]]+)?"
+	// Match a selected model within the header only; never cross the customer separator.
+	multiPrefix := "^[[:space:]]*adobe[[:space:]]*(([^+-]|-[^[:space:]])+[[:space:]]+\\+[[:space:]]+)*"
+	prefix := multiPrefix + "(gpt[[:space:]]+image[[:space:]]+)?"
 	boundary := "([[:space:]/&-]|$)"
 	switch normalized {
 	case "2", "2.5", "2.6":
@@ -53,6 +55,6 @@ func AdobeGroupModelPattern(model string) (string, bool) {
 		variants := "(" + variant + "([[:space:]]*/[[:space:]]*" + other + ")?|" + other + "[[:space:]]*/[[:space:]]*" + variant + ")"
 		return prefix + regexp.QuoteMeta(parts[0]) + "[[:space:]]*-?[[:space:]]*" + variants + "([[:space:]-]|$)", true
 	default:
-		return "^[[:space:]]*adobe[[:space:]]+" + regexp.QuoteMeta(model) + "([[:space:]]+-[[:space:]]+|$)", true
+		return multiPrefix + regexp.QuoteMeta(model) + "([[:space:]]+[+-][[:space:]]+|$)", true
 	}
 }

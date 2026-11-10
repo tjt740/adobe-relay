@@ -9,17 +9,26 @@ import Toast from '../src/components/common/Toast.vue'
 import { useAuthStore } from '../src/stores/auth'
 import { useAppStore } from '../src/stores/app'
 import { i18n, loadLocaleMessages } from '../src/i18n'
-import { adobeGroupNameModels, adobeGroupNameModelIds, adobeModels } from '../src/utils/adobeGroupName'
+import { adobeGroupNameModels, adobeGroupNameModelIds, adobeGroupModelNames, adobeModels } from '../src/utils/adobeGroupName'
 import { makeDemoGroups, demoNameChanges } from './adobe-groups-data'
+import type { AdminGroup } from '../src/types'
 import '../src/style.css'
 
 function matchesModel(name: string, selection: string): boolean {
   const known = adobeModels.find(m => m.id === selection || m.label === selection)
   if (known) return adobeGroupNameModelIds(name).includes(known.id)
   if (['2', '2.5', '2.6'].includes(selection)) return adobeGroupNameModels(name).includes(selection as '2')
-  return name.toLowerCase().startsWith(('Adobe ' + selection + ' - ').toLowerCase())
+  return adobeGroupModelNames(name).some(model => model.toLowerCase() === selection.toLowerCase())
 }
-const groups = makeDemoGroups()
+type GroupSnapshot = {
+  source: 'production_snapshot'
+  captured_at: string
+  groups: AdminGroup[]
+  usage: Array<{ group_id: number; today_cost: number; yesterday_cost: number; total_cost: number }>
+  capacity: Array<{ group_id: number; concurrency_used: number; concurrency_max: number; sessions_used: number; sessions_max: number; rpm_used: number; rpm_max: number }>
+}
+let snapshot: GroupSnapshot | undefined
+let groups = makeDemoGroups().map(group => ({ ...group, image_quality_pricing_enabled: group.image_quality_pricing_enabled ?? (group.platform === 'adobe') }))
 let nextId = 1000
 apiClient.defaults.adapter = async config => {
   const path = config.url || ''
@@ -46,7 +55,7 @@ apiClient.defaults.adapter = async config => {
     const pageSize = Number(params.page_size || 20)
     data = { items: items.slice((page - 1) * pageSize, page * pageSize), total, page, page_size: pageSize, pages: Math.ceil(total / pageSize) }
   } else if (path === '/admin/groups' && method === 'post') {
-    const created = { ...groups[0], ...body, id: nextId++, account_count: 0, active_account_count: 0, sort_order: groups.length, status: 'active' }
+    const created = { ...groups[0], image_quality_pricing_enabled: body.platform === 'adobe', ...body, id: nextId++, account_count: 0, active_account_count: 0, sort_order: groups.length, status: 'active' }
     groups.push(created)
     data = created
   } else if (path === '/admin/groups/all') {
@@ -54,9 +63,9 @@ apiClient.defaults.adapter = async config => {
   } else if (path.endsWith('/live-capability')) {
     data = { supported: false }
   } else if (path.endsWith('/usage-summary')) {
-    data = groups.map(g => ({ group_id: g.id, today_cost: 0, yesterday_cost: 0, total_cost: 0 }))
+    data = snapshot?.usage || groups.map(g => ({ group_id: g.id, today_cost: 0, yesterday_cost: 0, total_cost: 0 }))
   } else if (path.endsWith('/capacity-summary')) {
-    data = groups.map(g => ({ group_id: g.id, concurrency_used: 0, concurrency_max: (g.active_account_count || 0) * 3, sessions_used: 0, sessions_max: 0, rpm_used: 0, rpm_max: 0 }))
+    data = snapshot?.capacity || groups.map(g => ({ group_id: g.id, concurrency_used: 0, concurrency_max: (g.active_account_count || 0) * 3, sessions_used: 0, sessions_max: 0, rpm_used: 0, rpm_max: 0 }))
   } else if (path === '/admin/groups/adobe-models') {
     const mode = new URLSearchParams(location.search).get('models')
     if (mode === 'error') throw new Error('Simulated Adobe discovery failure')
@@ -105,6 +114,15 @@ apiClient.defaults.adapter = async config => {
 }
 
 async function start() {
+  const response = await fetch('/__preview/group-snapshot', { credentials: 'omit', cache: 'no-store' })
+  if (response.ok) {
+    snapshot = await response.json() as GroupSnapshot
+    if (snapshot.source !== 'production_snapshot' || !snapshot.groups.length) throw new Error('Invalid local snapshot')
+    groups = structuredClone(snapshot.groups).map(group => ({ ...group, image_quality_pricing_enabled: group.image_quality_pricing_enabled ?? (group.platform === 'adobe') }))
+    nextId = Math.max(...groups.map(group => group.id)) + 1
+  } else if (response.status !== 404) {
+    throw new Error('Local group snapshot is unavailable')
+  }
   const locale = new URLSearchParams(location.search).get('locale') === 'en' ? 'en' : 'zh'
   await loadLocaleMessages(locale)
   i18n.global.locale.value = locale
@@ -125,9 +143,9 @@ async function start() {
   createApp({
     render: () => h('div', [
       h('div', { class: 'fixed bottom-3 left-3 z-40 max-w-[240px] rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-emerald-800 shadow-sm' }, [
-        h('strong', { class: 'block' }, '本地预览 · 44 个模拟分组'),
-        h('span', '示例名称与账号数均为模拟；操作刷新后重置。'),
-        h('button', { class: 'mt-2 block font-medium underline', onClick: () => { showNames.value = !showNames.value } }, '查看命名整理 · 6 项'),
+        h('strong', { class: 'block' }, snapshot ? `线上分组快照 · ${groups.length} 组` : '本地预览 · 44 个模拟分组'),
+        h('span', snapshot ? `仅本地试改，刷新恢复。快照时间：${new Date(snapshot.captured_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}` : '示例名称与账号数均为模拟；操作刷新后重置。'),
+        snapshot ? null : h('button', { class: 'mt-2 block font-medium underline', onClick: () => { showNames.value = !showNames.value } }, '查看命名整理 · 6 项'),
       ]),
       showNames.value ? h('div', { class: 'fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4' }, [
         h('section', { class: 'max-h-[80vh] w-full max-w-4xl overflow-auto rounded-2xl bg-white p-6' }, [
@@ -141,4 +159,4 @@ async function start() {
     ])
   }).use(pinia).use(router).use(i18n).mount('#app')
 }
-start().catch(error => console.error('Preview failed to start', error))
+start().catch(error => { console.error('Preview failed to start', error); document.getElementById('app')!.textContent = '本地快照加载失败，请检查本地预览服务。' })

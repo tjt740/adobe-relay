@@ -2,6 +2,7 @@ package adobe
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -86,4 +87,31 @@ func TestWebsiteModelsHonorsCancellation(t *testing.T) {
 	result, err := client.Fetch(ctx)
 	require.Error(t, err)
 	require.Nil(t, result)
+}
+
+func TestWebsitePricingSchemaPreservesActualTiersAndResolvesOnlyLocalRefs(t *testing.T) {
+	var raw struct {
+		Schema map[string]any
+		Common map[string]any
+	}
+	require.NoError(t, json.Unmarshal([]byte(`{
+ "Schema":{"properties":{"prompt":{"type":"string","description":"not forwarded"},"resolution":{"$ref":"#/$defs/resolution"},"generationSettings":{"properties":{"detailLevel":{"anyOf":[{"minimum":1,"maximum":5,"type":"integer"},{"type":"null"}]},"contentPolicy":{"enum":["not forwarded"]}}},"size":{"properties":{"width":{"minimum":480,"maximum":3840},"height":{"minimum":480,"maximum":3840}}}}},
+ "Common":{"$defs":{"resolution":{"anyOf":[{"enum":["512","1K","1.5K","2K","4K"]},{"type":"null"}]}}}
+ }`), &raw))
+	out := websitePricingSchema(raw.Schema, raw.Common, 0)
+	body, err := json.Marshal(out)
+	require.NoError(t, err)
+	require.NotContains(t, string(body), "prompt")
+	require.NotContains(t, string(body), "contentPolicy")
+	require.NotContains(t, string(body), "not forwarded")
+	require.NotContains(t, string(body), "$ref")
+	require.Contains(t, string(body), `"maximum":5`)
+	require.Contains(t, string(body), `"1.5K"`)
+	require.Contains(t, string(body), `"maximum":3840`)
+	for _, ref := range []string{"https://example.invalid/schema", "#/$defs/missing"} {
+		require.Equal(t, map[string]any{"$ref": ref}, websitePricingSchema(map[string]any{"$ref": ref}, raw.Common, 0))
+	}
+	// A malformed upstream cycle is bounded without any extra network requests.
+	cycle := map[string]any{"$ref": "#/$defs/self"}
+	require.Nil(t, websitePricingSchema(cycle, map[string]any{"$defs": map[string]any{"self": cycle}}, 0))
 }

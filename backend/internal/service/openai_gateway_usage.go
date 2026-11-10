@@ -785,7 +785,7 @@ func (s *OpenAIGatewayService) calculateOpenAIImageCost(
 	sizeTier := NormalizeImageBillingTierOrDefault(result.ImageSize)
 	if platform == PlatformAdobe && result.ImageQuality != "" {
 		apiKey = s.apiKeyWithFreshGroupMediaPricing(ctx, apiKey)
-		if apiKey != nil && apiKey.Group != nil {
+		if apiKey != nil && apiKey.Group != nil && apiKey.Group.ImageQualityPricingEnabled {
 			if price, ok := lookupImageQualityPrice(apiKey.Group.ImageQualityPrices, billingModel, sizeTier, result.ImageQuality); ok {
 				total := price * float64(max(0, result.ImageCount))
 				if multiplier < 0 {
@@ -950,7 +950,7 @@ func groupMediaPricingLooksIncomplete(group *Group) bool {
 		return false
 	}
 	// Any first-class pricing field present means the projection is not a blank shell.
-	if len(group.VideoModelPrices) > 0 || len(group.ImageQualityPrices) > 0 {
+	if group.ImageQualityPricingEnabled || len(group.VideoModelPrices) > 0 || len(group.ImageQualityPrices) > 0 {
 		return false
 	}
 	if len(group.ModelPricing) > 0 || group.LongContextPricingEnabled {
