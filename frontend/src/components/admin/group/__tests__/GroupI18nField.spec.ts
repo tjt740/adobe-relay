@@ -4,6 +4,7 @@ import { defineComponent, h, reactive } from 'vue'
 
 import GroupI18nField from '../GroupI18nField.vue'
 import AdobeGroupNameFields from '../AdobeGroupNameFields.vue'
+import Select from '@/components/common/Select.vue'
 import type { GroupI18n } from '@/types'
 
 vi.mock('vue-i18n', async () => {
@@ -71,16 +72,17 @@ describe('GroupI18nField', () => {
       }),
     })
     const wrapper = mount(host, { attachTo: document.body })
-    await wrapper.get('#adobe-name-category').setValue('custom')
-    await wrapper.get('#adobe-name-custom').setValue('高质量 4K')
+    wrapper.findComponent(Select).vm.$emit('update:modelValue', 'gpt-image-2')
+    await wrapper.get('#adobe-name-customer').setValue('高质量 4K - blue')
     expect(state.name).toBe('')
     await choose(wrapper, 'en')
     expect(wrapper.get('fieldset').attributes('disabled')).toBeDefined()
-    await wrapper.get('input:not(#adobe-name-customer):not(#adobe-name-custom)').setValue('Translated name')
+    await wrapper.get('input:not(#adobe-name-customer)').setValue('Translated name')
     await choose(wrapper, 'default')
-    expect((wrapper.get('#adobe-name-custom').element as HTMLInputElement).value).toBe('高质量 4K')
-    await wrapper.get('#adobe-name-customer').setValue('blue')
-    expect(state.name).toBe('Adobe GPT Image 2 - 高质量 4K - blue')
+    expect((wrapper.get('#adobe-name-customer').element as HTMLInputElement).value).toBe('高质量 4K - blue')
+    wrapper.findComponent(Select).vm.$emit('update:modelValue', 'gpt-image-2.5-flare')
+    await wrapper.vm.$nextTick()
+    expect(state.name).toBe('Adobe GPT Image 2.5 Flare - 高质量 4K - blue')
     expect(state.i18n.en?.name).toBe('Translated name')
   })
 

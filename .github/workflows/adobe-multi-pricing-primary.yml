@@ -58,6 +58,7 @@ jobs:
           github-token: ${{ github.token }}
       - name: Operate guarded primary release
         env:
+          GH_TOKEN: ${{ github.token }}
           SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
           APP_SHA: ${{ inputs.application_sha }}

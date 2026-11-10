@@ -139,6 +139,10 @@
     "before": "fb6ddb038c28bed23aa0425fa7b5606d47e208c8cf2e63c1ba28ddfa07255fe7",
     "candidate": "88f8b2e417ef7a414a40b33a7652e90f7c318a2cf527d0ac2e3c52f3cf575a6e"
   },
+  "frontend/src/api/__tests__/admin.groups.model-options.spec.ts": {
+    "before": "0b35a7eaf4c4253ed84646b7ddaa102ef386c1c153a7cc54a750c9643b127abf",
+    "candidate": "ca07a0a6097721b3654417e25c31466a9e272a6929a2c9608d049c37deb4ec9f"
+  },
   "frontend/src/api/admin/groups.ts": {
     "before": "d313ec396303612541976cb2468cfe4036fc135f400cb69104a3b20feffbe716",
     "candidate": "132f30ba0932421fbe4ce9b0b6fd47d52a9176bd87e6eea3d7eb49cbcec9a372"
@@ -158,6 +162,10 @@
   "frontend/src/components/admin/group/__tests__/AdobeGroupNameFields.spec.ts": {
     "before": "07dbec4437cd932189cab5171254dde6ef98acb0d57b741ee15c6838718813f8",
     "candidate": "4e80ab02426c56c64076b690f28c4e6d268d6c677fb48eff1199ff7c369ce2b3"
+  },
+  "frontend/src/components/admin/group/__tests__/GroupI18nField.spec.ts": {
+    "before": "59520e42156ee7c93c4ce02fdcbe5a40f5bd3e86a3b4bc32bd401db33acf8878",
+    "candidate": "3c2d68f43b96845956e0e46de301de19a8d912efd877af76af947a00a954a207"
   },
   "frontend/src/components/admin/group/__tests__/ImageQualityPricing.spec.ts": {
     "before": "f44b9274b8ca2916ccdfebfbb9354a96c739e52682214220bf52b44fc81c8822",
