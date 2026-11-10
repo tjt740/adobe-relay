@@ -1,0 +1,44 @@
+{
+  "at": "2026-11-10T20:11:00.119475+00:00",
+  "application_sha": "77e6ece37dc357728699211b9ab2799d4298de00",
+  "image_id": "sha256:ae965a08bf456c93092dbe28135f9751a687d2912b8af8857363ec90805e849a",
+  "status": "deployed_billing_modes_verified",
+  "preserved": {
+    "existing_groups_and_prices": true,
+    "other_containers": true,
+    "configuration": true,
+    "resources_and_go": true,
+    "environment": true,
+    "okad_settings": true,
+    "sub2_settings_including_smtp": true,
+    "clash_nodes_bindings_and_configuration": true,
+    "alert_rules": true,
+    "retired_route_matches_current_baseline": true,
+    "billing_mode_initialization": true
+  },
+  "real_billing_scope": {
+    "model": "gpt-image-2.6-flare",
+    "size": "1K",
+    "quality": "medium",
+    "cases": 2,
+    "new_actual_cost": 0.01845,
+    "legacy_actual_cost": 0.0351,
+    "real_database_debits_verified": true,
+    "pipeline_correlated": true,
+    "replayed_requests": 0,
+    "other_models_and_tiers_not_covered": true
+  },
+  "rollback_guard": {
+    "passed": true,
+    "executed": false
+  },
+  "test_email_sent": false,
+  "live_browser_verified": false,
+  "frontend_tests_passed": 688,
+  "price_cells_verified": 69,
+  "original_401_retained": true,
+  "temporary_resources_cleaned": true,
+  "docs_update_run": 42888769238,
+  "docs_verify_run": 42889539706,
+  "ci_run": 42885179978
+}
