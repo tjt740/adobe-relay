@@ -75,7 +75,7 @@ def snapshot():
     out['excluded_route_state'] = json.loads(sql("SELECT json_build_object('excluded',EXISTS(SELECT 1 FROM adobe_route_exclusions WHERE proxy_id=1290),'status',(SELECT status FROM proxies WHERE id=1290),'bindings',(SELECT count(*) FROM accounts WHERE deleted_at IS NULL AND proxy_id=1290),'leases',(SELECT count(*) FROM adobe_proxy_test_leases WHERE proxy_id=1290))"))
     out['account_state'] = json.loads(sql("SELECT coalesce(json_agg(json_build_object('id',id,'credentials_hash',md5(credentials::text),'proxy_id',proxy_id,'status',status,'schedulable',schedulable,'manual_pause',extra->>'okad_manual_pause') ORDER BY id),'[]') FROM accounts WHERE deleted_at IS NULL"))
     out['group_prices'] = json.loads(sql("SELECT coalesce(json_object_agg(id,md5((to_jsonb(g)-'updated_at'-'image_quality_pricing_enabled')::text)),'{}') FROM groups g WHERE deleted_at IS NULL"))
-    out['group_modes'] = json.loads(sql("SELECT coalesce(json_object_agg(id,json_build_object('platform',platform,'mode',to_jsonb(g)->'image_quality_pricing_enabled'))),'{}') FROM groups g WHERE deleted_at IS NULL"))
+    out['group_modes'] = json.loads(sql("SELECT coalesce(json_object_agg(id,json_build_object('platform',platform,'mode',to_jsonb(g)->'image_quality_pricing_enabled')),'{}') FROM groups g WHERE deleted_at IS NULL"))
     return out
 
 
