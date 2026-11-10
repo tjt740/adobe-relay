@@ -1,7 +1,7 @@
 """Operate the authorized release with exact CI artifacts and preserved guards."""
 import datetime,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','status','verify','live-billing']
+assert phase in ['preflight','prepare','start','status','verify','live-billing','resume']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-multi-pricing-20261111'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -85,4 +85,27 @@ assert (r/'deployment-verification.json').exists()
 assert not (r/'live-billing-started.json').exists(), 'Already started; no replay'
 subprocess.run(['systemd-run','--unit=adobe-multi-pricing-billing-20261111','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/live-billing.log','--property=StandardError=append:{root}/live-billing.log','/usr/bin/python3',str(r/'live-billing.py')],check=True)
 print(json.dumps({{'single_live_billing_dispatch':True}}))
+""")
+
+elif phase=='resume':
+ # Resume only a proven pre-migration failure, with no canary/lease/route created.
+ remote(f"""import pathlib,json,subprocess
+r=pathlib.Path('{root}')
+assert (r/'expected-sha').read_text().strip()=='{sha}'
+p=json.loads((r/'progress.json').read_text())
+assert p['step']=='failed' and 'prepare' in p['error']
+assert not (r/'rolling-prepared.json').exists() and not (r/'rolling-route-canary.json').exists()
+d=json.loads(subprocess.check_output(['docker','inspect','adobe-relay-app-1']))[0]
+assert d['Id']==json.loads((r/'before.json').read_text())['containers']['adobe-relay-app-1']['id']
+assert d['Config']['Image']=='adobe-relay:900bee9ed507ac75c7a84baf65caa911c163c9c4'
+assert subprocess.run(['docker','inspect','adobe-relay-memory-canary'],capture_output=True).returncode!=0
+assert not subprocess.check_output(['docker','exec','adobe-relay-redis-1','redis-cli','--raw','GET','concurrency:rolling_deployment'],text=True).strip()
+assert not (r/'progress-attempt1-failed.json').exists()
+""")
+ copy([pathlib.Path(__file__).with_name(n) for n in ['audit.py','operations.py']])
+ remote(f"""import pathlib,subprocess,json
+r=pathlib.Path('{root}')
+(r/'progress.json').rename(r/'progress-attempt1-failed.json')
+subprocess.run(['systemd-run','--unit=adobe-multi-pricing-release-attempt2-20261111','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/driver.log','--property=StandardError=append:{root}/driver.log','/usr/bin/python3',str(r/'driver.py')],check=True)
+print(json.dumps({{'guarded_resume_dispatched':True,'original_failure_retained':True}}))
 """)
