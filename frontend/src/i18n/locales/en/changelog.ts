@@ -18,6 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
+      mihomoMemory: {"title": "Live proxy capacity increase for connection stability", "body": "Increase proxy memory capacity to address connection interruptions caused by memory exhaustion under load. The adjustment takes effect without restarting existing services; models, billing and account settings are preserved."},
       adobeGroupMultiPricing: {title: 'Adobe model selection, billing modes and native WebP', body: 'Select multiple models, edit four-decimal prices in model tabs, and switch real billing modes. Quality billing defaults on; disabling retains saved prices and restores legacy billing. Website model tiers and custom names remain available. Both 2.6 models add native WebP, transparency and compression options.'},
       adobePricingRevert: {"title": "Restore independent Image 2.6 pricing tables", "body": "Choose the 2.6 pricing model independently, retaining the legacy/new editor switch and saved prices. Withdraw 2/2.5 quality pricing while retaining the website model directory, naming and filters."},
       adobeGroupNaming: {"title": "Adobe model filters and quality tables for three generations", "body": "Model names prefer Adobe discovery and allow custom input. Image 2, 2.5 and 2.6 prices follow the selected model, with the legacy editor selected by default."},
@@ -44,6 +45,7 @@ export default {
       }
     },
     "updates": {
+      mihomoMemory: {"title": "More memory capacity for the proxy service", "body": "The proxy memory limit increased from 256 MiB to 1 GiB, allocated on demand.", "sections": {"reason": {"title": "Address the cause of disconnections", "body": "Historical records confirmed repeated proxy exits caused by memory exhaustion, affecting multiple subscriptions. This change increases shared proxy capacity."}, "continuity": {"title": "Apply to the running process", "body": "Raise the limit on the existing process and save the persistent configuration without restarting services."}, "preservation": {"title": "Preserve existing services", "body": "Application versions, models, billing, accounts, subscriptions and other service resource allocations are preserved."}, "boundary": {"title": "Verification scope", "body": "The effective memory limit, process identity and existing connections were checked. Passive traffic observation does not replace peak-load validation; Adobe authorization rejections require separate investigation."}}},
       adobeWebP: {
         title: 'Native WebP for both Image 2.6 variants',
         body: 'Flare and Sunburst can return native WebP through URL or Base64 delivery.',

@@ -18,6 +18,7 @@ export default {
     },
     measurements: "发布准备实测与样本范围",
     overviews: {
+      mihomoMemory: {"title": "代理服务在线扩容，改善连接稳定性", "body": "提高代理服务内存容量，处理高负载下内存不足导致的连接中断。调整在线生效，现有服务无需重启，模型、计费和账号设置保持。"},
       adobeGroupMultiPricing: {title: 'Adobe 模型多选、计费切换与原生 WebP', body: '分组支持模型多选、按模型切换价格表和四位小数；默认新版，关闭恢复旧版计费并保留质量价格。官网档位、名称预览及自定义模型同时保留；两款 2.6 新增原生 WebP、透明背景和压缩参数。'},
       adobePricingRevert: {"title": "撤回价格表与分组模型绑定", "body": "2.6 价格表恢复独立选择，保留新旧开关和原价格；撤回 2/2.5 质量计费扩展，官网模型目录与命名筛选保留。"},
       adobeGroupNaming: {"title": "Adobe模型筛选与三代质量价格表", "body": "模型名称优先读取Adobe官网，支持自定义；2、2.5、2.6价格表跟随所选模型，默认保留旧版填写方式。"},
@@ -44,6 +45,7 @@ export default {
       }
     },
     "updates": {
+      mihomoMemory: {"title": "代理服务内存容量提升", "body": "代理服务内存上限从 256 MiB 提高到 1 GiB，按实际需要使用。", "sections": {"reason": {"title": "处理断连原因", "body": "历史故障记录确认代理服务因内存不足反复退出，影响多个订阅。此次提高共享代理服务容量。"}, "continuity": {"title": "在线调整", "body": "在原进程上提高内存上限并保存持久配置，现有服务无需重启。"}, "preservation": {"title": "保留原有服务", "body": "现有应用版本、模型、计费、账号、订阅和其他服务资源保持。"}, "boundary": {"title": "验证范围", "body": "已核对实际内存上限、进程身份和现有连接；自然流量观察不能替代高峰验证，Adobe 授权拒绝仍需单独排查。"}}},
       adobeWebP: {
         title: '两款 Image 2.6 支持原生 WebP',
         body: 'Flare 与 Sunburst 可请求 WebP，原文件支持 URL 或 Base64 交付。',

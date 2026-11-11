@@ -17,6 +17,7 @@ export const changelogPreviews = [
 export const pendingDailyUpdates: readonly Omit<DailyUpdate, 'date'>[] = []
 
 export const dailyOverviews: Readonly<Record<string, string>> = {
+  '2026-11-12': 'mihomoMemory',
   '2026-11-11': 'adobeGroupMultiPricing',
   '2026-11-09': 'adobeGroupNaming',
   '2026-11-07': 'adobeImage26Pricing',
@@ -33,6 +34,7 @@ export const dailyOverviews: Readonly<Record<string, string>> = {
 
 // Use the actual release date in Asia/Shanghai; multiple releases share one day.
 export const dailyUpdates: readonly DailyUpdate[] = [
+  { date: '2026-11-12', id: 'mihomoMemory', type: 'fixed', sections: ['reason', 'continuity', 'preservation', 'boundary'] },
   { date: '2026-11-11', id: 'adobeWebP', type: 'added', sections: ['output', 'options', 'validation'] },
   { date: '2026-11-11', id: 'adobeGroupMultiPricing', type: 'improved', sections: ['selection', 'pricing', 'mode', 'billing', 'boundary'] },
   { date: '2026-11-11', id: 'adobeGroupNameLayout', type: 'improved', sections: ['layout', 'preservation', 'boundary'] },
