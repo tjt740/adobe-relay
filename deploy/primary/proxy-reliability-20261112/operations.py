@@ -74,7 +74,7 @@ elif phase=='verify':
  remote(f"""import pathlib,subprocess,sys
 r=pathlib.Path('{root}')
 assert (r/'expected-sha').read_text().strip()=='{sha}'
-for script,out in [('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('route-guard-review.py','route-guard-review.json'),('api-verify.py','api-verification.json'),('observe.py','observation.json'),('verify-reliability.py','reliability-verification.json'),('verify-deployment.py','deployment-verification.json')]:
+for script,out in [('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('route-guard-review.py','route-guard-review.json'),('api-verify.py','api-verification.json'),('observe.py','observation.json'),('verify-reliability.py','reliability-verification.json'),('verify-diagnostic-logs.py','diagnostic-log-verification.json'),('verify-deployment.py','deployment-verification.json')]:
  if not (r/out).exists():subprocess.run([sys.executable,str(r/script)],check=True,timeout=240)
 """)
 elif phase=='archive':
@@ -92,6 +92,7 @@ assert container['Image']==json.loads((r/'image-loaded.json').read_text())['imag
 core=json.loads((r/'deployment-verification.json').read_text());assert core['application_sha']=='{sha}' and core['status']=='deployed_api_verified'
 assert core['api_verification']['base64_ss2022_nodes']==3 and core['api_verification']['existing_subscription_unchanged']
 assert core['reliability_verified']
+diagnostic=json.loads((r/'diagnostic-log-verification.json').read_text());assert diagnostic['passed'] and diagnostic['application_sha']=='{sha}'
 before=json.loads((r/'before.json').read_text());current=a.snapshot()
 checks=a.check_preserved(before,current);a.validate_rollback(before,current,'{sha}',a.inspect(a.ROLLBACK_IMAGE)['Id'])
 files={{}}
@@ -100,6 +101,7 @@ for name,value in {payload!r}.items():
  path=r/name;path.write_bytes(data);path.chmod(0o600);files[name]=a.digest(data)
  if name=='primary-README.md':pathlib.Path('/opt/adobe-relay/deploy/primary/README.md').write_bytes(data)
 out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'deployed_proxy_reliability_verified','application_sha':'{sha}','archive_source':'{source}','image_id':container['Image'],'core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'node_imports':0,'mail_sent':False}}
+out['diagnostic_log_evidence']=diagnostic
 out['validation_mode']=core['validation_mode'];out['official_workflow_completed']=core['official_workflow_completed']
 a.save('release-completion.json',out);print(json.dumps(out))
 """)
