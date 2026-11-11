@@ -12,7 +12,7 @@ class ManualGateTests(TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.sha = 'a' * 40
-        workflow = Path(__file__).resolve().parents[3].joinpath('.github/workflows/deploy-adobe-relay.yml').read_text()
+        workflow = Path(__file__).with_name('checked-workflow.yml').read_text()
         data = {name: '' for name in FILES}
         data.update({
             'workflow.yml': workflow,

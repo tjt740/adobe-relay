@@ -1,0 +1,21 @@
+{
+  "tested_feature_sha": "e944c5b5c7107cf4f0e79849adccc3503705acd1",
+  "actual_application_sha": "47c5c46ead01a03cbfa7c547e4da971a561f86c7",
+  "tested_feature_is_ancestor": true,
+  "unchanged_ss_source_hashes": {
+    "backend/internal/clash/subscription.go": "332f14a4d2ecd57d89526314a8858ffc0a27bb9ead50f16a0f888c1d1151434f",
+    "backend/internal/clash/shadowsocks.go": "ef21f837b079a1aff81a16aff6eee10db8043bd0a6c8ac9503c513170d39c603",
+    "backend/internal/clash/shadowsocks_test.go": "9c56c2dbc83e61817f24eca1d2fde019ee17c553c6d2f0b155da35b7b806b41a",
+    "backend/internal/clash/shadowsocks_mihomo_test.go": "68fe3b53c77b802381f7e3724e406abc8b64914ba9d5ed218b6cb8a864f913df",
+    "backend/internal/clash/testdata/shadowsocks-base64.txt": "d8d22ec7d162dde2b7e75c81da291701e9044363603d85bb84fa2b78fcdfac3e"
+  },
+  "workflow": {
+    "id": 43104288465,
+    "status": "completed",
+    "conclusion": "success",
+    "head_sha": "47c5c46ead01a03cbfa7c547e4da971a561f86c7",
+    "path": ".github/workflows/deploy-adobe-relay.yml",
+    "html_url": "https://github.com/tjt740/adobe-relay/actions/runs/43104288465"
+  },
+  "earlier_local_candidate_deployed": false
+}
