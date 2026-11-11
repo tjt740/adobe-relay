@@ -1,7 +1,7 @@
 """Operate the authorized release with exact CI artifacts and preserved guards."""
 import datetime,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','status','verify','live-billing','resume']
+assert phase in ['preflight','prepare','start','status','verify','live-billing','resume','defer-old','defer-canary']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-webp-20261111'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -60,11 +60,12 @@ print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 elif phase=='status':
  remote(f"""import pathlib,json
 r=pathlib.Path('{root}')
-for name in ['progress.json','rolling-old-drain-progress.json','rolling-canary-drain-progress.json','after.json','api-verification.json','deployment-verification.json']:
+for name in ['progress.json','rolling-old-drain-progress.json','rolling-canary-drain-progress.json','after.json','api-verification.json','deployment-verification.json','live-billing-verification.json','live-billing-cleanup.json','live-flare-default-result.json','live-sunburst-transparent-25-result.json','deferred-old.json','deferred-canary.json']:
  p=r/name
  if p.exists():
   d=json.loads(p.read_text())
   if name=='after.json':d={{'backup':d['backup'],'preserved':d['preserved']}}
+  if name.startswith('rolling-') and 'samples' in d:d={{'sample_count':len(d['samples']),'last_samples':d['samples'][-2:]}}
   print(name,json.dumps(d))
 p=r/'driver.log'
 if p.exists():print(p.read_text()[-3500:])
@@ -109,4 +110,12 @@ r=pathlib.Path('{root}')
 (r/'progress.json').rename(r/'progress-attempt1-failed.json')
 subprocess.run(['systemd-run','--unit=adobe-webp-release-attempt2-20261111','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/driver.log','--property=StandardError=append:{root}/driver.log','/usr/bin/python3',str(r/'driver.py')],check=True)
 print(json.dumps({{'guarded_resume_dispatched':True,'original_failure_retained':True}}))
+""")
+
+elif phase in ['defer-old','defer-canary']:
+ part=phase.removeprefix('defer-')
+ remote(f"""import pathlib,subprocess,sys
+r=pathlib.Path('{root}')
+assert (r/'expected-sha').read_text().strip()=='{sha}'
+subprocess.run([sys.executable,str(r/'defer-pending-tests.py'),'{part}'],check=True,timeout=310)
 """)
