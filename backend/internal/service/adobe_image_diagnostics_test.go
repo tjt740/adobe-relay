@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/adobe"
 	"github.com/gin-gonic/gin"
@@ -51,4 +52,47 @@ func TestAdobeDiagnosticsDoNotResubmitAcceptedJobs(t *testing.T) {
 	require.Equal(t, NextAccountStop, failure.Failover.NextAccountAction, "5xx submission outcome is unknown")
 	failure = classifyAdobeError(&adobe.OperationError{Stage: "submit", SubmissionRejected: true, Err: adobe.NewUpstreamTemporaryError("HTTP 408", 408, adobe.ErrorTypeStatus)})
 	require.Equal(t, NextAccountRetry, failure.Failover.NextAccountAction)
+}
+
+func TestAdobe403DiagnosticFingerprintSurvivesQueueWithoutCredentials(t *testing.T) {
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	pid := int64(12)
+	a := &Account{ID: 22, Platform: PlatformAdobe, ProxyID: &pid, Proxy: &Proxy{ID: 12, Host: "proxy.local", Port: 20202, Username: "private-user", Password: "private-pass"}, Credentials: map[string]any{"access_token": "old-account-token"}}
+	fp := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	err := &adobe.OperationError{Stage: "submit", HTTPStatus: 403, SubmissionRejected: true, UpstreamRequestID: "r403", RequestDiagnostics: adobe.RequestDiagnostics{CredentialFingerprint: fp, FingerprintVersion: "adobe-bearer-arp-v1", UpstreamErrorCode: "access_error"}, Err: adobe.NewAuthError("Adobe denied", 403)}
+	RecordAdobeImageFailure(c, a, "gpt-image-2.5-sunburst", err)
+	raw, _ := c.Get(OpsUpstreamErrorsKey)
+	events := raw.([]*OpsUpstreamErrorEvent)
+	entry := &OpsInsertErrorLogInput{UpstreamErrors: events}
+	require.NoError(t, SanitizeOpsUpstreamErrorsForQueue(entry))
+	events, e := ParseOpsUpstreamErrors(*entry.UpstreamErrorsJSON)
+	require.NoError(t, e)
+	require.Equal(t, fp, events[0].CredentialFingerprint)
+	require.Len(t, events[0].ProxyFingerprint, 64)
+	b, e := json.Marshal(events)
+	require.NoError(t, e)
+	for _, secret := range []string{"private-user", "private-pass", "old-account-token"} {
+		require.NotContains(t, string(b), secret)
+	}
+	require.Contains(t, string(b), "access_denied_undetermined")
+	require.Contains(t, string(b), "not_observed")
+	entry.UpstreamErrorsJSON = nil
+	entry.UpstreamErrors = events
+	entry.UpstreamErrors[0].CredentialFingerprint = "Bearer unsafe"
+	require.NoError(t, SanitizeOpsUpstreamErrorsForQueue(entry))
+	events, e = ParseOpsUpstreamErrors(*entry.UpstreamErrorsJSON)
+	require.NoError(t, e)
+	require.Empty(t, events[0].CredentialFingerprint)
+}
+
+func TestAdobeProxyFingerprintTracksConfigurationNotRefreshTime(t *testing.T) {
+	p := int64(7)
+	a := &Account{ProxyID: &p, Proxy: &Proxy{ID: p, Host: "127.0.0.1", Port: 12000}}
+	first, _ := adobeProxyDiagnosticIdentity(a)
+	a.Proxy.UpdatedAt = a.Proxy.UpdatedAt.Add(time.Minute)
+	same, _ := adobeProxyDiagnosticIdentity(a)
+	require.Equal(t, first, same)
+	a.Proxy.Port++
+	changed, _ := adobeProxyDiagnosticIdentity(a)
+	require.NotEqual(t, first, changed)
 }

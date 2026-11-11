@@ -61,4 +61,15 @@ describe('Adobe alert ratio rule', () => {
   expect(mocks.update.mock.calls[0][1].filters).not.toHaveProperty('adobe_error_ratio_percent')
   w.unmount()
  })
+ it('preserves site-only Mihomo memory alerts without Adobe filters', async () => {
+  mocks.list.mockResolvedValue([{ ...rule(), name: 'Mihomo memory', metric_type: 'mihomo_memory_percent', threshold: 70, notify_email: false, filters: {} }])
+  const w = await setup()
+  await w.findAll('button').find(b => b.text() === 'common.edit')!.trigger('click')
+  expect(w.find('#adobe-alert-ratio').exists()).toBe(false)
+  await w.findAll('button').find(b => b.text() === 'common.save')!.trigger('click')
+  await flushPromises()
+  expect(mocks.update).toHaveBeenCalledWith(9, expect.objectContaining({ metric_type: 'mihomo_memory_percent', threshold: 70, notify_email: false, filters: {} }))
+  w.unmount()
+ })
+
 })

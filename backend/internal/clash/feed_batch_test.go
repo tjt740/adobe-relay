@@ -158,7 +158,8 @@ func TestRefreshSavesCompletedFeedsWhenAnotherExceedsBatchBudget(t *testing.T) {
 func TestPartialImportPreservesFailedBindingsAndAllFailureIsNoOp(t *testing.T) {
 	db := sourceTestDB(t)
 	_, err := db.Exec(`CREATE TABLE proxies(id BIGSERIAL PRIMARY KEY,name text,protocol text,host text,port int,username text,password text,status text,backup_proxy_id bigint,fallback_mode text,updated_at timestamptz DEFAULT NOW(),deleted_at timestamptz);
-CREATE TABLE accounts(id BIGSERIAL PRIMARY KEY,proxy_id bigint,proxy_fallback_origin_id bigint,extra jsonb,status text,schedulable bool,error_message text,updated_at timestamptz DEFAULT NOW(),deleted_at timestamptz);
+CREATE TABLE adobe_route_exclusions(proxy_id bigint PRIMARY KEY);
+ CREATE TABLE accounts(id BIGSERIAL PRIMARY KEY,proxy_id bigint,proxy_fallback_origin_id bigint,extra jsonb,status text,schedulable bool,error_message text,updated_at timestamptz DEFAULT NOW(),deleted_at timestamptz);
 CREATE TABLE account_proxy_failover(account_id bigint,primary_proxy_id bigint,backup_proxy_ids jsonb,revision int,updated_at timestamptz);
 CREATE TABLE scheduler_outbox(event_type text,payload jsonb);`)
 	require.NoError(t, err)
@@ -243,10 +244,15 @@ CREATE TABLE scheduler_outbox(event_type text,payload jsonb);`)
 	require.Len(t, preview.Nodes, 2)
 	require.True(t, preview.Nodes[1].Retained)
 	// A client cannot accidentally remove a failed source even when names is empty.
+	_, err = db.Exec(`INSERT INTO adobe_route_exclusions(proxy_id) VALUES(2)`)
+	require.NoError(t, err)
 	v, err := m.Import(context.Background(), ImportRequest{URL: urls, Names: []string{}, Revision: 3})
 	require.NoError(t, err)
 	require.Len(t, v.Nodes, 1)
 	require.EqualValues(t, 2, v.Nodes[0].ProxyID)
+	var excludedStatus string
+	require.NoError(t, db.QueryRow(`SELECT status FROM proxies WHERE id=2`).Scan(&excludedStatus))
+	require.Equal(t, "inactive", excludedStatus, "subscription import must preserve explicit exclusion without removing its listener")
 	var proxyID int64
 	var schedulable bool
 	var extra string

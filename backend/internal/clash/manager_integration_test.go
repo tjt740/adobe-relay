@@ -47,6 +47,7 @@ func TestMihomoLifecycleIntegration(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 	_, err = db.Exec(`CREATE TABLE proxies(id BIGSERIAL PRIMARY KEY,name varchar(100),protocol text,host text,port int,username text,password text,status text,updated_at timestamptz DEFAULT NOW(),deleted_at timestamptz);
+ CREATE TABLE adobe_route_exclusions(proxy_id bigint PRIMARY KEY);
  CREATE TABLE accounts(id BIGSERIAL PRIMARY KEY,proxy_id bigint REFERENCES proxies(id) ON DELETE SET NULL,extra jsonb,status text DEFAULT 'active',schedulable boolean DEFAULT true,error_message text,updated_at timestamptz DEFAULT NOW(),deleted_at timestamptz);
  CREATE TABLE scheduler_outbox(id BIGSERIAL PRIMARY KEY,event_type text,payload jsonb);`)
 	require.NoError(t, err)

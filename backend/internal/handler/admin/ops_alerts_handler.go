@@ -18,6 +18,7 @@ import (
 
 var validOpsAlertMetricTypes = []string{
 	service.OpsMetricAdobeErrorAccounts,
+	service.OpsMetricMihomoMemory, service.OpsMetricMihomoFaults, service.OpsMetricMihomoMonitor,
 	"success_rate",
 	"error_rate",
 	"upstream_error_rate",
@@ -89,7 +90,7 @@ type opsAlertRuleValidatedInput struct {
 
 func isPercentOrRateMetric(metricType string) bool {
 	switch metricType {
-	case "success_rate",
+	case service.OpsMetricMihomoMemory, "success_rate",
 		"error_rate",
 		"upstream_error_rate",
 		"cpu_usage_percent",

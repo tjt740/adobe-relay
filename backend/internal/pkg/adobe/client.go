@@ -252,19 +252,20 @@ type GenerateResult struct {
 	Timings GenerationTimings
 }
 
-// GenerationTimings contains durations, counts and applied model/quality only;
+// GenerationTimings contains durations, counts, applied model/quality and safe credential fingerprints;
 // never prompts, tokens, full payloads or signed URLs.
 // PollMS includes time spent waiting for the upstream job, but excludes downloading its output.
 type GenerationTimings struct {
-	SubmittedModelVersion string `json:"submitted_model_version,omitempty"`
-	SubmittedDetailLevel  int    `json:"submitted_detail_level,omitempty"`
-	SubmitMS              int64  `json:"submit_ms"`
-	PollMS                int64  `json:"poll_ms"`
-	DownloadMS            int64  `json:"download_ms"`
-	SubmitAttempts        int    `json:"submit_attempts"`
-	PollCount             int    `json:"poll_count"`
-	DownloadAttempts      int    `json:"download_attempts"`
-	DownloadFallback      bool   `json:"download_fallback,omitempty"`
+	RequestDiagnostics    RequestDiagnostics `json:"request_diagnostics"`
+	SubmittedModelVersion string             `json:"submitted_model_version,omitempty"`
+	SubmittedDetailLevel  int                `json:"submitted_detail_level,omitempty"`
+	SubmitMS              int64              `json:"submit_ms"`
+	PollMS                int64              `json:"poll_ms"`
+	DownloadMS            int64              `json:"download_ms"`
+	SubmitAttempts        int                `json:"submit_attempts"`
+	PollCount             int                `json:"poll_count"`
+	DownloadAttempts      int                `json:"download_attempts"`
+	DownloadFallback      bool               `json:"download_fallback,omitempty"`
 	// HTTP time includes both network transit and Adobe's handling/long polling.
 	// It is not a measurement of network latency alone.
 	PollHTTPMS         int64             `json:"poll_http_ms"`
@@ -278,7 +279,7 @@ type GenerationTimings struct {
 // GenerateImage 走「提交 → 轮询 → 下载」完成一次出图。
 //
 // 提交阶段依次尝试 BuildImagePayloadCandidates 返回的候选，命中 200 即停；
-// 遇到 401/403 立即中断——那是凭据问题，换 payload 形状无用。
+// 遇到 401/403 立即中断——这是访问拒绝，换 payload 形状无用。
 // 408/429/451/5xx 是上游过载或故障，不是 schema 问题：不再换候选（重试策略见 postSubmit）。
 func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) (result *GenerateResult, retErr error) {
 	started := time.Now()
@@ -290,6 +291,11 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) (r
 			attempts = submitResp.Attempts
 		}
 		retErr = operationError(retErr, stage, started, attempts, submitResp, "")
+		diagnostic := requestDiagnostics(input, started, submitResp)
+		retErr = attachRequestDiagnostics(retErr, diagnostic)
+		if result != nil {
+			result.Timings.RequestDiagnostics = diagnostic
+		}
 	}()
 	candidates, err := BuildImagePayloadCandidates(input.Options)
 	if err != nil {
@@ -297,6 +303,7 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) (r
 	}
 
 	headers, order := c.submitHeaders(input.Token, input.Options.Prompt, input.ARPSessionID)
+	input.ARPSessionID = headers["x-arp-session-id"] // fingerprint the normalized or generated value actually sent
 	stage = "submit"
 	submitStarted := time.Now()
 	submitAttemptCount := 0
@@ -796,11 +803,17 @@ func ClassifyAuthResponse(status int, accessError, preview string) error {
 		return NewNotEntitledError(message, status, "")
 	}
 	message := "Token invalid or expired"
+	if status == http.StatusForbidden {
+		message = "Adobe access denied; account, session or IP cause not specified"
+	}
 	if preview != "" {
 		message += ": " + preview
 	}
 	authErr := NewAuthError(message, status)
 	authErr.UserMessage = "Adobe account authentication failed"
+	if status == http.StatusForbidden {
+		authErr.UserMessage = "Adobe denied access to this request"
+	}
 	return authErr
 }
 
