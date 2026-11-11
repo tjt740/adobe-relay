@@ -194,6 +194,7 @@ func TestGenerateImageRoundTrip(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, []byte("PNGDATA"), out.Bytes)
+	require.Len(t, out.Timings.RequestDiagnostics.CredentialFingerprint, 64)
 	require.Equal(t, "https://cdn/img.png", out.URL)
 	require.Equal(t, "COMPLETED", out.Raw["status"])
 	require.Equal(t, "https://cdn/img.png", download.calls[0].URL)

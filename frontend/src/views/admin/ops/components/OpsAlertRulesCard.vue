@@ -189,6 +189,24 @@ const metricDefinitions = computed(() => {
       unit: '%'
     },
     {
+      type: 'mihomo_memory_percent', group: 'system',
+      label: t('admin.ops.alertRules.metrics.mihomoMemory'),
+      description: t('admin.ops.alertRules.metricDescriptions.mihomoMemory'),
+      recommendedOperator: '>=', recommendedThreshold: 70, unit: '%'
+    },
+    {
+      type: 'mihomo_abnormal_events', group: 'system',
+      label: t('admin.ops.alertRules.metrics.mihomoFaults'),
+      description: t('admin.ops.alertRules.metricDescriptions.mihomoFaults'),
+      recommendedOperator: '>=', recommendedThreshold: 1
+    },
+    {
+      type: 'mihomo_monitor_unavailable', group: 'system',
+      label: t('admin.ops.alertRules.metrics.mihomoMonitor'),
+      description: t('admin.ops.alertRules.metricDescriptions.mihomoMonitor'),
+      recommendedOperator: '>=', recommendedThreshold: 1
+    },
+    {
       type: 'concurrency_queue_depth',
       group: 'system',
       label: t('admin.ops.alertRules.metrics.queueDepth'),

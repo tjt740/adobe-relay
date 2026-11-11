@@ -1,0 +1,17 @@
+[Unit]
+Description=Read-only Mihomo resource observer
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/adobe-relay/monitoring/mihomo-observer.py
+User=root
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=64M
+CPUQuota=10%
+TimeoutStartSec=12
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/adobe-relay/shared/data /var/lib/adobe-proxy-observer

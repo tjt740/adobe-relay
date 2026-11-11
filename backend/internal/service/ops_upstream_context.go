@@ -446,8 +446,10 @@ type OpsUpstreamErrorEvent struct {
 	// used by this attempt. ProxyID is null for direct and unknown routes;
 	// ProxyName distinguishes direct/no_proxy from unknown.
 	// Never add proxy URLs or credentials to this event.
-	ProxyID   *int64 `json:"proxy_id"`
-	ProxyName string `json:"proxy_name"`
+	ProxyID               *int64 `json:"proxy_id"`
+	ProxyName             string `json:"proxy_name"`
+	CredentialFingerprint string `json:"credential_fingerprint,omitempty"`
+	ProxyFingerprint      string `json:"proxy_fingerprint,omitempty"`
 
 	// DroppedEarlierAttempts is set on the oldest retained event when queue
 	// bounds forced earlier attempts of the same request to be discarded.

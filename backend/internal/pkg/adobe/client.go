@@ -252,19 +252,20 @@ type GenerateResult struct {
 	Timings GenerationTimings
 }
 
-// GenerationTimings contains durations, counts and applied model/quality only;
+// GenerationTimings contains durations, counts, applied model/quality and safe credential fingerprints;
 // never prompts, tokens, full payloads or signed URLs.
 // PollMS includes time spent waiting for the upstream job, but excludes downloading its output.
 type GenerationTimings struct {
-	SubmittedModelVersion string `json:"submitted_model_version,omitempty"`
-	SubmittedDetailLevel  int    `json:"submitted_detail_level,omitempty"`
-	SubmitMS              int64  `json:"submit_ms"`
-	PollMS                int64  `json:"poll_ms"`
-	DownloadMS            int64  `json:"download_ms"`
-	SubmitAttempts        int    `json:"submit_attempts"`
-	PollCount             int    `json:"poll_count"`
-	DownloadAttempts      int    `json:"download_attempts"`
-	DownloadFallback      bool   `json:"download_fallback,omitempty"`
+	RequestDiagnostics    RequestDiagnostics `json:"request_diagnostics"`
+	SubmittedModelVersion string             `json:"submitted_model_version,omitempty"`
+	SubmittedDetailLevel  int                `json:"submitted_detail_level,omitempty"`
+	SubmitMS              int64              `json:"submit_ms"`
+	PollMS                int64              `json:"poll_ms"`
+	DownloadMS            int64              `json:"download_ms"`
+	SubmitAttempts        int                `json:"submit_attempts"`
+	PollCount             int                `json:"poll_count"`
+	DownloadAttempts      int                `json:"download_attempts"`
+	DownloadFallback      bool               `json:"download_fallback,omitempty"`
 	// HTTP time includes both network transit and Adobe's handling/long polling.
 	// It is not a measurement of network latency alone.
 	PollHTTPMS         int64             `json:"poll_http_ms"`
@@ -290,6 +291,11 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) (r
 			attempts = submitResp.Attempts
 		}
 		retErr = operationError(retErr, stage, started, attempts, submitResp, "")
+		diagnostic := requestDiagnostics(input, started, submitResp)
+		retErr = attachRequestDiagnostics(retErr, diagnostic)
+		if result != nil {
+			result.Timings.RequestDiagnostics = diagnostic
+		}
 	}()
 	candidates, err := BuildImagePayloadCandidates(input.Options)
 	if err != nil {
@@ -796,11 +802,17 @@ func ClassifyAuthResponse(status int, accessError, preview string) error {
 		return NewNotEntitledError(message, status, "")
 	}
 	message := "Token invalid or expired"
+	if status == http.StatusForbidden {
+		message = "Adobe access denied; account, session or IP cause not specified"
+	}
 	if preview != "" {
 		message += ": " + preview
 	}
 	authErr := NewAuthError(message, status)
 	authErr.UserMessage = "Adobe account authentication failed"
+	if status == http.StatusForbidden {
+		authErr.UserMessage = "Adobe denied access to this request"
+	}
 	return authErr
 }
 

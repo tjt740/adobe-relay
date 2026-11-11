@@ -1734,6 +1734,12 @@ func applyOpsUpstreamErrorEvents(entry *service.OpsInsertErrorLogInput, events [
 		return
 	}
 
+	// Adobe failover can end on a different account than the outer request snapshot.
+	// Attribute the final failure to the same attempt as its proxy and HTTP response.
+	if last.Platform == service.PlatformAdobe && last.AccountID > 0 {
+		id := last.AccountID
+		entry.AccountID = &id
+	}
 	entry.UpstreamStatusCode = nil
 	entry.UpstreamErrorMessage = nil
 	entry.UpstreamErrorDetail = nil

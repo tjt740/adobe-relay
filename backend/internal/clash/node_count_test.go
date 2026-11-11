@@ -71,7 +71,8 @@ func TestMergeSubscriptionsAbove512Nodes(t *testing.T) {
 func TestImportAbove512NodesPreservesFailedSources(t *testing.T) {
 	db := sourceTestDB(t)
 	_, err := db.Exec(`CREATE TABLE proxies(id BIGSERIAL PRIMARY KEY,name text,protocol text,host text,port int,username text,password text,status text,backup_proxy_id bigint,fallback_mode text,updated_at timestamptz DEFAULT NOW(),deleted_at timestamptz);
-CREATE TABLE accounts(id BIGSERIAL PRIMARY KEY,proxy_id bigint,proxy_fallback_origin_id bigint,extra jsonb,status text,schedulable bool,error_message text,updated_at timestamptz DEFAULT NOW(),deleted_at timestamptz);
+CREATE TABLE adobe_route_exclusions(proxy_id bigint PRIMARY KEY);
+ CREATE TABLE accounts(id BIGSERIAL PRIMARY KEY,proxy_id bigint,proxy_fallback_origin_id bigint,extra jsonb,status text,schedulable bool,error_message text,updated_at timestamptz DEFAULT NOW(),deleted_at timestamptz);
 CREATE TABLE scheduler_outbox(event_type text,payload jsonb);`)
 	require.NoError(t, err)
 	const count = 520

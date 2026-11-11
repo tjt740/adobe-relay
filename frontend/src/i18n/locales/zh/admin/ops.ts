@@ -509,6 +509,10 @@ export default {
           account: '账号级别指标'
         },
         metrics: {
+          mihomoMemory: "Mihomo 内存使用率 (%)",
+          mihomoFaults: "Mihomo 近五分钟异常信号",
+          mihomoMonitor: "Mihomo 监控不可用",
+
           successRate: '成功率 (%)',
           errorRate: '错误率 (%)',
           upstreamErrorRate: '上游错误率 (%)',
@@ -528,6 +532,10 @@ export default {
           overloadAccountCount: '过载账号数'
         },
         metricDescriptions: {
+          mihomoMemory: "代理容器总内存占硬上限的比例，包含连接与内核内存；仅使用90秒内有效样本。",
+          mihomoFaults: "近五分钟出现的新 OOM 或重启信号数量；首次采样不把历史累计值当新故障。",
+          mihomoMonitor: "采样缺失、超过90秒、进程停止或读取失败为1，正常为0；缺失不当作内存已恢复。",
+
           successRate: '统计窗口内成功请求占比（0~100）。',
           errorRate: '统计窗口内失败请求占比（0~100）。',
           upstreamErrorRate: '统计窗口内上游错误占比（0~100）。',

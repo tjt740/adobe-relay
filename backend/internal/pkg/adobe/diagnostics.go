@@ -11,6 +11,7 @@ import (
 // OperationError preserves the original typed error while identifying the failed
 // stage. URLs and credentials are deliberately excluded from its metadata.
 type OperationError struct {
+	RequestDiagnostics RequestDiagnostics
 	Stage              string
 	UpstreamRequestID  string
 	JobID              string

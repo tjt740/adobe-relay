@@ -369,7 +369,7 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 		if !n.Enabled {
 			continue
 		}
-		result, e := tx.ExecContext(ctx, `UPDATE proxies SET status='active',updated_at=NOW() WHERE id=$1 AND deleted_at IS NULL`, n.ProxyID)
+		result, e := tx.ExecContext(ctx, `UPDATE proxies SET status=CASE WHEN EXISTS(SELECT 1 FROM adobe_route_exclusions e WHERE e.proxy_id=proxies.id) THEN 'inactive' ELSE 'active' END,updated_at=NOW() WHERE id=$1 AND deleted_at IS NULL`, n.ProxyID)
 		if e != nil {
 			return View{}, e
 		}

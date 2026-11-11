@@ -509,6 +509,10 @@ export default {
           account: 'Account-level Metrics'
         },
         metrics: {
+          mihomoMemory: "Mihomo memory usage (%)",
+          mihomoFaults: "Mihomo recent fault signals",
+          mihomoMonitor: "Mihomo monitoring unavailable",
+
           successRate: 'Success Rate (%)',
           errorRate: 'Error Rate (%)',
           upstreamErrorRate: 'Upstream Error Rate (%)',
@@ -528,6 +532,10 @@ export default {
           overloadAccountCount: 'Overloaded Accounts'
         },
         metricDescriptions: {
+          mihomoMemory: "Total proxy cgroup memory as a percentage of its hard limit, including socket and kernel memory. Samples must be valid and no older than 90 seconds.",
+          mihomoFaults: "New OOM or restart signals within five minutes. Initial sampling does not treat historic counters as new faults.",
+          mihomoMonitor: "1 for missing or stale samples, a stopped process, or collection errors; 0 when healthy. Missing telemetry does not resolve memory alerts.",
+
           successRate: 'Percentage of successful requests in the window (0-100).',
           errorRate: 'Percentage of failed requests in the window (0-100).',
           upstreamErrorRate: 'Percentage of upstream failures in the window (0-100).',

@@ -1,0 +1,9 @@
+[Unit]
+Description=Sample Mihomo resources every 15 seconds
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=15s
+AccuracySec=1s
+Unit=adobe-mihomo-observer.service
+[Install]
+WantedBy=timers.target

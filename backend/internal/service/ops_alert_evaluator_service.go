@@ -564,6 +564,8 @@ func (s *OpsAlertEvaluatorService) computeRuleMetric(
 		return 0, false
 	}
 	switch strings.TrimSpace(rule.MetricType) {
+	case OpsMetricMihomoMemory, OpsMetricMihomoFaults, OpsMetricMihomoMonitor:
+		return currentMihomoMetric(strings.TrimSpace(rule.MetricType), time.Now().UTC())
 	case OpsMetricAdobeErrorAccounts:
 		value, _, _, _, err := s.adobeErrorMetric(ctx, start, end, groupID, rule.Filters)
 		return value, err == nil

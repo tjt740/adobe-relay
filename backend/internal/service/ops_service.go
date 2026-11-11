@@ -603,6 +603,8 @@ func sanitizeOpsUpstreamErrors(entry *OpsInsertErrorLogInput) error {
 		out.MappedModel = truncateString(strings.TrimSpace(out.MappedModel), 128)
 		out.KiroModelID = truncateString(strings.TrimSpace(out.KiroModelID), 128)
 		out.ProxyName = truncateString(strings.TrimSpace(out.ProxyName), 128)
+		out.CredentialFingerprint = safeOpsDiagnosticFingerprint(out.CredentialFingerprint)
+		out.ProxyFingerprint = safeOpsDiagnosticFingerprint(out.ProxyFingerprint)
 		out.UpstreamRequestID = truncateString(strings.TrimSpace(out.UpstreamRequestID), 128)
 		out.UpstreamURL = truncateString(strings.TrimSpace(out.UpstreamURL), urlMaxLen)
 		if body := strings.TrimSpace(out.UpstreamResponseBody); keepBody && body != "" {

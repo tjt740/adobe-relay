@@ -60,11 +60,11 @@ func TestProbeClassification(t *testing.T) {
 		status, _ := classifyStatus(code)
 		require.Equal(t, "healthy", status)
 	}
-	for _, code := range []int{403, 407} {
+	for _, code := range []int{407} {
 		status, _ := classifyStatus(code)
 		require.Equal(t, "unhealthy", status)
 	}
-	for _, code := range []int{301, 429, 500, 502, 503} {
+	for _, code := range []int{301, 403, 429, 500, 502, 503} {
 		status, _ := classifyStatus(code)
 		require.Equal(t, "unknown", status)
 	}
