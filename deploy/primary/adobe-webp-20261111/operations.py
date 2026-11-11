@@ -1,7 +1,7 @@
 """Operate the authorized release with exact CI artifacts and preserved guards."""
-import datetime,hashlib,json,os,pathlib,re,subprocess,sys
+import base64,datetime,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','status','verify','live-billing','resume','defer-old','defer-canary']
+assert phase in ['preflight','prepare','start','status','verify','live-billing','resume','defer-old','defer-canary','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/adobe-webp-20261111'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -118,4 +118,39 @@ elif phase in ['defer-old','defer-canary']:
 r=pathlib.Path('{root}')
 assert (r/'expected-sha').read_text().strip()=='{sha}'
 subprocess.run([sys.executable,str(r/'defer-pending-tests.py'),'{part}'],check=True,timeout=310)
+""")
+
+elif phase=='archive':
+ documents={'release-notes.md':pathlib.Path('deploy/primary/adobe-webp-20261111.md'),'primary-README.md':pathlib.Path('deploy/primary/README.md'),'release-verification.json':pathlib.Path(__file__).with_name('release-verification.json')}
+ payload={name:base64.b64encode(path.read_bytes()).decode() for name,path in documents.items()}
+ source=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+ remote(f"""import base64,datetime,fcntl,hashlib,importlib.util,json,pathlib
+r=pathlib.Path('{root}');held=[]
+for path in ['/opt/adobe-relay/shared/.adobe-deploy.lock','/opt/adobe-relay/.release.lock','/opt/adobe-team-cookie/.release.lock','/opt/adobe-team-cookie/.incremental-release.lock']:
+ f=open(path,'a');fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB);held.append(f)
+assert not (r/'release-completion.json').exists(), 'Completion already recorded; inspect without replay'
+spec=importlib.util.spec_from_file_location('audit',r/'audit.py');a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
+container=a.inspect(a.APP);assert container['Config']['Image']=='adobe-relay:{sha}'
+assert container['Image']==json.loads((r/'image-loaded.json').read_text())['image_id']
+core=json.loads((r/'deployment-verification.json').read_text());assert core['application_sha']=='{sha}' and core['status']=='deployed_api_verified'
+live=json.loads((r/'live-billing-verification.json').read_text());assert live['application_sha']=='{sha}' and live['live_billing_verified'] and live['webp_fully_decoded'] and live['replayed_requests']==0
+assert len(live['cases'])==2 and {{c['model'] for c in live['cases']}}=={{'gpt-image-2.6-flare','gpt-image-2.6-sunburst'}}
+assert all(c['success'] and c['outer_posts']==1 and c['image']['fully_decoded'] for c in live['cases'])
+cleanup=json.loads((r/'live-billing-cleanup.json').read_text());assert all(cleanup[k] for k in ['temporary_key_deleted','temporary_group_deleted','temporary_grant_removed']) and not cleanup['customer_prices_changed']
+metadata=json.loads(base64.b64decode({payload!r}['release-verification.json']))
+assert metadata['application_sha']=='{sha}' and metadata['status']=='deployed_live_webp_verified' and not metadata['docs_update_pending']
+docs=metadata['docs'];verification=json.loads(pathlib.Path(docs['verification']['audit']).joinpath('result.json').read_text())
+assert verification==docs['verification'] and verification['example_blocks']==24 and verification['native_webp_documented']
+assert all(verification[k] for k in ['existing_sub2_user_login_and_read','anonymous_content_blocked','logout_invalidates_docs_session','public_https'])
+assert hashlib.sha256(pathlib.Path('/opt/creative-docs/current/docs-server').read_bytes()).hexdigest()==docs['update']['binary_sha256']
+assert hashlib.sha256(pathlib.Path('/opt/creative-docs/staging').joinpath(verification['source_sha'],'guide.md').read_bytes()).hexdigest()==verification['protected_markdown_sha256']
+before=json.loads((r/'before.json').read_text());current=a.snapshot()
+checks=a.check_preserved(before,current);a.validate_rollback(before,current,'{sha}',a.inspect(a.ROLLBACK_IMAGE)['Id'])
+files={{}}
+for name,value in {payload!r}.items():
+ data=base64.b64decode(value);assert b'PENDING' not in data
+ path=r/name;path.write_bytes(data);path.chmod(0o600);files[name]=a.digest(data)
+ if name=='primary-README.md':pathlib.Path('/opt/adobe-relay/deploy/primary/README.md').write_bytes(data)
+out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'deployed_live_webp_verified','application_sha':'{sha}','archive_source':'{source}','image_id':container['Image'],'core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'live_webp_cases':2,'real_database_debits_verified':True,'replayed_requests':0,'docs':docs,'mail_sent':False}}
+a.save('release-completion.json',out);print(json.dumps(out))
 """)
