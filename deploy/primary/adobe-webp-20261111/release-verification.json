@@ -1,0 +1,455 @@
+{
+  "status": "deployed_live_webp_verified_docs_pending",
+  "application_sha": "106e911e98fdf22f8610983a709584440296d585",
+  "feature_pr": 183,
+  "feature_main": "6e82746d586b8b3365393cc306e7dbcb8075f3ba",
+  "build_run": 42960957053,
+  "preflight_run": 42962430601,
+  "prepare_run": 42962504991,
+  "start_run": 42962834753,
+  "verification_run": 42964819500,
+  "live_test_dispatch_run": 42965178650,
+  "deployment": {
+    "at": "2026-11-11T05:20:10.283570+00:00",
+    "application_sha": "106e911e98fdf22f8610983a709584440296d585",
+    "application_version": "2026-11-11T13:20:08.340+0800\tINFO\tstdlog\tSub2API 0.2.19 (commit: 106e911e98fdf22f8610983a709584440296d585, built: 2026-11-11T04:45:01Z)\t{\"service\": \"sub2api\", \"env\": \"bootstrap\", \"legacy_stdlog\": true}",
+    "preserved": {
+      "existing_groups_and_prices": true,
+      "other_containers": true,
+      "configuration": true,
+      "resources_and_go": true,
+      "environment": true,
+      "okad_settings": true,
+      "sub2_settings_including_smtp": true,
+      "clash_nodes_bindings_and_configuration": true,
+      "alert_rules": true,
+      "retired_route_matches_current_baseline": true,
+      "billing_mode_initialization": true
+    },
+    "business_preservation": {
+      "backup_accounts": 1059,
+      "checked_accounts": 1059,
+      "manual_pauses_preserved": true,
+      "manual_proxy_modes_preserved": true,
+      "proxy_bindings_changed_with_event_chain": 15,
+      "cookie_rotations_with_version_advance": 0,
+      "non_source_cookie_credential_changes": 3,
+      "credential_field_names_changed": [
+        "_token_version",
+        "access_token",
+        "adobe_session_cookie",
+        "expires_at"
+      ]
+    },
+    "migration_checksums_preserved": true,
+    "migration_set_retained": true,
+    "retired_408_gates_empty": true,
+    "canonical_assets": {
+      "/assets/index-B8Rt2772.js": "ce3a43d3628ebff6ed01e81c4c1080d756a20ecd78b1e23b058c379d012242ad",
+      "/assets/ProxiesView-hmxNolJI.js": "5c48844ad59fbca1ba1245ee8d1a609f9dc6c27c4da07a2744b82b43b5edda31",
+      "/assets/ChangelogView-C_pnYFdR.js": "0156cfa0f82b53df08764c7657e08f0b772086b8f3df62108be7daa21a78836d",
+      "/assets/GroupsView-CFydH5O0.js": "888b112247d62604507851493864ae6ae00dfb83fefe7416a8e99d15fc93cc0d",
+      "/assets/AccountsView-CFYRjjc1.js": "19528023782107bece97b1fb4d5b290f4356a5d6b2bf4ca2582722e50f10a5b6",
+      "/assets/index-iXkNe7sX.js": "00775c165de2dd6fc3196332594c836209893dc09c237661ec293c39b4d25c4c",
+      "/assets/index-CV9jSK22.js": "d48ca81a5699fdd656489c929b23c39faf5ad9a070ac1e48e193974835203e0e"
+    },
+    "live_browser_cases": 0,
+    "browser_limitation": "Live authenticated browser verification unavailable; asset and API checks only",
+    "heartbeat_after_temporary_process_cleanup": {
+      "at": "2026-11-11T13:19:39.378992+08:00",
+      "healthy": true
+    },
+    "passive_sample_count": 13,
+    "temporary_cleanup": {
+      "at": "2026-11-11T05:17:09.686898+00:00",
+      "temporary_container_removed": true,
+      "temporary_nat_rule_removed": true,
+      "rolling_lease_removed": true,
+      "nginx_configuration_unchanged": true
+    },
+    "api_verification": {
+      "at": "2026-11-11T05:18:07.272126+00:00",
+      "application_sha": "106e911e98fdf22f8610983a709584440296d585",
+      "passed": true,
+      "read_only": true,
+      "model_directory_source": "adobe",
+      "active_generation": false,
+      "existing_group_changes": false
+    },
+    "route_api_verified": true,
+    "excluded_1290": {
+      "excluded": false,
+      "status": null,
+      "bindings": 0,
+      "leases": 0
+    },
+    "cutover_route_checks": {
+      "retired_proxy_absence_preserved": true,
+      "no_bindings_or_test_leases": true
+    },
+    "live_billing_verified": false,
+    "live_generation_tested": false,
+    "test_mail_sent": false,
+    "verified_locale_bundle_count": 2,
+    "verified_admin_model_labels": {
+      "gpt-image-2.6-flare": "GPT Image 2.6 Flare",
+      "gpt-image-2.6-sunburst": "GPT Image 2.6 Sunburst"
+    },
+    "status": "deployed_api_verified"
+  },
+  "live_webp": {
+    "live-billing-started.json": {
+      "at": "2026-11-11T05:21:27.800241+00:00",
+      "application_sha": "106e911e98fdf22f8610983a709584440296d585",
+      "source_group_id": 57,
+      "original_allowed_groups": [],
+      "planned_outer_posts": 2,
+      "selected_account_id": 2315,
+      "never_replay": true,
+      "cleanup_required": true
+    },
+    "live-billing-verification.json": {
+      "application_sha": "106e911e98fdf22f8610983a709584440296d585",
+      "cases": [
+        {
+          "name": "flare-default",
+          "application_sha": "106e911e98fdf22f8610983a709584440296d585",
+          "mode_enabled": true,
+          "outer_posts": 1,
+          "success": true,
+          "at": "2026-11-11T05:21:28.214694+00:00",
+          "http_status": 200,
+          "http_request_id": "aabe13b7-eb93-4161-9031-33913d0df4f3",
+          "image_http_content_type": "image/webp",
+          "image": {
+            "alpha_max": 65535,
+            "alpha_min": 65535,
+            "bytes": 796114,
+            "format": "webp",
+            "fully_decoded": true,
+            "has_transparency": false,
+            "height": 1024,
+            "sha256": "77cb7d7fffe554560e7ffd1edbba5b28de27e2a05cb642f1b09c263bc3eb7eab",
+            "width": 1024
+          },
+          "model": "gpt-image-2.6-flare",
+          "response_format": "url",
+          "background": "auto",
+          "output_compression": null,
+          "usage": {
+            "request_id": "client:beb68714-32ce-409a-afe0-b4b858368352",
+            "account_id": 2315,
+            "model": "gpt-image-2.6-flare",
+            "upstream_model": "firefly-gpt-image-2-6-flare",
+            "image_count": 1,
+            "image_size": "1K",
+            "image_quality": "medium",
+            "total_cost": 0.0123,
+            "actual_cost": 0.01845,
+            "rate_multiplier": 1.5,
+            "created_at": "2026-11-11T13:21:40.632897+08:00"
+          },
+          "key_quota_debit": 0.01845,
+          "admin_balance_delta": 0.01845,
+          "other_admin_usage_count": 0,
+          "pipeline": {
+            "request_id": "aabe13b7-eb93-4161-9031-33913d0df4f3",
+            "client_request_id": "beb68714-32ce-409a-afe0-b4b858368352",
+            "generation_request_id": "5126987c-e9b1-4fd8-a730-a601fc9fa756",
+            "api_key_id": 243,
+            "account_id": 2315,
+            "processing_ms": 12199,
+            "applied_submissions": [
+              {
+                "submitted_model_version": "gpt-image-2.6-star-swirl",
+                "submitted_detail_level": 3,
+                "submit_attempts": 1
+              }
+            ]
+          },
+          "seconds": 13.305
+        },
+        {
+          "name": "sunburst-transparent-25",
+          "application_sha": "106e911e98fdf22f8610983a709584440296d585",
+          "mode_enabled": true,
+          "outer_posts": 1,
+          "success": true,
+          "at": "2026-11-11T05:21:41.722632+00:00",
+          "http_status": 200,
+          "http_request_id": "96637581-3c5d-40bf-acd5-0f45ef35b322",
+          "image": {
+            "alpha_max": 65278,
+            "alpha_min": 0,
+            "bytes": 63654,
+            "format": "webp",
+            "fully_decoded": true,
+            "has_transparency": true,
+            "height": 1024,
+            "sha256": "35f82d6419a11799d34f6717d905750468a48f4e6409ca74e58f546db9a97ca6",
+            "width": 1024
+          },
+          "model": "gpt-image-2.6-sunburst",
+          "response_format": "b64_json",
+          "background": "transparent",
+          "output_compression": 25,
+          "usage": {
+            "request_id": "client:ce36b34c-1b58-46f4-8732-2fbac56a8db4",
+            "account_id": 2315,
+            "model": "gpt-image-2.6-sunburst",
+            "upstream_model": "firefly-gpt-image-2-6-sunburst",
+            "image_count": 1,
+            "image_size": "1K",
+            "image_quality": "medium",
+            "total_cost": 0.0123,
+            "actual_cost": 0.01845,
+            "rate_multiplier": 1.5,
+            "created_at": "2026-11-11T13:22:09.749135+08:00"
+          },
+          "key_quota_debit": 0.01845,
+          "admin_balance_delta": 0.01845,
+          "other_admin_usage_count": 0,
+          "pipeline": {
+            "request_id": "96637581-3c5d-40bf-acd5-0f45ef35b322",
+            "client_request_id": "ce36b34c-1b58-46f4-8732-2fbac56a8db4",
+            "generation_request_id": "df44066e-a52f-4a9d-9024-ef4dc8334b2a",
+            "api_key_id": 243,
+            "account_id": 2315,
+            "processing_ms": 27817,
+            "applied_submissions": [
+              {
+                "submitted_model_version": "gpt-image-2.6-aurora",
+                "submitted_detail_level": 3,
+                "submit_attempts": 1
+              }
+            ]
+          },
+          "seconds": 28.682
+        }
+      ],
+      "live_billing_verified": true,
+      "real_database_debits_verified": true,
+      "webp_fully_decoded": true,
+      "scope": "Both 2.6 models, 1K Medium; Flare URL default and Sunburst Base64 transparent compression 25",
+      "saved_prices_preserved": true,
+      "replayed_requests": 0
+    },
+    "live-billing-cleanup.json": {
+      "temporary_key_deleted": true,
+      "temporary_group_deleted": true,
+      "temporary_grant_removed": true,
+      "original_allowed_groups": [],
+      "current_allowed_groups": [],
+      "customer_prices_changed": false,
+      "selected_account_id": 2315
+    }
+  },
+  "rolling": {
+    "progress.json": {
+      "at": "2026-11-11T05:17:11.438348+00:00",
+      "step": "complete",
+      "state": "done"
+    },
+    "rolling-route-canary.json": {
+      "at": "2026-11-11T05:00:41.903297+00:00",
+      "temporary_redirect": true,
+      "source_and_canary_healthy": true
+    },
+    "rolling-route-canonical.json": {
+      "at": "2026-11-11T05:07:40.891681+00:00",
+      "temporary_redirect": false,
+      "source_and_canary_healthy": true
+    },
+    "rolling-old-drained.json": {
+      "at": "2026-11-11T05:06:35.024000+00:00",
+      "drained": "old",
+      "stable_zero_seconds": 45,
+      "canary_prefixes": [
+        "r1zq0gocz3a15p"
+      ],
+      "sample_count": 66,
+      "last_sample": {
+        "at": "2026-11-11T05:06:35.022807+00:00",
+        "running_automatic_checks": 0,
+        "elapsed_seconds": 353,
+        "remaining_tracked_slots": 0,
+        "pending_input_sockets": 0,
+        "host_available_bytes": 64955404288
+      }
+    },
+    "rolling-canary-drained.json": {
+      "at": "2026-11-11T05:17:05.734644+00:00",
+      "drained": "canary",
+      "stable_zero_seconds": 45,
+      "sample_count": 105,
+      "last_sample": {
+        "at": "2026-11-11T05:17:05.733004+00:00",
+        "running_automatic_checks": 0,
+        "elapsed_seconds": 565,
+        "remaining_tracked_slots": 0,
+        "pending_input_sockets": 0,
+        "host_available_bytes": 64946794496
+      }
+    },
+    "rolling-finished.json": {
+      "at": "2026-11-11T05:17:09.686898+00:00",
+      "temporary_container_removed": true,
+      "temporary_nat_rule_removed": true,
+      "rolling_lease_removed": true,
+      "nginx_configuration_unchanged": true
+    },
+    "premigration-backup.json": {
+      "path": "/opt/adobe-relay/backups/20261111T045833Z-before-adobe-webp-20261111",
+      "verified": true,
+      "sha256": "be9cc820c386e42ab9c51894ba457dfb32ce2ebdc2f28576abe7126f9d55609b"
+    },
+    "after.json": {
+      "at": "2026-11-11T05:17:09.761794+00:00",
+      "backup": "/opt/adobe-relay/backups/20261111T050635Z-106e911e98fdf22f8610983a709584440296d585",
+      "preserved": {
+        "existing_groups_and_prices": true,
+        "other_containers": true,
+        "configuration": true,
+        "resources_and_go": true,
+        "environment": true,
+        "okad_settings": true,
+        "sub2_settings_including_smtp": true,
+        "clash_nodes_bindings_and_configuration": true,
+        "alert_rules": true,
+        "retired_route_matches_current_baseline": true,
+        "billing_mode_initialization": true
+      },
+      "containers": {
+        "adobe-relay-app-1": {
+          "id": "a601a76eb555252a792f1778e761b6a4c99538d38b94700b5db818fd0c32fbc0",
+          "image": "adobe-relay:106e911e98fdf22f8610983a709584440296d585",
+          "image_id": "sha256:50d4e65477b1d431ac366c89b0592c0f8d961edb2e91ce87b7d2ee839b739ff8",
+          "started": "2026-11-11T05:07:34.75920729Z",
+          "health": "healthy",
+          "restarts": 0,
+          "resources": {
+            "Memory": 57982058496,
+            "MemorySwap": 115964116992,
+            "CpuShares": 4096,
+            "CpuQuota": 0,
+            "CpuPeriod": 0,
+            "NanoCpus": 0,
+            "PidsLimit": null
+          },
+          "go_env": {
+            "GOMAXPROCS": "16",
+            "GOMEMLIMIT": "43008MiB"
+          }
+        },
+        "adobe-team-cookie-app-1": {
+          "id": "10af6343a865a0c026e04edea03f772b88a3dec70a195b862f22cb7793cfaf12",
+          "image": "adobe-team-cookie:org-session-recovery-20261111t025217z",
+          "image_id": "sha256:057366874219530f364eadc1b7826d3d80bff7dd16881e5732af178f7c5b5e04",
+          "started": "2026-11-11T02:52:40.023297887Z",
+          "health": "healthy",
+          "restarts": 0,
+          "resources": {
+            "Memory": 3221225472,
+            "MemorySwap": 6442450944,
+            "CpuShares": 0,
+            "CpuQuota": 0,
+            "CpuPeriod": 0,
+            "NanoCpus": 0,
+            "PidsLimit": null
+          },
+          "go_env": {}
+        },
+        "adobe-relay-postgres-1": {
+          "id": "622159a3e217801e7f3bedbe4d79f41737822afeb70422b7b6a204339f50599c",
+          "image": "postgres:18-alpine",
+          "image_id": "sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873",
+          "started": "2026-10-16T12:25:21.223184976Z",
+          "health": "healthy",
+          "restarts": 0,
+          "resources": {
+            "Memory": 1073741824,
+            "MemorySwap": 2147483648,
+            "CpuShares": 0,
+            "CpuQuota": 0,
+            "CpuPeriod": 0,
+            "NanoCpus": 0,
+            "PidsLimit": null
+          },
+          "go_env": {}
+        },
+        "adobe-relay-redis-1": {
+          "id": "f258ff0067c7c298c3b76b32152cac7c1eb45138c1f29caf05e6dbec5cb4b251",
+          "image": "redis:8-alpine",
+          "image_id": "sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0",
+          "started": "2026-10-16T12:25:21.221242858Z",
+          "health": "healthy",
+          "restarts": 0,
+          "resources": {
+            "Memory": 268435456,
+            "MemorySwap": 536870912,
+            "CpuShares": 0,
+            "CpuQuota": 0,
+            "CpuPeriod": 0,
+            "NanoCpus": 0,
+            "PidsLimit": null
+          },
+          "go_env": {}
+        },
+        "adobe-relay-mihomo-1": {
+          "id": "77770d0d02af1d14fc2a2c30d86bad98220bdadfa9f3123bc4afb5e0e78ba182",
+          "image": "metacubex/mihomo:v1.19.31",
+          "image_id": "sha256:739edd73a352d6beb82fad6790ef9d417a4d6f061584cc3cab1bd4536d1c60e5",
+          "started": "2026-11-10T09:24:37.892575664Z",
+          "health": null,
+          "restarts": 14,
+          "resources": {
+            "Memory": 268435456,
+            "MemorySwap": 536870912,
+            "CpuShares": 0,
+            "CpuQuota": 0,
+            "CpuPeriod": 0,
+            "NanoCpus": 0,
+            "PidsLimit": null
+          },
+          "go_env": {}
+        },
+        "image-api-lab-image-lab-1": {
+          "id": "fb128720596d98185d5a54ca2773b71a68c708547a515b77118f4bbf71d08f77",
+          "image": "image-api-lab:cab7ffc81a68",
+          "image_id": "sha256:d64136dde869a9ecd1c077d7911e215df3e9f91f0b3b44880af8824453acfcf5",
+          "started": "2026-10-16T12:25:21.222368104Z",
+          "health": "healthy",
+          "restarts": 0,
+          "resources": {
+            "Memory": 1073741824,
+            "MemorySwap": 2147483648,
+            "CpuShares": 0,
+            "CpuQuota": 0,
+            "CpuPeriod": 0,
+            "NanoCpus": 2000000000,
+            "PidsLimit": 100
+          },
+          "go_env": {}
+        }
+      }
+    },
+    "runtime-verification.json": {
+      "at": "2026-11-11T05:17:11.399562+00:00",
+      "sha": "106e911e98fdf22f8610983a709584440296d585",
+      "https_both_sites": true,
+      "runtime_events": true,
+      "report_policy_preserved": true,
+      "report_total": 1059,
+      "report_pending": 699,
+      "heartbeat": {
+        "last_success_at": "2026-11-11T13:16:40.701948+08:00",
+        "healthy": true
+      },
+      "sent_mail": false,
+      "triggered_adobe_generation": false
+    },
+    "deferred_pending_tests": false
+  },
+  "historical_nov7_billing_acceptance_completed": false,
+  "docs_update_pending": true
+}
