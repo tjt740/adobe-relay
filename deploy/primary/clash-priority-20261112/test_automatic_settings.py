@@ -10,6 +10,14 @@ spec=importlib.util.spec_from_file_location('audit',Path(__file__).with_name('au
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
 class AutomaticSettingReviewTests(TestCase):
+    def test_subscription_settings_cannot_be_preset_during_release(self):
+        before={'containers':{},'config_hashes':{},'env_without_image_hash':'same','okad_settings_hash':'same','settings_hashes':{},'clash_contract_hash':'same','clash_settings_hash':'original','rules_hash':'same'}
+        current=copy.deepcopy(before)
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(m,'ROOT',Path(directory)):
+            self.assertTrue(all(m.check_preserved(before,current).values()))
+            current['clash_settings_hash']='preset-priority'
+            with self.assertRaises(AssertionError):m.check_preserved(before,current)
+
     def setUp(self):
         self.old={'claude_code_client_version_synced':hashlib.md5(b'2.1.305').hexdigest(),'smtp':hashlib.md5(b'preserved').hexdigest()}
         self.review={'key':'claude_code_client_version_synced','old_value':'2.1.305','new_value':'2.1.309','old_hash':self.old['claude_code_client_version_synced'],'new_hash':hashlib.md5(b'2.1.309').hexdigest(),'sync_source_path':'backend/internal/service/claude_code_version_sync_service.go','sync_source_before':'b477e00bc6a393ee4cf985ae881ce3e036603e8e96f6bf3bdcb0a302b91fba5b','sync_source_candidate':'b477e00bc6a393ee4cf985ae881ce3e036603e8e96f6bf3bdcb0a302b91fba5b','event':'claude_code_version_synced','evidence_log_sha256':'a'*64}
