@@ -14,7 +14,7 @@ req=urllib.request.Request('https://creative.cheap/api/v1/admin/ops/alert-rules'
 with urllib.request.urlopen(req,timeout=25)as res:alert_api=json.load(res)['data']
 if isinstance(alert_api,dict):alert_api=alert_api.get('rules',alert_api.get('items'))
 assert isinstance(alert_api,list)and len([r for r in alert_api if r['id']in ids and r['enabled']and not r['notify_email']])==4
-s=json.loads(subprocess.check_output(['docker','exec',a.APP,'cat','/app/data/mihomo-runtime.json'],text=True));now=datetime.datetime.now(datetime.timezone.utc)
+s=json.loads(subprocess.check_output(['docker','exec','--user','sub2api',a.APP,'cat','/app/data/mihomo-runtime.json'],text=True));now=datetime.datetime.now(datetime.timezone.utc)
 assert s['schema_version']==1 and s['sample_ok']and s['running']and s['memory_limit_bytes']==1610612736
 assert 0<=(now-datetime.datetime.fromisoformat(s['observed_at'])).total_seconds()<60
 original=json.loads((ROOT/'observer-installed.json').read_text())['snapshot']
@@ -24,7 +24,10 @@ heartbeat=json.loads(a.sql("SELECT to_jsonb(h)FROM ops_job_heartbeats h WHERE jo
 cleanup=json.loads((ROOT/'rolling-finished.json').read_text())
 assert datetime.datetime.fromisoformat(heartbeat['last_success_at'])>datetime.datetime.fromisoformat(cleanup['at'])
 assert not heartbeat['last_error_at']or heartbeat['last_success_at']>heartbeat['last_error_at']
-assert re.search(r'rules=14 enabled=14 evaluated=(?:1[2-4]) ',heartbeat['last_result']), 'New metrics must be evaluated by the formal instance'
+# Two legacy latency rules are not evaluated by the existing engine; the two Adobe
+# rules also run only on their existing two-minute cadence. All four new rules
+# plus the six always-due existing rules yield at least ten evaluations.
+assert re.search(r'rules=14 enabled=14 evaluated=(?:1[0-4]) ',heartbeat['last_result']), 'New metrics must be evaluated by the formal instance'
 health=json.loads(a.sql("SELECT json_build_object('checked',(SELECT count(*)FROM proxy_failover_health WHERE checked_at>now()-interval '2 minutes'),'https_evidence',(SELECT count(*)FROM proxy_failover_health WHERE checked_at>now()-interval '2 minutes'AND message LIKE '%https_api=%'),'examples',(SELECT coalesce(json_agg(x),'[]')FROM(SELECT proxy_id,status,message,checked_at FROM proxy_failover_health WHERE checked_at>now()-interval '2 minutes'AND message LIKE '%https_api=%' ORDER BY checked_at DESC LIMIT 3)x))"))
 assert health['https_evidence']>0,'Wait for natural HTTPS health checks from new application'
 # Only return bounded metadata; never extract complete event details or user requests.
@@ -36,7 +39,7 @@ assert mail_events==0
 logs=subprocess.run(['docker','logs','--since',cutover,'--tail','3000',a.APP],capture_output=True,text=True,check=True)
 records=[]
 for line in (logs.stdout+'\n'+logs.stderr).splitlines():
- try:record=json.loads(line)
+ try:record=json.loads(line[line.index('{'):])
  except ValueError:continue
  timing=record.get('timings')or{}
  if not isinstance(timing,dict):continue
@@ -44,5 +47,5 @@ for line in (logs.stdout+'\n'+logs.stderr).splitlines():
   d=im.get('request_diagnostics')or{}
   if re.fullmatch('[a-f0-9]{64}',d.get('credential_fingerprint','')):
    records.append({'combined':True,'bearer':bool(re.fullmatch('[a-f0-9]{64}',d.get('bearer_fingerprint',''))),'session':bool(re.fullmatch('[a-f0-9]{64}',d.get('session_fingerprint','')))})
-out={'at':now.isoformat(),'passed':True,'application_sha':sha,'quarantine':quarantine,'rule_ids':ids,'original_alert_rules_unchanged':True,'alert_api_verified':True,'site_only_alerts':True,'observer_snapshot':s,'memory_percent':s['memory_current_bytes']*100/s['memory_limit_bytes'],'formal_alert_heartbeat':heartbeat,'https_probe_evidence':health,'natural_403_diagnostics':diag,'natural_success_diagnostics':{'image_records':len(records),'all_separate_fingerprints_present':all(r['bearer']and r['session']for r in records)},'natural_traffic_since_cutover':traffic,'active_generation_tests':0,'forced_online_failures':0,'test_mail_sent':False}
+out={'at':now.isoformat(),'passed':True,'application_sha':sha,'quarantine':quarantine,'rule_ids':ids,'original_alert_rules_unchanged':True,'alert_api_verified':True,'site_only_alerts':True,'observer_snapshot':s,'memory_percent':s['memory_current_bytes']*100/s['memory_limit_bytes'],'formal_alert_heartbeat':heartbeat,'https_probe_evidence':health,'natural_403_diagnostics':diag,'natural_success_diagnostics':{'image_records':len(records),'all_separate_fingerprints_present':bool(records)and all(r['bearer']and r['session']for r in records)},'natural_traffic_since_cutover':traffic,'active_generation_tests':0,'forced_online_failures':0,'test_mail_sent':False}
 a.save('reliability-verification.json',out);print(json.dumps(out,ensure_ascii=False))

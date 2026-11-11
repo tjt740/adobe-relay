@@ -1,6 +1,6 @@
 # Proxy reliability and 403 diagnostics — 2026-11-12
 
-Status: prepared, not yet deployed. Follow-up evidence will identify the exact application and verification results.
+Status: deployed and verified. Actual application/image `47c5c46ead01a03cbfa7c547e4da971a561f86c7`, Sub2API 0.2.19. Functional PR #189 merged as `47896d8f332e7c4c7043a1f6752ea80efed874e9`; the merge and audit commits do not redeploy the application. Full official gate [43104288465](https://github.com/tjt740/adobe-relay/actions/runs/43104288465) passed backend, 689 frontend cases, exact image and checked release artifact. The preceding candidate run 43103315433 was superseded and cancelled, not counted as a successful gate.
 
 ## Scope
 
@@ -14,8 +14,28 @@ A read-only host sampler publishes bounded, credential-free cgroup memory and re
 
 The six prior controls (three idle accounts × two proxies) all returned images. They do not establish the historical 403 cause because original failing credentials/exit identity were not preserved across all controls. See `mihomo-memory-20261112.md` and the server `adobe-403-control-20261112` audit.
 
+## Release evidence
+
+- Beijing 05:10:44: quarantine 1124/1160/1953. 05:29:03: read-only sampler installed; all existing container identities and protected configs retained. 05:30:18: add four site-only rules (IDs 11–14), preserving the original ten. 05:39:19: quarantine 1948 after the 32 submission EOF failures. All four had zero bindings/leases at their respective isolation times. No listener was removed or Mihomo process restarted.
+- 05:54:44: temporary instance receives new connections. 06:00:29: formal instance receives new connections. 06:04:48: temporary container, NAT and rolling lease removed. Both drains required zero tracked business slots, input sockets and automatic checks through a stable window; no queue delay or forced termination.
+- 06:07:55: core production verification passed, including both sites, public HTTPS SS-2022 preview (three synthetic nodes, zero import), Chinese/English assets, cleanup, formal-process alert heartbeat and 13 passive samples over two minutes. All migration checksums/set retained; retired 408 gates remain empty; 1290 remains absent with zero bindings/leases. No docs restart, new migration, price or Cookie policy change.
+- 1059 backup accounts retained, manual pause and manual IP modes preserved. The 27 proxy changes have event chains; five source Cookie rotations have advancing synchronization versions; 18 other token/session credential changes were reviewed and their live values preserved. Protected settings, SMTP, original alert rules, subscription/node configuration, other services and resources remain. Sub2: 54 GiB, Go 43008 MiB, GOMAXPROCS 16, CPU shares 4096. Okad: current org-session-recovery-20261111t025217z, 3 GiB. Mihomo: same original process, 1536 MiB/3 GiB, historical restart count 51 with no increment and no new OOM.
+- From first cutover through 06:07:52: 60 natural usage records/60 images; zero final 502 or 403. Separate error rows include recovered 200 ×58, 400 ×1, 404 ×4, 451 ×1; this is not an all-requests-success or peak-load claim. The earlier 32 EOF/502 rows remain in `predeployment-502-review.json`; they were all on 1948 and ended at 05:13:30, before application deployment.
+- At final core verification, 412 recent HTTPS observations contain the new API/web stage result. Mihomo sampled memory was 6.66% of its 1.5 GiB cap. The alert heartbeat evaluated all four new rules together with currently due legacy rules; Adobe rules retain their two-minute cadence. No new monitoring alarm or email was forced.
+- Supplemental 06:09:49 log verification confirms 42 naturally completed images with combined, bearer and effective-session fingerprints plus declared JWT expiry. A 06:11:08 database check confirms all 53 natural upstream 451 attempts (51 submit, two poll) retained credential and proxy fingerprints. These are upstream attempts, not 53 final customer failures. No 403 occurred in this observation, so the specific 403 path is backed by isolated tests, not a claimed live reproduction.
+- The first auxiliary log parser assumed JSON-only lines and found no success records because production uses a console prefix. That receipt is retained. The parser was corrected and `diagnostic-log-verification.json` supplements it; no application redeployment or new generation was needed. The heartbeat check also accounts for existing unsupported latency rules and the original two-minute Adobe cadence.
+- 31 release/sampler protection cases and the original 44 release protections passed locally; targeted race, PostgreSQL import preservation, full Adobe SDK and frontend types passed. The first local broad SDK run inherited host proxy settings and failed loopback download cases; the unchanged command passed after clearing proxy variables for that test process. An optional broad vet inspection reported pre-existing unkeyed test literals and unreachable pricing code, both byte-identical to the live baseline; the required official gate passed.
+
 ## Deployment and verification
 
 Use the exact checked image and existing rolling drain tooling, natural drain only, preservation checks, rollback tag and current database backup. No migration, pricing, cookie-policy, scheduler budget, Dockerfile or startup change is planned. Retain current SS/SS2022 work from main. Do not classify prepared or failed gates as production success. No email will be sent by this task.
 
 Lowering memory or removing these exclusions is not an automatic rollback: inspect current traffic and evidence first. Code rollback never restores old database/config snapshots. Capacity and health checks reduce known failure modes; they cannot guarantee every possible 502 is eliminated.
+
+## Artifacts and rollback
+
+- Image ID: `sha256:73a713b5bcf7f700bb1aaaffbfe957da99d8ef80f42d7768b77c4fa9e81e528e`; archive SHA256: `695b00947d03eacc308e689f6a8f2d9e6b7f1398f50307852c8f08faf2971133`.
+- Audit: `/opt/adobe-relay/releases/proxy-reliability-20261112/`. Core `deployment-verification.json`, specific `reliability-verification.json`, supplemental `diagnostic-log-verification.json` and `natural-attempt-diagnostics.json` remain separate.
+- Cutover backup: `/opt/adobe-relay/backups/20261111T215908Z-47c5c46ead01a03cbfa7c547e4da971a561f86c7`. Earlier verified database backup: `/opt/adobe-relay/backups/20261111T215237Z-before-proxy-reliability-20261112`.
+- Rollback image: `adobe-relay:before-proxy-reliability-20261112` (106e911e). Any actual rollback must review later versions and active traffic, drain naturally and roll back code only. Keep the current 1.5 GiB resource override, four route exclusions, current credentials and business data. Old code will not evaluate the new Mihomo metrics and loses the new diagnostics/HTTPS classification.
+- The existing SS/SS2022 feature on main was included in this exact official-gated image. The earlier independent SS preparation did not perform the live cutover; no old manual-gate candidate was substituted.

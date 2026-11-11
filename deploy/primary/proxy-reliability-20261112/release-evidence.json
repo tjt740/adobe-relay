@@ -1,0 +1,84 @@
+{
+  "application_sha": "47c5c46ead01a03cbfa7c547e4da971a561f86c7",
+  "workflow_run": 43104288465,
+  "official_workflow_completed": true,
+  "core_verified_at": "2026-11-11T22:07:55.083581+00:00",
+  "image_id": "sha256:73a713b5bcf7f700bb1aaaffbfe957da99d8ef80f42d7768b77c4fa9e81e528e",
+  "archive_sha256": "695b00947d03eacc308e689f6a8f2d9e6b7f1398f50307852c8f08faf2971133",
+  "business_preservation": {
+    "backup_accounts": 1059,
+    "checked_accounts": 1059,
+    "manual_pauses_preserved": true,
+    "manual_proxy_modes_preserved": true,
+    "proxy_bindings_changed_with_event_chain": 27,
+    "cookie_rotations_with_version_advance": 5,
+    "non_source_cookie_credential_changes": 18,
+    "credential_field_names_changed": [
+      "_token_version",
+      "access_token",
+      "adobe_session_cookie",
+      "adobe_session_cookie_source_hash",
+      "cookie",
+      "expires_at"
+    ]
+  },
+  "traffic": {
+    "usage": {
+      "records": 60,
+      "images": 60
+    },
+    "errors": [
+      {
+        "status_code": 200,
+        "count": 58
+      },
+      {
+        "status_code": 400,
+        "count": 1
+      },
+      {
+        "status_code": 404,
+        "count": 4
+      },
+      {
+        "status_code": 451,
+        "count": 1
+      }
+    ]
+  },
+  "diagnostic_success_counts": {
+    "pipeline_records": 42,
+    "image_diagnostics": 42,
+    "three_fingerprints_present": 42,
+    "declared_expiry_present": 42
+  },
+  "diagnostic_attempts": {
+    "at": "2026-11-11T22:11:08.992390+00:00",
+    "error_attempt_diagnostics": [
+      {
+        "status": "451",
+        "stage": "poll",
+        "events": 2,
+        "with_credential_fingerprint": 2,
+        "with_proxy_fingerprint": 2
+      },
+      {
+        "status": "451",
+        "stage": "submit",
+        "events": 51,
+        "with_credential_fingerprint": 51,
+        "with_proxy_fingerprint": 51
+      }
+    ]
+  },
+  "quarantined_proxy_ids": [
+    1124,
+    1160,
+    1948,
+    1953
+  ],
+  "mihomo_memory_limit_bytes": 1610612736,
+  "live_403_reproduced": false,
+  "forced_live_failure_tests": false,
+  "mail_sent": false
+}
