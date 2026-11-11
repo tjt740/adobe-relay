@@ -117,7 +117,7 @@ func DescribeError(err error) PublicErrorDetails {
 	var op *OperationError
 	if errors.As(err, &op) {
 		switch op.Stage {
-		case "prepare", "validation", "input_fetch", "upload", "submit", "poll", "download":
+		case "prepare", "validation", "input_fetch", "upload", "submit", "poll", "download", "transcode":
 			d.Stage = op.Stage
 		}
 		if op.HTTPStatus > 0 {

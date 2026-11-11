@@ -647,7 +647,7 @@ func TestAdobeImageServiceRejectsNAboveMax(t *testing.T) {
 	require.Equal(t, NextAccountStop, classifyAdobeError(err).Failover.NextAccountAction)
 }
 
-func TestAdobeImageServiceRejectsWebPOutputFormat(t *testing.T) {
+func TestAdobeImageServiceRejectsWebPOnOlderModels(t *testing.T) {
 	api := &adobeFakeTransport{handler: func(*adobe.Request, int) (*adobe.Response, error) {
 		t.Fatal("不应发起上游请求")
 		return nil, nil

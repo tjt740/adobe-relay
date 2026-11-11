@@ -105,6 +105,36 @@ func TestBuildImagePayloadCandidatesGPTImage26GIF(t *testing.T) {
 	require.Equal(t, Size{Width: 896, Height: 896}, candidates[0]["size"])
 }
 
+func TestBuildImagePayloadCandidatesNativeWebP(t *testing.T) {
+	zero, quality := 0, 70
+	for _, compression := range []*int{nil, &zero, &quality} {
+		for _, kind := range []PayloadKind{PayloadKindGPTImage26, PayloadKindGPTImage25} {
+			payloads, err := BuildImagePayloadCandidates(ImagePayloadOptions{
+				Prompt: "red mug", UpstreamModelID: "gpt-image", PayloadKind: kind,
+				OutputFormat: " WEBP ", OutputCompression: compression,
+				FrameCount: 4, FrameDurationMS: 200, SourceImageIDs: []string{"reference-1"}, Edit: true,
+			})
+			require.NoError(t, err)
+			require.Len(t, payloads, 1)
+			msp := payloads[0]["modelSpecificPayload"].(map[string]any)
+			if kind == PayloadKindGPTImage26 {
+				require.Equal(t, "webp", msp["output_format"])
+				if compression != nil {
+					require.Equal(t, *compression, msp["output_compression"])
+				} else {
+					require.NotContains(t, msp, "output_compression")
+				}
+			} else {
+				require.NotContains(t, msp, "output_format")
+				require.NotContains(t, msp, "output_compression")
+			}
+			require.NotContains(t, msp, "frame_count")
+			require.NotContains(t, msp, "frame_duration_ms")
+			require.Equal(t, []any{map[string]any{"id": "reference-1", "usage": "subject"}}, payloads[0]["referenceBlobs"])
+		}
+	}
+}
+
 func TestBuildImagePayloadCandidatesGPTImage25DoesNotReceiveGIFFields(t *testing.T) {
 	candidates, err := BuildImagePayloadCandidates(ImagePayloadOptions{
 		Prompt:               "a cat",

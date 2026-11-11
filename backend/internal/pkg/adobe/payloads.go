@@ -108,12 +108,12 @@ type ImagePayloadOptions struct {
 	// Background 是 OpenAI 的 background 参数（transparent / opaque / auto）。
 	// gpt-image 只把非 auto 的 background 塞进 modelSpecificPayload。
 	Background string
-	// OutputFormat is used by GPT Image 2.6's native animated GIF path. PNG and
-	// JPEG continue to be applied locally after download for every GPT Image
-	// version, so these fields are intentionally omitted unless GIF is requested.
-	OutputFormat    string
-	FrameCount      int
-	FrameDurationMS int
+	// WebP and GIF use GPT Image 2.6's native output. PNG/JPEG keep the existing
+	// local conversion path. OutputCompression is sent only for native WebP.
+	OutputFormat      string
+	OutputCompression *int
+	FrameCount        int
+	FrameDurationMS   int
 	// Seed 写入 payload 的 seeds[0]。未设时用 SeedNow()。
 	Seed *int
 }
@@ -163,6 +163,12 @@ func buildGPTImage25Payloads(opts ImagePayloadOptions) ([]map[string]any, error)
 	}
 	if bg := strings.ToLower(strings.TrimSpace(opts.Background)); bg != "" && bg != "auto" {
 		modelSpecific["background"] = bg
+	}
+	if opts.PayloadKind == PayloadKindGPTImage26 && strings.EqualFold(strings.TrimSpace(opts.OutputFormat), "webp") {
+		modelSpecific["output_format"] = "webp"
+		if opts.OutputCompression != nil {
+			modelSpecific["output_compression"] = *opts.OutputCompression
+		}
 	}
 	if opts.PayloadKind == PayloadKindGPTImage26 && strings.EqualFold(strings.TrimSpace(opts.OutputFormat), "gif") {
 		modelSpecific["output_format"] = "gif"
