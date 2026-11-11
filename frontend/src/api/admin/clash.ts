@@ -71,10 +71,24 @@ export async function importClashSubscription(url: string, names: string[], revi
   return data
 }
 
+export interface BlockedProxyNode {
+  proxy_id: number
+  name: string
+  server: string
+  server_port: number
+  enabled: boolean
+  bound_accounts: number
+  manual: boolean
+  excluded_at: string | null
+  failed_at: string | null
+  retry_after: string | null
+}
+
 export interface ProxySourceHealth {
   proxy_ids: number[]
   blocked_proxy_ids: number[]
   generation_blocked: number
+  blocked_nodes?: BlockedProxyNode[]
   id: string
   index: number
   url_hint: string

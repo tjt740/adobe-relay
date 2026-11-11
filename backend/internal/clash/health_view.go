@@ -2,9 +2,25 @@ package clash
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 )
+
+// BlockedNodeView exposes current pause evidence only, never credentials,
+// subscription URLs, raw upstream payloads or free-form operator notes.
+type BlockedNodeView struct {
+	ProxyID       int64      `json:"proxy_id"`
+	Name          string     `json:"name"`
+	Server        string     `json:"server"`
+	ServerPort    int        `json:"server_port"`
+	Enabled       bool       `json:"enabled"`
+	BoundAccounts int        `json:"bound_accounts"`
+	Manual        bool       `json:"manual"`
+	ExcludedAt    *time.Time `json:"excluded_at"`
+	FailedAt      *time.Time `json:"failed_at"`
+	RetryAfter    *time.Time `json:"retry_after"`
+}
 
 // A full sweep must fit the admission window, even with many failed endpoints.
 // The automatic worker has 24 probes and at most three 6s batches per 30s round.
@@ -14,27 +30,28 @@ func ProbeFreshness(nodes int) time.Duration {
 }
 
 type SourceView struct {
-	ProxyIDs          []int64    `json:"proxy_ids"`
-	BlockedProxyIDs   []int64    `json:"blocked_proxy_ids"`
-	GenerationBlocked int        `json:"generation_blocked"`
-	ID                string     `json:"id"`
-	Index             int        `json:"index"`
-	URLHint           string     `json:"url_hint"`
-	Status            string     `json:"status"`
-	FetchError        string     `json:"fetch_error,omitempty"`
-	HTTPStatus        int        `json:"http_status,omitempty"`
-	CheckedAt         time.Time  `json:"checked_at"`
-	LastSuccessAt     time.Time  `json:"last_success_at"`
-	TrafficKnown      bool       `json:"traffic_known"`
-	RemainingBytes    *int64     `json:"remaining_bytes"`
-	TotalBytes        *int64     `json:"total_bytes"`
-	TrafficObservedAt *time.Time `json:"traffic_observed_at"`
-	ExpiresAt         *time.Time `json:"expires_at"`
-	Nodes             int        `json:"nodes"`
-	Healthy           int        `json:"healthy"`
-	Failed            int        `json:"failed"`
-	Unknown           int        `json:"unknown"`
-	BoundAccounts     int        `json:"bound_accounts"`
+	ProxyIDs          []int64           `json:"proxy_ids"`
+	BlockedProxyIDs   []int64           `json:"blocked_proxy_ids"`
+	GenerationBlocked int               `json:"generation_blocked"`
+	BlockedNodes      []BlockedNodeView `json:"blocked_nodes"`
+	ID                string            `json:"id"`
+	Index             int               `json:"index"`
+	URLHint           string            `json:"url_hint"`
+	Status            string            `json:"status"`
+	FetchError        string            `json:"fetch_error,omitempty"`
+	HTTPStatus        int               `json:"http_status,omitempty"`
+	CheckedAt         time.Time         `json:"checked_at"`
+	LastSuccessAt     time.Time         `json:"last_success_at"`
+	TrafficKnown      bool              `json:"traffic_known"`
+	RemainingBytes    *int64            `json:"remaining_bytes"`
+	TotalBytes        *int64            `json:"total_bytes"`
+	TrafficObservedAt *time.Time        `json:"traffic_observed_at"`
+	ExpiresAt         *time.Time        `json:"expires_at"`
+	Nodes             int               `json:"nodes"`
+	Healthy           int               `json:"healthy"`
+	Failed            int               `json:"failed"`
+	Unknown           int               `json:"unknown"`
+	BoundAccounts     int               `json:"bound_accounts"`
 }
 type GroupCapacity struct {
 	ID           int64  `json:"id"`
@@ -100,20 +117,38 @@ func (m *Manager) Health(ctx context.Context) (HealthView, error) {
 	if err != nil {
 		return v, err
 	}
-	blocked := map[int64]bool{}
-	rows, err = m.db.QueryContext(ctx, `SELECT p.id FROM proxies p WHERE
-     EXISTS(SELECT 1 FROM adobe_route_exclusions e WHERE e.proxy_id=p.id)
-     OR EXISTS(SELECT 1 FROM adobe_route_health h WHERE h.proxy_id=p.id AND h.proxy_updated_at=p.updated_at AND h.retry_after IS NOT NULL)`)
+	blocked := map[int64]BlockedNodeView{}
+	// Match the active-cooldown predicate used by RouteReady. An expired
+	// retry_after is historical evidence, not a current generation pause.
+	rows, err = m.db.QueryContext(ctx, `SELECT p.id,e.proxy_id IS NOT NULL,e.created_at,h.failed_at,h.retry_after
+ FROM proxies p
+ LEFT JOIN adobe_route_exclusions e ON e.proxy_id=p.id
+ LEFT JOIN LATERAL (
+   SELECT max(failed_at) AS failed_at,max(retry_after) AS retry_after
+   FROM adobe_route_health
+   WHERE proxy_id=p.id AND proxy_updated_at=p.updated_at AND retry_after>$1
+ ) h ON true
+ WHERE p.deleted_at IS NULL AND (e.proxy_id IS NOT NULL OR h.retry_after IS NOT NULL)`, v.CheckedAt)
 	if err != nil {
 		return v, err
 	}
 	for rows.Next() {
-		var id int64
-		if err = rows.Scan(&id); err != nil {
+		var node BlockedNodeView
+		var excluded, failed, retry sql.NullTime
+		if err = rows.Scan(&node.ProxyID, &node.Manual, &excluded, &failed, &retry); err != nil {
 			rows.Close()
 			return v, err
 		}
-		blocked[id] = true
+		if excluded.Valid {
+			node.ExcludedAt = &excluded.Time
+		}
+		if failed.Valid {
+			node.FailedAt = &failed.Time
+		}
+		if retry.Valid {
+			node.RetryAfter = &retry.Time
+		}
+		blocked[node.ProxyID] = node
 	}
 	err = rows.Err()
 	rows.Close()
@@ -121,7 +156,7 @@ func (m *Manager) Health(ctx context.Context) (HealthView, error) {
 		return v, err
 	}
 	for _, src := range s.Sources {
-		sv := SourceView{ProxyIDs: []int64{}, BlockedProxyIDs: []int64{}, ID: src.ID, Index: src.Index, URLHint: src.URLHint, Status: "checking", FetchError: src.FetchError, HTTPStatus: src.HTTPStatus, CheckedAt: src.CheckedAt, LastSuccessAt: src.LastSuccessAt}
+		sv := SourceView{ProxyIDs: []int64{}, BlockedProxyIDs: []int64{}, BlockedNodes: []BlockedNodeView{}, ID: src.ID, Index: src.Index, URLHint: src.URLHint, Status: "checking", FetchError: src.FetchError, HTTPStatus: src.HTTPStatus, CheckedAt: src.CheckedAt, LastSuccessAt: src.LastSuccessAt}
 		if t := src.Traffic; t != nil {
 			sv.TrafficObservedAt = &t.ObservedAt
 			if t.Total > 0 && time.Since(t.ObservedAt) <= 15*time.Minute {
@@ -136,10 +171,16 @@ func (m *Manager) Health(ctx context.Context) (HealthView, error) {
 				sv.ExpiresAt = &expiry
 			}
 		}
+		seenBlocked := map[int64]bool{}
 		for _, node := range s.Nodes {
 			if node.SourceID == src.ID && node.ProxyID > 0 {
 				sv.ProxyIDs = append(sv.ProxyIDs, node.ProxyID)
-				if blocked[node.ProxyID] {
+				if detail, ok := blocked[node.ProxyID]; ok && !seenBlocked[node.ProxyID] {
+					seenBlocked[node.ProxyID] = true
+					nv := m.nodeView(node)
+					detail.Name, detail.Server, detail.ServerPort = nv.Name, nv.Server, nv.ServerPort
+					detail.Enabled, detail.BoundAccounts = node.Enabled, bound[node.ProxyID]
+					sv.BlockedNodes = append(sv.BlockedNodes, detail)
 					sv.BlockedProxyIDs = append(sv.BlockedProxyIDs, node.ProxyID)
 					sv.GenerationBlocked++
 				}
