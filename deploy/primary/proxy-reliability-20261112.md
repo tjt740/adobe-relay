@@ -4,7 +4,7 @@ Status: prepared, not yet deployed. Follow-up evidence will identify the exact a
 
 ## Scope
 
-Keep the live 1536 MiB Mihomo limit and preserve its process/connections. Proxies 1124, 1160 and 1953 were placed inactive with persistent route exclusions at 05:10:44 Beijing; all had zero account bindings and zero test leases. No listener was removed. Audit: `/opt/adobe-relay/releases/proxy-reliability-20261112/quarantine-applied.json`.
+Keep the live 1536 MiB Mihomo limit and preserve its process/connections. Proxies 1124, 1160 and 1953 were placed inactive with persistent route exclusions at 05:10:44 Beijing; all had zero account bindings and zero test leases. No listener was removed. At 05:39:19 Beijing, proxy 1948 was also excluded (`manual_quarantine_submission_eof`) after all 32 newly reviewed 502 errors since 05:10:44 were traced to submission EOF on that route (last error 05:13:30). It also had zero account bindings and zero test leases; all container identities and listener/config hashes remained unchanged. These errors occurred before this application deployment, without Mihomo OOM/restart. Audit: `/opt/adobe-relay/releases/proxy-reliability-20261112/quarantine-applied.json`.
 
 Health checks complete certificate verification, TLS and HTTP through the selected proxy. A failed primary Adobe API check triggers a second Adobe host check; healthy routes incur no second request. A 403 proves an HTTP denial, not a broken transport. Both targets must fail transport before the route is marked unhealthy. Existing queue/concurrency/deadlines remain.
 
