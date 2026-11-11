@@ -65,6 +65,12 @@ func attachRequestDiagnostics(err error, d RequestDiagnostics) error {
 		return err
 	}
 	copy := *op
+	// Keep response evidence from the actual failing stage (including poll/download),
+	// while attaching credentials from this exact GenerateImage call.
+	d.UpstreamErrorCode = op.RequestDiagnostics.UpstreamErrorCode
+	d.AccessError = op.RequestDiagnostics.AccessError
+	d.ResponseBodySHA256 = op.RequestDiagnostics.ResponseBodySHA256
+	d.UpstreamRequestID = op.RequestDiagnostics.UpstreamRequestID
 	copy.RequestDiagnostics = d
 	return &copy
 }

@@ -50,7 +50,7 @@ func operationError(err error, stage string, started time.Time, attempts int, re
 	if resp != nil {
 		status = resp.StatusCode
 	}
-	return &OperationError{Stage: stage, HTTPStatus: status, UpstreamRequestID: id, JobID: diagnosticJobID(jobURL), SubmissionRejected: stage == "submit" && rejectedSubmission(resp),
+	return &OperationError{RequestDiagnostics: requestDiagnostics(GenerateImageInput{}, started, resp), Stage: stage, HTTPStatus: status, UpstreamRequestID: id, JobID: diagnosticJobID(jobURL), SubmissionRejected: stage == "submit" && rejectedSubmission(resp),
 		Attempts: attempts, ElapsedMS: time.Since(started).Milliseconds(), Err: err}
 }
 

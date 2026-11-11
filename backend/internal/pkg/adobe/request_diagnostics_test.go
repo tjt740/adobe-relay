@@ -60,3 +60,25 @@ func TestAdobeRequestDiagnosticsRejectSecretLookingHeaders(t *testing.T) {
 	require.Empty(t, d.UpstreamErrorCode)
 	require.Empty(t, d.CredentialFingerprint)
 }
+
+func TestAdobeRequestDiagnosticsUseEffectiveSessionAndPollFailure(t *testing.T) {
+	var actualSession string
+	api := &fakeTransport{handler: func(req *Request, _ int) (*Response, error) {
+		if req.Method == "POST" {
+			actualSession = req.Headers["x-arp-session-id"]
+			return jsonResponse(t, 200, map[string]any{"links": map[string]any{"result": "https://firefly-3p.ff.adobe.io/poll/job"}}, map[string]string{"x-request-id": "submit-success"}), nil
+		}
+		return jsonResponse(t, 403, map[string]any{"error_code": "access_error"}, map[string]string{"x-request-id": "poll-denied"}), nil
+	}}
+	input := GenerateImageInput{Token: fakeToken(t), Options: ImagePayloadOptions{Prompt: "test", AspectRatio: "1:1", UpstreamModelID: "gpt-image"}}
+	_, err := testClient(api, nil).GenerateImage(WithSingleSubmission(context.Background()), input)
+	var op *OperationError
+	require.True(t, errors.As(err, &op))
+	require.Equal(t, "poll", op.Stage)
+	require.False(t, CanRetrySubmission(err))
+	require.Equal(t, "poll-denied", op.RequestDiagnostics.UpstreamRequestID)
+	require.Equal(t, "access_error", op.RequestDiagnostics.UpstreamErrorCode)
+	require.NotEmpty(t, actualSession)
+	input.ARPSessionID = actualSession
+	require.Equal(t, requestDiagnostics(input, time.Now(), nil).CredentialFingerprint, op.RequestDiagnostics.CredentialFingerprint)
+}

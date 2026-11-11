@@ -279,7 +279,7 @@ type GenerationTimings struct {
 // GenerateImage 走「提交 → 轮询 → 下载」完成一次出图。
 //
 // 提交阶段依次尝试 BuildImagePayloadCandidates 返回的候选，命中 200 即停；
-// 遇到 401/403 立即中断——那是凭据问题，换 payload 形状无用。
+// 遇到 401/403 立即中断——这是访问拒绝，换 payload 形状无用。
 // 408/429/451/5xx 是上游过载或故障，不是 schema 问题：不再换候选（重试策略见 postSubmit）。
 func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) (result *GenerateResult, retErr error) {
 	started := time.Now()
@@ -303,6 +303,7 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) (r
 	}
 
 	headers, order := c.submitHeaders(input.Token, input.Options.Prompt, input.ARPSessionID)
+	input.ARPSessionID = headers["x-arp-session-id"] // fingerprint the normalized or generated value actually sent
 	stage = "submit"
 	submitStarted := time.Now()
 	submitAttemptCount := 0
