@@ -175,6 +175,9 @@ func (s *AdobeImageService) GenerateCall(
 	if err := validateAdobeImage26Quality(req, conf); err != nil {
 		return nil, err
 	}
+	if err := validateAdobeWebPParams(req, conf, outputFormat); err != nil {
+		return nil, err
+	}
 	gifOptions, err := validateAdobeGIFParams(req, conf, outputFormat)
 	if err != nil {
 		return nil, err
@@ -211,6 +214,7 @@ func (s *AdobeImageService) GenerateCall(
 		QualityLevel:         req.Quality,
 		Complexity:           complexity,
 		OutputFormat:         outputFormat,
+		OutputCompression:    req.OutputCompression,
 		FrameCount:           gifOptions.FrameCount,
 		FrameDurationMS:      gifOptions.FrameDurationMS,
 		SourceImageIDs:       sourceImageIDs,

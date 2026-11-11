@@ -52,7 +52,10 @@ func TestNormalizeAdobeOutputFormat(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, empty)
 
-	_, err = normalizeAdobeOutputFormat("webp")
+	webpFormat, err := normalizeAdobeOutputFormat(" WEBP ")
+	require.NoError(t, err)
+	require.Equal(t, adobeOutputFormatWebP, webpFormat)
+	_, err = normalizeAdobeOutputFormat("svg")
 	require.ErrorContains(t, err, "output_format=")
 	gifFormat, err := normalizeAdobeOutputFormat(" GIF ")
 	require.NoError(t, err)

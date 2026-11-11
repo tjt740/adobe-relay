@@ -35,11 +35,11 @@ Key 必须属于有相应模型权限、可用账号及余额/额度的分组。
 
 两款 2.6 与 Adobe 官网同名：**GPT Image 2.6 Flare**、**GPT Image 2.6 Sunburst**。新的接入使用表内 `gpt-image-2.6-flare` / `gpt-image-2.6-sunburst`。旧 `gpt-image-2.6-star-swirl` / `gpt-image-2.6-aurora` 分别作为相同变体的兼容名称，仍受分组与账号白名单限制；已有旧名称白名单可识别对应新名称，不跨变体放行。2.5 的 `gpt-image-2.5-prism` 是 Sunburst 的兼容名称。不要使用没有变体后缀的 `gpt-image-2.5` 或 `gpt-image-2.6`。
 
-**不支持 WebP、SVG 和流式出图。** Adobe 原生静态输出支持 PNG/JPEG，2.6 另支持纯文字 GIF 文生图；添加 `svg.model` 或更换模型别名不会开启 SVG。
+两款 2.6 支持原生 WebP。SVG 和流式出图仍不支持。静态输出支持 PNG/JPEG，2.6 另支持 WebP 和纯文字 GIF 文生图；2/2.5 不接受 WebP 输出，添加 `svg.model` 或更换模型别名不会开启 SVG。
 
 ### 0.2.1 两款 2.6 的线上实测支持范围
 
-2026-11-07 通过本站正式图片接口分别验证了 Flare（`gpt-image-2.6-flare`）与 Sunburst（`gpt-image-2.6-sunburst`），以下结果两款一致。支持范围以本通道为准，不能直接照搬其他平台的参数列表。
+2026-11-07 通过本站正式图片接口分别验证了 Flare（`gpt-image-2.6-flare`）与 Sunburst（`gpt-image-2.6-sunburst`），当时的结果两款一致；WebP 的新增支持与发布前实测见下节。支持范围以本通道为准，不能直接照搬其他平台的参数列表。
 
 | 参数 / 能力 | 当前支持情况 | 实测结果与限制 |
 | --- | --- | --- |
@@ -48,16 +48,49 @@ Key 必须属于有相应模型权限、可用账号及余额/额度的分组。
 | `background=auto / opaque` | 支持 | auto 请求正常生成；opaque 的 PNG 实际为完全不透明图片 |
 | `background=transparent` | 支持 PNG 透明背景 | 两款返回的 PNG 均有真实透明像素；与 JPEG 组合返回 400 / `incompatible_image_background` |
 | `complexity` | 仅支持 `low / medium / high` | 三档均有成功输出；`none / xhigh / max` 均返回 400 / `invalid_complexity`。不传时沿用上游默认，不等同于关闭规划 |
-| `output_format` | 支持 `png / jpeg / gif` | 实际解码确认三种文件；`webp / svg` 均返回 400 / `unsupported_output_format` |
+| `output_format` | 支持 `png / jpeg / webp / gif` | WebP 由上游原生生成，按实际字节核验格式与尺寸；SVG 仍返回 400 / `unsupported_output_format` |
 | `frame_count` | GIF 支持 2–16，默认 9 | 两款均验证 2、9、16 帧；1 和 17 返回 400。16 帧使用 `size=auto` |
 | `frame_duration_ms` | GIF 支持至少 20ms，按 10ms 取整 | 实际逐帧验证 20ms、默认 200ms，以及传 25ms 得到 30ms；19ms 返回 400 |
-| `output_compression` | 仅 JPEG 编码质量控制 | 25、90 均与实际 JPEG 编码参数一致；PNG 不使用该值，GIF 传此字段返回 400 |
+| `output_compression` | JPEG 本地编码；WebP 上游编码 | JPEG 25、90 已核验；WebP 接受整数 0–100，省略沿用上游默认，不在本站重复压缩；PNG 不使用该值，GIF 传此字段返回 400 |
 | `stream=true` | 不支持 | 两款均返回 400 / `invalid_stream`；省略或使用 false |
 | `partial_images` | 不支持渐进预览 | 静态非流式请求传 2 仍只返回一张完整图片，不产生中间图；GIF 传正数返回 400 / `gif_partial_images_unsupported` |
 | `svg.model` | 不支持 SVG 模型选择 | 与 `output_format=svg` 一起传仍被拒绝，不是启用 SVG 的开关 |
 
-这里的“支持”已经核对实际文件，不只检查 HTTP 200 或响应标签。`complexity` 控制规划，`quality` 控制生成质量，`output_compression` 控制 JPEG 编码，三者不能互相代替。透明背景请明确使用 PNG；不要把不支持的 WebP 当作透明输出备选。
+这里的“支持”已经核对实际文件，不只检查 HTTP 200 或响应标签。`complexity` 控制规划，`quality` 控制生成质量，`output_compression` 控制 JPEG 或 WebP 编码，三者不能互相代替。透明背景可使用 PNG 或两款 2.6 的 WebP，不支持 JPEG。
 
+
+### 0.2.2 WebP 调用与实测范围
+
+WebP 由 Adobe 原生生成，本站保留原始文件并识别实际格式与尺寸。
+
+2026-11-11 使用实时只读获取的线上账号和当前代理配置，在本地候选服务完成 **3 次真实生成，3 次成功**；均为 1024×1024、Medium，每项只提交一次上游任务。Go 与 Pillow 均完整解码通过。
+
+| 模型 | 背景 / 压缩参数 | 交付与实际文件 |
+| --- | --- | --- |
+| Sunburst | auto / 省略 | 原生 URL，无损 WebP，759,664 字节 |
+| Flare | auto / 省略 | 原生 URL，无损 WebP，678,592 字节 |
+| Flare | transparent / 70 | Base64，有损 WebP，96,986 字节，存在真实透明像素 |
+
+Sunburst 的 transparent / 25 组合因 SSH 读取超时、一次本地代理 TLS 预检失败及候选账号状态变化，未进入生成阶段，不计作成功或上游格式拒绝。用户提供的 Sunburst 3840×2160 WebP 已下载并完整解码，但本次没有新发 4K 请求。编辑、多图、高档质量及生产扣费不在这三次实测范围内。这些是发布前的本地实测结果，不代表其他组合已经验收。
+
+两款 2.6 及其同变体旧别名支持 `output_format=webp`，`response_format` 可选 `url` 或 `b64_json`。下例使用与用户提供的成功图片相同的模型、4K 尺寸和 Medium 质量；可以省略 `output_compression` 以沿用上游默认，或传整数 0–100。请求透明背景时使用 `background=transparent`。文件大小不保证按压缩参数同比例变化。
+
+```bash
+curl https://creative.cheap/v1/images/generations \
+  -H "Authorization: Bearer $SUB2_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-2.6-sunburst",
+    "prompt": "A red ceramic mug on a pale wooden table",
+    "size": "3840x2160",
+    "quality": "medium",
+    "output_format": "webp",
+    "response_format": "url",
+    "n": 1
+  }'
+```
+
+读取 `data[0].url`，或将 Base64 解码后保存为 `.webp`。WebP 原文件会直接交付，响应的 `output_format` 和 `size` 根据实际文件识别。模型映射到旧模型时在提交前拒绝；已生成后若上游返回非 WebP 文件，则明确报错，不换号重提。WebP 沿用原模型、分辨率和质量计费规则。
 
 ### 0.3 公共参数
 
@@ -70,10 +103,10 @@ Key 必须属于有相应模型权限、可用账号及余额/额度的分组。
 | `n` | integer | 默认 `1`，允许 `1–10` | 返回图片/动画的数量，不是 GIF 帧数；建议先用 1。大于 10 会返回 400 |
 | `size` | string | 省略 / `auto`，或 `宽x高` | 小写 `x`，例如 `1024x1024`。具体尺寸限制见下节；不要写 `1K`、`2K`、`4K` 或 `16:9` 代替像素 |
 | `quality` | string | `auto / low / medium / high / xhigh / max` | 省略、空值或 `auto` 使用 medium；不同模型上限见质量表 |
-| `output_format` | string | 省略保留上游格式；`png / jpeg / jpg`；2.6 可用 `gif` | `jpg` 归一化为 JPEG；GIF 必须显式传 `gif`。静态转码失败可能保留原字节，应读取实际响应格式 |
+| `output_format` | string | 省略保留上游格式；`png / jpeg / jpg`；2.6 可用 `webp / gif` | `jpg` 归一化为 JPEG；WebP/GIF 必须显式传入。WebP 返回格式不符时明确报错，不伪装成功或重新生成；PNG/JPEG 转码失败可能保留原字节，应读取实际响应格式 |
 | `response_format` | string | `b64_json / url`，建议显式传 | `b64_json` 强制内联 Base64；`url` 优先链接，但存储或原图链接不可用时回退 Base64。省略时按服务器存储配置决定 |
 | `background` | string | 省略 / `auto`，可用 `opaque / transparent` | 两款 2.6 的透明 PNG 和不透明 PNG 已实测；本次不扩大为旧模型的透明支持保证。`transparent` 不能与 `jpeg/jpg` 一起使用；透明图明确选 PNG |
-| `output_compression` | integer | JPEG 默认 `100`，建议 `1–100` | 控制本站 JPEG 编码质量，不是模型生成质量；当前实现将范围外数值截到 1–100（0 按 1）；本次实测 25、90。PNG 不使用该值，GIF 不能传此参数 |
+| `output_compression` | integer | JPEG 默认 `100`，建议 `1–100`；WebP 为 `0–100` | JPEG 在本站编码，范围外截到 1–100（0 按 1）；WebP 透传上游，省略保留上游默认，范围外提交前拒绝。不是模型生成质量；PNG 不使用该值，GIF 不能传此参数 |
 | `stream` | boolean | 默认 `false` | 不支持 true，返回 400 / `invalid_stream`；保持 false 或省略 |
 | `partial_images` | integer | 请省略 | 不支持渐进预览；静态非流式中不会产生中间图，GIF 对正值返回 400 |
 | `complexity` | string | 省略 / JSON `null` 保留上游默认；`low / medium / high` | 仅两款 2.6；与 quality 独立，适用于静态生成、静态编辑及 GIF 文生图 |
@@ -482,7 +515,9 @@ Gemini 兼容入口仍采用 Google 错误信封：违规时 HTTP 451，`error.c
 | HTTP / `code` | 含义 | 客户处理 |
 | --- | --- | --- |
 | 400 / `invalid_n` | n 超出当前支持范围 | 使用 1–10 的整数 |
-| 400 / `unsupported_output_format` | 请求 WebP、SVG 等不支持格式 | 静态使用 PNG/JPEG；2.6 动图使用 GIF |
+| 400 / `unsupported_output_format` | 请求 SVG，或在非 2.6 模型（含映射目标）上请求 WebP | 使用 PNG/JPEG；WebP 请选择两款 2.6；2.6 动图使用 GIF |
+| 400 / `invalid_output_compression` | WebP 压缩参数不在整数 0–100 范围 | 修正参数或省略以沿用上游默认 |
+| 502 / `invalid_image_output` | 已受理的 WebP 任务返回无效或非 WebP 文件 | 不要重试或重新提交同一生成请求 |
 | 400 / `image_size_exceeds_model_limit` | 显式静态尺寸不满足模型规则 | 按模型尺寸表修改，勿把 4K 当作 4096 方图 |
 | 400 / `invalid_complexity` | complexity 使用 none、xhigh、max 等无效值 | 仅使用 low / medium / high；不传时保留上游默认 |
 | 400 / `invalid_stream` | 请求 stream=true | 使用 false 或省略；本通道不支持流式出图 |
@@ -644,7 +679,7 @@ curl --fail-with-body --connect-timeout 15 --max-time 600 \
   }' -o transparent-response.json
 ```
 
-将 `data[0].b64_json` 解码后保存为 `.png`。需要不透明背景时改为 `background: "opaque"`；交给上游决定时用 `auto`。不要将透明示例的 output_format 改成 jpeg、webp 或 svg。
+将 `data[0].b64_json` 解码后保存为 `.png`。需要不透明背景时改为 `background: "opaque"`；交给上游决定时用 `auto`。两款 2.6 也可将 output_format 改成 webp 并保存为 `.webp`；不要改成 jpeg 或 svg。
 
 ### 7.7 Image 2.6：JPEG 压缩质量
 
@@ -761,7 +796,7 @@ for index, item in enumerate(response.get("data", []), 1):
 
 ## 9. 验证范围与使用边界
 
-2026-11-07 通过正式域名补测两款 2.6，共 40 项独立请求：14 个真实输出、26 次符合预期的参数拒绝。每款均取得透明 PNG、不透明 PNG、25/90 两档 JPEG、默认 9 帧 GIF、auto 16 帧 GIF 和固定 896×896 的 2 帧 GIF。已解码验证透明像素、JPEG 编码参数、GIF 的不同画面帧数和逐帧时长；不是只凭 HTTP 200 判断支持。非流式 partial_images=2 只返回完整图片，WebP、SVG、无效 complexity 与不支持的组合有明确错误。
+2026-11-07 通过正式域名补测两款 2.6，共 40 项独立请求：14 个真实输出、26 次符合预期的参数拒绝。每款均取得透明 PNG、不透明 PNG、25/90 两档 JPEG、默认 9 帧 GIF、auto 16 帧 GIF 和固定 896×896 的 2 帧 GIF。已解码验证透明像素、JPEG 编码参数、GIF 的不同画面帧数和逐帧时长；不是只凭 HTTP 200 判断支持。非流式 partial_images=2 只返回完整图片；当时的 WebP、SVG、无效 complexity 与不支持的组合有明确错误。该历史 WebP 拒绝记录保留，WebP 新支持范围以本页新增说明为准。
 
 另有首次测试分组的一次上游认证 401，未计为通过，也未作为“透明参数不支持”的依据；之后使用有近期成功记录的业务分组完成独立样本。测试没有重放失败或未知结果，临时测试权限已清理。上述证据只覆盖已列组合，不代表所有账号、所有尺寸、所有参数组合或高峰吞吐；本节记录此前参数实测；本次 2.6 质量修正与新增 4K 高档位证据见 0.4 节。
 

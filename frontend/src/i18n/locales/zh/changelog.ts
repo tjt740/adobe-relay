@@ -18,7 +18,7 @@ export default {
     },
     measurements: "发布准备实测与样本范围",
     overviews: {
-      adobeGroupMultiPricing: {title: 'Adobe 模型多选与新旧质量计费切换', body: '分组支持模型多选、按模型切换价格表和四位小数；默认新版，关闭恢复旧版计费并保留质量价格。官网档位、名称预览及自定义模型同时保留。'},
+      adobeGroupMultiPricing: {title: 'Adobe 模型多选、计费切换与原生 WebP', body: '分组支持模型多选、按模型切换价格表和四位小数；默认新版，关闭恢复旧版计费并保留质量价格。官网档位、名称预览及自定义模型同时保留；两款 2.6 新增原生 WebP、透明背景和压缩参数。'},
       adobePricingRevert: {"title": "撤回价格表与分组模型绑定", "body": "2.6 价格表恢复独立选择，保留新旧开关和原价格；撤回 2/2.5 质量计费扩展，官网模型目录与命名筛选保留。"},
       adobeGroupNaming: {"title": "Adobe模型筛选与三代质量价格表", "body": "模型名称优先读取Adobe官网，支持自定义；2、2.5、2.6价格表跟随所选模型，默认保留旧版填写方式。"},
       adobeImage26Pricing: {"title": "两款 2.6 支持按分辨率和质量分别定价", "body": "Adobe 分组新增 Flare、Sunburst 各自的质量价格表，Extra High 与 Max 可独立收费，未填写沿用原价。保留今天上线的高档生成、官网名称、接口文档阅读和共享登录。"},
@@ -44,6 +44,16 @@ export default {
       }
     },
     "updates": {
+      adobeWebP: {
+        title: '两款 Image 2.6 支持原生 WebP',
+        body: 'Flare 与 Sunburst 可请求 WebP，原文件支持 URL 或 Base64 交付。',
+        sections: {
+          output: { title: '原生格式与实际信息', body: 'output_format=webp 原样传给上游，响应格式和尺寸从实际文件识别，原 URL 与文件字节保持一致。同变体旧名称兼容；模型映射到旧版时在提交前明确拒绝。' },
+          options: { title: '透明背景与压缩参数', body: '可传 background=transparent；WebP 的 output_compression 接受整数 0–100，省略沿用上游默认。PNG/JPEG/GIF 的处理和原计费规则保持。' },
+          validation: { title: '文件核验与提交保护', body: '返回非 WebP 或无效文件时明确报错，不将其他格式标成 WebP，不重新提交已受理任务。具体实测范围见接口文档。' },
+        },
+      },
+
       adobeGroupMultiPricing: {"title": "Adobe 模型多选与价格标签页", "body": "创建分组支持多选官网模型和自定义名称，按所选模型使用定价标签页，支持四位小数。", "sections": {"selection": {"title": "多选与名称预览", "body": "模型可连续勾选，名称以 + 连接；官网目录、备用名称与自定义输入保留，分组可按任一已选模型筛选。"}, "pricing": {"title": "分别填写并保留草稿", "body": "开启新版后按所选模型显示标签页，以分辨率为行、质量为列填写美元单价。切换或重新勾选保留草稿；创建仅保存当前勾选模型的价格。编辑保留并展示已有其他模型价格。空白继承，0免费。 行列按官网当前模型参数展示：Image 2 仅官网默认尺寸与三档质量，2.5/2.6 为三种分辨率与五档质量；其他模型不补造档位，隐藏的旧价格保留。"}, "billing": {"title": "恢复 Image 2 / 2.5 质量计费", "body": "GPT Image 2、2.5、2.6 按模型、分辨率和质量匹配单价，仍乘适用图片倍率；2.5 Extra High / Max 提交6/7档，与价格质量一致。不为未知模型推测质量表。"}, "boundary": {"title": "验证与适用范围", "body": "新建及未设置模式的 Adobe 分组默认新版，已保存的关闭状态保持。官网目录不代表账号权益或全部模型均已接入。相关计费回归与本地两张真实出图检查通过，不代表全池、所有档位或生产扣款验收。"}, "mode": {"title": "真正切换新旧计费", "body": "Adobe 新建及未设置模式的分组默认新版，已保存的选择保持。说明收进标题旁的感叹号，点击查看。开启并保存后质量价格优先，空白沿用原价；关闭并保存后使用旧版计费，同时保留已填质量价格。"}}},
       adobeGroupNameLayout: {
         title: '简化 Adobe 分组名称填写',

@@ -18,7 +18,7 @@ export default {
     },
     measurements: "Release preparation measurements and sample scope",
     overviews: {
-      adobeGroupMultiPricing: {title: 'Adobe model selection and quality billing modes', body: 'Select multiple models, edit four-decimal prices in model tabs, and switch real billing modes. Quality billing defaults on; disabling retains saved prices and restores legacy billing. Website model tiers and custom names remain available.'},
+      adobeGroupMultiPricing: {title: 'Adobe model selection, billing modes and native WebP', body: 'Select multiple models, edit four-decimal prices in model tabs, and switch real billing modes. Quality billing defaults on; disabling retains saved prices and restores legacy billing. Website model tiers and custom names remain available. Both 2.6 models add native WebP, transparency and compression options.'},
       adobePricingRevert: {"title": "Restore independent Image 2.6 pricing tables", "body": "Choose the 2.6 pricing model independently, retaining the legacy/new editor switch and saved prices. Withdraw 2/2.5 quality pricing while retaining the website model directory, naming and filters."},
       adobeGroupNaming: {"title": "Adobe model filters and quality tables for three generations", "body": "Model names prefer Adobe discovery and allow custom input. Image 2, 2.5 and 2.6 prices follow the selected model, with the legacy editor selected by default."},
       adobeImage26Pricing: {"title": "Separate resolution and quality prices for both Image 2.6 models", "body": "Adobe groups now have independent Flare and Sunburst quality price tables. Extra High and Max can be priced separately; blank cells inherit existing rates. Today’s generation quality, official names, documentation reading theme and shared login remain available."},
@@ -44,6 +44,16 @@ export default {
       }
     },
     "updates": {
+      adobeWebP: {
+        title: 'Native WebP for both Image 2.6 variants',
+        body: 'Flare and Sunburst can return native WebP through URL or Base64 delivery.',
+        sections: {
+          output: { title: 'Native files and actual metadata', body: 'output_format=webp is sent upstream. Response format and dimensions describe the delivered bytes, and the original URL stays consistent with the file. Existing aliases work; mappings to older models are rejected before submission.' },
+          options: { title: 'Transparency and compression', body: 'Use background=transparent when needed. WebP output_compression accepts integers from 0 to 100; omission preserves the upstream default. PNG/JPEG/GIF handling and existing billing rules remain unchanged.' },
+          validation: { title: 'File validation and submission protection', body: 'Invalid or non-WebP output returns an explicit error. Other formats are never labeled WebP, and accepted tasks are not resubmitted. See the API guide for the measured coverage.' },
+        },
+      },
+
       adobeGroupMultiPricing: {"title": "Adobe model selection and pricing tabs", "body": "Select multiple website or custom model names and edit prices in model tabs with four decimal places.", "sections": {"selection": {"title": "Multiple models and a name preview", "body": "Choose models without closing the list. Names are joined with +, retain website and fallback discovery and custom input, and can be filtered by any selected model."}, "pricing": {"title": "Separate prices with preserved drafts", "body": "The new editor uses model tabs, resolution rows and quality columns in USD. Switching tabs or reselecting models preserves drafts; creation saves only selected models. Editing retains access to other saved model prices. Blank inherits and zero is free. Rows and columns follow website model parameters: Image 2 uses the website default size and three qualities, while 2.5/2.6 expose three resolutions and five qualities. Other model tiers are not invented, and hidden saved prices remain intact."}, "billing": {"title": "Restore Image 2 / 2.5 quality billing", "body": "Billing matches GPT Image 2, 2.5 and 2.6 prices by model, resolution and quality, with applicable multipliers. Image 2.5 Extra High / Max use tiers 6/7 to match billing. Unknown model quality tables are not guessed."}, "boundary": {"title": "Validation and scope", "body": "New and unset Adobe groups default to quality billing; saved off states remain. Website discovery is not an entitlement list or support promise. Billing regressions and two local real generations passed; this does not verify the full pool, every tier or production debits."}, "mode": {"title": "Switch actual billing modes", "body": "New and unset Adobe groups default to quality billing; saved choices are retained. Click the exclamation icon beside the title for details. Enabled quality prices take priority, blank cells inherit legacy rates, and disabling preserves prices while using legacy billing after saving."}}},
       adobeGroupNameLayout: {
         title: 'Simplify Adobe group naming',

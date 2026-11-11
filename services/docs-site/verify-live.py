@@ -43,7 +43,10 @@ try:
     text=b.decode()
     assert all(v in text for v in ['gpt-image-2.6-flare','gpt-image-2.6-sunburst','Extra High（6）','Max（7）','quality_model_not_supported'])
     results['example_blocks']=len(re.findall(r'^```(?:bash|json|python)\s*$',text,re.M))
-    assert results['example_blocks']==23
+    assert results['example_blocks']==24
+    assert all(v in text for v in ['output_format=webp','0–100','invalid_output_compression','invalid_image_output'])
+    assert 'WebP 本地待发布' not in text
+    results['native_webp_documented']=True
     results['image26_names_and_quality_contract']=True
 finally:
     s,h,b=call('POST','/auth/logout',{},cookie)

@@ -33,6 +33,7 @@ export const dailyOverviews: Readonly<Record<string, string>> = {
 
 // Use the actual release date in Asia/Shanghai; multiple releases share one day.
 export const dailyUpdates: readonly DailyUpdate[] = [
+  { date: '2026-11-11', id: 'adobeWebP', type: 'added', sections: ['output', 'options', 'validation'] },
   { date: '2026-11-11', id: 'adobeGroupMultiPricing', type: 'improved', sections: ['selection', 'pricing', 'mode', 'billing', 'boundary'] },
   { date: '2026-11-11', id: 'adobeGroupNameLayout', type: 'improved', sections: ['layout', 'preservation', 'boundary'] },
   { date: '2026-11-09', id: 'adobeGroupNaming', type: 'added', sections: ['reason', 'filter', 'naming', 'pricing', 'compatibility', 'validation', 'boundary'] },
