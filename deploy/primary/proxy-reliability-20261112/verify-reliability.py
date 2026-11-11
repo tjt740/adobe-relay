@@ -33,5 +33,16 @@ diag=json.loads(a.sql("SELECT json_build_object('final_403',count(*) FILTER(WHER
 traffic=json.loads(a.sql("SELECT json_build_object('usage',(SELECT json_build_object('records',count(*),'images',coalesce(sum(image_count),0))FROM usage_logs WHERE created_at>='"+cutover+"'::timestamptz),'errors',(SELECT coalesce(json_agg(e),'[]')FROM(SELECT status_code,count(*) AS count FROM ops_error_logs WHERE created_at>='"+cutover+"'::timestamptz GROUP BY status_code ORDER BY status_code)e))"))
 mail_events=int(a.sql('SELECT count(*)FROM ops_alert_events WHERE rule_id IN('+','.join(map(str,ids))+')AND email_sent'))
 assert mail_events==0
-out={'at':now.isoformat(),'passed':True,'application_sha':sha,'quarantine':quarantine,'rule_ids':ids,'original_alert_rules_unchanged':True,'alert_api_verified':True,'site_only_alerts':True,'observer_snapshot':s,'memory_percent':s['memory_current_bytes']*100/s['memory_limit_bytes'],'formal_alert_heartbeat':heartbeat,'https_probe_evidence':health,'natural_403_diagnostics':diag,'natural_traffic_since_cutover':traffic,'active_generation_tests':0,'forced_online_failures':0,'test_mail_sent':False}
+logs=subprocess.run(['docker','logs','--since',cutover,'--tail','3000',a.APP],capture_output=True,text=True,check=True)
+records=[]
+for line in (logs.stdout+'\n'+logs.stderr).splitlines():
+ try:record=json.loads(line)
+ except ValueError:continue
+ timing=record.get('timings')or{}
+ if not isinstance(timing,dict):continue
+ for im in timing.get('images')or[]:
+  d=im.get('request_diagnostics')or{}
+  if re.fullmatch('[a-f0-9]{64}',d.get('credential_fingerprint','')):
+   records.append({'combined':True,'bearer':bool(re.fullmatch('[a-f0-9]{64}',d.get('bearer_fingerprint',''))),'session':bool(re.fullmatch('[a-f0-9]{64}',d.get('session_fingerprint','')))})
+out={'at':now.isoformat(),'passed':True,'application_sha':sha,'quarantine':quarantine,'rule_ids':ids,'original_alert_rules_unchanged':True,'alert_api_verified':True,'site_only_alerts':True,'observer_snapshot':s,'memory_percent':s['memory_current_bytes']*100/s['memory_limit_bytes'],'formal_alert_heartbeat':heartbeat,'https_probe_evidence':health,'natural_403_diagnostics':diag,'natural_success_diagnostics':{'image_records':len(records),'all_separate_fingerprints_present':all(r['bearer']and r['session']for r in records)},'natural_traffic_since_cutover':traffic,'active_generation_tests':0,'forced_online_failures':0,'test_mail_sent':False}
 a.save('reliability-verification.json',out);print(json.dumps(out,ensure_ascii=False))
