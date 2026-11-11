@@ -1,0 +1,58 @@
+{
+  "backend/internal/pkg/adobe/payloads.go": {
+    "before": "bf664c7782a6db0e36cfb4040289647219a898f5cba407f553f019699f1913ae",
+    "candidate": "45ab7a001cc206d788717c59e37d4311058132f18b577469fff43a645a04e547"
+  },
+  "backend/internal/pkg/adobe/payloads_test.go": {
+    "before": "44a42a8895e9b1c0446e31a7970e839f1c4bfe0d8e63598714f518b51ef7ac62",
+    "candidate": "6b91582a870559168bc2b1832d839923ba512f21a3dcc0c05293f9b0a5a3149e"
+  },
+  "backend/internal/pkg/adobe/public_errors.go": {
+    "before": "d1eec04a1ab42d9f82834bc688646c824dca84ab6aac94cdea94ba60483618f7",
+    "candidate": "3ed716dc8fe95f2fc6f1d5c72ef6b309c234c27daf3c74d7c5bab3c1f4bc5b5d"
+  },
+  "backend/internal/service/adobe_image_output.go": {
+    "before": "cf3d6b6cf835f19d315170b661f3d3752258d86ea58f7beba67f20a609706718",
+    "candidate": "a837a144cd77f5bc7a35b4e6d22154f99a74b6576de725d994413671e515b2d8"
+  },
+  "backend/internal/service/adobe_image_output_test.go": {
+    "before": "c3a6bcd102a9225ed3bfb966afab8808fa5a4b496836ad6399337b778877040c",
+    "candidate": "df9048ef619b269c9a4c081ae09bcd6c8847777c045565703df03e4f12f6feab"
+  },
+  "backend/internal/service/adobe_image_service.go": {
+    "before": "7aca21454ae8db904bcd871b1a3d9bae8fe9aa8da30638057edd00e55e58e962",
+    "candidate": "1d87f06dc110c38ad9fe2043fb1f8f380a238093910cec604097888b22a3073c"
+  },
+  "backend/internal/service/adobe_image_service_test.go": {
+    "before": "b37e2c5ba06bdc91d4d25412d9ecdaa5cb1e023cfc31ce6a39c2edd269c01dd8",
+    "candidate": "51d10fb1d188da3930f2c6e387619fc95dc26d3e9726acc0c7e2d362c377274c"
+  },
+  "backend/internal/service/adobe_image_webp_test.go": {
+    "before": null,
+    "candidate": "aa8a6979df0edb38bd19ce8db6765086dd3daab1749c00d37e961f28714a64b9"
+  },
+  "backend/internal/service/testdata/adobe-webp-alpha.webp": {
+    "before": null,
+    "candidate": "b51fd40e47a7702f6c2496650d976997427ce7d927391c7bfb227cd34f0a8f48"
+  },
+  "docs/ADOBE_IMAGE_CLIENT_GUIDE.md": {
+    "before": "d45bcaa1ad50daf72c946cb8bdcf06944ae38b5ebd543c193745787680ba52d3",
+    "candidate": "7e51e72293b28383f145b172ea139ed4b01ea1feba2180b947038b93c7459baf"
+  },
+  "frontend/src/content/changelog/daily.ts": {
+    "before": "cdddd09f8da08c23f143e2f949a6258c207e9ce9009719aa3dc794cde069af71",
+    "candidate": "448f7ebc07365d6aa49b1363271a7a55d572ddc73614d218998ddfefe9b8160e"
+  },
+  "frontend/src/i18n/locales/en/changelog.ts": {
+    "before": "55bde77c99cc64689230fbe4338dbc186a76c099557344b810ec3b325a9f2948",
+    "candidate": "97cb6c0cb2d816dc0c8f00a25a27abef53491940dd0c576826fda67b274e8796"
+  },
+  "frontend/src/i18n/locales/zh/changelog.ts": {
+    "before": "d759b3bbb6ab6df9c6764508229fec4f73462a6809e38c01fa7d72d8d0407606",
+    "candidate": "a36f2c8c1b40f34ac8cdb4630a81e60cb3272425f68023a3d964583b7a583198"
+  },
+  "services/docs-site/guide.md": {
+    "before": "d45bcaa1ad50daf72c946cb8bdcf06944ae38b5ebd543c193745787680ba52d3",
+    "candidate": "7e51e72293b28383f145b172ea139ed4b01ea1feba2180b947038b93c7459baf"
+  }
+}
