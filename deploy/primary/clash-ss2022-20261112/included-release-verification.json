@@ -1,0 +1,65 @@
+{
+  "at": "2026-11-11T22:08:49.120140+00:00",
+  "status": "deployed_ss2022_preview_verified_in_shared_release",
+  "application_sha": "47c5c46ead01a03cbfa7c547e4da971a561f86c7",
+  "tested_ss_source_sha": "e944c5b5c7107cf4f0e79849adccc3503705acd1",
+  "shared_release": "/opt/adobe-relay/releases/proxy-reliability-20261112",
+  "workflow_run": 43104288465,
+  "official_workflow_completed": true,
+  "image_id": "sha256:73a713b5bcf7f700bb1aaaffbfe957da99d8ef80f42d7768b77c4fa9e81e528e",
+  "shared_verification_at": "2026-11-11T22:07:55.083581+00:00",
+  "api_verification": {
+    "at": "2026-11-11T22:05:51.446380+00:00",
+    "application_sha": "47c5c46ead01a03cbfa7c547e4da971a561f86c7",
+    "passed": true,
+    "read_only": true,
+    "public_https_preview": true,
+    "base64_ss2022_nodes": 3,
+    "existing_subscription_unchanged": true,
+    "mihomo_same_process_and_1536m_limit": true,
+    "active_generation": false,
+    "node_imports": 0,
+    "outbound_probes": 0
+  },
+  "locale_assets": {
+    "/assets/index-D2wSSzyN.js": "c8cf85720d8b9d88bc9f7daf0e1e6faecc9d6b0c46e19bc2ca50083c4ca6c68d",
+    "/assets/index-9p94WM6A.js": "697391b3df14a2199e9875e129489a861f635d9afd32904add8c8a62bce970fc"
+  },
+  "mihomo_memory": 1610612736,
+  "mihomo_swap_limit": 3221225472,
+  "mihomo_original_process_preserved": true,
+  "docs_original_process_preserved": true,
+  "natural_drain_confirmed": true,
+  "temporary_cleanup": {
+    "at": "2026-11-11T22:04:48.826747+00:00",
+    "temporary_container_removed": true,
+    "temporary_nat_rule_removed": true,
+    "rolling_lease_removed": true,
+    "nginx_configuration_unchanged": true
+  },
+  "business_preservation": {
+    "backup_accounts": 1059,
+    "checked_accounts": 1059,
+    "manual_pauses_preserved": true,
+    "manual_proxy_modes_preserved": true,
+    "proxy_bindings_changed_with_event_chain": 27,
+    "cookie_rotations_with_version_advance": 5,
+    "non_source_cookie_credential_changes": 18,
+    "credential_field_names_changed": [
+      "_token_version",
+      "access_token",
+      "adobe_session_cookie",
+      "adobe_session_cookie_source_hash",
+      "cookie",
+      "expires_at"
+    ]
+  },
+  "passive_sample_count": 13,
+  "separate_deployment_started": false,
+  "node_imports": 0,
+  "generation_requests_by_this_task": 0,
+  "mail_sent_by_this_task": false,
+  "cutover_backup": "/opt/adobe-relay/backups/20261111T215908Z-47c5c46ead01a03cbfa7c547e4da971a561f86c7",
+  "route_canary_at": "2026-11-11T21:54:44.609170+00:00",
+  "route_canonical_at": "2026-11-11T22:00:29.371653+00:00"
+}
