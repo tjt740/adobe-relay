@@ -93,6 +93,9 @@ func decodeBase64Subscription(body []byte) ([]byte, error) {
 }
 
 func parseProxyURI(raw string) (map[string]any, bool, error) {
+	if scheme, _, ok := strings.Cut(raw, "://"); ok && strings.EqualFold(scheme, "ss") {
+		return parseShadowsocksURI(raw)
+	}
 	u, err := url.Parse(raw)
 	if err != nil || u.Hostname() == "" {
 		return nil, false, errors.New("节点链接无效")

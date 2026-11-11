@@ -1,0 +1,46 @@
+{
+  "backend/internal/clash/shadowsocks.go": {
+    "before": null,
+    "candidate": "ef21f837b079a1aff81a16aff6eee10db8043bd0a6c8ac9503c513170d39c603"
+  },
+  "backend/internal/clash/shadowsocks_mihomo_test.go": {
+    "before": null,
+    "candidate": "68fe3b53c77b802381f7e3724e406abc8b64914ba9d5ed218b6cb8a864f913df"
+  },
+  "backend/internal/clash/shadowsocks_test.go": {
+    "before": null,
+    "candidate": "9c56c2dbc83e61817f24eca1d2fde019ee17c553c6d2f0b155da35b7b806b41a"
+  },
+  "backend/internal/clash/subscription.go": {
+    "before": "66db1d726971f3670b574c9b8042cb7fb3d21b86e5773e3e3d7cb1c845cd7cd5",
+    "candidate": "332f14a4d2ecd57d89526314a8858ffc0a27bb9ead50f16a0f888c1d1151434f"
+  },
+  "backend/internal/clash/testdata/shadowsocks-base64.txt": {
+    "before": null,
+    "candidate": "d8d22ec7d162dde2b7e75c81da291701e9044363603d85bb84fa2b78fcdfac3e"
+  },
+  "frontend/src/content/changelog/daily.ts": {
+    "before": "448f7ebc07365d6aa49b1363271a7a55d572ddc73614d218998ddfefe9b8160e",
+    "candidate": "b5cedd48ea1cf11552fa9b5c3f8148108a40645185b7ade2eb728144cdd8c5dd"
+  },
+  "frontend/src/i18n/locales/en/changelog.ts": {
+    "before": "97cb6c0cb2d816dc0c8f00a25a27abef53491940dd0c576826fda67b274e8796",
+    "candidate": "b02517c27b457d60028c054a2347310edb6c00d0c1b067504edc6d0fcb3ccd98"
+  },
+  "frontend/src/i18n/locales/zh/changelog.ts": {
+    "before": "a36f2c8c1b40f34ac8cdb4630a81e60cb3272425f68023a3d964583b7a583198",
+    "candidate": "0d384b3d2292d961334d05ced05349c6e74a936be41c04884cfac5919f443f97"
+  },
+  "docs/ADOBE_IMAGE_CLIENT_GUIDE.md": {
+    "before": "7e51e72293b28383f145b172ea139ed4b01ea1feba2180b947038b93c7459baf",
+    "candidate": "432e0a07da38ab580e1da40be5f920113baf5ad66e4771410276413c5981acd2"
+  },
+  "services/docs-site/guide.md": {
+    "before": "7e51e72293b28383f145b172ea139ed4b01ea1feba2180b947038b93c7459baf",
+    "candidate": "432e0a07da38ab580e1da40be5f920113baf5ad66e4771410276413c5981acd2"
+  },
+  "services/docs-site/verify-live.py": {
+    "before": "61b0cf4c1f6ce8cf1a75974784b5e09af0b2d46e673f536f7fbb8ba386f125cc",
+    "candidate": "5fc95b7cf6b066b388cfd2f19143e3e212cb63378ad1d0bb14970e07e505d7b0"
+  }
+}
