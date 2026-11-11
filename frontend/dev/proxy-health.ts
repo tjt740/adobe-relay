@@ -3,6 +3,7 @@ import { createApp, h } from 'vue'
 import { createI18n } from 'vue-i18n'
 import { apiClient } from '../src/api/client'
 import type { ProxyHealth, ProxySourceHealth } from '../src/api/admin/clash'
+import type { ProxyRelatedAccount, ProxyRelatedAccountsView } from '../src/api/admin/proxyRelatedAccounts'
 import ProxyHealthPanel from '../src/components/admin/proxy/ProxyHealthPanel.vue'
 import zh from '../src/i18n/locales/zh/proxyHealth'
 import en from '../src/i18n/locales/en/proxyHealth'
@@ -48,8 +49,28 @@ const data: ProxyHealth = {
   ],
 }
 apiClient.defaults.adapter = async config => {
-  if (config.method !== 'get' || config.url !== '/admin/proxies/clash/health') throw new Error('Preview only supports health reads')
-  return { config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, data } }
+  if (config.method !== 'get') throw new Error('Preview only supports reads')
+  let payload: ProxyHealth | ProxyRelatedAccountsView = data
+  const match = config.url?.match(/^\/admin\/proxies\/(\d+)\/related-accounts$/)
+  if (match) {
+    const id = Number(match[1])
+    const node = data.sources.flatMap(s => s.blocked_nodes ?? []).find(n => n.proxy_id === id)!
+    const items: ProxyRelatedAccount[] = Array.from({ length: node.bound_accounts }, (_, i) => ({
+      id: 3100 + i, name: ['图片业务 A', '固定出口 B', '已暂停账号 C'][i], platform: 'adobe',
+      using_this_node: true, mode: i === 1 ? 'manual' : 'automatic',
+      account_state: i === 2 ? 'paused' : 'eligible', route_state: 'generation_paused', impact: 'affected',
+      current_proxy: { id, name: node.name }, last_departure: null,
+    }))
+    items.push(
+      { id: 3201, name: '已切换账号 D', platform: 'adobe', using_this_node: false, mode: 'automatic', account_state: 'eligible', route_state: 'reachable', impact: 'left_node', current_proxy: { id: 2901, name: '日本备用 01' }, last_departure: { at, destination: { id: 2901, name: '日本备用 01' } } },
+      { id: 3202, name: '等待代理 E', platform: 'adobe', using_this_node: false, mode: 'automatic', account_state: 'waiting_proxy', route_state: 'waiting_proxy', impact: 'left_node', current_proxy: null, last_departure: { at, destination: null } },
+      { id: 3203, name: '再次切换账号 F', platform: 'adobe', using_this_node: false, mode: 'automatic', account_state: 'eligible', route_state: 'unavailable', impact: 'left_node', current_proxy: { id: 2902, name: '新加坡备用 02' }, last_departure: { at, destination: { id: 2901, name: '日本备用 01' } } },
+    )
+    const { search = '', relation = 'all', page = 1, page_size = 20 } = config.params
+    const matching = items.filter(a => (relation === 'all' || (relation === 'current' ? a.using_this_node : !a.using_this_node)) && `${a.name} ${a.id}`.toLowerCase().includes(String(search).toLowerCase()))
+    payload = { proxy: { id, name: node.name }, checked_at: new Date().toISOString(), history_since: new Date(Date.now() - 86400000).toISOString(), current_count: node.bound_accounts, departed_count: 3, total: matching.length, page, page_size, items: matching.slice((page - 1) * page_size, page * page_size) }
+  } else if (config.url !== '/admin/proxies/clash/health') throw new Error('Unsupported preview request')
+  return { config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, data: payload } }
 }
 const i18n = createI18n({ legacy: false, locale, messages: {
   zh: { proxyHealth: zh, common: { refresh: '刷新', loading: '读取中' } },

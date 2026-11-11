@@ -3,7 +3,9 @@ import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import ProxyHealthPanel from '../ProxyHealthPanel.vue'
 import { getProxyHealth, type ProxyHealth } from '@/api/admin/clash'
 import proxyHealth from '@/i18n/locales/zh/proxyHealth'
+import { getProxyRelatedAccounts } from '@/api/admin/proxyRelatedAccounts'
 vi.mock('@/api/admin/clash', () => ({ getProxyHealth: vi.fn() }))
+vi.mock('@/api/admin/proxyRelatedAccounts', () => ({ getProxyRelatedAccounts: vi.fn() }))
 vi.mock('vue-i18n', async () => ({ ...await vi.importActual<typeof import('vue-i18n')>('vue-i18n'), useI18n: () => ({
  t: (key: string, values: Record<string, unknown> = {}) => {
    const messages: Record<string, unknown> = { proxyHealth, common: { refresh: '刷新', loading: '读取中' } }
@@ -20,6 +22,19 @@ async function panel() {
 }
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(getProxyHealth).mockResolvedValue(fixture()) })
 describe('Proxy subscription health', () => {
+  it('opens account details even when the current association count is zero', async () => {
+    const data = fixture()
+    data.sources[0].blocked_nodes = [{ proxy_id: 1290, name: '节点', server: '', server_port: 443, enabled: true, bound_accounts: 0, manual: true, excluded_at: data.checked_at, failed_at: null, retry_after: null }]
+    vi.mocked(getProxyHealth).mockResolvedValue(data)
+    vi.mocked(getProxyRelatedAccounts).mockResolvedValue({ proxy: { id: 1290, name: '节点' }, checked_at: data.checked_at, history_since: data.checked_at, current_count: 0, departed_count: 0, total: 0, page: 1, page_size: 20, items: [] })
+    const w = mount(ProxyHealthPanel, { global: { stubs: { teleport: true } } }); await flushPromises()
+    await w.get('[data-testid="blocked-details"]').trigger('click')
+    expect(w.get('[data-testid="related-accounts"]').text()).toContain('关联账号数')
+    await w.get('[data-testid="related-accounts"]').trigger('click'); await flushPromises()
+    expect(w.findAll('[role="dialog"]')).toHaveLength(2)
+    expect(getProxyRelatedAccounts).toHaveBeenCalledWith(1290, expect.any(Object), expect.any(AbortSignal))
+    expect(w.text()).toContain('关联账号明细')
+  })
   it.each([
     [0, 100, '0', 'bg-red-500'],
     [7, 100, '7', 'bg-red-500'],

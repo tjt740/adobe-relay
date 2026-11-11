@@ -40,7 +40,15 @@
             <div v-if="node.excluded_at"><dt class="inline text-gray-500 dark:text-gray-400">{{ t('proxyHealth.details.excludedAt') }} </dt><dd class="inline tabular-nums">{{ formatDateTime(node.excluded_at) }}</dd></div>
             <div v-if="node.failed_at"><dt class="inline text-gray-500 dark:text-gray-400">{{ t('proxyHealth.details.failedAt') }} </dt><dd class="inline tabular-nums">{{ formatDateTime(node.failed_at) }}</dd></div>
             <div v-if="node.retry_after"><dt class="inline text-gray-500 dark:text-gray-400">{{ t('proxyHealth.details.retryAfter') }} </dt><dd class="inline tabular-nums">{{ formatDateTime(node.retry_after) }}</dd></div>
-            <div v-if="source.blocked_nodes"><dt class="inline text-gray-500 dark:text-gray-400">{{ t('proxyHealth.details.accounts') }} </dt><dd class="inline tabular-nums">{{ node.bound_accounts }}</dd></div>
+            <div v-if="source.blocked_nodes">
+              <dt class="sr-only">{{ t('proxyHealth.details.accounts') }}</dt>
+              <dd>
+                <button class="inline-flex min-h-8 items-center gap-2 rounded text-primary-700 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 dark:text-primary-400" data-testid="related-accounts" @click="selectedAccountNode = node">
+                  <span>{{ t('proxyHealth.details.accounts') }}</span><span class="tabular-nums">{{ node.bound_accounts }}</span>
+                  <span>{{ t('proxyHealth.viewDetails') }}</span>
+                </button>
+              </dd>
+            </div>
           </dl>
           <p v-if="source.blocked_nodes && !node.enabled" class="text-xs text-gray-500 dark:text-gray-400">{{ t('proxyHealth.details.disabled') }}</p>
         </li>
@@ -54,6 +62,7 @@
       </div>
     </template>
   </BaseDialog>
+  <ProxyRelatedAccountsModal v-if="source && selectedAccountNode" :key="selectedAccountNode.proxy_id" :node="selectedAccountNode" @close="selectedAccountNode = null" />
 </template>
 
 <script setup lang="ts">
@@ -61,6 +70,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { BlockedProxyNode, ProxySourceHealth } from '@/api/admin/clash'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import ProxyRelatedAccountsModal from './ProxyRelatedAccountsModal.vue'
 import { formatDateTime } from '@/utils/format'
 const props = defineProps<{ source: ProxySourceHealth | null; checkedAt: string; stale: boolean }>()
 const emit = defineEmits<{ close: [] }>()
@@ -68,6 +78,7 @@ const { t } = useI18n()
 const search = ref('')
 const reason = ref('all')
 const page = ref(1)
+const selectedAccountNode = ref<BlockedProxyNode | null>(null)
 const nodes = computed<BlockedProxyNode[]>(() => props.source?.blocked_nodes ?? (props.source?.blocked_proxy_ids ?? []).map(proxy_id => ({
   proxy_id, name: '', server: '', server_port: 0, enabled: false, bound_accounts: 0,
   manual: false, excluded_at: null, failed_at: null, retry_after: null,
@@ -78,7 +89,7 @@ const filtered = computed(() => nodes.value.filter(node =>
 ))
 const pages = computed(() => Math.max(1, Math.ceil(filtered.value.length / 20)))
 const pageNodes = computed(() => filtered.value.slice((page.value - 1) * 20, page.value * 20))
-watch(() => props.source?.id, () => { search.value = ''; reason.value = 'all'; page.value = 1 })
+watch(() => props.source?.id, () => { search.value = ''; reason.value = 'all'; page.value = 1; selectedAccountNode.value = null })
 watch([search, reason], () => { page.value = 1 })
 watch(pages, count => { page.value = Math.min(page.value, count) })
 </script>
