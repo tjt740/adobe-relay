@@ -45,7 +45,7 @@ export default {
       }
     },
     "updates": {
-      mihomoMemory: {"title": "代理服务内存容量提升", "body": "代理服务内存上限从 256 MiB 提高到 1 GiB，按实际需要使用。", "sections": {"reason": {"title": "处理断连原因", "body": "历史故障记录确认代理服务因内存不足反复退出，影响多个订阅。此次提高共享代理服务容量。"}, "continuity": {"title": "在线调整", "body": "在原进程上提高内存上限并保存持久配置，现有服务无需重启。"}, "preservation": {"title": "保留原有服务", "body": "现有应用版本、模型、计费、账号、订阅和其他服务资源保持。"}, "boundary": {"title": "验证范围", "body": "已核对实际内存上限、进程身份和现有连接；自然流量观察不能替代高峰验证，Adobe 授权拒绝仍需单独排查。"}}},
+      mihomoMemory: {"title": "代理服务内存容量提升", "body": "代理服务内存上限从 256 MiB 提高到 1.5 GiB，按实际需要使用。", "sections": {"reason": {"title": "处理断连原因", "body": "历史故障记录确认代理服务因内存不足反复退出，影响多个订阅。此次提高共享代理服务容量。"}, "continuity": {"title": "在线调整", "body": "在原进程上提高内存上限并保存持久配置，现有服务无需重启。"}, "preservation": {"title": "保留原有服务", "body": "现有应用版本、模型、计费、账号、订阅和其他服务资源保持。"}, "boundary": {"title": "验证范围", "body": "已核对实际内存上限、进程身份和现有连接；自然流量观察不能替代高峰验证，Adobe 授权拒绝仍需单独排查。"}}},
       adobeWebP: {
         title: '两款 Image 2.6 支持原生 WebP',
         body: 'Flare 与 Sunburst 可请求 WebP，原文件支持 URL 或 Base64 交付。',
