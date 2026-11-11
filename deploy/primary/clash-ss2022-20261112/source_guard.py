@@ -7,7 +7,8 @@ import subprocess
 import sys
 
 BASE = '106e911e98fdf22f8610983a709584440296d585'
-ALLOWED = {'backend/internal/clash/subscription.go', 'frontend/src/i18n/locales/en/changelog.ts', 'backend/internal/clash/shadowsocks.go', 'backend/internal/clash/shadowsocks_test.go', 'frontend/src/i18n/locales/zh/changelog.ts', 'backend/internal/clash/shadowsocks_mihomo_test.go', 'frontend/src/content/changelog/daily.ts', 'backend/internal/clash/testdata/shadowsocks-base64.txt'}
+# Preserve independently deployed documentation already present on the starting main.
+ALLOWED = {'docs/ADOBE_IMAGE_CLIENT_GUIDE.md', 'services/docs-site/guide.md', 'services/docs-site/verify-live.py', 'backend/internal/clash/subscription.go', 'frontend/src/i18n/locales/en/changelog.ts', 'backend/internal/clash/shadowsocks.go', 'backend/internal/clash/shadowsocks_test.go', 'frontend/src/i18n/locales/zh/changelog.ts', 'backend/internal/clash/shadowsocks_mihomo_test.go', 'frontend/src/content/changelog/daily.ts', 'backend/internal/clash/testdata/shadowsocks-base64.txt'}
 
 
 def validate(changed, before, candidate, manifest):

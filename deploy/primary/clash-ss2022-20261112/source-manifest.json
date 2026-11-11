@@ -30,5 +30,17 @@
   "frontend/src/i18n/locales/zh/changelog.ts": {
     "before": "a36f2c8c1b40f34ac8cdb4630a81e60cb3272425f68023a3d964583b7a583198",
     "candidate": "0d384b3d2292d961334d05ced05349c6e74a936be41c04884cfac5919f443f97"
+  },
+  "docs/ADOBE_IMAGE_CLIENT_GUIDE.md": {
+    "before": "7e51e72293b28383f145b172ea139ed4b01ea1feba2180b947038b93c7459baf",
+    "candidate": "432e0a07da38ab580e1da40be5f920113baf5ad66e4771410276413c5981acd2"
+  },
+  "services/docs-site/guide.md": {
+    "before": "7e51e72293b28383f145b172ea139ed4b01ea1feba2180b947038b93c7459baf",
+    "candidate": "432e0a07da38ab580e1da40be5f920113baf5ad66e4771410276413c5981acd2"
+  },
+  "services/docs-site/verify-live.py": {
+    "before": "61b0cf4c1f6ce8cf1a75974784b5e09af0b2d46e673f536f7fbb8ba386f125cc",
+    "candidate": "5fc95b7cf6b066b388cfd2f19143e3e212cb63378ad1d0bb14970e07e505d7b0"
   }
 }
