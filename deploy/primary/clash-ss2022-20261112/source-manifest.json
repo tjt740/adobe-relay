@@ -25,11 +25,11 @@
   },
   "frontend/src/i18n/locales/en/changelog.ts": {
     "before": "97cb6c0cb2d816dc0c8f00a25a27abef53491940dd0c576826fda67b274e8796",
-    "candidate": "b02517c27b457d60028c054a2347310edb6c00d0c1b067504edc6d0fcb3ccd98"
+    "candidate": "22c6e04b1dc074e32b0daef086e2e6d4de2ab66e3e20599dec5a0578f6fea1f8"
   },
   "frontend/src/i18n/locales/zh/changelog.ts": {
     "before": "a36f2c8c1b40f34ac8cdb4630a81e60cb3272425f68023a3d964583b7a583198",
-    "candidate": "0d384b3d2292d961334d05ced05349c6e74a936be41c04884cfac5919f443f97"
+    "candidate": "f12cab6bcd369ada302246fe2d941f234cceae1d306e8fec6cdd171394ad2349"
   },
   "docs/ADOBE_IMAGE_CLIENT_GUIDE.md": {
     "before": "7e51e72293b28383f145b172ea139ed4b01ea1feba2180b947038b93c7459baf",

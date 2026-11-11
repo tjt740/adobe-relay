@@ -183,7 +183,7 @@ def main():
     current = snapshot()
     if args.action == 'before':
         assert not (ROOT / 'before.json').exists(), 'Preflight already recorded'
-        assert current['containers']['adobe-relay-mihomo-1']['resources']['Memory'] == 1073741824, 'Preserve the November 12 Mihomo memory increase'
+        assert current['containers']['adobe-relay-mihomo-1']['resources']['Memory'] == 1610612736, 'Preserve the November 12 Mihomo memory increase'
         assert current['containers'][APP]['image'] == OLD_IMAGE, 'Production changed; review it first'
         assert current['containers'][APP]['health'] == 'healthy'
         tags = json.loads(subprocess.check_output(['docker', 'image', 'ls', '--format', '{{json .}}', ROLLBACK_IMAGE]).strip() or b'null')
