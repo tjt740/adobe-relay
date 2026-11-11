@@ -85,5 +85,8 @@ a.save('route-api-verification.json',health_proof)
 
 route_at=datetime.datetime.fromisoformat(json.loads((ROOT/'rolling-route-canary.json').read_text())['at']);assert route_at.astimezone(datetime.timezone(datetime.timedelta(hours=8))).date().isoformat()=='2026-11-12', 'Release crossed its Beijing date; rebuild notes before claiming success'
 out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'application_version':version,'preserved':checks,'business_preservation':summary,'migration_checksums_preserved':True,'migration_set_retained':True,'retired_408_gates_empty':True,'canonical_assets':{p:hashlib.sha256(v.encode()).hexdigest() for p,v in assets.items()},'live_browser_cases':browser['case_count'],'browser_limitation':browser.get('limitation'),'heartbeat_after_temporary_process_cleanup':heartbeat,'passive_sample_count':13,'temporary_cleanup':cleanup,'api_verification':api,'route_api_verified':True,'excluded_1290':exclusion,'cutover_route_checks':route_checks,'live_billing_verified':False,'live_generation_tested':False,'test_mail_sent':False,'verified_locale_bundle_count':len(locale_assets),'verified_admin_model_labels':admin_labels,'status':'deployed_api_verified'}
+loaded=json.loads((ROOT/'image-loaded.json').read_text())
+out['validation_mode']=loaded['validation_mode']
+out['official_workflow_completed']=loaded['official_workflow_completed']
 a.save('deployment-verification.json',out)
 print(json.dumps(out,ensure_ascii=False))

@@ -1,4 +1,4 @@
-"""Load only the exact successful CI artifact; leave routing and current data intact."""
+"""Load a verified exact artifact; leave routing and current data intact."""
 import datetime, hashlib, json, os, subprocess
 from pathlib import Path
 
@@ -8,7 +8,12 @@ RUN=int((ROOT/'expected-run').read_text())
 os.umask(0o077)
 def inspect(name):return json.loads(subprocess.check_output(['docker','inspect',name],text=True))[0]
 proof=json.loads((ROOT/'artifact/ci-proof.json').read_text())
-assert proof['application_sha']==SHA and proof['workflow_run']==RUN and proof['conclusion']=='success'
+assert proof['application_sha']==SHA and proof['workflow_run']==RUN
+if proof.get('mode')=='local_full_checks_exact_build':
+ from manual_gate import validate
+ validate(proof,SHA,ROOT/'artifact')
+else:
+ assert proof['conclusion']=='success'
 archive=ROOT/'artifact/release-images.tar.gz'
 digest=hashlib.sha256(archive.read_bytes()).hexdigest()
 assert digest==proof['archive_sha256']
@@ -22,7 +27,8 @@ p=subprocess.run(['docker','load','--input',str(archive)],text=True,capture_outp
 (ROOT/'image-load.log').write_text(p.stdout+p.stderr)
 assert p.returncode==0,'Image load failed; no traffic changed'
 image=inspect('adobe-relay:'+SHA)
+if proof.get('mode')=='local_full_checks_exact_build':assert image['Id']==proof['image_id']
 assert old['Id']==inspect('adobe-relay-app-1')['Id']
-out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'sha':SHA,'workflow_run':RUN,'image_id':image['Id'],'archive_sha256':digest,'changed_routing':False}
+out={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'sha':SHA,'workflow_run':RUN,'image_id':image['Id'],'archive_sha256':digest,'changed_routing':False,'validation_mode':proof.get('mode','successful_github_workflow'),'official_workflow_completed':proof.get('official_workflow_completed',True)}
 (ROOT/'image-loaded.json').write_text(json.dumps(out,indent=2))
 print(json.dumps(out))

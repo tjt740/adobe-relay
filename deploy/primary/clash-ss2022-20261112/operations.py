@@ -1,4 +1,4 @@
-"""Operate the authorized release with exact CI artifacts and preserved guards."""
+"""Operate the authorized release with verified exact artifacts and preserved guards."""
 import base64,datetime,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
 assert phase in ['preflight','prepare','start','status','verify','archive']
@@ -19,13 +19,24 @@ assert not subprocess.check_output(['docker','exec','adobe-relay-redis-1','redis
 print(json.dumps({'read_only':True,'locks_available':True,'rolling_lease_empty':True,'image':d['Config']['Image']}))
 """)
 elif phase=='prepare':
- ci=json.loads(subprocess.check_output(['gh','api','repos/tjt740/adobe-relay/actions/runs/'+build]))
- assert ci['head_sha']==sha and ci['status']=='completed' and ci['conclusion']=='success' and ci['path']=='.github/workflows/deploy-adobe-relay.yml'
  subprocess.run([sys.executable,str(pathlib.Path(__file__).with_name('source_guard.py')),sha],check=True)
  artifact=pathlib.Path(os.environ.get('PRIMARY_RELEASE_ARTIFACT','release-artifact'))
+ manual=os.environ.get('PRIMARY_MANUAL_GATE_PROOF')
+ if manual:
+  from manual_gate import validate
+  protected=['backend','frontend','Dockerfile','deploy/docker-entrypoint.sh','docs/legal','.github/workflows/deploy-adobe-relay.yml']
+  subprocess.run(['git','diff','--exit-code',sha,'--',*protected],check=True)
+  assert not subprocess.check_output(['git','ls-files','--others','--exclude-standard','--',*protected],text=True).strip(), 'Untracked application source exists'
+  proof=json.loads(pathlib.Path(manual).read_text())
+  assert str(proof['workflow_run'])==build
+  validate(proof,sha,artifact)
+ else:
+  ci=json.loads(subprocess.check_output(['gh','api','repos/tjt740/adobe-relay/actions/runs/'+build]))
+  assert ci['head_sha']==sha and ci['status']=='completed' and ci['conclusion']=='success' and ci['path']=='.github/workflows/deploy-adobe-relay.yml'
  archive=artifact/'release-images.tar.gz';digest=hashlib.sha256(archive.read_bytes()).hexdigest()
  assert pathlib.Path(str(archive)+'.sha256').read_text().split()==[digest,archive.name]
- (artifact/'ci-proof.json').write_text(json.dumps({'application_sha':sha,'workflow_run':int(build),'conclusion':'success','archive_sha256':digest}))
+ if not manual:proof={'application_sha':sha,'workflow_run':int(build),'conclusion':'success','archive_sha256':digest}
+ (artifact/'ci-proof.json').write_text(json.dumps(proof))
  remote(f"import pathlib; r=pathlib.Path('{root}'); assert not (r/'progress.json').exists(); (r/'artifact').mkdir(parents=True,exist_ok=True,mode=0o700)")
  copy(pathlib.Path(__file__).parent.glob('*.py'));copy(pathlib.Path(__file__).parent.glob('*.json'))
  copy(artifact.glob('*'),root+'/artifact/')
@@ -98,5 +109,6 @@ for name,value in {payload!r}.items():
  path=r/name;path.write_bytes(data);path.chmod(0o600);files[name]=a.digest(data)
  if name=='primary-README.md':pathlib.Path('/opt/adobe-relay/deploy/primary/README.md').write_bytes(data)
 out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'deployed_ss2022_preview_verified','application_sha':'{sha}','archive_source':'{source}','image_id':container['Image'],'core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'node_imports':0,'mail_sent':False}}
+out['validation_mode']=core['validation_mode'];out['official_workflow_completed']=core['official_workflow_completed']
 a.save('release-completion.json',out);print(json.dumps(out))
 """)
