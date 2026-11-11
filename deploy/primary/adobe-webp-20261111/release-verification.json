@@ -1,5 +1,5 @@
 {
-  "status": "deployed_live_webp_verified_docs_pending",
+  "status": "deployed_live_webp_verified",
   "application_sha": "106e911e98fdf22f8610983a709584440296d585",
   "feature_pr": 183,
   "feature_main": "6e82746d586b8b3365393cc306e7dbcb8075f3ba",
@@ -451,5 +451,39 @@
     "deferred_pending_tests": false
   },
   "historical_nov7_billing_acceptance_completed": false,
-  "docs_update_pending": true
+  "docs_update_pending": false,
+  "docs": {
+    "source_sha": "823de7c3d07cf74a6557da32dba576f8926c3933",
+    "update_run": 42965688666,
+    "verification_run": 42965812201,
+    "update": {
+      "audit": "/opt/creative-docs/audit/update-20261111T052622Z",
+      "binary_sha256": "0d593addff1c290e573941596ae0f5a84e1ef83f4bc335481f22fc3e3f894855",
+      "previous_binary_sha256": "61b9c77bb8af5298f0845c5b9d349c8ae4f8bd9c37d75db047fca99525facf74",
+      "service": "active",
+      "existing_containers_and_configs_preserved": true,
+      "referrer_policy": "same-origin",
+      "login_copy_simplified": true
+    },
+    "verification": {
+      "anonymous_content_blocked": true,
+      "existing_sub2_user_login_and_read": true,
+      "protected_markdown_sha256": "432e0a07da38ab580e1da40be5f920113baf5ad66e4771410276413c5981acd2",
+      "example_blocks": 24,
+      "native_webp_documented": true,
+      "image26_names_and_quality_contract": true,
+      "logout_invalidates_docs_session": true,
+      "credentials_persisted": false,
+      "adobe_requests": 0,
+      "public_https": true,
+      "source_sha": "823de7c3d07cf74a6557da32dba576f8926c3933",
+      "audit": "/opt/creative-docs/audit/verify-823de7c3d07cf74a6557da32dba576f8926c3933",
+      "verified_at_utc": "2026-11-11T05:27:14Z"
+    }
+  },
+  "rollback_guard": {
+    "passed": true,
+    "mutated": false
+  },
+  "browser_layout_verified": false
 }
