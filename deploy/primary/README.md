@@ -1,3 +1,12 @@
+## Mihomo 再次热扩容至 1.5 GiB（2026-11-12，当前资源覆盖）
+
+- 用户要求继续提高 Mihomo 内存并保护在途请求。北京时间 **04:27:57** 在原容器在线将 **1 GiB 提高至 1536 MiB（1.5 GiB）**，持久配置 `/opt/adobe-relay/shared/resources.yml` 为 `mihomo.mem_limit: 1536m`、`memswap_limit: 3g`。主机 SwapTotal=0，未启用交换空间；本节覆盖前节 1 GiB 和历史 256 MiB 值。
+- 主机约 62.79 GiB，全部既有容器硬上限合计 60.75 GiB，给宿主系统及独立 docs 留约 2.04 GiB；Sub2 54 GiB / Go 43008 MiB / GOMAXPROCS16 / CPU shares4096、Okad 3 GiB 和其他服务资源保持。不在有负载时直接缩减 Sub2 上限来继续扩大 Mihomo。
+- 原 Mihomo 容器 `77770d0d02af` / PID 82636 / 累计重启 51、全部原服务容器和进程身份保持；调整前后 24 条连接的 ID 全部保留。无重启、切流或其他配置改动，实际应用仍 `106e911e98fdf22f8610983a709584440296d585`。
+- **04:28:36–04:33:36，16 次五分钟采样通过**：零新增 OOM/重启，Mihomo 本窗口峰值 98.5 MiB，三次 HTTPS 健康检查 200；调整至观察结束有 29 条自然成功/29 张图片，零 502/代理连接错误，另有 400×6、404×1、451×1、503×1。SSH 返回中断但服务器完成了全部采样，已取回完成回执；未重复执行扩容。低流量验证不代表高峰验收或所有来源的 502 永不出现。
+- 审计 `/opt/adobe-relay/releases/mihomo-memory-1536m-20261112/`，备份 `resources.before.yml`，实施 `applied.json`，验证 `verification.json`。后续发布须保留 1536m/3g，回退前复核负载，不恢复旧整份配置。此项不处理 Adobe 403 授权拒绝。
+- 本地中英文日志文字同步为 1.5 GiB；未推送或重发主站，不能宣称网站已展示。本次文字更新的 10 项日志/语言键检查通过；首次因工作树缺少 vitest 未执行，随后借用既有本地依赖完成，临时依赖链接已删除。
+
 ## Mihomo 内存在线扩容（2026-11-12，当前资源覆盖）
 
 - 用户授权按现有资源提高 Mihomo 内存、不中断现有请求并验证。北京时间 **03:47:14** 在原容器上在线将内存上限从 **256 MiB 提高至 1 GiB**，持久写入 `/opt/adobe-relay/shared/resources.yml` 的 `mihomo.mem_limit: 1g`、`memswap_limit: 2g`；宿主 SwapTotal=0，没有启用交换空间。后续发布必须保留此覆盖，旧 256 MiB 记录被本节替代。

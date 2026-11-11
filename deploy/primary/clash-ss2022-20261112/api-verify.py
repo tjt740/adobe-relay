@@ -18,6 +18,6 @@ assert all(not s.get('fetch_error') for s in data['sources'])
 after=a.snapshot();a.check_preserved(before,after)
 assert before['clash_contract_hash']==after['clash_contract_hash']
 m=after['containers']['adobe-relay-mihomo-1'];original=json.loads((ROOT/'before.json').read_text())['containers']['adobe-relay-mihomo-1']
-assert m['resources']['Memory']==1073741824 and m['id']==original['id'] and m['restarts']==original['restarts'] and m['started']==original['started']
-proof={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'passed':True,'read_only':True,'public_https_preview':True,'base64_ss2022_nodes':3,'existing_subscription_unchanged':True,'mihomo_same_process_and_1g_limit':True,'active_generation':False,'node_imports':0,'outbound_probes':0}
+assert m['resources']['Memory']==1610612736 and m['id']==original['id'] and m['restarts']==original['restarts'] and m['started']==original['started']
+proof={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'passed':True,'read_only':True,'public_https_preview':True,'base64_ss2022_nodes':3,'existing_subscription_unchanged':True,'mihomo_same_process_and_1536m_limit':True,'active_generation':False,'node_imports':0,'outbound_probes':0}
 a.save('api-verification.json',proof);print(json.dumps(proof))
