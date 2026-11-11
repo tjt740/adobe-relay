@@ -1,13 +1,23 @@
 """Operate the authorized release with verified exact artifacts and preserved guards."""
-import base64,datetime,hashlib,json,os,pathlib,re,subprocess,sys
+import base64,datetime,hashlib,json,os,pathlib,re,shlex,subprocess,sys,tarfile,tempfile
 phase,sha,build=sys.argv[1:]
 assert phase in ['preflight','prepare','start','status','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/clash-ss2022-20261112'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
+if os.environ.get('PRIMARY_SSH_CONTROL_PATH'):
+ options+=['-o','ControlMaster=auto','-o','ControlPersist=120','-o','ControlPath='+os.environ['PRIMARY_SSH_CONTROL_PATH']]
 target='root@173.234.15.150'
 def remote(script):return subprocess.run(['ssh',*options,target,'python3 -'],input=script,text=True,check=True,timeout=900)
-def copy(paths,dest=root+'/'):subprocess.run(['scp',*options,*map(str,paths),target+':'+dest],check=True,timeout=300)
+def copy(paths,dest=root+'/'):
+ assert dest in [root+'/',root+'/artifact/']
+ with tempfile.TemporaryFile() as stream:
+  with tarfile.open(fileobj=stream,mode='w') as bundle:
+   for path in paths:
+    assert path.is_file() and not path.is_symlink()
+    bundle.add(path,arcname=path.name,recursive=False)
+  stream.seek(0)
+  subprocess.run(['ssh',*options,target,'umask 077; tar -xf - --no-same-owner -C '+shlex.quote(dest)],stdin=stream,check=True,timeout=300)
 if phase=='preflight':
  remote("""import fcntl,json,subprocess
 held=[]
