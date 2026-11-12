@@ -41,7 +41,13 @@ original=json.loads(before_path.read_text())
 assert original['containers']==refs and original['configuration']==configs,'Baseline changed; review first'
 # Exclusions are future-selection guards. Keeping proxy revisions, listener
 # definitions and existing slots intact allows accepted work to finish normally.
-applied=sql(f"""INSERT INTO adobe_route_exclusions(proxy_id,proxy_updated_at,reason)
+expected=' OR '.join("(id="+str(n['id'])+" AND updated_at='"+n['updated_at']+"'::timestamptz)" for n in nodes)
+applied=sql(f"""DO $$ BEGIN
+ PERFORM id FROM proxies WHERE id IN ({ids}) ORDER BY id FOR UPDATE;
+ IF (SELECT count(*) FROM proxies WHERE deleted_at IS NULL AND ({expected}))<>4
+ THEN RAISE EXCEPTION 'Route revision changed; inspect'; END IF;
+ END $$;
+ INSERT INTO adobe_route_exclusions(proxy_id,proxy_updated_at,reason)
  SELECT id,updated_at,'{reason}' FROM proxies WHERE id IN ({ids}) AND deleted_at IS NULL
  ON CONFLICT(proxy_id) DO NOTHING;
  SELECT json_agg(t) FROM (SELECT proxy_id,proxy_updated_at,reason,created_at FROM adobe_route_exclusions WHERE proxy_id IN ({ids}) ORDER BY proxy_id)t""",True)

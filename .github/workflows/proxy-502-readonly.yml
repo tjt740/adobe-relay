@@ -1,4 +1,4 @@
-name: Read-only proxy 502 incident evidence
+name: Guarded proxy 502 incident investigation
 on:
   push:
     branches: [codex/proxy-502-followup-20261112]
