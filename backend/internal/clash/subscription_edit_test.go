@@ -95,6 +95,7 @@ func TestAppendValidatesDeduplicatedCombinedURLLimitBeforeFetching(t *testing.T)
 func TestAppendImportsOnlyNewFeedsAndPreservesExistingRecords(t *testing.T) {
 	db := sourceTestDB(t)
 	_, err := db.Exec(`CREATE TABLE proxies(id BIGSERIAL PRIMARY KEY,name text,protocol text,host text,port int,username text,password text,status text,updated_at timestamptz DEFAULT NOW(),deleted_at timestamptz);
+ CREATE TABLE adobe_route_exclusions(proxy_id bigint PRIMARY KEY);
  CREATE TABLE accounts(id BIGSERIAL PRIMARY KEY,proxy_id bigint,extra jsonb,status text,schedulable bool,updated_at timestamptz DEFAULT NOW(),deleted_at timestamptz);
  CREATE TABLE scheduler_outbox(event_type text,payload jsonb);`)
 	require.NoError(t, err)
@@ -172,6 +173,7 @@ func TestAppendImportsOnlyNewFeedsAndPreservesExistingRecords(t *testing.T) {
 	previous.Sources[0].Traffic = &SourceTraffic{Total: 10, Download: 10}
 	raw, _ := json.Marshal(previous)
 	_, err = db.Exec(`INSERT INTO proxies(id,name,status) VALUES(1,'old','inactive'),(2,'disabled','inactive'); SELECT setval(pg_get_serial_sequence('proxies','id'),2);
+ INSERT INTO adobe_route_exclusions(proxy_id) VALUES(1);
  INSERT INTO accounts(proxy_id,extra,status,schedulable) VALUES(1,'{"upstream_billing_probe":{"keep":true}}','active',false);`)
 	require.NoError(t, err)
 	_, err = db.Exec(`UPDATE clash_subscription SET document=$1`, string(raw))

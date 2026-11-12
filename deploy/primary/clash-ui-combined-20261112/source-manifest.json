@@ -1,0 +1,166 @@
+{
+  ".github/workflows/deploy-adobe-relay.yml": {
+    "before": "d946109eb92b69d6d8501a165af881d41e5b1a9b5ab68708459c142d94001723",
+    "candidate": "1239617242ad30d60bb55ca12a62e57a048659164a76ad9b9eb3be100f7fa84e"
+  },
+  "backend/internal/clash/health_details_test.go": {
+    "before": null,
+    "candidate": "6bd64e693039309ee49aab5f8277ed5480cb5ef529405d70b1a5dec3c3ea0208"
+  },
+  "backend/internal/clash/health_view.go": {
+    "before": "d06d899bb3a09fb7f04752a78746596c98eb5101a5340a0a1feec92bd839a747",
+    "candidate": "8fd1510537ca73e88359068d89387431618fed9afb689ccdf079c255a6664af8"
+  },
+  "backend/internal/clash/manager.go": {
+    "before": "4a27f779d9ecc6bc3196b421fbc58dd15abab5fe28469ada87f46665914d7092",
+    "candidate": "32ad22f099f39daf6c48d1af02f4250a359986d0bb379be33e0c4ec0f50b2191"
+  },
+  "backend/internal/clash/manager_integration_test.go": {
+    "before": "ef53c9f770eefbbf0b6106762023e92ae3f74d03b36f3b8c32bf02dfae60509f",
+    "candidate": "33703a8f3a0fd0b3b109ec21f91b045c6f3c6ea79374a7d2325e648d52cb34b0"
+  },
+  "backend/internal/clash/related_accounts.go": {
+    "before": null,
+    "candidate": "d36f4fc6256de86324243df98c0dbecf081695333a03e156360ec8633583900c"
+  },
+  "backend/internal/clash/related_accounts_test.go": {
+    "before": null,
+    "candidate": "e874e17283351f2062a4ab1a31e8b3d990a53e977758f42b4253ba997b811156"
+  },
+  "backend/internal/clash/source_health.go": {
+    "before": "183577d0cf8855f4f7abe5ea1546c6c3f0287e95177a5ed2c64a696334340048",
+    "candidate": "2e3d6363c5f3e594d883faf0eeae2a1153d1e3b8dfca9fe689929211184896e7"
+  },
+  "backend/internal/clash/source_health_test.go": {
+    "before": "b45eaec439743faa915a6097d2210b27072394a137521e016215ded76aaea215",
+    "candidate": "f38290bc208f4f8a8592e2ea51972711323f3e926a9b314283db30e14a71c263"
+  },
+  "backend/internal/clash/subscription_edit.go": {
+    "before": null,
+    "candidate": "e96344b2eb6902a407f7d7f9abd86ffa3a930a38d1a766475bac166fbead2c25"
+  },
+  "backend/internal/clash/subscription_edit_test.go": {
+    "before": null,
+    "candidate": "7a5b15cba2a077fd02e7bb17a045f425af3d5bcdbc39daf479ddaf7f274c1a6b"
+  },
+  "backend/internal/handler/admin/proxy_clash.go": {
+    "before": "5eb586fd4583a0b908f4bcacde59b1a1eeafdf6a3ff1183b0cc64598f68f8c91",
+    "candidate": "95be3540c1a0375d11defe35d76fce150250814f5a584e1ccd48afdd76a8fc82"
+  },
+  "backend/internal/handler/admin/proxy_related_accounts.go": {
+    "before": null,
+    "candidate": "67e3163107163241c9568c24785bca201d98f5e0da1521fe3a56de8286f79b78"
+  },
+  "backend/internal/handler/admin/proxy_related_accounts_test.go": {
+    "before": null,
+    "candidate": "980ac7c027e25e6e1a6ff08be02f32cc2f97d3af6ce09edde0832f660e9ff91e"
+  },
+  "backend/internal/proxyfailover/allocation.go": {
+    "before": "c4b7ad86ed2fe7ba1786bc3e4c4de088bc2b5ffb944039dc85007bd9527f0b90",
+    "candidate": "e835ff2a48887a4f31513b455e46a4cfba0164f30296e97190759fb890a90402"
+  },
+  "backend/internal/proxyfailover/manager.go": {
+    "before": "f96eaaac34bc990e459c93bcbff571a85192e34cddbad687fea089c75a3ebf61",
+    "candidate": "830d12217f68aeee663eb202bc2760f1120d6e756f23f1933ccebd7448ecd8e9"
+  },
+  "backend/internal/proxyfailover/subscription_priority_test.go": {
+    "before": null,
+    "candidate": "fd8f8c88de22954f37f78482bce034cf01730682492fc21106c2e7ee4c1f5b15"
+  },
+  "backend/internal/server/routes/admin.go": {
+    "before": "4532936fd51725786c5368d699ace00a519edb5145c301c04f5647a8ec487a4c",
+    "candidate": "b877510db7a046b625035b62579f3a304a1241900f314a5b059f63554fd0f5a6"
+  },
+  "backend/internal/server/routes/custom_admin_key_access_test.go": {
+    "before": "2c2f85fe695f611e537615be22695cc4eaa9d9ebc02b73caa954091c662eb2ea",
+    "candidate": "486b87982ddcae4c6d0bbaa23129217ff04a5ac6a33556dfa7293e8e7abacb69"
+  },
+  "frontend/dev/clash-subscriptions.ts": {
+    "before": "7b726715c618e56b2c3e7a061e0059e7fdd60660355fe04ff5584f5d89faac17",
+    "candidate": "d43753d4e3f3408c78084b9b1aba49b4b9f0184f0df9ed1f3fe2c87191f9caab"
+  },
+  "frontend/dev/proxy-health.html": {
+    "before": null,
+    "candidate": "bcde5344c24ad3d933988d589a30f2ea5976b624a49ba898c82e4bde4944dc32"
+  },
+  "frontend/dev/proxy-health.ts": {
+    "before": null,
+    "candidate": "8e131ace488ad0473764a21dd8db76269f1a60fa1fdb1d2293029a12541b61e5"
+  },
+  "frontend/src/__tests__/integration/clash-subscription.spec.ts": {
+    "before": "20d681f88f08789c74f29ea12a9370137d3ff79e71954e94683022e50aec1aa0",
+    "candidate": "077940c4e46a13573bf91c568846f2ac3f07b3e9fbc52a57ff839c00c75150dd"
+  },
+  "frontend/src/api/admin/clash.ts": {
+    "before": "a086419c52431b9c441f584a77bdcd26f184a096823922e51d4bc455c7df5ae8",
+    "candidate": "826f85ea9fb026f5fb1da9d4b779c7273380f721028352a38efb5c5ea166d365"
+  },
+  "frontend/src/api/admin/proxyRelatedAccounts.ts": {
+    "before": null,
+    "candidate": "dcfb7fc5abc95efd318509b63a05fed6279e9175ec2394b0bc8c1b5bf875032d"
+  },
+  "frontend/src/components/admin/proxy/BlockedProxyNodesModal.vue": {
+    "before": null,
+    "candidate": "bd78c50be498e6101b2d944fd02059ceb72107ac4246264405d9ee5f2bb00197"
+  },
+  "frontend/src/components/admin/proxy/ClashSubscriptionModal.vue": {
+    "before": "700d91a9d8483a912aa53c22cc7c76b4f6f0f9a048c5c73d180b5211ba185e68",
+    "candidate": "a6317b0d839a95e70d858bdd95b515e70ebe8797be44d5c046aa94e1b1d02fed"
+  },
+  "frontend/src/components/admin/proxy/HealthCapacityBar.vue": {
+    "before": null,
+    "candidate": "36738171cc6bac82cb9361f3f5e54dcd3113471d8b4f0e55227cddf7f8e5d18d"
+  },
+  "frontend/src/components/admin/proxy/ProxyHealthPanel.vue": {
+    "before": "33a6bbba44dd20a78e1b0e3b6e5389c91e2df04a6fcb1d4ebd0c6e3492d3372b",
+    "candidate": "c39d4a1b9f6630fd606233addf74fff9caf282d160c15cde44b2596b223fd9e4"
+  },
+  "frontend/src/components/admin/proxy/ProxyRelatedAccountsModal.vue": {
+    "before": null,
+    "candidate": "ab16f97e92e7145dc88e58acbf94f3d0a1ced9dcd7761feffbc32b5b5dc35bfd"
+  },
+  "frontend/src/components/admin/proxy/ProxySourceHealthCard.vue": {
+    "before": null,
+    "candidate": "03e8fded47cf9aa4d4e2361862c7211beceed7bc475ca26fb15697dcf0f84049"
+  },
+  "frontend/src/components/admin/proxy/SubscriptionSourceEditor.vue": {
+    "before": "eb07032e2cfc4d8d60990ff0126955858a628a35d7afffbba8505eb44c075ddd",
+    "candidate": "98fbc5187c6480a4762a6fb84f0860296435edf808fdb8182f222eb615046bf9"
+  },
+  "frontend/src/components/admin/proxy/__tests__/ProxyHealthPanel.spec.ts": {
+    "before": "e6fe17f1723780246ccf6aebb6bf0b8657d61314e2a731f9e529e5fdad56d300",
+    "candidate": "663674f8c0d987e555b97b63d8a1c9dc595279aaba34456a0d5a5c36bd0838ca"
+  },
+  "frontend/src/components/admin/proxy/__tests__/ProxyRelatedAccountsModal.spec.ts": {
+    "before": null,
+    "candidate": "7981666d82a8050f0beed175a5c86931a458663aac90b4389f7bdeab4bf786d5"
+  },
+  "frontend/src/content/changelog/daily.ts": {
+    "before": "4ee04f390f88f323c5abe5aa21be104627966976059c1e74b6d615132ab3ea34",
+    "candidate": "0e00f8528b57696d501d89738050f96fdd0d82fdbbd097b87ffdab424f422449"
+  },
+  "frontend/src/i18n/locales/en/admin/resources.ts": {
+    "before": "22402441c995057b3a2bb11b4a1905c8e31d7371b9fb6831a1a87471e28d1049",
+    "candidate": "760977791dd7c05cba066a87c846a816b18498b06ef50d7d14557d11f756226a"
+  },
+  "frontend/src/i18n/locales/en/changelog.ts": {
+    "before": "7a35397ed24dbce3d177f5d3ca46e8cdb8800c4a42417583fc4112fb9bd992d0",
+    "candidate": "775f9261f7083db70592c814160c5a8d8e8c5492dd95133c5f11a141b9685122"
+  },
+  "frontend/src/i18n/locales/en/proxyHealth.ts": {
+    "before": "d0943d47ec40db54bc0b7e055ce83119ab24bdf6d7c918c9a7782c0ce1c78025",
+    "candidate": "dd62b9eb269003c327ab61f65024b4dfd90f0364f9d7446a8bcfa0f5e85a5c5c"
+  },
+  "frontend/src/i18n/locales/zh/admin/resources.ts": {
+    "before": "89832037b9d1728d067c32ddcc6d45cbddada40795c34b91629ca047afd0f36d",
+    "candidate": "c679c4229ca28251c6c7974549b417b4c6e58e552dc665b213a853df53792cae"
+  },
+  "frontend/src/i18n/locales/zh/changelog.ts": {
+    "before": "c1083fc31fe59472758003e95cc2fddb75543440e189b5d4d627c16e97db2ced",
+    "candidate": "74e56a29b36ff2fa9342fbd8b0240b876da6dd0e37c1371848bc3a8e504970e7"
+  },
+  "frontend/src/i18n/locales/zh/proxyHealth.ts": {
+    "before": "abc6ede8d91e42e9b2b9033f9a09cf9e806acfebc9ecfaea64ceef78f84f37d3",
+    "candidate": "2b79964d7dd3fc1a6d00a377e6c33df3ecb2f7c3de9901aec764b415ea34693f"
+  }
+}

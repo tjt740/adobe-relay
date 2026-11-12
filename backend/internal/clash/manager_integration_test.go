@@ -89,8 +89,12 @@ func TestMihomoLifecycleIntegration(t *testing.T) {
 	defer a.Close()
 	defer b.Close()
 	portOf := func(raw string) int { u, _ := url.Parse(raw); p, _ := strconv.Atoi(u.Port()); return p }
+	outboundHost := os.Getenv("CLASH_TEST_OUTBOUND_HOST")
+	if outboundHost == "" {
+		outboundHost = "host.docker.internal"
+	}
 	yamlBody := func(aPort int) string {
-		return fmt.Sprintf("proxies:\n - {name: A, type: http, server: host.docker.internal, port: %d}\n - {name: B, type: http, server: host.docker.internal, port: %d}\n", aPort, portOf(b.URL))
+		return fmt.Sprintf("proxies:\n - {name: A, type: http, server: %s, port: %d}\n - {name: B, type: http, server: %s, port: %d}\n", outboundHost, aPort, outboundHost, portOf(b.URL))
 	}
 	var mu sync.Mutex
 	subscription := yamlBody(portOf(a.URL))
