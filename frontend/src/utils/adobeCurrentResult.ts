@@ -4,12 +4,16 @@ type RecordValue = Record<string, unknown>
 const object = (value: unknown): RecordValue => value && typeof value === 'object' ? value as RecordValue : {}
 const time = (value: unknown) => typeof value === 'string' ? Date.parse(value) || 0 : 0
 
+export function adobeCheckPending(account: Pick<Account, 'platform' | 'extra'>) {
+  const check = object(account.extra?.okad_connection_test)
+  return account.platform === 'adobe' && ['pending', 'running', 'proxy_pending'].includes(String(check.state))
+}
+
 /** The latest completed result is shown once; older model failures stay in details. */
-export function adobeCurrentResult(account: Account) {
+export function adobeCurrentResult(account: Pick<Account, 'platform' | 'extra'>) {
   if (account.platform !== 'adobe') return null
   const extra = account.extra || {}
-  const check = object(extra.okad_connection_test)
-  if (['pending', 'running', 'proxy_pending'].includes(String(check.state))) return null
+  if (adobeCheckPending(account)) return null
   const latest = object(object(extra.adobe_health).latest)
   const checkedAt = time(extra.last_check_at)
   const observedAt = time(latest.checked_at)

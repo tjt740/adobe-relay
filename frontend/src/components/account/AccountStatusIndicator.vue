@@ -230,7 +230,7 @@
 <script setup lang="ts">
 import { getAccountStatusCode, getAccountAuthenticationError, isAdobeAccountCookieError } from '@/utils/accountStatus'
 import { computed } from 'vue'
-import { adobeCurrentResult } from '@/utils/adobeCurrentResult'
+import { adobeCurrentResult, adobeCheckPending } from '@/utils/adobeCurrentResult'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import OkadIntegrationStatus from './OkadIntegrationStatus.vue'
@@ -388,7 +388,7 @@ const authenticationError = computed(() => getAccountAuthenticationError(props.a
 const isAdobeCookieError = (message: string) => isAdobeAccountCookieError(props.account, message)
 
 const okadCheckPhase = computed(() => String((props.account.extra?.okad_connection_test as Record<string, unknown> | undefined)?.state || ''))
-const isOkadCheckPending = computed(() => props.account.platform === 'adobe' && props.account.status === 'error' && ['pending', 'running'].includes(String((props.account.extra?.okad_connection_test as Record<string, unknown> | undefined)?.state || '')))
+const isOkadCheckPending = computed(() => adobeCheckPending(props.account))
 
 const isAuthenticationFailed = computed(() => Boolean(authenticationError.value))
 const authenticationFailureText = computed(() => t(

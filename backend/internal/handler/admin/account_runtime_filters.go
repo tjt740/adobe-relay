@@ -70,7 +70,7 @@ func runtimeFiltersFromQuery(c *gin.Context) (accountRuntimeFilters, error) {
 
 func isRuntimeAccountStatus(status string) bool {
 	switch status {
-	case "active", "authentication_failed", "request_timeout", "test_passed", "test_failed", "untested":
+	case "active", "authentication_failed", "request_timeout", "test_passed", "test_failed", "request_succeeded", "request_failed", "untested":
 		return true
 	}
 	return false
@@ -139,20 +139,86 @@ func accountRuntimeStatus(a service.Account, now time.Time) (authFailed, timedOu
 	return false, false
 }
 
+// Match the visible result selected by frontend/utils/adobeCurrentResult.ts.
+// JavaScript dates have millisecond precision, including for RFC3339Nano input.
+func accountResultTime(value any) int64 {
+	text, _ := value.(string)
+	parsed, err := time.Parse(time.RFC3339Nano, text)
+	if err != nil {
+		return 0
+	}
+	return parsed.UnixMilli()
+}
+
+func adobeCheckPending(a service.Account) bool {
+	check, _ := a.Extra["okad_connection_test"].(map[string]any)
+	state, _ := check["state"].(string)
+	return a.Platform == service.PlatformAdobe && (state == "pending" || state == "running" || state == "proxy_pending")
+}
+
+type currentAccountResult struct {
+	success bool
+	code    int
+	test    bool
+}
+
+func adobeAccountCurrentResult(a service.Account) *currentAccountResult {
+	if a.Platform != service.PlatformAdobe || adobeCheckPending(a) {
+		return nil
+	}
+	health, _ := a.Extra["adobe_health"].(map[string]any)
+	latest, _ := health["latest"].(map[string]any)
+	success, completed := latest["success"].(bool)
+	if completed && accountResultTime(latest["checked_at"]) > accountResultTime(a.Extra["last_check_at"]) {
+		source, _ := latest["source"].(string)
+		return &currentAccountResult{success: success, code: numericAccountStatus(latest["code"]), test: source == "test" || source == "okad"}
+	}
+	if passed, _ := a.Extra["last_check_success"].(bool); passed {
+		return &currentAccountResult{success: true, code: 200, test: true}
+	}
+	return nil
+}
+
 func matchesRuntimeAccountStatus(a service.Account, status string, now time.Time) bool {
+	if result := adobeAccountCurrentResult(a); result != nil {
+		switch status {
+		case "active":
+			return result.success
+		case "authentication_failed":
+			return !result.success && result.code == 401
+		case "request_timeout":
+			return !result.success && result.code == 408
+		case "test_passed":
+			return result.test && result.success
+		case "test_failed":
+			return result.test && !result.success
+		case "request_succeeded":
+			return !result.test && result.success
+		case "request_failed":
+			return !result.test && !result.success
+		case "untested":
+			return false
+		}
+	}
+	pending := adobeCheckPending(a)
 	auth, timeout := accountRuntimeStatus(a, now)
+	if pending {
+		auth, timeout = false, false
+	}
 	success, checked := a.Extra["last_check_success"].(bool)
 	switch status {
 	case "active":
 		return !auth && !timeout
 	case "authentication_failed":
-		return auth || (checked && !success && numericAccountStatus(a.Extra["last_check_status_code"]) == 401)
+		return auth || (!pending && checked && !success && numericAccountStatus(a.Extra["last_check_status_code"]) == 401)
 	case "request_timeout":
 		return timeout
 	case "test_passed":
-		return checked && success && !auth && !timeout
+		return !pending && checked && success && !auth && !timeout
 	case "test_failed":
-		return checked && !success
+		return !pending && checked && !success && !auth && !timeout
+	case "request_succeeded", "request_failed":
+		return false
 	case "untested":
 		return !checked
 	default:

@@ -493,3 +493,20 @@ describe('AccountStatusIndicator', () => {
   })
 
 })
+
+import currentCases from '@/utils/__tests__/fixtures/account-current-status.json'
+import { matchesAccountRuntimeStatus } from '@/utils/accountStatus'
+describe('status filter and displayed result parity', () => {
+  const labels: Record<string, string> = {
+    test_passed: 'admin.accounts.bulkTest.passed', test_failed: 'admin.accounts.bulkTest.failed',
+    request_succeeded: 'admin.accounts.currentResult.succeeded', request_failed: 'admin.accounts.currentResult.failed'
+  }
+  it.each(currentCases)('$name', ({ account: values }) => {
+    const account = makeAccount(values as Partial<Account>)
+    const wrapper = mount(AccountStatusIndicator, { props: { account }, global: { stubs: { Icon: true, OkadIntegrationStatus: true } } })
+    for (const [status, label] of Object.entries(labels)) {
+      expect(matchesAccountRuntimeStatus(account, status), status).toBe(wrapper.text().includes(label))
+    }
+    wrapper.unmount()
+  })
+})

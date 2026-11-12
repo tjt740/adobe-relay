@@ -35,6 +35,7 @@ export const dailyOverviews: Readonly<Record<string, string>> = {
 
 // Use the actual release date in Asia/Shanghai; multiple releases share one day.
 export const dailyUpdates: readonly DailyUpdate[] = [
+  { date: '2026-11-12', id: 'accountCurrentStatusFilters', type: 'fixed' },
   { date: '2026-11-12', id: 'proxyHealthCapacity', type: 'improved', sections: ['reason', 'capacity', 'details', 'accounts', 'accuracy', 'boundary'] },
   { date: '2026-11-12', id: 'proxyReliability', type: 'improved', sections: ['reason', 'https', 'memory', 'diagnostics', 'preservation', 'validation', 'boundary'] },
   { date: '2026-11-12', id: 'clashShadowsocks', type: 'added', sections: ['reason', 'formats', 'plugins', 'preservation', 'validation', 'boundary'] },

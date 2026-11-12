@@ -1,0 +1,54 @@
+{
+  "backend/internal/handler/admin/account_runtime_filters.go": {
+    "before": "5b9081092187763f4991391972329e585725c6cddb068b99cc54bffe3c08a0fb",
+    "candidate": "711cd0e7c8ec4101c1c013b7e2658c54215cb8f8d3cc30fc901d91375804272b"
+  },
+  "backend/internal/handler/admin/account_runtime_filters_test.go": {
+    "before": "8fcd54c6b48eb0abe31c0669d8841314a8535a247b0cc67e3e39d8b4920291ca",
+    "candidate": "1efef474157b29afbaaba0d9cc21493950c3f5c75298e7bea2fc9c4b617865ac"
+  },
+  "frontend/src/components/account/AccountStatusIndicator.vue": {
+    "before": "9fb8e22cfa8a07efa17565bab43171d896c4eb2caed99bb535babe28cfce92b5",
+    "candidate": "5fc942cd34c23ffad57515726960db13cb19cb0fb1adcacd4a7cdff32aabf97e"
+  },
+  "frontend/src/components/account/__tests__/AccountStatusIndicator.spec.ts": {
+    "before": "e782c940ca5deca2599565ca2bafe0cb8e777f0141773263ea411b3b5908682e",
+    "candidate": "a68c767d2c8f14aaff163681b4edc57ba947cc7c042bb1ebf08d282bbaafcf4c"
+  },
+  "frontend/src/components/admin/account/AccountTableFilters.vue": {
+    "before": "700a1d33a7db130f2d58252472fde160be76d677a17f4c45faa55517457f8bb1",
+    "candidate": "fdc45aae05a5ac1c714df6470bf3b9417cba90acfb17a4766d6af3e5355ad96d"
+  },
+  "frontend/src/components/admin/account/__tests__/AccountTableFilters.spec.ts": {
+    "before": "b04db1fa7154e090ad517864a68e4803755e1f707ce3e5e748096b50dc78a40a",
+    "candidate": "e5cf46a129308120c08f454dea0510f1baddd7ec7162525d10cae4f614601b6a"
+  },
+  "frontend/src/content/changelog/daily.ts": {
+    "before": "0e00f8528b57696d501d89738050f96fdd0d82fdbbd097b87ffdab424f422449",
+    "candidate": "010f82c6b12d8e1e0e200789916b4580fd148d7b6c962e9a658afe03125e1241"
+  },
+  "frontend/src/i18n/locales/en/changelog.ts": {
+    "before": "775f9261f7083db70592c814160c5a8d8e8c5492dd95133c5f11a141b9685122",
+    "candidate": "f72024d310a1a03495df8d672ea68301844baca5b8c6a81dea2297b6429cc7de"
+  },
+  "frontend/src/i18n/locales/zh/changelog.ts": {
+    "before": "74e56a29b36ff2fa9342fbd8b0240b876da6dd0e37c1371848bc3a8e504970e7",
+    "candidate": "7207b5f809b7ae306bcc6ebcb17253bd1ce5f1cdb7aedbf8395e206096042148"
+  },
+  "frontend/src/utils/__tests__/accountStatusEvidence.spec.ts": {
+    "before": "f7b6975e4b8eb77a03774d877fc0a9c166184e9d061497d61b6dd6184198a173",
+    "candidate": "77feadfe47a81ad55dc29b8cb56aad67edf18be9d74b9f4c1d495e00b0fbcc57"
+  },
+  "frontend/src/utils/__tests__/fixtures/account-current-status.json": {
+    "before": null,
+    "candidate": "15bda91d12ddb697e42d3d2bbfc2497fcb66279843829e4460c39c3c81b6a8a6"
+  },
+  "frontend/src/utils/accountStatus.ts": {
+    "before": "91bc3a97a347ff3ad56ea8e6a58ed81bc5434f65baa0eb030a8b8d8312b794bd",
+    "candidate": "98658fdcafe388529944185ff684335a959d503dcfeecb8527ec833ed885b506"
+  },
+  "frontend/src/utils/adobeCurrentResult.ts": {
+    "before": "0bc214aa983be1c597b8601b3b91dbd3ed26480b9caad5f13d997bed424c8d56",
+    "candidate": "2fdb6545343a568071afc165e530eed58717bace68edad18a30538da84f0ee03"
+  }
+}
