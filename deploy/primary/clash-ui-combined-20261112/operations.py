@@ -61,7 +61,7 @@ elif phase=='resume-precutover':
 elif phase=='status':
  remote(fr"""import pathlib,json,subprocess,re,hashlib
 r=pathlib.Path('{root}')
-for name in ['image-loaded.json','premigration-backup.json','initial-start-failure.json','reviewed-concurrent-okad.json','precutover-retry-1.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','progress.json','rolling-old-drain-progress.json','rolling-canary-drain-progress.json','after.json','api-verification.json','deployment-verification.json','live-billing-verification.json','live-billing-cleanup.json','live-flare-default-result.json','live-sunburst-transparent-25-result.json','deferred-old.json','deferred-canary.json']:
+for name in ['image-loaded.json','premigration-backup.json','initial-start-failure.json','reviewed-concurrent-okad.json','precutover-retry-1.json','process-preservation.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','progress.json','rolling-old-drain-progress.json','rolling-canary-drain-progress.json','after.json','api-verification.json','deployment-verification.json','live-billing-verification.json','live-billing-cleanup.json','live-flare-default-result.json','live-sunburst-transparent-25-result.json','deferred-old.json','deferred-canary.json']:
  p=r/name
  if p.exists():
   d=json.loads(p.read_text())
@@ -88,9 +88,15 @@ elif phase=='verify':
   proof=json.loads(browser.read_text());assert proof['application_sha']==sha and proof['authenticated'] and proof['case_count']==6 and not proof['attempted_writes'] and not proof['runtime_errors']
   encoded=base64.b64encode(browser.read_bytes()).decode()
   remote(f"import pathlib,base64,json; r=pathlib.Path('{root}'); assert (r/'expected-sha').read_text().strip()=='{sha}'; p=r/'live-browser-verification.json'; data=base64.b64decode('{encoded}'); assert not p.exists() or p.read_bytes()==data; p.write_bytes(data); p.chmod(0o600)")
- remote(f"""import pathlib,subprocess,sys
+ remote(f"""import pathlib,subprocess,sys,json,importlib.util,datetime
 r=pathlib.Path('{root}')
 assert (r/'expected-sha').read_text().strip()=='{sha}'
+assert json.loads((r/'progress.json').read_text())['step']=='complete'
+spec=importlib.util.spec_from_file_location('audit',r/'audit.py');a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
+before=json.loads((r/'before.json').read_text());current=a.snapshot();preserved=a.check_preserved(before,current)
+others={{name:{{'pid':a.inspect(name)['State']['Pid'],'started':item['started'],'restarts':item['restarts'],'image':item['image'],'resources':item['resources']}} for name,item in current['containers'].items() if name!=a.APP}}
+assert all(item['started']==before['containers'][name]['started'] and item['restarts']==before['containers'][name]['restarts'] for name,item in others.items())
+if not (r/'process-preservation.json').exists():a.save('process-preservation.json',{{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'passed':True,'other_processes':others,'docs_process':current['docs_process'],'preserved':preserved}})
 for script,out in [('business-verify.py','business-verification.json'),('review-credentials.py','credential-change-review.json'),('route-guard-review.py','route-guard-review.json'),('api-verify.py','api-verification.json'),('observe.py','observation.json'),('verify-deployment.py','deployment-verification.json')]:
  if not (r/out).exists():subprocess.run([sys.executable,str(r/script)],check=True,timeout=240)
 """)
@@ -108,15 +114,17 @@ spec=importlib.util.spec_from_file_location('audit',r/'audit.py');a=importlib.ut
 container=a.inspect(a.APP);assert container['Config']['Image']=='adobe-relay:{sha}'
 assert container['Image']==json.loads((r/'image-loaded.json').read_text())['image_id']
 core=json.loads((r/'deployment-verification.json').read_text());assert core['application_sha']=='{sha}' and core['status']=='deployed_api_verified'
+processes=json.loads((r/'process-preservation.json').read_text());assert processes['passed']
 metadata=json.loads(base64.b64decode({payload!r}['release-verification.json']))
 assert metadata['application_sha']=='{sha}' and metadata['status']=='deployed_subscription_settings_verified'
 before=json.loads((r/'before.json').read_text());current=a.snapshot()
 checks=a.check_preserved(before,current);a.validate_rollback(before,current,'{sha}',a.inspect(a.ROLLBACK_IMAGE)['Id'])
+assert all(current['containers'][name]['started']==item['started'] and current['containers'][name]['restarts']==item['restarts'] for name,item in before['containers'].items() if name!=a.APP)
 files={{}}
 for name,value in {payload!r}.items():
  data=base64.b64decode(value);assert b'PENDING' not in data
  path=r/name;path.write_bytes(data);path.chmod(0o600);files[name]=a.digest(data)
  if name=='primary-README.md':pathlib.Path('/opt/adobe-relay/deploy/primary/README.md').write_bytes(data)
-out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'deployed_subscription_settings_verified','application_sha':'{sha}','archive_source':'{source}','image_id':container['Image'],'core_verified_at':core['at'],'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'active_generation':False,'production_priority_changed':False,'mail_sent':False}}
+out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'deployed_subscription_settings_verified','application_sha':'{sha}','archive_source':'{source}','image_id':container['Image'],'core_verified_at':core['at'],'process_preservation':processes,'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'active_generation':False,'production_priority_changed':False,'mail_sent':False}}
 a.save('release-completion.json',out);print(json.dumps(out))
 """)
