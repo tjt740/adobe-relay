@@ -18,6 +18,8 @@ def safe(s):
     s=re.sub(r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}','[email]',s)
     return s[:500]
 def quality(q):return 'medium' if not q or q=='auto' else q
+def fingerprint(v):return v if isinstance(v,str) and re.fullmatch(r'[0-9a-f]{64}',v) else None
+def expiry(v):return v if type(v) is int and 0<v<=253402300799 else None
 out={'window_start':start.isoformat(),'window_end':end.isoformat(),'read_only':True}
 out['hourly']=sql("SELECT coalesce(json_agg(t),'[]') FROM (SELECT date_trunc('hour',created_at) bucket,status_code,count(*) n FROM ops_error_logs WHERE created_at>now()-interval '5 hours' AND status_code IN (401,403,429,502) GROUP BY 1,2 ORDER BY 1,2)t")
 out['usage']=sql("SELECT json_build_object('records',count(*),'images',sum(image_count)) FROM usage_logs WHERE "+window)
@@ -29,9 +31,13 @@ for r in rows:
     e=r.get('last') or {}
     try:d=json.loads(e.get('detail') or '{}')
     except (ValueError,TypeError):d={}
-    diag=d.get('request_diagnostics') or {}
+    diag=dict(d.get('request_diagnostics') or {})
+    # Persisted nested secrets are redacted; only validated safe fingerprints count.
+    diag['credential_fingerprint']=fingerprint(e.get('credential_fingerprint')) or fingerprint(diag.get('credential_fingerprint'))
+    for k in ['bearer_fingerprint','session_fingerprint']:diag[k]=fingerprint(diag.get(k))
+    diag['credential_expires_at']=expiry(diag.get('credential_expires_at'))
     failures.append({'id':r['id'],'at':r['created_at'],'account':e.get('account_id') or r['account_id'],'proxy':e.get('proxy_id'),'proxy_revision':d.get('proxy_updated_at'),'model':r['model'],'quality':r['quality'],'size':r['size'],'upstream_status':r['upstream_status_code'],'stage':d.get('stage'),'code':d.get('code'),'assessment':d.get('forbidden_assessment'),'message':safe(e.get('message') or r.get('upstream_error_message') or r.get('error_message')),'diagnostics':{k:diag[k] for k in ['credential_fingerprint','bearer_fingerprint','session_fingerprint','credential_expires_at','expired_at_start','upstream_error_code','access_error','response_body_sha256'] if k in diag}})
-out['final_403']={'records':len(failures),'accounts':len({x['account'] for x in failures}),'proxies':len({x['proxy'] for x in failures if x['proxy'] is not None}),'with_credential_fp':sum(bool(x['diagnostics'].get('credential_fingerprint')) for x in failures),'expired_at_start':sum(bool(x['diagnostics'].get('expired_at_start')) for x in failures),'declared_expiry_present':sum(bool(x['diagnostics'].get('credential_expires_at')) for x in failures)}
+out['final_403']={'records':len(failures),'accounts':len({x['account'] for x in failures if x['account'] is not None}),'proxies':len({x['proxy'] for x in failures if x['proxy'] is not None}),'with_credential_fp':sum(bool(x['diagnostics'].get('credential_fingerprint')) for x in failures),'expired_at_start':sum(x['diagnostics'].get('expired_at_start') is True for x in failures),'declared_expiry_present':sum(bool(x['diagnostics'].get('credential_expires_at')) for x in failures)}
 out['classifications']=[dict(zip(['stage','code','assessment','upstream_code','access_error','message','n'],(*k,n))) for k,n in collections.Counter((x['stage'],x['code'],x['assessment'],x['diagnostics'].get('upstream_error_code'),x['diagnostics'].get('access_error'),x['message']) for x in failures).most_common(25)]
 out['by_account']=[{'account':k,'final_403':n} for k,n in collections.Counter(x['account'] for x in failures).most_common(30)]
 out['by_proxy']=[{'proxy':k,'final_403':n} for k,n in collections.Counter(x['proxy'] for x in failures).most_common(30)]
@@ -49,7 +55,7 @@ for line in proc.stdout:
     except (ValueError,IndexError):continue
     for item in (d.get('timings') or {}).get('images') or []:
         diag=item.get('request_diagnostics') or {}
-        if not diag.get('credential_fingerprint'):continue
+        if not fingerprint(diag.get('credential_fingerprint')):continue
         success.append({'at':at,'account':d.get('account_id'),'model':d.get('model'),'upstream_model':d.get('upstream_model'),'quality':d.get('requested_quality'),'size':d.get('size'),'processing_ms':d.get('processing_ms'),'credential_fp':diag.get('credential_fingerprint'),'bearer_fp':diag.get('bearer_fingerprint'),'session_fp':diag.get('session_fingerprint')})
 assert proc.wait(timeout=20)==0
 out['success_diagnostics_count']=len(success)
@@ -74,7 +80,7 @@ for f in failures:
     if exact:
         s=min(exact,key=lambda s:ts(s['at']))
         same_proxy.append({'failed_record_id':f['id'],'failed_at':f['at'],'success_at':s['at'],'success_started_at':s['generation_started_at'],'account':f['account'],'proxy':f['proxy'],'model':f['model'],'quality_comparison':'not_available','upstream_error_code':f['diagnostics'].get('upstream_error_code')})
-out['natural_pairs']={'same_account_credentials_public_model_then_success':len(matched),'accounts':len({f['account'] for f in matched}),'also_same_proxy_revision_and_new_generation_after_failure':len(same_proxy),'same_proxy_accounts':len({p['account'] for p in same_proxy}),'examples':same_proxy[:12],'limitation':'Exact bearer/session fingerprints; prompts, quality and actual mapped model are not compared. Configured route is known, actual request egress IP is not observed.'}
+out['natural_pairs']={'same_account_credentials_public_model_then_success':len(matched),'accounts':len({f['account'] for f in matched}),'also_same_proxy_revision_and_new_generation_after_failure':len(same_proxy),'same_proxy_accounts':len({p['account'] for p in same_proxy}),'examples':same_proxy[:12],'limitation':'Validated combined bearer/session fingerprint; prompts, quality and actual mapped model are not compared. Successful diagnostics may be sampled. Configured route is known, actual request egress IP is not observed. Redacted expiry values are unavailable, not independently verified.'}
 out['latest_failures']=failures[:12]
 out['failure_fingerprints']=failures
 print(json.dumps(out,ensure_ascii=False,indent=2))
