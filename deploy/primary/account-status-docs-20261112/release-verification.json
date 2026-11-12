@@ -1,0 +1,143 @@
+{
+  "status": "deployed_and_reading_verified",
+  "source_sha": "ec61d598b741b27af5ada230f20a6c59ce3e382d",
+  "feature_pr": 196,
+  "docs_checks_run": 43165319925,
+  "update_run": 43171136915,
+  "verification_run": 43171314779,
+  "access_inspection_run": 43172406623,
+  "updated_at_utc": "2026-11-12T06:52:50.4309451Z",
+  "update": {
+    "audit": "/opt/creative-docs/audit/update-20261112T065249Z",
+    "binary_sha256": "01c9d101cf9229268876a1b77dbf3a17cb4df9324b3ff657c542a27affbc05c4",
+    "previous_binary_sha256": "0d593addff1c290e573941596ae0f5a84e1ef83f4bc335481f22fc3e3f894855",
+    "service": "active",
+    "existing_containers_and_configs_preserved": true,
+    "referrer_policy": "same-origin",
+    "login_copy_simplified": true
+  },
+  "public_verification": {
+    "anonymous_content_blocked": true,
+    "existing_sub2_user_login_and_read": true,
+    "protected_markdown_sha256": "9ee8f97d5196660bf07e1b31145dfa546c2dc629e69de8cab8bb03e85d169d3b",
+    "example_blocks": 24,
+    "account_status_meaning_documented": true,
+    "native_webp_documented": true,
+    "image26_names_and_quality_contract": true,
+    "logout_invalidates_docs_session": true,
+    "credentials_persisted": false,
+    "adobe_requests": 0,
+    "public_https": true,
+    "source_sha": "ec61d598b741b27af5ada230f20a6c59ce3e382d",
+    "audit": "/opt/creative-docs/audit/verify-ec61d598b741b27af5ada230f20a6c59ce3e382d",
+    "verified_at_utc": "2026-11-12T06:54:10Z"
+  },
+  "browser_reading": {
+    "at": "2026-11-12T07:00:49.089Z",
+    "source_sha": "ec61d598b741b27af5ada230f20a6c59ce3e382d",
+    "public_https": true,
+    "browser": "Chrome desktop automation",
+    "authenticated": true,
+    "results": [
+      {
+        "at": "2026-11-12T07:00:31.864Z",
+        "width": 1440,
+        "anchor": "10-",
+        "shared_entry": true,
+        "chapter_verified": true,
+        "no_horizontal_overflow": true,
+        "download_viewport_width": 1440,
+        "download_sha256": "9ee8f97d5196660bf07e1b31145dfa546c2dc629e69de8cab8bb03e85d169d3b",
+        "code_examples": 24
+      },
+      {
+        "at": "2026-11-12T07:00:49.080Z",
+        "width": 390,
+        "anchor": "10-",
+        "shared_entry": true,
+        "chapter_verified": true,
+        "no_horizontal_overflow": true,
+        "download_viewport_width": 1440,
+        "download_sha256": "9ee8f97d5196660bf07e1b31145dfa546c2dc629e69de8cab8bb03e85d169d3b",
+        "code_examples": 24
+      }
+    ],
+    "runtime_errors": [],
+    "failed_responses": [],
+    "business_writes": [],
+    "active_generation": false,
+    "limitation": "Independent reading sessions at two emulated viewport widths. Download link tested at 1440 width. Full sequential logout/reentry flow at 390 is not accepted; earlier failures are retained.",
+    "visual_reviewed": true
+  },
+  "desktop_shared_session_flow": {
+    "width": 1440,
+    "anchor": "10-",
+    "shared_entry": true,
+    "chapter_verified": true,
+    "no_horizontal_overflow": true,
+    "download_viewport_width": 1440,
+    "download_sha256": "9ee8f97d5196660bf07e1b31145dfa546c2dc629e69de8cab8bb03e85d169d3b",
+    "code_examples": 24,
+    "docs_logout_keeps_sub2": true,
+    "sub2_session_removal_closes_docs": true,
+    "anonymous_denied": true
+  },
+  "narrow_sequential_session_flow_accepted": false,
+  "rate_limit_inspection": {
+    "read_only": true,
+    "status_counts": {
+      "303": 20,
+      "404": 2,
+      "200": 89,
+      "429": 8
+    },
+    "rate_limit_events": [
+      {
+        "at": "2026-11-12T06:54:17+00:00",
+        "path": "/docs/assets/session.js",
+        "status": 429
+      },
+      {
+        "at": "2026-11-12T06:54:17+00:00",
+        "path": "/docs/assets/site.js",
+        "status": 429
+      },
+      {
+        "at": "2026-11-12T06:54:18+00:00",
+        "path": "/docs/login",
+        "status": 429
+      },
+      {
+        "at": "2026-11-12T06:57:15+00:00",
+        "path": "/docs/assets/site.css",
+        "status": 429
+      },
+      {
+        "at": "2026-11-12T06:57:15+00:00",
+        "path": "/docs/assets/session.js",
+        "status": 429
+      },
+      {
+        "at": "2026-11-12T06:57:16+00:00",
+        "path": "/docs/",
+        "status": 429
+      },
+      {
+        "at": "2026-11-12T06:58:30+00:00",
+        "path": "/docs/assets/site.css",
+        "status": 429
+      },
+      {
+        "at": "2026-11-12T06:58:30+00:00",
+        "path": "/docs/assets/session.js",
+        "status": 429
+      }
+    ],
+    "reading_limit_preserved": "60r/m, burst=20; no configuration change"
+  },
+  "application_sha": "871822afc3d6b30d51a2abbbbbcddf5644cd5f89",
+  "application_archive_run": 43170964372,
+  "business_writes": false,
+  "active_generation": false,
+  "mail_sent": false
+}
