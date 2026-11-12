@@ -1,0 +1,41 @@
+name: Read-only proxy 502 incident evidence
+on:
+  push:
+    branches: [codex/proxy-502-followup-20261112]
+    paths:
+      - '.github/workflows/proxy-502-readonly.yml'
+      - 'deploy/primary/proxy-502-followup-20261112/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: proxy-502-readonly-evidence
+  cancel-in-progress: false
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read bounded sanitized production evidence
+        env:
+          SSH_KEY: ${{ secrets.PRIMARY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PRIMARY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/incident_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/incident_key ~/.ssh/known_hosts
+          mkdir -p incident-evidence
+          ssh -i ~/.ssh/incident_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=2 root@173.234.15.150 'python3 -' < deploy/primary/proxy-502-followup-20261112/inspect.py > incident-evidence/report.json
+          python3 -m json.tool incident-evidence/report.json > /dev/null
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: proxy-502-evidence
+          path: incident-evidence/report.json
+          retention-days: 7
+      - name: Remove runner SSH key
+        if: always()
+        run: rm -f ~/.ssh/incident_key
