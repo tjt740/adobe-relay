@@ -4,7 +4,7 @@ on:
     inputs:
       phase:
         type: choice
-        options: [preflight, prepare, start, resume-drain, status, verify, archive]
+        options: [preflight, prepare, start, resume-drain, review-operator-edits, status, verify, archive]
         required: true
         default: status
       application_sha:

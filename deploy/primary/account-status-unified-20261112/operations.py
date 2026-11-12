@@ -1,7 +1,7 @@
 """Operate the authorized release with exact CI artifacts and preserved guards."""
 import base64,datetime,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','resume-drain','status','verify','archive']
+assert phase in ['preflight','prepare','start','resume-drain','review-operator-edits','status','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/account-status-unified-20261112'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -65,10 +65,13 @@ assert not (r/'canary-drain-retry-1.json').exists()
 subprocess.run(['systemd-run','--unit=account-status-unified-drain-20261112-retry1','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/driver.log','--property=StandardError=append:{root}/driver.log','/usr/bin/python3',str(r/'resume-drain.py')],check=True)
 print('Existing canary natural drain continuation dispatched')
 """)
+elif phase=='review-operator-edits':
+ copy([pathlib.Path(__file__).with_name('review-operator-edits.py'),pathlib.Path(__file__).with_name('verify-deployment.py')])
+ remote(f"import subprocess,pathlib; r=pathlib.Path('{root}'); assert not (r/'operator-changes-review.json').exists(); subprocess.run(['/usr/bin/python3',str(r/'review-operator-edits.py')],check=True)")
 elif phase=='status':
  remote(fr"""import pathlib,json,subprocess,re,hashlib
 r=pathlib.Path('{root}')
-for name in ['canary-drain-initial-failure.json','canary-drain-retry-1.json','image-loaded.json','premigration-backup.json','initial-start-failure.json','reviewed-concurrent-okad.json','precutover-retry-1.json','process-preservation.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','progress.json','rolling-old-drain-progress.json','rolling-canary-drain-progress.json','after.json','api-verification.json','deployment-verification.json','live-billing-verification.json','live-billing-cleanup.json','live-flare-default-result.json','live-sunburst-transparent-25-result.json','deferred-old.json','deferred-canary.json']:
+for name in ['operator-changes-review.json','canary-drain-initial-failure.json','canary-drain-retry-1.json','image-loaded.json','premigration-backup.json','initial-start-failure.json','reviewed-concurrent-okad.json','precutover-retry-1.json','process-preservation.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','progress.json','rolling-old-drain-progress.json','rolling-canary-drain-progress.json','after.json','api-verification.json','deployment-verification.json','live-billing-verification.json','live-billing-cleanup.json','live-flare-default-result.json','live-sunburst-transparent-25-result.json','deferred-old.json','deferred-canary.json']:
  p=r/name
  if p.exists():
   d=json.loads(p.read_text())
@@ -112,7 +115,7 @@ elif phase=='archive':
  documents={'release-notes.md':pathlib.Path('deploy/primary/account-status-unified-20261112.md'),'primary-README.md':pathlib.Path('deploy/primary/README.md'),'release-verification.json':pathlib.Path(__file__).with_name('release-verification.json')}
  payload={name:base64.b64encode(path.read_bytes()).decode() for name,path in documents.items()}
  source=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
- remote(f"""import base64,datetime,fcntl,hashlib,importlib.util,json,pathlib
+ remote(f"""import base64,datetime,fcntl,hashlib,importlib.util,json,pathlib,subprocess
 r=pathlib.Path('{root}');held=[]
 for path in ['/opt/adobe-relay/shared/.adobe-deploy.lock','/opt/adobe-relay/.release.lock','/opt/adobe-team-cookie/.release.lock','/opt/adobe-team-cookie/.incremental-release.lock']:
  f=open(path,'a');fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB);held.append(f)
@@ -126,6 +129,7 @@ metadata=json.loads(base64.b64decode({payload!r}['release-verification.json']))
 assert metadata['application_sha']=='{sha}' and metadata['status']=='deployed_account_status_filters_verified'
 before=json.loads((r/'before.json').read_text());current=a.snapshot()
 checks=a.check_preserved(before,current);a.validate_rollback(before,current,'{sha}',a.inspect(a.ROLLBACK_IMAGE)['Id'])
+if (r/'operator-changes-review.json').exists():subprocess.run(['/usr/bin/python3',str(r/'review-operator-edits.py'),'--validate-only'],check=True,timeout=150)
 assert all(current['containers'][name]['started']==item['started'] and current['containers'][name]['restarts']==item['restarts'] for name,item in before['containers'].items() if name!=a.APP)
 files={{}}
 for name,value in {payload!r}.items():
