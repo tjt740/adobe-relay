@@ -56,6 +56,7 @@ type View struct {
 	Events      []Event  `json:"events"`
 }
 type proxy struct {
+	sourcePriority                             int
 	sourceTrafficAvailable                     bool
 	sourceID                                   string
 	sourceBlocked                              bool
@@ -125,6 +126,7 @@ func loadProxies(ctx context.Context, q queryer) (map[int64]proxy, error) {
 			p.sourceID = source.ID
 			p.sourceBlocked = source.Blocked
 			p.sourceTrafficAvailable = source.TrafficAvailable
+			p.sourcePriority = source.Priority
 			result[id] = p
 		}
 	}

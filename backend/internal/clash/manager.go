@@ -24,29 +24,40 @@ import (
 )
 
 type State struct {
-	Sources   []Source  `json:"sources,omitempty"`
-	URL       string    `json:"url"`
-	Revision  int64     `json:"revision"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Nodes     []Node    `json:"nodes"`
+	Priorities       map[string]int    `json:"priorities,omitempty"`
+	Notes            map[string]string `json:"notes,omitempty"`
+	SettingsRevision int64             `json:"settings_revision,omitempty"`
+	Sources          []Source          `json:"sources,omitempty"`
+	URL              string            `json:"url"`
+	Revision         int64             `json:"revision"`
+	UpdatedAt        time.Time         `json:"updated_at"`
+	Nodes            []Node            `json:"nodes"`
 }
 
 type View struct {
-	Sources    []Source   `json:"sources"`
-	Configured bool       `json:"configured"`
-	Ready      bool       `json:"ready"`
-	URL        string     `json:"url"`
-	URLHint    string     `json:"url_hint"`
-	Revision   int64      `json:"revision"`
-	UpdatedAt  time.Time  `json:"updated_at"`
-	Nodes      []NodeView `json:"nodes"`
+	Priorities       map[string]int    `json:"priorities"`
+	Notes            map[string]string `json:"notes"`
+	SettingsRevision int64             `json:"settings_revision"`
+	SkippedSources   []Source          `json:"skipped_sources,omitempty"`
+	Sources          []Source          `json:"sources"`
+	Configured       bool              `json:"configured"`
+	Ready            bool              `json:"ready"`
+	URL              string            `json:"url"`
+	URLHint          string            `json:"url_hint"`
+	Revision         int64             `json:"revision"`
+	UpdatedAt        time.Time         `json:"updated_at"`
+	Nodes            []NodeView        `json:"nodes"`
 }
 
 type ImportRequest struct {
-	SourceIDs map[string]string `json:"source_ids,omitempty"`
-	URL       string            `json:"url"`
-	Names     []string          `json:"names"`
-	Revision  int64             `json:"revision"`
+	Priorities       map[string]int    `json:"priorities,omitempty"`
+	Mode             string            `json:"mode,omitempty"`
+	Notes            map[string]string `json:"notes,omitempty"`
+	SettingsRevision *int64            `json:"settings_revision,omitempty"`
+	SourceIDs        map[string]string `json:"source_ids,omitempty"`
+	URL              string            `json:"url"`
+	Names            []string          `json:"names"`
+	Revision         int64             `json:"revision"`
 }
 
 type Manager struct {
@@ -104,7 +115,8 @@ func (m *Manager) view(s State) View {
 	if urls := strings.Fields(s.URL); len(urls) > 0 {
 		hint = sourceHint(urls[0])
 	}
-	v := View{Sources: s.Sources, Configured: m.configured(), URL: s.URL, URLHint: hint, Revision: s.Revision, UpdatedAt: s.UpdatedAt, Nodes: make([]NodeView, 0, len(s.Nodes))}
+	v := View{Notes: notesByURL(s), SettingsRevision: s.SettingsRevision, Sources: s.Sources, Configured: m.configured(), URL: s.URL, URLHint: hint, Revision: s.Revision, UpdatedAt: s.UpdatedAt, Nodes: make([]NodeView, 0, len(s.Nodes))}
+	v.Priorities = prioritiesByURL(s)
 	for _, n := range s.Nodes {
 		if n.Enabled {
 			v.Nodes = append(v.Nodes, m.nodeView(n))
@@ -235,17 +247,42 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 	if err != nil {
 		return View{}, err
 	}
+	if req.Mode != "" && req.Mode != "replace" && req.Mode != "append" {
+		return View{}, errors.New("订阅导入方式无效")
+	}
+	if snapshot.Revision != req.Revision {
+		return View{}, errors.New("订阅已被其他操作更新，请重新预览")
+	}
+	if err := validateNotes(req.Notes); err != nil {
+		return View{}, err
+	}
+	if err := validatePriorities(req.Priorities); err != nil {
+		return View{}, err
+	}
 	raw := strings.TrimSpace(req.URL)
 	if raw == "" {
 		raw = snapshot.URL
 	}
-	fetched, sources, err := fetchSubscriptionDetails(ctx, m.fetchClient, raw)
+	var fetched []Node
+	var sources, skipped []Source
+	preserved := map[int64]bool{}
+	if req.Mode == "append" {
+		raw, fetched, sources, skipped, err = m.fetchNewSubscriptions(ctx, snapshot, raw)
+		for _, n := range snapshot.Nodes {
+			preserved[n.ProxyID] = true
+		}
+	} else {
+		fetched, sources, err = fetchSubscriptionDetails(ctx, m.fetchClient, raw)
+	}
 	if err != nil {
 		return View{}, err
 	}
-	fetched, retained, err := preserveFailedSources(snapshot, fetched, sources)
-	if err != nil {
-		return View{}, err
+	retained := map[string]bool{}
+	if req.Mode != "append" {
+		fetched, retained, err = preserveFailedSources(snapshot, fetched, sources)
+		if err != nil {
+			return View{}, err
+		}
 	}
 	anySuccess := false
 	for _, src := range sources {
@@ -255,7 +292,14 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 		return View{}, errors.New("所有订阅均未成功获取，已保留现有配置")
 	}
 	selected := make(map[string]bool, len(req.Names))
-	for _, n := range req.Names {
+	names := req.Names
+	if req.Mode == "append" {
+		names = make([]string, 0, len(fetched))
+		for _, n := range fetched {
+			names = append(names, n.Name)
+		}
+	}
+	for _, n := range names {
 		if selected[n] {
 			return View{}, errors.New("节点选择重复")
 		}
@@ -301,6 +345,9 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 	if previous.Revision != req.Revision {
 		return View{}, errors.New("订阅已被其他操作更新，请重新预览")
 	}
+	if err = checkSettingsRevision(previous, req.Notes, req.Priorities, req.SettingsRevision); err != nil {
+		return View{}, err
+	}
 	normalizeSources(&previous)
 	previousSources := map[string]Source{}
 	for _, src := range previous.Sources {
@@ -308,11 +355,16 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 	}
 	for i, src := range sources {
 		if old, ok := previousSources[src.ID]; ok {
+			if req.Mode == "append" {
+				sources[i] = old
+				continue
+			}
 			sources[i] = mergeSourceObservation(old, src)
 		}
 	}
 	urls, _ := subscriptionURLs(raw)
 	next := State{Sources: sources, URL: strings.Join(urls, "\n"), Revision: previous.Revision + 1, UpdatedAt: time.Now().UTC(), Nodes: make([]Node, 0)}
+	next.Notes, next.Priorities, next.SettingsRevision = updatedSettings(previous, urls, req.Notes, req.Priorities)
 	oldByName := map[string]Node{}
 	usedPorts := map[int]bool{}
 	retiredIDs := []int64{}
@@ -320,6 +372,10 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 		// Mihomo creates new listeners before closing removed ones. Reserve all
 		// previous ports for this reload; retired ports become free next import.
 		usedPorts[n.Port] = true
+		if req.Mode == "append" {
+			next.Nodes = append(next.Nodes, n)
+			continue
+		}
 		if failedSourceIDs[n.SourceID] && !n.Enabled {
 			// Preserve legacy disabled nodes without enabling them after a failed fetch.
 			next.Nodes = append(next.Nodes, n)
@@ -366,7 +422,7 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 		next.Nodes = append(next.Nodes, n)
 	}
 	for _, n := range next.Nodes {
-		if !n.Enabled {
+		if !n.Enabled || preserved[n.ProxyID] {
 			continue
 		}
 		result, e := tx.ExecContext(ctx, `UPDATE proxies SET status=CASE WHEN EXISTS(SELECT 1 FROM adobe_route_exclusions e WHERE e.proxy_id=proxies.id) THEN 'inactive' ELSE 'active' END,updated_at=NOW() WHERE id=$1 AND deleted_at IS NULL`, n.ProxyID)
@@ -382,7 +438,7 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 	if len(next.Nodes) > 0 {
 		ids := make([]int64, 0, len(next.Nodes))
 		for _, n := range next.Nodes {
-			if n.Enabled {
+			if n.Enabled && !preserved[n.ProxyID] {
 				ids = append(ids, n.ProxyID)
 			}
 		}
@@ -413,6 +469,7 @@ func (m *Manager) Import(ctx context.Context, req ImportRequest) (View, error) {
 		return View{}, err
 	}
 	v := m.view(next)
+	v.SkippedSources = skipped
 	v.Ready = true
 	return v, nil
 }
@@ -455,6 +512,9 @@ func (m *Manager) restorePersisted() {
 }
 
 func marker(s State) string {
+	s.Priorities = nil
+	s.Notes = nil
+	s.SettingsRevision = 0
 	s.Sources = nil
 	s.Nodes = append([]Node(nil), s.Nodes...)
 	for i := range s.Nodes {

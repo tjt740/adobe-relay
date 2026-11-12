@@ -2,11 +2,11 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import ClashSubscriptionModal from '@/components/admin/proxy/ClashSubscriptionModal.vue'
-import { getClashSubscription, previewClashSubscription, importClashSubscription, checkClashSource, type ClashSubscription } from '@/api/admin/clash'
+import { getClashSubscription, previewClashSubscription, importClashSubscription, checkClashSource, saveClashSettings, importNewClashSubscriptions, type ClashSubscription } from '@/api/admin/clash'
 import { testProxy } from '@/api/admin/proxies'
 import { useClashNodeTestStore } from '@/stores/clashNodeTests'
 
-vi.mock('@/api/admin/clash', () => ({ getClashSubscription: vi.fn(), previewClashSubscription: vi.fn(), importClashSubscription: vi.fn(), checkClashSource: vi.fn() }))
+vi.mock('@/api/admin/clash', () => ({ getClashSubscription: vi.fn(), previewClashSubscription: vi.fn(), importClashSubscription: vi.fn(), checkClashSource: vi.fn(), saveClashSettings: vi.fn(), importNewClashSubscriptions: vi.fn() }))
 vi.mock('@/api/admin/proxies', () => ({ testProxy: vi.fn(), default: {} }))
 vi.mock('@/utils/format', () => ({ formatDateTime: (s: string) => s }))
 vi.mock('vue-i18n', async () => ({ ...await vi.importActual<typeof import('vue-i18n')>('vue-i18n'), useI18n: () => ({ t: (key: string) => key }) }))
@@ -247,6 +247,94 @@ describe('Clash subscription workflow', () => {
     const w = await setup()
     expect(w.text()).not.toContain('admin.proxies.clash.sourceReadable')
     expect(w.get('footer .btn-primary').attributes('disabled')).toBeDefined()
+  })
+
+  it('saves notes separately without fetching subscriptions or changing a preview', async () => {
+    const url = 'https://one.example/sub'
+    const state = { ...saved, url, notes: { [url]: 'Original' }, settings_revision: 3 }
+    vi.mocked(getClashSubscription).mockResolvedValue(state)
+    vi.mocked(saveClashSettings).mockResolvedValue({ ...state, notes: { [url]: 'Primary' }, settings_revision: 4 })
+    const w = await setup()
+    await w.get('input[aria-label="admin.proxies.clash.sourceNote"]').setValue('Primary')
+    await w.findAll('button').find(b => b.text() === 'admin.proxies.clash.saveSettings')!.trigger('click'); await flushPromises()
+    expect(saveClashSettings).toHaveBeenCalledWith(2, { notes: { [url]: 'Primary' }, priorities: {}, settings_revision: 3 })
+    expect(previewClashSubscription).not.toHaveBeenCalled()
+    expect(importClashSubscription).not.toHaveBeenCalled()
+    expect(importNewClashSubscriptions).not.toHaveBeenCalled()
+    expect(testProxy).not.toHaveBeenCalled()
+    expect(w.text()).toContain('admin.proxies.clash.settingsSaved')
+    expect(w.findAll('button').find(b => b.text() === 'admin.proxies.clash.saveSettings')!.attributes('disabled')).toBeDefined()
+  })
+  it('keeps notes attached to URLs across bulk reorder and sends clearing explicitly', async () => {
+    const one = 'https://one.example/sub', two = 'https://two.example/sub'
+    const state = { ...saved, url: one + '\n' + two, notes: { [one]: 'First', [two]: 'Second' }, settings_revision: 1 }
+    vi.mocked(getClashSubscription).mockResolvedValue(state)
+    vi.mocked(saveClashSettings).mockResolvedValue({ ...state, notes: { [one]: '', [two]: 'Second' }, settings_revision: 2 })
+    const w = await setup()
+    const button = (key: string) => w.findAll('button').find(b => b.text() === key)!
+    await button('admin.proxies.clash.bulkMode').trigger('click')
+    await w.get('#clash-bulk-urls').setValue(two + '\n' + one)
+    await button('admin.proxies.clash.listMode').trigger('click')
+    const inputs = w.findAll('input[aria-label="admin.proxies.clash.sourceNote"]')
+    expect((inputs[0].element as HTMLInputElement).value).toBe('Second')
+    expect((inputs[1].element as HTMLInputElement).value).toBe('First')
+    await inputs[1].setValue('')
+    await button('admin.proxies.clash.saveSettings').trigger('click'); await flushPromises()
+    expect(saveClashSettings).toHaveBeenCalledWith(2, { notes: { [one]: '' }, priorities: {}, settings_revision: 1 })
+  })
+  it('imports only new URLs directly and keeps failed additions and their notes editable', async () => {
+    const old = 'https://old.example/sub', fresh = 'https://new.example/sub', bad = 'https://bad.example/sub'
+    vi.mocked(getClashSubscription).mockResolvedValue({ ...saved, url: old, notes: { [old]: 'Original' }, settings_revision: 2 })
+    vi.mocked(importNewClashSubscriptions).mockResolvedValue({ ...saved, url: old + '\n' + fresh, notes: { [old]: 'Original', [fresh]: 'New' }, settings_revision: 3, revision: 3,
+      nodes: [...saved.nodes, { name: 'New node', type: 'http', proxy_id: 8, enabled: true }],
+      skipped_sources: [{ id: 'bad', index: 3, url_hint: 'https://bad.example/••••', node_count: 0, fetch_error: 'http_error', http_status: 503 }] })
+    const w = await setup()
+    const button = (key: string) => w.findAll('button').find(b => b.text() === key)!
+    await button('admin.proxies.clash.bulkMode').trigger('click')
+    await w.get('#clash-bulk-urls').setValue(old + '\n' + fresh + '\n' + bad + '\n' + fresh)
+    await button('admin.proxies.clash.listMode').trigger('click')
+    const inputs = w.findAll('input[aria-label="admin.proxies.clash.sourceNote"]')
+    await inputs[1].setValue('New'); await inputs[2].setValue('Retry later')
+    await button('admin.proxies.clash.importNew').trigger('click'); await flushPromises()
+    expect(importNewClashSubscriptions).toHaveBeenCalledWith(fresh + '\n' + bad, 2, { notes: { [fresh]: 'New', [bad]: 'Retry later' }, priorities: {}, settings_revision: 2 })
+    expect(previewClashSubscription).not.toHaveBeenCalled()
+    expect(importClashSubscription).not.toHaveBeenCalled()
+    expect(w.text()).toContain('admin.proxies.clash.skippedNew')
+    const remaining = w.findAll('input[aria-label="admin.proxies.clash.sourceNote"]')
+    expect((remaining[2].element as HTMLInputElement).value).toBe('Retry later')
+    await button('admin.proxies.clash.importNew').trigger('click'); await flushPromises()
+    expect(importNewClashSubscriptions).toHaveBeenLastCalledWith(bad, 3, { notes: { [bad]: 'Retry later' }, priorities: {}, settings_revision: 3 })
+  })
+  it('does not claim success or lose draft notes on a conflicting notes save', async () => {
+    const url = 'https://one.example/sub'
+    vi.mocked(getClashSubscription).mockResolvedValue({ ...saved, url, notes: { [url]: '' } })
+    vi.mocked(saveClashSettings).mockRejectedValue(new Error('Notes changed elsewhere'))
+    const w = await setup()
+    await w.get('input[aria-label="admin.proxies.clash.sourceNote"]').setValue('My draft')
+    await w.findAll('button').find(b => b.text() === 'admin.proxies.clash.saveSettings')!.trigger('click'); await flushPromises()
+    expect(w.get('[role="alert"]').text()).toContain('Notes changed elsewhere')
+    expect((w.get('input[aria-label="admin.proxies.clash.sourceNote"]').element as HTMLInputElement).value).toBe('My draft')
+    expect(w.text()).not.toContain('admin.proxies.clash.settingsSaved')
+  })
+
+  it('saves priority independently, persists through reorder and clears back to normal', async () => {
+    const one = 'https://one.example/sub', two = 'https://two.example/sub'
+    const state = { ...saved, url: one + '\n' + two, priorities: { [one]: 100 }, settings_revision: 2 }
+    vi.mocked(getClashSubscription).mockResolvedValue(state)
+    vi.mocked(saveClashSettings).mockResolvedValue({ ...state, priorities: { [one]: 0, [two]: 50 }, settings_revision: 3 })
+    const w = await setup()
+    const button = (key: string) => w.findAll('button').find(b => b.text() === key)!
+    await button('admin.proxies.clash.bulkMode').trigger('click')
+    await w.get('#clash-bulk-urls').setValue(two + '\n' + one)
+    await button('admin.proxies.clash.listMode').trigger('click')
+    const inputs = w.findAll('select[aria-label="admin.proxies.clash.sourcePriority"]')
+    expect((inputs[1].element as HTMLSelectElement).value).toBe('100')
+    await inputs[0].setValue('50'); await inputs[1].setValue('0')
+    await button('admin.proxies.clash.saveSettings').trigger('click'); await flushPromises()
+    expect(saveClashSettings).toHaveBeenCalledWith(2, { notes: {}, priorities: { [one]: 0, [two]: 50 }, settings_revision: 2 })
+    expect(previewClashSubscription).not.toHaveBeenCalled()
+    expect(importClashSubscription).not.toHaveBeenCalled()
+    expect(button('admin.proxies.clash.saveSettings').attributes('disabled')).toBeDefined()
   })
 
 })

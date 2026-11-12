@@ -37,6 +37,7 @@ export const dailyUpdates: readonly DailyUpdate[] = [
   { date: '2026-11-12', id: 'proxyReliability', type: 'improved', sections: ['reason', 'https', 'memory', 'diagnostics', 'preservation', 'validation', 'boundary'] },
   { date: '2026-11-12', id: 'clashShadowsocks', type: 'added', sections: ['reason', 'formats', 'plugins', 'preservation', 'validation', 'boundary'] },
   { date: '2026-11-12', id: 'mihomoMemory', type: 'fixed', sections: ['reason', 'continuity', 'preservation', 'boundary'] },
+  { date: '2026-11-12', id: 'clashNotesAppend', type: 'added', sections: ['notes', 'priority', 'append', 'refresh', 'validation'] },
   { date: '2026-11-11', id: 'adobeWebP', type: 'added', sections: ['output', 'options', 'validation'] },
   { date: '2026-11-11', id: 'adobeGroupMultiPricing', type: 'improved', sections: ['selection', 'pricing', 'mode', 'billing', 'boundary'] },
   { date: '2026-11-11', id: 'adobeGroupNameLayout', type: 'improved', sections: ['layout', 'preservation', 'boundary'] },
