@@ -16,6 +16,29 @@ def fixture():
  return review,old,current,events
 class OperatorReview(unittest.TestCase):
  def test_exact_authenticated_current_edits(self):r.validate(*fixture())
+ def test_accepts_later_audited_edits_without_accepting_unexplained_changes(self):
+  args=fixture();current,events=args[2:]
+  event=copy.deepcopy(events[0]);event.update(id=180000,created_at='2026-11-12T06:25:00+00:00',extra={'params':{'id':'999999'}})
+  events.append(event);current[999999].update(manual_pause=True,schedulable=False)
+  bulk=copy.deepcopy(events[4]);bulk.update(id=180001,created_at='2026-11-12T06:25:01+00:00',request_body=json.dumps({'account_ids':[999999],'credentials':{'model_mapping':{'later':'model'}},'concurrency':2,'group_ids':[5]}))
+  events.append(bulk);current[999999].update(mapping={'later':'model'},concurrency=2,group_ids=[5])
+  checked=r.validate(*args);self.assertIn(999999,checked['pause_ids']);self.assertIn(999999,checked['mapping_ids'])
+  for key,value in [('actor_user_id',2),('auth_method','admin_api_key'),('status_code',403)]:
+   altered=copy.deepcopy(args);altered[3][-1][key]=value
+   with self.subTest(key=key),self.assertRaises(AssertionError):r.validate(*altered)
+ def test_uses_latest_audited_value_and_keeps_manual_resume_separate_from_scheduler(self):
+  args=fixture();current,events=args[2:];i=r.PAUSE_IDS[0]
+  event=copy.deepcopy(events[0]);event.update(id=180000,created_at='2026-11-12T06:25:00+00:00',request_body=json.dumps({'schedulable':True}))
+  events.append(event);current[i]['manual_pause']=False
+  # A subsequent automatic check can restrict scheduling without undoing the manual resume flag.
+  self.assertFalse(current[i]['schedulable']);r.validate(*args)
+  current[i]['manual_pause']=True
+  with self.assertRaises(AssertionError):r.validate(*args)
+ def test_later_group_only_update_must_match_current_group(self):
+  args=fixture();i=r.MAPPING_IDS[0];event=copy.deepcopy(args[3][4]);event.update(id=180000,created_at='2026-11-12T06:25:00+00:00',request_body=json.dumps({'account_ids':[i],'group_ids':[9]}))
+  args[3].append(event);args[2][i]['group_ids']=[9];r.validate(*args)
+  args[2][i]['group_ids']=[10]
+  with self.assertRaises(AssertionError):r.validate(*args)
  def test_rejects_wrong_actor_failed_action_or_unrelated_evidence(self):
   for key,value in [('actor_user_id',2),('actor_role','user'),('auth_method','admin_api_key'),('status_code',403),('method','GET'),('path','/other'),('action','other'),('created_at','2026-11-12T06:20:00+00:00'),('created_at','2026-11-12T06:30:00+00:00'),('request_body','{"schedulable":true}'),('extra',{'params':{'id':'99'}})]:
    with self.subTest(key=key,value=value):

@@ -93,6 +93,13 @@ if progress.get('step')=='drain-canary':
  print('pending-input-metadata',json.dumps(pending))
 """)
 elif phase=='verify':
+ remote(f"""import pathlib
+r=pathlib.Path('{root}'); assert (r/'operator-changes-review.json').exists()
+for name in ['review-operator-edits.py','verify-deployment.py']:
+ original=r/(name+'.before-live-audit')
+ if not original.exists():original.write_bytes((r/name).read_bytes());original.chmod(0o600)
+""")
+ copy([pathlib.Path(__file__).with_name('review-operator-edits.py'),pathlib.Path(__file__).with_name('verify-deployment.py')])
  browser=pathlib.Path(__file__).with_name('live-browser-verification.json')
  if browser.exists():
   proof=json.loads(browser.read_text());assert proof['application_sha']==sha and proof['authenticated'] and proof['case_count']>=4 and not proof['attempted_writes'] and not proof['runtime_errors']
@@ -129,13 +136,15 @@ metadata=json.loads(base64.b64decode({payload!r}['release-verification.json']))
 assert metadata['application_sha']=='{sha}' and metadata['status']=='deployed_account_status_filters_verified'
 before=json.loads((r/'before.json').read_text());current=a.snapshot()
 checks=a.check_preserved(before,current);a.validate_rollback(before,current,'{sha}',a.inspect(a.ROLLBACK_IMAGE)['Id'])
-if (r/'operator-changes-review.json').exists():subprocess.run(['/usr/bin/python3',str(r/'review-operator-edits.py'),'--validate-only'],check=True,timeout=150)
+live_operator_review=None
+if (r/'operator-changes-review.json').exists():
+ live_operator_review=json.loads(subprocess.check_output(['/usr/bin/python3',str(r/'review-operator-edits.py'),'--validate-only'],text=True,timeout=150));a.save('operator-changes-review-archive.json',live_operator_review)
 assert all(current['containers'][name]['started']==item['started'] and current['containers'][name]['restarts']==item['restarts'] for name,item in before['containers'].items() if name!=a.APP)
 files={{}}
 for name,value in {payload!r}.items():
  data=base64.b64decode(value);assert b'PENDING' not in data
  path=r/name;path.write_bytes(data);path.chmod(0o600);files[name]=a.digest(data)
  if name=='primary-README.md':pathlib.Path('/opt/adobe-relay/deploy/primary/README.md').write_bytes(data)
-out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'deployed_account_status_filters_verified','application_sha':'{sha}','archive_source':'{source}','image_id':container['Image'],'core_verified_at':core['at'],'process_preservation':processes,'published_document_hashes':files,'preserved':checks,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'active_generation':False,'production_priority_changed':False,'mail_sent':False}}
+out={{'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'deployed_account_status_filters_verified','application_sha':'{sha}','archive_source':'{source}','image_id':container['Image'],'core_verified_at':core['at'],'process_preservation':processes,'published_document_hashes':files,'preserved':checks,'live_operator_review':live_operator_review,'rollback_guard':{{'passed':True,'mutated':False}},'cutover_backup':json.loads((r/'after.json').read_text())['backup'],'active_generation':False,'production_priority_changed':False,'mail_sent':False}}
 a.save('release-completion.json',out);print(json.dumps(out))
 """)
