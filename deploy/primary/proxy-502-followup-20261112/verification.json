@@ -1,0 +1,154 @@
+{
+  "status": "bulk_proxy_transport_failures_mitigated_residual_502_remain",
+  "at": "2026-11-12T06:26:12.876824+00:00",
+  "isolated_nodes": [
+    1120,
+    1149,
+    1944,
+    1946,
+    1969,
+    1970
+  ],
+  "original_exclusions_preserved": [
+    1124,
+    1160,
+    1948,
+    1953
+  ],
+  "initial_window": {
+    "end": "2026-11-12T06:08:05Z",
+    "hours": 2,
+    "final_502_records": 770,
+    "proxy_1120": 384,
+    "proxy_1149": 88
+  },
+  "outbreak_window": {
+    "start": "2026-11-12T06:12:02Z",
+    "end": "2026-11-12T06:15:18Z",
+    "final_502_records": 350,
+    "four_subscription3_nodes": 342
+  },
+  "observation": {
+    "start": "2026-11-12T06:21:08.526799+00:00",
+    "end": "2026-11-12T06:26:12.876824+00:00",
+    "traffic": {
+      "success_records": 805,
+      "images": 805,
+      "errors": [
+        {
+          "status_code": 400,
+          "n": 24
+        },
+        {
+          "status_code": 403,
+          "n": 120
+        },
+        {
+          "status_code": 404,
+          "n": 1
+        },
+        {
+          "status_code": 429,
+          "n": 410
+        },
+        {
+          "status_code": 451,
+          "n": 35
+        },
+        {
+          "status_code": 500,
+          "n": 3
+        },
+        {
+          "status_code": 502,
+          "n": 2
+        },
+        {
+          "status_code": 503,
+          "n": 3
+        }
+      ]
+    },
+    "remaining_502": [
+      {
+        "proxy": "1942",
+        "stage": "upload",
+        "n": 1,
+        "last_at": "2026-11-12T14:21:26.84031+08:00"
+      },
+      {
+        "proxy": "2129",
+        "stage": "submit",
+        "n": 1,
+        "last_at": "2026-11-12T14:24:07.956108+08:00"
+      }
+    ],
+    "new_generation_observations_on_excluded_nodes": {
+      "observations": 0,
+      "successes": 0
+    }
+  },
+  "protection": {
+    "manual_pause_schedulable_status_preserved": true,
+    "configuration_preserved": true,
+    "mihomo_original_process": {
+      "id": "77770d0d02af1d14fc2a2c30d86bad98220bdadfa9f3123bc4afb5e0e78ba182",
+      "image": "metacubex/mihomo:v1.19.31",
+      "pid": 82636,
+      "started": "2026-11-11T09:40:11.451739918Z",
+      "restarts": 51,
+      "health": null
+    },
+    "credential_changes_not_attributed_by_this_audit": [
+      {
+        "account_id": 3096,
+        "fields": [
+          "credentials_hash"
+        ]
+      }
+    ],
+    "direct_account_writes": false,
+    "connections_closed": false,
+    "generation_submissions": 0,
+    "requests_replayed": false,
+    "app_deployed_by_this_task": false
+  },
+  "concurrent_application": {
+    "id": "6a4fad056d9585df3ec3e9beaba8efb4555c6d09be7b6100ba8dbe8193890a90",
+    "image": "adobe-relay:871822afc3d6b30d51a2abbbbbcddf5644cd5f89",
+    "pid": 1086140,
+    "started": "2026-11-12T06:23:17.102620868Z",
+    "restarts": 0,
+    "health": "healthy"
+  },
+  "memory": {
+    "container_id": "77770d0d02af1d14fc2a2c30d86bad98220bdadfa9f3123bc4afb5e0e78ba182",
+    "running": true,
+    "started_at": "2026-11-11T09:40:11.451739918Z",
+    "restart_count": 51,
+    "memory_current_bytes": 201842688,
+    "memory_limit_bytes": 1610612736,
+    "memory_peak_bytes": 849231872,
+    "socket_bytes": 11751424,
+    "kernel_bytes": 8282112,
+    "oom_events": 0,
+    "oom_kills": 0,
+    "schema_version": 1,
+    "observed_at": "2026-11-12T06:26:01.534849+00:00",
+    "sample_ok": true
+  },
+  "limits": [
+    "HTTPS HEAD is not a generation or sustained upload test.",
+    "Independent HTTPS recovered after the fault; intermittent transport failure is established, provider versus path root cause remains unresolved.",
+    "Residual 502s and 403/429 remain. No claim of zero future errors.",
+    "Business EOF/reset automatic cooldown is a recommendation, not implemented.",
+    "One credential hash changed during normal concurrent activity; exact writer not established and no credentials restored."
+  ],
+  "runs": {
+    "initial_read": 43165978072,
+    "corrected_read": 43166795734,
+    "lock_blocked_before_mutation": 43167208326,
+    "outbreak_isolation": 43167505919,
+    "five_minute_read": 43168093813
+  }
+}
