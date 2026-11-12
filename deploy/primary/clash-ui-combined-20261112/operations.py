@@ -59,7 +59,7 @@ print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 elif phase=='resume-precutover':
  remote(pathlib.Path(__file__).with_name('review_concurrent_okad.py').read_text()+'\n'+pathlib.Path(__file__).with_name('resume-precutover.py').read_text())
 elif phase=='status':
- remote(f"""import pathlib,json,subprocess,re,hashlib
+ remote(fr"""import pathlib,json,subprocess,re,hashlib
 r=pathlib.Path('{root}')
 for name in ['image-loaded.json','premigration-backup.json','initial-start-failure.json','reviewed-concurrent-okad.json','precutover-retry-1.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','progress.json','rolling-old-drain-progress.json','rolling-canary-drain-progress.json','after.json','api-verification.json','deployment-verification.json','live-billing-verification.json','live-billing-cleanup.json','live-flare-default-result.json','live-sunburst-transparent-25-result.json','deferred-old.json','deferred-canary.json']:
  p=r/name
