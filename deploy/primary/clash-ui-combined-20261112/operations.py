@@ -1,7 +1,7 @@
 """Operate the authorized release with exact CI artifacts and preserved guards."""
 import base64,datetime,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','status','verify','archive']
+assert phase in ['preflight','prepare','start','resume-precutover','status','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/clash-ui-combined-20261112'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -56,6 +56,8 @@ assert not (r/'progress.json').exists(), 'Already started; inspect saved evidenc
 subprocess.run(['systemd-run','--unit=clash-ui-combined-release-20261112','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/driver.log','--property=StandardError=append:{root}/driver.log','/usr/bin/python3',str(r/'driver.py')],check=True)
 print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 """)
+elif phase=='resume-precutover':
+ remote(pathlib.Path(__file__).with_name('review_concurrent_okad.py').read_text()+'\n'+pathlib.Path(__file__).with_name('resume-precutover.py').read_text())
 elif phase=='status':
  remote(f"""import pathlib,json
 r=pathlib.Path('{root}')
