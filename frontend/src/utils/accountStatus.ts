@@ -44,9 +44,8 @@ export function matchesAccountRuntimeStatus(account: StatusAccount, status: stri
       case 'active': return result.success
       case 'authentication_failed': return !result.success && result.code === 401
       case 'request_timeout': return !result.success && result.code === 408
-      case 'test_passed': return result.source === 'test' && result.success
+      case 'test_passed': return result.success
       case 'test_failed': return result.source === 'test' && !result.success
-      case 'request_succeeded': return result.source === 'business' && result.success
       case 'request_failed': return result.source === 'business' && !result.success
       case 'untested': return false
     }
@@ -62,10 +61,9 @@ export function matchesAccountRuntimeStatus(account: StatusAccount, status: stri
     case 'request_timeout': return timeout
     case 'test_passed': return !pending && success === true && !auth && !timeout
     case 'test_failed': return !pending && success === false && !auth && !timeout
-    case 'request_succeeded':
     case 'request_failed': return false
     case 'untested': return !checked
     default: return true
   }
 }
-export const runtimeAccountStatuses = ['authentication_failed', 'request_timeout', 'test_passed', 'test_failed', 'request_succeeded', 'request_failed', 'untested']
+export const runtimeAccountStatuses = ['authentication_failed', 'request_timeout', 'test_passed', 'test_failed', 'request_failed', 'untested']

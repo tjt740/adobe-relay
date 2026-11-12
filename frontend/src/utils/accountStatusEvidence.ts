@@ -22,7 +22,7 @@ const reasons = {
   upstream: '上游返回失败响应', proxy: '代理连接失败', network: '网络连接失败', content: '上游拒绝了请求内容',
   legacy: '旧记录没有保存具体原因', unknown: '记录中没有明确原因'
 }
-const checkStates = { pending: '已排队，尚未开始', running: '检测已开始，尚未记录结束结果', proxy_pending: '等待代理就绪', interrupted: '检测已中断', failed: '检测失败', success: '检测成功' }
+const checkStates = { pending: '已排队，尚未开始', running: '检测已开始，尚未记录结束结果', proxy_pending: '等待代理就绪', interrupted: '检测已中断', failed: '检测失败', success: '检测通过' }
 const verificationStates = {
   pending: '尚未完成凭据验证', verified: '凭据与额度验证通过', verification_retry: '上次验证未完成，等待重试',
   proxy_pending: '等待代理就绪后验证', auth_failed: '凭据验证失败', quota_blocked: '额度未达到验证要求',
@@ -63,7 +63,7 @@ export function statusErrorExplanation(value: unknown): string {
 
 function observation(title: string, value: Data): StatusRecord {
   return {
-    title, result: `请求${result(value.success)}`, time: text(value.checked_at),
+    title, result: value.success === true ? '检测通过' : `请求${result(value.success)}`, time: text(value.checked_at),
     fields: [field('状态码', code(value.code)), field('来源', label(sources, value.source)),
       field('发生阶段', label(stages, value.stage)), field('模型', text(value.scope) || '未记录'),
       ...(!value.success ? [field('记录的原因', label(reasons, value.reason))] : [])]
@@ -85,7 +85,7 @@ export function accountStatusRecords(account: Account): StatusRecord[] {
     records.push(observation('最近成功记录', success))
   }
   if (typeof extra.last_check_success === 'boolean') {
-    records.push({ title: '最近账号检测', result: extra.last_check_success ? '检测成功' : '检测失败', time: text(extra.last_check_at),
+    records.push({ title: '最近账号检测', result: extra.last_check_success ? '检测通过' : '检测失败', time: text(extra.last_check_at),
       fields: [field('状态码', code(extra.last_check_status_code)), field('来源 / 阶段', '此条检测摘要未单独记录')],
       note: !Object.keys(latest).length ? '目前只有检测摘要，没有完整的请求过程记录。' : undefined })
   }

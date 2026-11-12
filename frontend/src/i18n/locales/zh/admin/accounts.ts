@@ -1,6 +1,6 @@
 export default {
     accounts: {
-      currentResult: { succeeded: '请求成功', failed: '请求失败' },
+      currentResult: { succeeded: '检测通过', failed: '请求失败' },
       manualProxy: { title: '手动 IP 设置', hint: '开启后固定下方选择的代理（无代理表示直连），不参与自动分配、自动换 IP 或 408 代理释放；408 账号也可手动设置。随“更新”保存；不清除错误或恢复调度。关闭后恢复原自动管理规则。', failoverHint: '手动 IP 设置已开启或正在编辑，自动故障切换暂停。请先更新账号以保存设置。' },
       proxyFailover: {
   "autoManaged": "代理由 IP 管理中的自动分配统一维护，每个节点最多 3 个账号。",

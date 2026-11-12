@@ -70,7 +70,7 @@ func runtimeFiltersFromQuery(c *gin.Context) (accountRuntimeFilters, error) {
 
 func isRuntimeAccountStatus(status string) bool {
 	switch status {
-	case "active", "authentication_failed", "request_timeout", "test_passed", "test_failed", "request_succeeded", "request_failed", "untested":
+	case "active", "authentication_failed", "request_timeout", "test_passed", "test_failed", "request_failed", "untested":
 		return true
 	}
 	return false
@@ -189,11 +189,9 @@ func matchesRuntimeAccountStatus(a service.Account, status string, now time.Time
 		case "request_timeout":
 			return !result.success && result.code == 408
 		case "test_passed":
-			return result.test && result.success
+			return result.success
 		case "test_failed":
 			return result.test && !result.success
-		case "request_succeeded":
-			return !result.test && result.success
 		case "request_failed":
 			return !result.test && !result.success
 		case "untested":
@@ -217,7 +215,7 @@ func matchesRuntimeAccountStatus(a service.Account, status string, now time.Time
 		return !pending && checked && success && !auth && !timeout
 	case "test_failed":
 		return !pending && checked && !success && !auth && !timeout
-	case "request_succeeded", "request_failed":
+	case "request_failed":
 		return false
 	case "untested":
 		return !checked

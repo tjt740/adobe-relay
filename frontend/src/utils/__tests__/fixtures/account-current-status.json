@@ -41,7 +41,7 @@
     ]
   },
   {
-    "name": "new business success is not a test",
+    "name": "business success shares the passed label",
     "account": {
       "platform": "adobe",
       "status": "active",
@@ -62,7 +62,7 @@
       }
     },
     "matches": [
-      "request_succeeded"
+      "test_passed"
     ]
   },
   {
@@ -241,7 +241,7 @@
       }
     },
     "matches": [
-      "request_succeeded"
+      "test_passed"
     ]
   },
   {
@@ -354,7 +354,7 @@
       }
     },
     "matches": [
-      "request_succeeded"
+      "test_passed"
     ]
   },
   {

@@ -6,7 +6,7 @@
         :data-testid="adobeResult.source === 'test' ? 'account-last-check' : 'account-current-result'"
         :title="[adobeResult.model, formatDateTime(adobeResult.at)].filter(Boolean).join(' · ')"
       >
-        {{ t(adobeResult.source === 'test' ? adobeResult.success ? 'admin.accounts.bulkTest.passed' : 'admin.accounts.bulkTest.failed' : adobeResult.success ? 'admin.accounts.currentResult.succeeded' : 'admin.accounts.currentResult.failed') }}
+        {{ t(adobeResult.success ? 'admin.accounts.bulkTest.passed' : adobeResult.source === 'test' ? 'admin.accounts.bulkTest.failed' : 'admin.accounts.currentResult.failed') }}
         <span v-if="!adobeResult.success && adobeResult.code >= 400">{{ adobeResult.code }}</span>
       </span>
       <span v-if="adobeResult.model" class="text-xs text-gray-500" data-testid="account-result-model">{{ adobeResult.model }}</span>
