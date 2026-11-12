@@ -108,11 +108,25 @@ def reviewed_setting_hashes(original, review=None):
     return expected
 
 
+def reviewed_subscription_hashes(before, review):
+    keys=['clash_settings_hash','clash_contract_hash']
+    if review is None:return {k:before[k] for k in keys}
+    assert review['status']=='confirmed_incremental_subscription_retained'
+    assert review['original_guard_hashes']=={k:before[k] for k in keys}
+    assert review['existing_node_contracts_preserved'] and review['priorities_preserved']
+    assert [review[k] for k in ['sources_before','sources_current','nodes_before','nodes_current']]==[8,9,623,666]
+    assert set(review['retained_guard_hashes'])==set(keys)
+    return review['retained_guard_hashes']
+
+
 def check_preserved(before, current):
     review_file = ROOT / 'reviewed-automatic-settings.json'
     review = json.loads(review_file.read_text()) if review_file.exists() else None
     expected_settings = reviewed_setting_hashes(before['settings_hashes'], review)
-    expected_clash = before['clash_contract_hash']
+    subscription_file=ROOT/'reviewed-operator-subscription.json'
+    subscription_review=json.loads(subscription_file.read_text()) if subscription_file.exists() else None
+    expected_subscription=reviewed_subscription_hashes(before,subscription_review)
+    expected_clash=expected_subscription['clash_contract_hash']
     checks = {
         'existing_groups_and_prices': all(current['group_prices'].get(k)==v for k,v in before.get('group_prices',{}).items()),
         'other_containers': all(current['containers'].get(name, {}).get('id') == value['id'] and
@@ -124,7 +138,7 @@ def check_preserved(before, current):
         'okad_settings': current['okad_settings_hash'] == before['okad_settings_hash'],
         'sub2_settings_including_smtp': current['settings_hashes'] == expected_settings,
         'clash_nodes_bindings_and_configuration': current['clash_contract_hash'] == expected_clash,
-        'clash_notes_and_priorities_not_preset': current.get('clash_settings_hash') == before.get('clash_settings_hash'),
+        'clash_notes_and_priorities_not_preset': current.get('clash_settings_hash') == expected_subscription['clash_settings_hash'],
         'recent_manual_exclusions': all(current.get('retained_exclusions', {}).get(k) == v for k, v in before.get('retained_exclusions', {}).items()),
         'docs_process': current.get('docs_process') == before.get('docs_process'),
         'alert_rules': current['rules_hash'] == before['rules_hash'],

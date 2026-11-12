@@ -1,0 +1,71 @@
+{
+  "at": "2026-11-12T05:09:30.650Z",
+  "site": "https://creative.cheap",
+  "browser": "Chrome desktop automation",
+  "case_count": 6,
+  "viewport_widths": [
+    1440,
+    390
+  ],
+  "authenticated": true,
+  "results": [
+    {
+      "width": 1440,
+      "view": "capacity",
+      "source_cards": 8,
+      "progress_bars": 18
+    },
+    {
+      "width": 1440,
+      "view": "blocked-and-related",
+      "nodes": 2,
+      "related_total": 42,
+      "read_only": true,
+      "modal_overflow": false
+    },
+    {
+      "width": 1440,
+      "view": "subscription-settings",
+      "sources": 8,
+      "note_priority_controls": true,
+      "urls_hidden": true,
+      "modal_overflow": false
+    },
+    {
+      "width": 390,
+      "view": "capacity",
+      "source_cards": 8,
+      "progress_bars": 18
+    },
+    {
+      "width": 390,
+      "view": "blocked-and-related",
+      "nodes": 2,
+      "related_total": 42,
+      "read_only": true,
+      "modal_overflow": false
+    },
+    {
+      "width": 390,
+      "view": "subscription-settings",
+      "sources": 8,
+      "note_priority_controls": true,
+      "urls_hidden": true,
+      "modal_overflow": false
+    }
+  ],
+  "attempted_writes": [],
+  "runtime_errors": [],
+  "active_generation": false,
+  "limitation": "Viewport emulation; not a physical mobile-device test",
+  "application_sha": "e1c9b83ace0472ad7e97b35d4bf2c4dd5dc1574b",
+  "visual_reviewed": true,
+  "prior_attempts_retained": [
+    "old-login-file-failure",
+    "animation-cancel",
+    "continuous-animation-wait",
+    "onboarding-interference",
+    "url-visibility-expectation",
+    "loading-not-awaited"
+  ]
+}

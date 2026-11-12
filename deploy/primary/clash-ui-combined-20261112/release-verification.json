@@ -1,0 +1,45 @@
+{
+  "application_sha": "e1c9b83ace0472ad7e97b35d4bf2c4dd5dc1574b",
+  "status": "deployed_subscription_settings_verified",
+  "verified_at": "2026-11-12T06:00:15.185217+00:00",
+  "feature_pr": 192,
+  "build_run": 43154453148,
+  "verification_run": 43164815924,
+  "business_preservation": {
+    "backup_accounts": 1172,
+    "checked_accounts": 1218,
+    "manual_pauses_preserved": false,
+    "confirmed_operator_pause_changes_retained": 63,
+    "confirmed_operator_model_mapping_changes_retained": 49,
+    "manual_proxy_modes_preserved": true,
+    "proxy_bindings_changed_with_event_chain": 38,
+    "cookie_rotations_with_version_advance": 32,
+    "non_source_cookie_credential_changes": 37,
+    "credential_field_names_changed": [
+      "access_token",
+      "adobe_session_cookie",
+      "adobe_session_cookie_source_hash",
+      "cookie",
+      "expires_at",
+      "model_mapping"
+    ]
+  },
+  "temporary_cleanup": {
+    "at": "2026-11-12T05:38:53.617017+00:00",
+    "temporary_container_removed": true,
+    "temporary_nat_rule_removed": true,
+    "rolling_lease_removed": true,
+    "nginx_configuration_unchanged": true
+  },
+  "browser_cases": 6,
+  "passive_samples": 13,
+  "operator_confirmed_subscription_addition": {
+    "sources_before": 8,
+    "sources_current": 9,
+    "nodes_before": 623,
+    "nodes_current": 666,
+    "original_node_contracts_preserved": true
+  },
+  "active_generation": false,
+  "mail_sent": false
+}

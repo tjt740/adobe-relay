@@ -11,7 +11,7 @@ m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 
 class AutomaticSettingReviewTests(TestCase):
     def test_subscription_settings_cannot_be_preset_during_release(self):
-        before={'containers':{},'config_hashes':{},'env_without_image_hash':'same','okad_settings_hash':'same','settings_hashes':{},'clash_contract_hash':'same','clash_settings_hash':'original','rules_hash':'same'}
+        before={'containers':{},'config_hashes':{},'env_without_image_hash':'same','okad_settings_hash':'same','settings_hashes':{},'clash_contract_hash':'same','clash_settings_hash':'same','clash_settings_hash':'original','rules_hash':'same'}
         current=copy.deepcopy(before)
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(m,'ROOT',Path(directory)):
             self.assertTrue(all(m.check_preserved(before,current).values()))
@@ -35,7 +35,7 @@ class AutomaticSettingReviewTests(TestCase):
                 m.reviewed_setting_hashes(self.old,{**self.review,**patch})
 
     def test_full_guard_accepts_only_the_exact_reviewed_hash(self):
-        before={'containers':{},'config_hashes':{},'env_without_image_hash':'same','okad_settings_hash':'same','settings_hashes':self.old,'clash_contract_hash':'same','rules_hash':'same'}
+        before={'containers':{},'config_hashes':{},'env_without_image_hash':'same','okad_settings_hash':'same','settings_hashes':self.old,'clash_contract_hash':'same','clash_settings_hash':'same','rules_hash':'same'}
         current=copy.deepcopy(before)
         current['settings_hashes']=m.reviewed_setting_hashes(self.old,self.review)
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(m,'ROOT',Path(directory)):
@@ -52,7 +52,7 @@ class AutomaticSettingReviewTests(TestCase):
         with self.assertRaises(AssertionError):m.reviewed_setting_hashes(old,{**review,'event':'claude_code_version_synced'})
 
     def test_new_mode_initialization_preserves_platform_and_saved_choices(self):
-        before={'containers':{},'config_hashes':{},'env_without_image_hash':'same','okad_settings_hash':'same','settings_hashes':{},'clash_contract_hash':'same','rules_hash':'same','group_modes':{'1':{'platform':'adobe','mode':None},'2':{'platform':'openai','mode':None},'3':{'platform':'adobe','mode':False}}}
+        before={'containers':{},'config_hashes':{},'env_without_image_hash':'same','okad_settings_hash':'same','settings_hashes':{},'clash_contract_hash':'same','clash_settings_hash':'same','rules_hash':'same','group_modes':{'1':{'platform':'adobe','mode':None},'2':{'platform':'openai','mode':None},'3':{'platform':'adobe','mode':False}}}
         current=copy.deepcopy(before)
         for gid,value in [('1',True),('2',False),('3',False)]:current['group_modes'][gid]['mode']=value
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(m,'ROOT',Path(directory)):
@@ -61,7 +61,7 @@ class AutomaticSettingReviewTests(TestCase):
             with self.assertRaises(AssertionError):m.check_preserved(before,current)
 
     def test_before_migration_null_is_allowed_only_while_column_is_absent(self):
-        before={'containers':{},'config_hashes':{},'env_without_image_hash':'same','okad_settings_hash':'same','settings_hashes':{},'clash_contract_hash':'same','rules_hash':'same','billing_mode_schema_present':False,'group_modes':{'1':{'platform':'adobe','mode':None}}}
+        before={'containers':{},'config_hashes':{},'env_without_image_hash':'same','okad_settings_hash':'same','settings_hashes':{},'clash_contract_hash':'same','clash_settings_hash':'same','rules_hash':'same','billing_mode_schema_present':False,'group_modes':{'1':{'platform':'adobe','mode':None}}}
         current=copy.deepcopy(before)
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(m,'ROOT',Path(directory)):
             self.assertTrue(all(m.check_preserved(before,current).values()))
