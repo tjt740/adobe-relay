@@ -1,7 +1,7 @@
 """Operate the authorized release with exact CI artifacts and preserved guards."""
 import base64,datetime,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','resume-drain','review-operator-edits','status','verify','archive']
+assert phase in ['preflight','prepare','start','resume-drain','review-operator-edits','docs-access','status','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/account-status-unified-20261112'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -68,6 +68,18 @@ print('Existing canary natural drain continuation dispatched')
 elif phase=='review-operator-edits':
  copy([pathlib.Path(__file__).with_name('review-operator-edits.py'),pathlib.Path(__file__).with_name('verify-deployment.py')])
  remote(f"import subprocess,pathlib; r=pathlib.Path('{root}'); assert not (r/'operator-changes-review.json').exists(); subprocess.run(['/usr/bin/python3',str(r/'review-operator-edits.py')],check=True)")
+elif phase=='docs-access':
+ remote(r"""import collections,datetime,hashlib,json,pathlib,re
+start=datetime.datetime(2026,11,12,6,53,tzinfo=datetime.timezone.utc)
+end=datetime.datetime(2026,11,12,7,2,tzinfo=datetime.timezone.utc)
+rows=[]
+for line in pathlib.Path('/var/log/nginx/creative-docs-access.log').read_bytes()[-4000000:].decode(errors='replace').splitlines():
+ m=re.match(r'^(\S+) \[([^]]+)\] "(\S+) (\S+) [^"]+" (\d+) ',line)
+ if not m:continue
+ at=datetime.datetime.strptime(m[2],'%d/%b/%Y:%H:%M:%S %z')
+ if start<=at<=end:rows.append({'at':at.isoformat(),'method':m[3],'path':m[4],'status':int(m[5]),'client_fingerprint':hashlib.sha256(m[1].encode()).hexdigest()[:12]})
+print(json.dumps({'read_only':True,'window_utc':[start.isoformat(),end.isoformat()],'counts':dict(collections.Counter(str(r['status']) for r in rows)),'errors':[r for r in rows if r['status']>=400],'successful_independent_reading':[r for r in rows if r['status']==200 and datetime.datetime.fromisoformat(r['at'])>=datetime.datetime(2026,11,12,7,0,tzinfo=datetime.timezone.utc) and r['path'] in ['/docs/session','/docs/session/guide.md']]}))
+""")
 elif phase=='status':
  remote(fr"""import pathlib,json,subprocess,re,hashlib
 r=pathlib.Path('{root}')
