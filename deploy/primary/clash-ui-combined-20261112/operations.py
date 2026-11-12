@@ -59,7 +59,7 @@ print(json.dumps({{'driver_dispatched':True,'application_sha':'{sha}'}}))
 elif phase=='resume-precutover':
  remote(pathlib.Path(__file__).with_name('review_concurrent_okad.py').read_text()+'\n'+pathlib.Path(__file__).with_name('resume-precutover.py').read_text())
 elif phase=='status':
- remote(f"""import pathlib,json
+ remote(f"""import pathlib,json,subprocess,re,hashlib
 r=pathlib.Path('{root}')
 for name in ['image-loaded.json','premigration-backup.json','initial-start-failure.json','reviewed-concurrent-okad.json','precutover-retry-1.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','progress.json','rolling-old-drain-progress.json','rolling-canary-drain-progress.json','after.json','api-verification.json','deployment-verification.json','live-billing-verification.json','live-billing-cleanup.json','live-flare-default-result.json','live-sunburst-transparent-25-result.json','deferred-old.json','deferred-canary.json']:
  p=r/name
@@ -70,6 +70,17 @@ for name in ['image-loaded.json','premigration-backup.json','initial-start-failu
   print(name,json.dumps(d))
 p=r/'driver.log'
 if p.exists():print(p.read_text()[-3500:])
+progress=json.loads((r/'progress.json').read_text()) if (r/'progress.json').exists() else {{}}
+if progress.get('step')=='drain-canary':
+ d=json.loads(subprocess.check_output(['docker','inspect','adobe-relay-memory-canary']))[0]
+ raw=subprocess.check_output(['nsenter','-t',str(d['State']['Pid']),'-n','ss','-nti','state','established','sport = :8080'],text=True)
+ pending=[]
+ for block in re.split(r'\n(?=\S)',raw)[1:]:
+  sent=re.search(r'bytes_sent:(\d+)',block)
+  if sent is None or int(sent[1])<=128:
+   first=block.splitlines()[0].split()
+   pending.append({{'connection_fingerprint':hashlib.sha256(' '.join(first[2:]).encode()).hexdigest()[:12],'receive_queue':first[0],'send_queue':first[1],'counters':dict(re.findall(r'(bytes_sent|bytes_received|lastsnd|lastrcv|lastack|segs_in|segs_out):([0-9]+)',block))}})
+ print('pending-input-metadata',json.dumps(pending))
 """)
 elif phase=='verify':
  browser=pathlib.Path(__file__).with_name('live-browser-verification.json')
