@@ -7,7 +7,8 @@ start=end-datetime.timedelta(minutes=20)
 def ts(v):return datetime.datetime.fromisoformat(v.replace('Z','+00:00'))
 window="created_at>='"+start.isoformat()+"' AND created_at<'"+end.isoformat()+"'"
 def sql(q):
-    p=subprocess.run(['docker','exec','-i','adobe-relay-postgres-1','psql','-U','sub2api','-d','sub2api','-Atq','-v','ON_ERROR_STOP=1'],input="BEGIN READ ONLY;SET LOCAL statement_timeout='12s';"+q+';COMMIT;',text=True,capture_output=True,check=True,timeout=25)
+    p=subprocess.run(['docker','exec','-i','adobe-relay-postgres-1','psql','-U','sub2api','-d','sub2api','-Atq','-v','ON_ERROR_STOP=1'],input="BEGIN READ ONLY;SET LOCAL statement_timeout='12s';"+q+';COMMIT;',text=True,capture_output=True,timeout=25)
+    if p.returncode:raise RuntimeError(p.stderr[:1500])
     return json.loads(p.stdout.strip())
 def safe(s):
     s=re.sub(r'https?://[^\s"<>]+','[url]',str(s or ''))
