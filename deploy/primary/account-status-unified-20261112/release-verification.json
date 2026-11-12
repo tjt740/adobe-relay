@@ -1,0 +1,95 @@
+{
+  "application_sha": "871822afc3d6b30d51a2abbbbbcddf5644cd5f89",
+  "image_id": "sha256:d865b27f5c3604a70af55eda34bffdfe9cd79cedd88fd3e071f1de6760e3ca72",
+  "status": "deployed_account_status_filters_verified",
+  "verified_at": "2026-11-12T06:46:35.592480+00:00",
+  "feature_pr": 195,
+  "merge_sha": "22bc65e02b8107375d95444b912595ea3f8b7770",
+  "build_run": 43165084326,
+  "prepare_run": 43166523305,
+  "start_run": 43166972327,
+  "earlier_verification_failure_runs": [
+    43168472756,
+    43169311243
+  ],
+  "operator_review_run": 43169193021,
+  "verification_run": 43170436289,
+  "business_preservation": {
+    "backup_accounts": 1218,
+    "checked_accounts": 1218,
+    "manual_pauses_preserved": false,
+    "audited_operator_pause_changes_retained": 5,
+    "audited_operator_model_mapping_changes_retained": 21,
+    "manual_proxy_modes_preserved": true,
+    "proxy_bindings_changed_with_event_chain": 12,
+    "cookie_rotations_with_version_advance": 0,
+    "non_source_cookie_credential_changes": 15,
+    "credential_field_names_changed": [
+      "model_mapping"
+    ]
+  },
+  "operator_audit_event_ids": [
+    178450,
+    178459,
+    178461,
+    178462,
+    178463,
+    178488,
+    178524,
+    178535,
+    178541,
+    178588,
+    178656
+  ],
+  "temporary_cleanup": {
+    "at": "2026-11-12T06:28:10.738840+00:00",
+    "temporary_container_removed": true,
+    "temporary_nat_rule_removed": true,
+    "rolling_lease_removed": true,
+    "nginx_configuration_unchanged": true
+  },
+  "browser_cases": 6,
+  "passive_samples": 13,
+  "account_filter_checks": [
+    {
+      "status": "test_passed",
+      "pages": 2,
+      "returned": 193,
+      "total_observed": [
+        192,
+        193
+      ],
+      "every_returned_result_matches": true
+    },
+    {
+      "status": "test_failed",
+      "pages": 2,
+      "returned": 145,
+      "total_observed": [
+        145,
+        145
+      ],
+      "every_returned_result_matches": true
+    },
+    {
+      "status": "request_failed",
+      "pages": 6,
+      "returned": 589,
+      "total_observed": [
+        590,
+        589,
+        589,
+        589,
+        589,
+        589
+      ],
+      "every_returned_result_matches": true
+    }
+  ],
+  "sources": 9,
+  "nodes": 666,
+  "cutover_backup": "/opt/adobe-relay/backups/20261112T062115Z-871822afc3d6b30d51a2abbbbbcddf5644cd5f89",
+  "docs_update_pending_at_application_archive": true,
+  "active_generation": false,
+  "mail_sent": false
+}
