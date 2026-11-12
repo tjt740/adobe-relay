@@ -1,7 +1,7 @@
 """Operate the authorized release with exact CI artifacts and preserved guards."""
 import base64,datetime,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','resume-precutover','resume-drain','review-operator-edits','inspect-subscription','status','verify','archive']
+assert phase in ['preflight','prepare','start','resume-precutover','resume-drain','review-operator-edits','inspect-subscription','review-subscription','status','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/clash-ui-combined-20261112'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -72,6 +72,9 @@ elif phase=='review-operator-edits':
  remote(f"import subprocess,pathlib; r=pathlib.Path('{root}'); assert not (r/'operator-changes-review.json').exists(); subprocess.run(['/usr/bin/python3',str(r/'review-operator-edits.py')],check=True)")
 elif phase=='inspect-subscription':
  remote(pathlib.Path(__file__).with_name('inspect-subscription.py').read_text())
+elif phase=='review-subscription':
+ copy([pathlib.Path(__file__).with_name(name) for name in ['audit.py','api-verify.py','review-subscription.py','subscription_review_guard.py']])
+ remote(f"import subprocess,pathlib; r=pathlib.Path('{root}'); assert not (r/'reviewed-operator-subscription.json').exists(); subprocess.run(['/usr/bin/python3',str(r/'review-subscription.py')],check=True)")
 elif phase=='status':
  remote(fr"""import pathlib,json,subprocess,re,hashlib
 r=pathlib.Path('{root}')

@@ -40,6 +40,8 @@ for pid in ids:
   assert not {'credentials','password','token','cookie'}.intersection(item)
  related_proofs.append({'proxy_id':pid,'total':view['total'],'returned':len(view['items'])})
 before=json.loads((ROOT/'before.json').read_text())
-assert a.snapshot()['clash_settings_hash']==before['clash_settings_hash']
+review_file=ROOT/'reviewed-operator-subscription.json'
+expected=a.reviewed_subscription_hashes(before,json.loads(review_file.read_text()) if review_file.exists() else None)
+assert a.snapshot()['clash_settings_hash']==expected['clash_settings_hash']
 proof={'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'application_sha':sha,'passed':True,'read_only':True,'sources':len(urls),'nodes':len(data['nodes']),'settings_fields_verified':True,'health_details_verified':True,'related_account_queries':related_proofs,'priorities_not_preset':True,'active_generation':False,'production_writes':False}
 a.save('api-verification.json',proof);print(json.dumps(proof))
