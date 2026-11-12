@@ -61,7 +61,7 @@ elif phase=='resume-precutover':
 elif phase=='status':
  remote(f"""import pathlib,json
 r=pathlib.Path('{root}')
-for name in ['progress.json','rolling-old-drain-progress.json','rolling-canary-drain-progress.json','after.json','api-verification.json','deployment-verification.json','live-billing-verification.json','live-billing-cleanup.json','live-flare-default-result.json','live-sunburst-transparent-25-result.json','deferred-old.json','deferred-canary.json']:
+for name in ['image-loaded.json','premigration-backup.json','initial-start-failure.json','reviewed-concurrent-okad.json','precutover-retry-1.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','progress.json','rolling-old-drain-progress.json','rolling-canary-drain-progress.json','after.json','api-verification.json','deployment-verification.json','live-billing-verification.json','live-billing-cleanup.json','live-flare-default-result.json','live-sunburst-transparent-25-result.json','deferred-old.json','deferred-canary.json']:
  p=r/name
  if p.exists():
   d=json.loads(p.read_text())
@@ -72,6 +72,11 @@ p=r/'driver.log'
 if p.exists():print(p.read_text()[-3500:])
 """)
 elif phase=='verify':
+ browser=pathlib.Path(__file__).with_name('live-browser-verification.json')
+ if browser.exists():
+  proof=json.loads(browser.read_text());assert proof['application_sha']==sha and proof['authenticated'] and proof['case_count']==6 and not proof['attempted_writes'] and not proof['runtime_errors']
+  encoded=base64.b64encode(browser.read_bytes()).decode()
+  remote(f"import pathlib,base64,json; r=pathlib.Path('{root}'); assert (r/'expected-sha').read_text().strip()=='{sha}'; p=r/'live-browser-verification.json'; data=base64.b64decode('{encoded}'); assert not p.exists() or p.read_bytes()==data; p.write_bytes(data); p.chmod(0o600)")
  remote(f"""import pathlib,subprocess,sys
 r=pathlib.Path('{root}')
 assert (r/'expected-sha').read_text().strip()=='{sha}'
