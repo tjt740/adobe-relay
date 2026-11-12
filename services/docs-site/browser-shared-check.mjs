@@ -60,6 +60,15 @@ try {
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    assert.equal(await page.locator('.copy').count(),(expected.toString().match(/^```[^\n]*$/gm)||[]).length/2);
    if(role==='admin')await page.screenshot({path:path.join(out,`shared-${width}.png`)});
+   if(role==='admin'){
+    const statusHeading=page.locator('article h2').filter({hasText:'10. 账号状态、分组归属与并发占用'});
+    await statusHeading.scrollIntoViewIfNeeded();
+    assert.equal(await statusHeading.count(),1);
+    assert((await page.locator('article').innerText()).includes('检测通过不表示已分配') || (await page.locator('article').innerText()).includes('“检测通过”不表示已分配'));
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await page.screenshot({path:path.join(out,`account-status-${width}.png`)});
+   }
+
    await page.setViewportSize({width:1440,height:950});
    const downloading=page.waitForEvent('download');await page.getByRole('link',{name:'下载 Markdown'}).click();
    assert.deepEqual(await fs.readFile(await (await downloading).path()),expected);

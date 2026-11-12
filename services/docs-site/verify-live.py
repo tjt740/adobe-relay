@@ -46,6 +46,8 @@ try:
     assert results['example_blocks']==24
     assert all(v in text for v in ['output_format=webp','0–100','invalid_output_compression','invalid_image_output'])
     assert 'WebP 本地待发布' not in text
+    assert all(v in text for v in ['## 10. 账号状态、分组归属与并发占用','检测通过','不表示已分配','所属分组','当前并发','调度开关','真实来源'])
+    results['account_status_meaning_documented']=True
     results['native_webp_documented']=True
     results['image26_names_and_quality_contract']=True
 finally:
