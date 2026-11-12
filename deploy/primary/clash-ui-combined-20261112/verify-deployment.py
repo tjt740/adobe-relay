@@ -43,9 +43,14 @@ observation=json.loads((ROOT/'observation.json').read_text());assert len(observa
 business=json.loads((ROOT/'business-verification.json').read_text())
 credentials=json.loads((ROOT/'credential-change-review.json').read_text())
 assert not business['missing_ids'], 'Review concurrent deletions before final verification'
-assert business['manual_pause_preserved'] and business['manual_proxy_modes_preserved'] and all(c['proxy_chain_matches'] for c in business['changes'])
+operator_review=json.loads((ROOT/'operator-changes-review.json').read_text()) if not business['manual_pause_preserved'] else None
+if operator_review:
+ assert operator_review['status']=='confirmed_operator_changes_retained' and operator_review['application_sha']==sha
+ assert operator_review['original_business_report_sha256']==hashlib.sha256((ROOT/'business-verification.json').read_bytes()).hexdigest()
+ assert len(operator_review['approved_pause_ids'])==63 and len(operator_review['approved_mapping_ids'])==49 and operator_review['other_manual_pause_states_preserved']
+assert (business['manual_pause_preserved'] or operator_review is not None) and business['manual_proxy_modes_preserved'] and all(c['proxy_chain_matches'] for c in business['changes'])
 assert all(c['version_advanced'] and c['issuer_compatible'] and c['source_key_compatible'] for c in credentials['cookie_changed_accounts'])
-summary={'backup_accounts':business['before_count'],'checked_accounts':business['current_count'],'manual_pauses_preserved':True,'manual_proxy_modes_preserved':True,'proxy_bindings_changed_with_event_chain':sum('proxy_id' in c['fields'] for c in business['changes']),'cookie_rotations_with_version_advance':len(credentials['cookie_changed_accounts']),'non_source_cookie_credential_changes':len(credentials['token_fields_only_accounts']), 'credential_field_names_changed':sorted({key for change in business['changes'] for key in change['credential_keys_changed']})}
+summary={'backup_accounts':business['before_count'],'checked_accounts':business['current_count'],'manual_pauses_preserved':business['manual_pause_preserved'],'confirmed_operator_pause_changes_retained':len(operator_review['approved_pause_ids']) if operator_review else 0,'confirmed_operator_model_mapping_changes_retained':len(operator_review['approved_mapping_ids']) if operator_review else 0,'manual_proxy_modes_preserved':True,'proxy_bindings_changed_with_event_chain':sum('proxy_id' in c['fields'] for c in business['changes']),'cookie_rotations_with_version_advance':len(credentials['cookie_changed_accounts']),'non_source_cookie_credential_changes':len(credentials['token_fields_only_accounts']), 'credential_field_names_changed':sorted({key for change in business['changes'] for key in change['credential_keys_changed']})}
 installed=json.loads(a.sql("SELECT json_object_agg(filename,checksum) FROM schema_migrations"))
 expected=json.loads((ROOT/'installed-migrations-before.json').read_text())
 new_migrations=json.loads((ROOT/'migration-manifest.json').read_text())

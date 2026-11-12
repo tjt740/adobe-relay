@@ -1,7 +1,7 @@
 """Operate the authorized release with exact CI artifacts and preserved guards."""
 import base64,datetime,hashlib,json,os,pathlib,re,subprocess,sys
 phase,sha,build=sys.argv[1:]
-assert phase in ['preflight','prepare','start','resume-precutover','resume-drain','status','verify','archive']
+assert phase in ['preflight','prepare','start','resume-precutover','resume-drain','review-operator-edits','status','verify','archive']
 assert re.fullmatch('[0-9a-f]{40}',sha) and build.isdigit()
 root='/opt/adobe-relay/releases/clash-ui-combined-20261112'
 options=['-i',os.environ.get('PRIMARY_SSH_IDENTITY',str(pathlib.Path.home()/'.ssh/deploy_key')),'-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','ConnectTimeout=20','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3']
@@ -67,10 +67,13 @@ assert not (r/'canary-drain-retry-1.json').exists()
 subprocess.run(['systemd-run','--unit=clash-ui-combined-drain-20261112-retry1','--collect','--property=WorkingDirectory={root}','--property=StandardOutput=append:{root}/driver.log','--property=StandardError=append:{root}/driver.log','/usr/bin/python3',str(r/'resume-drain.py')],check=True)
 print('Existing canary natural drain continuation dispatched')
 """)
+elif phase=='review-operator-edits':
+ copy([pathlib.Path(__file__).with_name('review-operator-edits.py'),pathlib.Path(__file__).with_name('verify-deployment.py')])
+ remote(f"import subprocess,pathlib; r=pathlib.Path('{root}'); assert not (r/'operator-changes-review.json').exists(); subprocess.run(['/usr/bin/python3',str(r/'review-operator-edits.py')],check=True)")
 elif phase=='status':
  remote(fr"""import pathlib,json,subprocess,re,hashlib
 r=pathlib.Path('{root}')
-for name in ['canary-drain-initial-failure.json','canary-drain-retry-1.json','image-loaded.json','premigration-backup.json','initial-start-failure.json','reviewed-concurrent-okad.json','precutover-retry-1.json','process-preservation.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','progress.json','rolling-old-drain-progress.json','rolling-canary-drain-progress.json','after.json','api-verification.json','deployment-verification.json','live-billing-verification.json','live-billing-cleanup.json','live-flare-default-result.json','live-sunburst-transparent-25-result.json','deferred-old.json','deferred-canary.json']:
+for name in ['operator-changes-review.json','canary-drain-initial-failure.json','canary-drain-retry-1.json','image-loaded.json','premigration-backup.json','initial-start-failure.json','reviewed-concurrent-okad.json','precutover-retry-1.json','process-preservation.json','rolling-route-canary.json','rolling-route-canonical.json','rolling-finished.json','progress.json','rolling-old-drain-progress.json','rolling-canary-drain-progress.json','after.json','api-verification.json','deployment-verification.json','live-billing-verification.json','live-billing-cleanup.json','live-flare-default-result.json','live-sunburst-transparent-25-result.json','deferred-old.json','deferred-canary.json']:
  p=r/name
  if p.exists():
   d=json.loads(p.read_text())
