@@ -1,0 +1,128 @@
+{
+  "at": "2026-11-12T06:26:35.329Z",
+  "application_sha": "871822afc3d6b30d51a2abbbbbcddf5644cd5f89",
+  "site": "https://creative.cheap",
+  "browser": "Chrome desktop automation",
+  "authenticated": true,
+  "case_count": 6,
+  "viewport_widths": [
+    1440,
+    390
+  ],
+  "results": [
+    {
+      "width": 1440,
+      "status": "test_passed",
+      "label": "检测通过",
+      "total": 218,
+      "returned": 50,
+      "displayed": 50,
+      "all_labels_match": true
+    },
+    {
+      "width": 1440,
+      "status": "test_failed",
+      "label": "检测失败",
+      "total": 145,
+      "returned": 50,
+      "displayed": 50,
+      "all_labels_match": true
+    },
+    {
+      "width": 1440,
+      "status": "request_failed",
+      "label": "请求失败",
+      "total": 563,
+      "returned": 50,
+      "displayed": 50,
+      "all_labels_match": true
+    },
+    {
+      "width": 390,
+      "status": "test_passed",
+      "label": "检测通过",
+      "total": 221,
+      "returned": 50,
+      "displayed": 50,
+      "all_labels_match": true
+    },
+    {
+      "width": 390,
+      "status": "test_failed",
+      "label": "检测失败",
+      "total": 145,
+      "returned": 50,
+      "displayed": 50,
+      "all_labels_match": true
+    },
+    {
+      "width": 390,
+      "status": "request_failed",
+      "label": "请求失败",
+      "total": 563,
+      "returned": 50,
+      "displayed": 50,
+      "all_labels_match": true
+    }
+  ],
+  "attempted_writes": [],
+  "suppressed_background_usage_queries": [
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/usage/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/usage/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/usage/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/usage/batch"
+    }
+  ],
+  "read_only_post_queries": [
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/today-stats/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/today-stats/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/today-stats/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/today-stats/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/today-stats/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/today-stats/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/today-stats/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/today-stats/batch"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/accounts/today-stats/batch"
+    }
+  ],
+  "runtime_errors": [],
+  "active_generation": false,
+  "limitation": "Viewport emulation; not a physical mobile-device test. Background usage queries were blocked to prevent credential/cooldown updates; only status and filter behavior was accepted."
+}
