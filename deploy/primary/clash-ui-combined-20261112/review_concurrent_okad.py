@@ -26,7 +26,7 @@ def reviewed_baseline(before, current, receipts):
         assert after['other_containers']['/'+APP] == {'id':before['containers'][APP]['id'], 'image':before['containers'][APP]['image_id']}
         expected = dict(prior['source_hashes'])
         for name, change in manifest['files'].items():
-            assert prior['source_hashes'][name] == change['before']
+            assert prior['source_hashes'].get(name) == change['before']
             expected[name] = change['after']
         assert after['source_hashes'] == expected
         previous = {'id':after['container'], 'image_id':after['image_id'], 'image':after['image']}

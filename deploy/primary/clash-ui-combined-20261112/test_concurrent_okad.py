@@ -47,3 +47,13 @@ class ConcurrentOkadReviewTests(TestCase):
     def test_other_application_replacement_is_rejected(self):
         self.receipts[-1]['after']['other_containers']['/'+m.APP]['id']='other'
         with self.assertRaises(AssertionError):m.reviewed_baseline(self.before,self.current,self.receipts)
+
+    def test_manifested_new_file_with_absent_original_is_allowed(self):
+        self.receipts[-1]['manifest']['files']['new.py']={'before':None,'after':'created'}
+        self.receipts[-1]['after']['source_hashes']['new.py']='created'
+        self.assertEqual(m.reviewed_baseline(self.before,self.current,self.receipts),self.current)
+
+    def test_claimed_existing_file_cannot_be_missing(self):
+        self.receipts[-1]['manifest']['files']['new.py']={'before':'claimed-original','after':'created'}
+        self.receipts[-1]['after']['source_hashes']['new.py']='created'
+        with self.assertRaises(AssertionError):m.reviewed_baseline(self.before,self.current,self.receipts)
