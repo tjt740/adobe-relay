@@ -30,11 +30,13 @@ jobs:
           mkdir -p incident-evidence
           ssh -i ~/.ssh/incident_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=2 root@173.234.15.150 'python3 -' < deploy/primary/proxy-502-followup-20261112/inspect.py > incident-evidence/report.json
           python3 -m json.tool incident-evidence/report.json > /dev/null
+          ssh -i ~/.ssh/incident_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=2 root@173.234.15.150 'python3 -' < deploy/primary/proxy-502-followup-20261112/verify.py > incident-evidence/verification.json
+          python3 -m json.tool incident-evidence/verification.json > /dev/null
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: proxy-502-evidence
-          path: incident-evidence/report.json
+          path: incident-evidence/*.json
           retention-days: 7
       - name: Remove runner SSH key
         if: always()
