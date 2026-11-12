@@ -189,13 +189,19 @@ func fetchSubscriptionDetails(ctx context.Context, client *http.Client, raw stri
 	if err != nil {
 		return nil, nil, err
 	}
+	return fetchSubscriptionURLs(ctx, client, urls, nil)
+}
+
+func fetchSubscriptionURLs(ctx context.Context, client *http.Client, urls []string, skip map[string]bool) ([]Node, []Source, error) {
 	batch, cancel := context.WithTimeout(ctx, 35*time.Second)
 	defer cancel()
-	jobs := make([]feedJob, len(urls))
+	jobs := make([]feedJob, 0, len(urls))
 	sources := make([]Source, len(urls))
 	bySource := make([][]Node, len(urls))
 	for i, u := range urls {
-		jobs[i] = feedJob{url: u, index: i + 1}
+		if !skip[u] {
+			jobs = append(jobs, feedJob{url: u, index: i + 1})
+		}
 		sources[i] = Source{ID: sourceID(u), Index: i + 1, URLHint: sourceHint(u), FetchError: "not_checked"}
 	}
 	total := 0
@@ -359,6 +365,7 @@ func (m *Manager) refreshSourcesWithin(ctx context.Context, budget time.Duration
 // ProxySources exposes only source identity and admission, never feed URLs or
 // node credentials. It also supports old documents before their first refresh.
 type ProxySource struct {
+	Priority         int
 	TrafficAvailable bool
 	ID               string
 	Blocked          bool
@@ -424,7 +431,7 @@ func LoadProxySources(ctx context.Context, q interface {
 		reason := sources[n.SourceID].BlockReason(time.Now())
 		src := sources[n.SourceID]
 		known := src.Traffic != nil && src.Traffic.Total > 0 && src.Traffic.remaining() > 0 && time.Since(src.Traffic.ObservedAt) <= 15*time.Minute
-		result[n.ProxyID] = ProxySource{ID: n.SourceID, Blocked: reason != "", Reason: reason, TrafficAvailable: known}
+		result[n.ProxyID] = ProxySource{ID: n.SourceID, Priority: s.Priorities[n.SourceID], Blocked: reason != "", Reason: reason, TrafficAvailable: known}
 	}
 	return result, rows.Err()
 }

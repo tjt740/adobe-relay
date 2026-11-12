@@ -17,17 +17,33 @@
           <label for="clash-subscription-url" class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('admin.proxies.clash.url') }}</label>
           <span v-if="state?.revision" class="text-xs text-gray-500">{{ t('admin.proxies.clash.updated') }} {{ formatDateTime(state.updated_at) }}</span>
         </div>
-        <SubscriptionSourceEditor v-model="url" :disabled="operationBusy" :sources="observations" @update:model-value="invalidatePreview" @checking="sourceChecking = $event" />
+        <SubscriptionSourceEditor v-model="url" v-model:notes="notes" v-model:priorities="priorities" :disabled="operationBusy" :sources="observations" @update:model-value="invalidatePreview" @checking="sourceChecking = $event" />
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span class="text-xs text-gray-500">{{ t('admin.proxies.clash.sourceCount', { count: url.trim() ? new Set(url.trim().split(/\s+/)).size : state?.sources?.length ?? 0 }) }}</span>
-          <button type="submit" class="btn btn-secondary h-10" :disabled="busy || (!url.trim() && !state?.url_hint)">
-            <Icon name="refresh" size="sm" :class="previewing ? 'motion-safe:animate-spin' : ''" />
-            {{ t(previewing ? 'admin.proxies.clash.previewing' : 'admin.proxies.clash.preview') }}
-          </button>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" class="btn btn-secondary h-10" :disabled="busy || !savedSettingsDirty" @click="saveSettings">
+              {{ t('admin.proxies.clash.saveSettings') }}
+            </button>
+            <button type="submit" class="btn btn-secondary h-10" :disabled="busy || (!url.trim() && !state?.url_hint)">
+              <Icon name="refresh" size="sm" :class="previewing ? 'motion-safe:animate-spin' : ''" />
+              {{ t(previewing ? 'admin.proxies.clash.previewing' : 'admin.proxies.clash.preview') }}
+            </button>
+            <button type="button" class="btn btn-primary h-10" :disabled="busy || !newURLs.length || !state?.configured" @click="importNew">
+              <Icon :name="appending ? 'refresh' : 'plus'" size="sm" :class="appending ? 'motion-safe:animate-spin' : ''" />
+              {{ t(appending ? 'admin.proxies.clash.importing' : 'admin.proxies.clash.importNew', { count: newURLs.length }) }}
+            </button>
+          </div>
         </div>
+        <p class="text-xs leading-relaxed text-gray-500">{{ t('admin.proxies.clash.appendHint') }}</p>
+        <p class="text-xs leading-relaxed text-gray-500">{{ t('admin.proxies.clash.notesHint') }}</p>
+        <p class="text-xs leading-relaxed text-gray-500">{{ t('admin.proxies.clash.priorityHint') }}</p>
         <p class="text-xs leading-relaxed text-gray-500">{{ t('admin.proxies.clash.replaceHint') }}</p>
       </form>
 
+      <div v-if="skippedSources.length" class="rounded-lg bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-300" role="status">
+        <p>{{ t('admin.proxies.clash.skippedNew', { count: skippedSources.length }) }}</p>
+        <p v-for="source in skippedSources" :key="source.id">{{ source.url_hint }} · {{ sourceReason(source) }}</p>
+      </div>
       <div v-if="failedSources.length" class="space-y-1 rounded-lg bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-300" role="status">
         <p class="flex items-center gap-1.5 font-medium"><Icon name="exclamationTriangle" size="sm" />{{ t('admin.proxies.clash.partialFailure', { count: failedSources.length }) }}</p>
         <p v-for="source in failedSources" :key="source.id">{{ t('proxyHealth.source', { index: source.index }) }} · {{ sourceReason(source) }}</p>
@@ -159,7 +175,7 @@ import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import SubscriptionSourceEditor from './SubscriptionSourceEditor.vue'
-import { getClashSubscription, previewClashSubscription, importClashSubscription, type ClashNode, type ClashSource, type ClashSubscription } from '@/api/admin/clash'
+import { getClashSubscription, previewClashSubscription, importClashSubscription, importNewClashSubscriptions, saveClashSettings, type ClashNode, type ClashSource, type ClashSubscription } from '@/api/admin/clash'
 import { storeToRefs } from 'pinia'
 import { useClashNodeTestStore } from '@/stores/clashNodeTests'
 import { formatDateTime } from '@/utils/format'
@@ -169,6 +185,30 @@ const { t } = useI18n()
 const state = ref<ClashSubscription | null>(null)
 const nodes = ref<ClashNode[]>([])
 const url = ref('')
+const notes = ref<Record<string, string>>({})
+const priorities = ref<Record<string, number>>({})
+const notesSaving = ref(false)
+const appending = ref(false)
+const skippedSources = ref<ClashSource[]>([])
+const urlsOf = (value: string) => [...new Set(value.trim().split(/\s+/).filter(Boolean))]
+const savedURLs = computed(() => new Set(urlsOf(state.value?.url ?? '')))
+const newURLs = computed(() => urlsOf(url.value).filter(u => !savedURLs.value.has(u)))
+function noteEdits(savedOnly = false) {
+  return Object.fromEntries(urlsOf(savedOnly ? state.value?.url ?? '' : url.value)
+    .filter(u => (notes.value[u] ?? '').trim() !== (state.value?.notes?.[u] ?? ''))
+    .map(u => [u, (notes.value[u] ?? '').trim()]))
+}
+function priorityEdits(savedOnly = false) {
+  return Object.fromEntries(urlsOf(savedOnly ? state.value?.url ?? '' : url.value)
+    .filter(u => (priorities.value[u] ?? 0) !== (state.value?.priorities?.[u] ?? 0))
+    .map(u => [u, priorities.value[u] ?? 0]))
+}
+const savedSettingsDirty = computed(() => Object.keys(noteEdits(true)).length > 0 || Object.keys(priorityEdits(true)).length > 0)
+function settingsOptions() {
+  const edits = noteEdits()
+  const priority = priorityEdits()
+  return Object.keys(edits).length || Object.keys(priority).length ? { notes: edits, priorities: priority, settings_revision: state.value?.settings_revision ?? 0 } : undefined
+}
 const sourceChecking = ref(false)
 const observations = ref<ClashSource[]>([])
 const failedSources = computed(() => observations.value.filter(source => source.fetch_error))
@@ -183,10 +223,10 @@ const nodeTests = useClashNodeTestStore()
 const { testing, testingIDs, done: testDone, total: testTotal, results, healthyCount, completed } = storeToRefs(nodeTests)
 const errorMessage = ref('')
 const successMessage = ref('')
-const operationBusy = computed(() => loading.value || previewing.value || saving.value || testing.value)
+const operationBusy = computed(() => loading.value || previewing.value || saving.value || notesSaving.value || appending.value || testing.value)
 const busy = computed(() => operationBusy.value || sourceChecking.value)
 const testableNodes = computed(() => (state.value?.nodes ?? []).filter(n => n.enabled && n.proxy_id))
-const closeBlocked = computed(() => loading.value || previewing.value || saving.value || sourceChecking.value)
+const closeBlocked = computed(() => loading.value || previewing.value || saving.value || notesSaving.value || appending.value || sourceChecking.value)
 const testSummary = computed(() => completed.value ? t('admin.proxies.clash.testComplete', { success: healthyCount.value, failed: testTotal.value - healthyCount.value }) : '')
 const protocols = computed(() => {
   const counts = new Map<string, number>()
@@ -215,7 +255,7 @@ function errorText(error: unknown): string {
 }
 function close() { if (!closeBlocked.value) emit('close') }
 function requestURL() { return url.value.trim() === state.value?.url ? '' : url.value.trim() }
-function invalidatePreview() { observations.value = []; hasPreview.value = false; nodes.value = state.value?.nodes ?? []; search.value = ''; successMessage.value = ''; errorMessage.value = '' }
+function invalidatePreview() { skippedSources.value = []; observations.value = []; hasPreview.value = false; nodes.value = state.value?.nodes ?? []; search.value = ''; successMessage.value = ''; errorMessage.value = '' }
 function toggle(name: string) { const next = new Set(selected.value); if (next.has(name)) next.delete(name); else next.add(name); selected.value = next }
 function selectAll() { selected.value = new Set(nodes.value.filter(n => selected.value.size !== nodes.value.length || n.retained).map(n => n.name)) }
 function endpoint(host?: string, port?: number) { return host ? `${host.includes(':') && !host.startsWith('[') ? `[${host}]` : host}${port ? `:${port}` : ''}` : '—' }
@@ -235,7 +275,7 @@ function healthClass(node: ClashNode) {
 }
 async function load() {
   loading.value = true
-  try { state.value = await getClashSubscription(); nodes.value = state.value.nodes; url.value = state.value.url ?? ''; observations.value = state.value.sources ?? [] }
+  try { state.value = await getClashSubscription(); nodes.value = state.value.nodes; url.value = state.value.url ?? ''; notes.value = { ...state.value.notes }; priorities.value = { ...state.value.priorities }; observations.value = state.value.sources ?? [] }
   catch (e) { errorMessage.value = errorText(e) }
   finally { loading.value = false }
 }
@@ -254,14 +294,45 @@ async function save() {
   saving.value = true; errorMessage.value = ''; successMessage.value = ''
   try {
     const sourceIDs = Object.fromEntries(nodes.value.filter(n => n.source_id && selected.value.has(n.name)).map(n => [n.name, n.source_id!]))
-    state.value = await (Object.keys(sourceIDs).length
+    const edits = settingsOptions()
+    state.value = await (edits
+      ? importClashSubscription(requestURL(), [...selected.value], previewRevision.value, sourceIDs, edits)
+      : Object.keys(sourceIDs).length
       ? importClashSubscription(requestURL(), [...selected.value], previewRevision.value, sourceIDs)
       : importClashSubscription(requestURL(), [...selected.value], previewRevision.value))
-    nodes.value = state.value.nodes; hasPreview.value = false; url.value = state.value.url ?? url.value; nodeTests.clearResults(); search.value = ''; observations.value = state.value.sources ?? []
+    notes.value = { ...notes.value, ...state.value.notes }; priorities.value = { ...priorities.value, ...state.value.priorities }; nodes.value = state.value.nodes; hasPreview.value = false; url.value = state.value.url ?? url.value; nodeTests.clearResults(); search.value = ''; observations.value = state.value.sources ?? []
     successMessage.value = t('admin.proxies.clash.imported', { count: state.value.nodes.filter(n => n.enabled).length })
     emit('changed', true)
   } catch (e) { errorMessage.value = errorText(e) }
   finally { saving.value = false }
+}
+async function saveSettings() {
+  if (busy.value || !state.value || !savedSettingsDirty.value) return
+  notesSaving.value = true; errorMessage.value = ''; successMessage.value = ''
+  try {
+    const data = await saveClashSettings(state.value.revision, { notes: noteEdits(true), priorities: priorityEdits(true), settings_revision: state.value.settings_revision ?? 0 })
+    state.value.priorities = data.priorities; state.value.notes = data.notes; state.value.settings_revision = data.settings_revision
+    notes.value = { ...notes.value, ...data.notes }; priorities.value = { ...priorities.value, ...data.priorities }
+    successMessage.value = t('admin.proxies.clash.settingsSaved')
+  } catch (e) { errorMessage.value = errorText(e) }
+  finally { notesSaving.value = false }
+}
+async function importNew() {
+  if (busy.value || !state.value?.configured || !newURLs.value.length) return
+  appending.value = true; errorMessage.value = ''; successMessage.value = ''; skippedSources.value = []
+  try {
+    const draftURLs = urlsOf(url.value)
+    const before = state.value.nodes.length
+    const data = await importNewClashSubscriptions(newURLs.value.join('\n'), state.value.revision, settingsOptions())
+    state.value = data; nodes.value = data.nodes; hasPreview.value = false; search.value = ''
+    notes.value = { ...notes.value, ...data.notes }; priorities.value = { ...priorities.value, ...data.priorities }
+    // Failed additions remain editable and are still new on the next attempt.
+    url.value = [...new Set([...urlsOf(data.url ?? ''), ...draftURLs])].join('\n')
+    observations.value = data.sources ?? []; skippedSources.value = data.skipped_sources ?? []
+    successMessage.value = t('admin.proxies.clash.newImported', { count: data.nodes.length - before })
+    emit('changed', true)
+  } catch (e) { errorMessage.value = errorText(e) }
+  finally { appending.value = false }
 }
 async function testNodes() {
   if (busy.value || !testableNodes.value.length) return

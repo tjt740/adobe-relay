@@ -573,6 +573,7 @@ func registerProxyRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth
 		proxies.POST("/clash/preview", h.Admin.Proxy.ClashPreview)
 		proxies.POST("/clash/check", h.Admin.Proxy.ClashCheck)
 		proxies.POST("/clash/import", h.Admin.Proxy.ClashImport)
+		proxies.PATCH("/clash/settings", h.Admin.Proxy.ClashSettings)
 		// 代理导出泄露账号密码原文——要求 step-up 2FA
 		proxies.GET("/data", gin.HandlerFunc(stepUpAuth), h.Admin.Proxy.ExportData)
 		proxies.POST("/data", h.Admin.Proxy.ImportData)
@@ -584,6 +585,7 @@ func registerProxyRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth
 		proxies.POST("/:id/quality-check", h.Admin.Proxy.CheckQuality)
 		proxies.GET("/:id/stats", h.Admin.Proxy.GetStats)
 		proxies.GET("/:id/accounts", h.Admin.Proxy.GetProxyAccounts)
+		proxies.GET("/:id/related-accounts", h.Admin.Proxy.RelatedAccounts)
 		proxies.POST("/batch-delete", h.Admin.Proxy.BatchDelete)
 		proxies.POST("/batch", h.Admin.Proxy.BatchCreate)
 	}

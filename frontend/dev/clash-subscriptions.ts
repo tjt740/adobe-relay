@@ -1,6 +1,7 @@
 // Synthetic development fixture: no production accounts, credentials or network calls.
 // Run with dev/account-recovery-demo.vite.ts to avoid app initialization requests.
 import { createApp, h, ref } from 'vue'
+import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import { apiClient } from '../src/api/client'
 import ClashSubscriptionModal from '../src/components/admin/proxy/ClashSubscriptionModal.vue'
@@ -18,7 +19,7 @@ const at = '2026-10-22T12:00:00+08:00'
 const urls = Array.from({ length: 12 }, (_, i) => `https://provider-${i + 1}.example/subscription?token=demo-${i + 1}`)
 const nodes = Array.from({ length: 103 }, (_, i) => ({ name: `订阅${i % 12 + 1} · Node ${i + 1}`, type: 'http', server: `node-${i + 1}.example`, server_port: 443, source_id: `sample${i % 12}`, proxy_id: i + 1, proxy_host: 'mihomo', proxy_port: 20000 + i, enabled: true }))
 const sources = urls.map((_, i) => ({ id: `sample${i}`, index: i + 1, url_hint: `https://provider-${i + 1}.example/••••`, node_count: 9, checked_at: at, fetch_error: i === 1 ? 'http_error' : '', http_status: i === 1 ? 503 : 200 }))
-const subscription = { configured: true, ready: true, revision: 3, updated_at: at, url: urls.join('\n'), url_hint: 'https://provider-1.example/••••', nodes, sources: sources.map(s => ({ ...s, fetch_error: '' })) }
+const subscription = { priorities: {} as Record<string, number>, notes: Object.fromEntries(urls.map((u, i) => [u, i === 0 ? '主力线路' : ''])), settings_revision: 0, configured: true, ready: true, revision: 3, updated_at: at, url: urls.join('\n'), url_hint: 'https://provider-1.example/••••', nodes, sources: sources.map(s => ({ ...s, fetch_error: '' })) }
 const requests: Array<{ url?: string; method?: string; data?: string }> = []
 Object.assign(window, { __clashQaRequests: requests })
 apiClient.defaults.adapter = async config => {
@@ -32,12 +33,38 @@ apiClient.defaults.adapter = async config => {
     const index = urls.indexOf(url)
     data = sources[index] ?? { id: 'new', index: 1, url_hint: 'https://new.example/••••', node_count: 16 }
   }
-  if (path.endsWith('/import')) data = { ...subscription, sources, revision: 4 }
+  if (path.endsWith('/settings')) {
+    const request = JSON.parse(config.data)
+    subscription.notes = { ...subscription.notes, ...request.notes }
+    subscription.priorities = { ...subscription.priorities, ...request.priorities }
+    subscription.settings_revision++
+    data = { ...subscription }
+  }
+  if (path.endsWith('/import')) {
+    const request = JSON.parse(config.data)
+    const incoming = [...new Set(String(request.url).split(/\s+/).filter(Boolean))]
+    const existing = subscription.url.split('\n')
+    const added = incoming.filter(u => !existing.includes(u))
+    if (request.mode === 'append') {
+      for (const u of added) {
+        const index = existing.length + 1
+        existing.push(u)
+        subscription.sources.push({ id: `sample${index}`, index, url_hint: new URL(u).origin + '/••••', node_count: 1, checked_at: at, fetch_error: '', http_status: 200 })
+        subscription.nodes.push({ ...nodes[0], name: `新增节点 ${index}`, proxy_id: 1000 + index, source_id: `sample${index}` })
+      }
+      subscription.url = existing.join('\n')
+    }
+    subscription.notes = { ...subscription.notes, ...request.notes }
+    subscription.priorities = { ...subscription.priorities, ...request.priorities }
+    subscription.settings_revision++
+    subscription.revision++
+    data = { ...subscription }
+  }
   return { config, status: 200, statusText: 'OK', headers: {}, data: { code: 0, data } }
 }
 createApp({
   setup() {
-    const show = ref(false)
+    const show = ref(params.get('modal') === '1')
     return () => h('main', { class: 'mx-auto max-w-7xl p-4 text-gray-900 dark:text-gray-100' }, [
       h('p', { class: 'mb-4 text-xs text-gray-500' }, 'Local synthetic fixture · 12 subscriptions · no production requests'),
       h(TablePageLayout, { scrollMode: 'page' }, {
@@ -48,4 +75,4 @@ createApp({
       show.value ? h(ClashSubscriptionModal, { onClose: () => { show.value = false } }) : null,
     ])
   },
-}).use(createI18n({ legacy: false, locale, messages: { zh, en } })).mount('#app')
+}).use(createPinia()).use(createI18n({ legacy: false, locale, messages: { zh, en } })).mount('#app')

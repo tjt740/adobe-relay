@@ -62,14 +62,39 @@ func TestMihomoLifecycleIntegration(t *testing.T) {
 	require.NoError(t, db.QueryRow(`INSERT INTO proxies(name,protocol,host,port,username,password,status) VALUES('Clash · Manual','http','mihomo',24900,'clash','manual-secret','active') RETURNING id`).Scan(&manualID))
 	// Two real outbound HTTP proxies return distinct markers, proving per-node routing.
 	upstream := func(label string) *httptest.Server {
-		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, label) }))
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodConnect {
+				fmt.Fprint(w, label)
+				return
+			}
+			// Mihomo tunnels through HTTP outbounds. The fixture must implement
+			// CONNECT instead of returning a body as if it were a direct origin.
+			conn, rw, err := w.(http.Hijacker).Hijack()
+			if err != nil {
+				return
+			}
+			defer conn.Close()
+			fmt.Fprint(rw, "HTTP/1.1 200 Connection established\r\n\r\n")
+			if err = rw.Flush(); err != nil {
+				return
+			}
+			if _, err = http.ReadRequest(rw.Reader); err != nil {
+				return
+			}
+			fmt.Fprintf(rw, "HTTP/1.1 200 OK\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s", len(label), label)
+			_ = rw.Flush()
+		}))
 	}
 	a, b := upstream("exit-a"), upstream("exit-b")
 	defer a.Close()
 	defer b.Close()
 	portOf := func(raw string) int { u, _ := url.Parse(raw); p, _ := strconv.Atoi(u.Port()); return p }
+	outboundHost := os.Getenv("CLASH_TEST_OUTBOUND_HOST")
+	if outboundHost == "" {
+		outboundHost = "host.docker.internal"
+	}
 	yamlBody := func(aPort int) string {
-		return fmt.Sprintf("proxies:\n - {name: A, type: http, server: host.docker.internal, port: %d}\n - {name: B, type: http, server: host.docker.internal, port: %d}\n", aPort, portOf(b.URL))
+		return fmt.Sprintf("proxies:\n - {name: A, type: http, server: %s, port: %d}\n - {name: B, type: http, server: %s, port: %d}\n", outboundHost, aPort, outboundHost, portOf(b.URL))
 	}
 	var mu sync.Mutex
 	subscription := yamlBody(portOf(a.URL))
@@ -126,6 +151,9 @@ func TestMihomoLifecycleIntegration(t *testing.T) {
 		}
 		defer res.Body.Close()
 		body, err := io.ReadAll(res.Body)
+		if res.StatusCode != http.StatusOK {
+			return string(body), fmt.Errorf("test proxy returned HTTP %d", res.StatusCode)
+		}
 		return string(body), err
 	}
 	body, err := requestThrough(original.Nodes[0])
@@ -315,7 +343,7 @@ func TestMihomoLifecycleIntegration(t *testing.T) {
 	require.Equal(t, cleaned.Revision, idempotent.Revision)
 	// Subscription order must not let a new node steal a retained node's port.
 	mu.Lock()
-	subscription = fmt.Sprintf("proxies:\n - {name: C, type: http, server: host.docker.internal, port: %d}\n - {name: A, type: http, server: host.docker.internal, port: %d}\n - {name: B, type: http, server: host.docker.internal, port: %d}\n", portOf(a.URL), portOf(a.URL), portOf(b.URL))
+	subscription = fmt.Sprintf("proxies:\n - {name: C, type: http, server: %s, port: %d}\n - {name: A, type: http, server: %s, port: %d}\n - {name: B, type: http, server: %s, port: %d}\n", outboundHost, portOf(a.URL), outboundHost, portOf(a.URL), outboundHost, portOf(b.URL))
 	mu.Unlock()
 	_, err = m.Import(ctx, ImportRequest{Names: []string{"C", "A", "B"}, Revision: cleaned.Revision})
 	require.NoError(t, err)
@@ -328,7 +356,7 @@ func TestMihomoLifecycleIntegration(t *testing.T) {
 	// Replacing every node in a single reload must not collide with listeners
 	// Mihomo has not closed yet. The next import may reuse those released ports.
 	mu.Lock()
-	subscription = fmt.Sprintf("proxies: [{name: D, type: http, server: host.docker.internal, port: %d}]", portOf(b.URL))
+	subscription = fmt.Sprintf("proxies: [{name: D, type: http, server: %s, port: %d}]", outboundHost, portOf(b.URL))
 	mu.Unlock()
 	_, err = m.Import(ctx, ImportRequest{Names: []string{"D"}, Revision: expanded.Revision})
 	require.NoError(t, err)
@@ -343,6 +371,29 @@ func TestMihomoLifecycleIntegration(t *testing.T) {
 	require.Equal(t, "exit-b", body)
 	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM proxies").Scan(&total))
 	require.Equal(t, 2, total, "replacement keeps only D and the manual proxy")
+	// Metadata edits leave real listeners and credentials intact. Appending a
+	// separate feed adds a distinct route without touching the old endpoint.
+	_, err = m.UpdateSettings(ctx, SettingsRequest{Revision: replaced.Revision, SettingsRevision: &replaced.SettingsRevision, Notes: map[string]string{replaced.URL: "Existing"}, Priorities: map[string]int{replaced.URL: 100}})
+	require.NoError(t, err)
+	require.True(t, m.matches(ctx, replaced))
+	newFeed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "proxies: [{name: D, type: http, server: %s, port: %d}]", outboundHost, portOf(a.URL))
+	}))
+	defer newFeed.Close()
+	_, err = m.Import(ctx, ImportRequest{Mode: "append", URL: newFeed.URL, Revision: replaced.Revision})
+	require.NoError(t, err)
+	appended, err := loadState(ctx, db, false)
+	require.NoError(t, err)
+	require.Len(t, appended.Nodes, 2)
+	require.Equal(t, replaced.Nodes[0], appended.Nodes[0])
+	require.Equal(t, 100, prioritiesByURL(appended)[replaced.URL])
+	require.Equal(t, "Existing", notesByURL(appended)[replaced.URL])
+	body, err = requestThrough(replaced.Nodes[0])
+	require.NoError(t, err)
+	require.Equal(t, "exit-b", body)
+	body, err = requestThrough(appended.Nodes[1])
+	require.NoError(t, err)
+	require.Equal(t, "exit-a", body)
 	viewJSON, err := json.Marshal(v)
 	require.NoError(t, err)
 	require.NotContains(t, string(viewJSON), "password")

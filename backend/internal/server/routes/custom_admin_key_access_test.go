@@ -392,7 +392,7 @@ func TestScopedAdminProxyReadPermissionAndBoundedRoutes(t *testing.T) {
 			} else {
 				require.Equal(t, 403, w.Code)
 			}
-			for _, path := range []string{"/api/v1/admin/proxies/data", "/api/v1/admin/proxies/10/accounts", "/api/v1/admin/proxies/10/stats"} {
+			for _, path := range []string{"/api/v1/admin/proxies/data", "/api/v1/admin/proxies/10/accounts", "/api/v1/admin/proxies/10/related-accounts", "/api/v1/admin/proxies/10/stats"} {
 				req := httptest.NewRequest("GET", path, nil)
 				req.Header.Set("x-api-key", key)
 				w := httptest.NewRecorder()

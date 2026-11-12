@@ -27,6 +27,21 @@
             </button>
           </div>
         </div>
+        <div class="mb-2 flex flex-wrap items-center gap-2">
+          <label :for="`clash-note-${row.id}`" class="text-xs text-gray-500">{{ t('admin.proxies.clash.note') }}</label>
+          <input :id="`clash-note-${row.id}`" :value="notes?.[row.url.trim()] ?? ''" type="text" maxlength="200" class="input min-w-0 flex-1 text-sm sm:max-w-sm"
+            :aria-label="t('admin.proxies.clash.sourceNote', { index: index + 1 })" :placeholder="t('admin.proxies.clash.notePlaceholder')" :disabled="disabled || !row.url.trim()" @input="updateNote(row, $event)" />
+        </div>
+        <div class="mb-2 flex flex-wrap items-center gap-2">
+          <label :for="`clash-priority-${row.id}`" class="text-xs text-gray-500">{{ t('admin.proxies.clash.priority') }}</label>
+          <select :id="`clash-priority-${row.id}`" :value="priorities?.[row.url.trim()] ?? 0" class="input w-auto min-w-0 text-sm"
+            :aria-label="t('admin.proxies.clash.sourcePriority', { index: index + 1 })" :disabled="disabled || !row.url.trim()" @change="updatePriority(row, $event)">
+            <option :value="0">{{ t('admin.proxies.clash.priorityNormal') }}</option>
+            <option :value="50">{{ t('admin.proxies.clash.priorityPreferred') }}</option>
+            <option :value="100">{{ t('admin.proxies.clash.priorityHighest') }}</option>
+            <option v-if="priorities?.[row.url.trim()] && ![0, 50, 100].includes(priorities[row.url.trim()])" :value="priorities[row.url.trim()]">{{ priorities[row.url.trim()] }}</option>
+          </select>
+        </div>
         <input :id="index === 0 ? 'clash-subscription-url' : `clash-source-${row.id}`" v-model="row.url" :type="showURL ? 'text' : 'password'" autocomplete="off" autocapitalize="off" spellcheck="false"
           class="input min-w-0 font-mono text-xs sm:text-sm" :disabled="disabled || checking.size > 0" :placeholder="t('admin.proxies.clash.singleURLPlaceholder')" @input="update" @paste="pasteRows($event, index)" />
         <p v-if="resultFor(row)" role="status" class="mt-2 flex items-start gap-1.5 break-words text-xs" :class="resultFor(row)?.fetch_error ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'">
@@ -54,8 +69,8 @@ import Icon from '@/components/icons/Icon.vue'
 import { formatDateTime } from '@/utils/format'
 import { checkClashSource, type ClashSource } from '@/api/admin/clash'
 
-const props = defineProps<{ modelValue: string; disabled?: boolean; sources?: ClashSource[] }>()
-const emit = defineEmits<{ 'update:modelValue': [value: string]; checking: [value: boolean] }>()
+const props = defineProps<{ modelValue: string; disabled?: boolean; sources?: ClashSource[]; notes?: Record<string, string>; priorities?: Record<string, number> }>()
+const emit = defineEmits<{ 'update:modelValue': [value: string]; checking: [value: boolean]; 'update:notes': [value: Record<string, string>]; 'update:priorities': [value: Record<string, number>] }>()
 const { t } = useI18n()
 const mode = ref<'list' | 'bulk'>('list')
 const modes = [
@@ -76,6 +91,8 @@ watch(() => props.modelValue, value => {
   if (rows.value.length && rows.value.map(row => row.url).join('\n') === value) return
   rows.value = (value.trim() ? value.trim().split(/\s+/) : ['']).map(url => ({ id: ++nextID, url }))
 }, { immediate: true })
+function updatePriority(row: Row, event: Event) { emit('update:priorities', { ...props.priorities, [row.url.trim()]: Number((event.target as HTMLSelectElement).value) }) }
+function updateNote(row: Row, event: Event) { emit('update:notes', { ...props.notes, [row.url.trim()]: (event.target as HTMLInputElement).value }) }
 function update() { emit('update:modelValue', rows.value.map(row => row.url).join('\n')) }
 function add() { rows.value.push({ id: ++nextID, url: '' }); update() }
 function remove(index: number) { rows.value.splice(index, 1); if (!rows.value.length) add(); else update() }

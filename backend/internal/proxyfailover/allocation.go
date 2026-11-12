@@ -296,6 +296,12 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 			if id == except || used[id] >= accountsPerProxy || !fresh(id, adobe) {
 				continue
 			}
+			if chosen != 0 && ps[id].sourcePriority != ps[chosen].sourcePriority {
+				if ps[id].sourcePriority > ps[chosen].sourcePriority {
+					chosen = id
+				}
+				continue
+			}
 			if chosen != 0 && ps[id].sourceTrafficAvailable != ps[chosen].sourceTrafficAvailable {
 				if ps[id].sourceTrafficAvailable {
 					chosen = id
@@ -341,7 +347,7 @@ func planAllocation(accounts []allocationAccount, ps map[int64]proxy, hs map[int
 					continue
 				}
 				candidate := best(current, a.Adobe)
-				if candidate != 0 && (!ps[current].sourceTrafficAvailable || ps[candidate].sourceTrafficAvailable) && betterLatencyRoute(hs[current], hs[candidate]) {
+				if candidate != 0 && ps[candidate].sourcePriority >= ps[current].sourcePriority && (!ps[current].sourceTrafficAvailable || ps[candidate].sourceTrafficAvailable) && betterLatencyRoute(hs[current], hs[candidate]) {
 					next[a.ID] = candidate
 					used[current]--
 					used[candidate]++

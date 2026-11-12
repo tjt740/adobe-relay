@@ -28,6 +28,10 @@ export interface ClashNode {
 }
 
 export interface ClashSubscription {
+  priorities?: Record<string, number>
+  notes?: Record<string, string>
+  settings_revision?: number
+  skipped_sources?: ClashSource[]
   sources?: ClashSource[]
   configured: boolean
   ready: boolean
@@ -48,15 +52,43 @@ export async function previewClashSubscription(url: string): Promise<ClashSubscr
   return data
 }
 
-export async function importClashSubscription(url: string, names: string[], revision: number, sourceIDs?: Record<string, string>): Promise<ClashSubscription> {
-  const { data } = await apiClient.post<ClashSubscription>('/admin/proxies/clash/import', { url, names, revision, source_ids: sourceIDs }, { timeout: 120000 })
+export interface ClashSettingsEdits {
+  priorities?: Record<string, number>
+  notes: Record<string, string>
+  settings_revision: number
+}
+
+export async function saveClashSettings(revision: number, edits: ClashSettingsEdits): Promise<ClashSubscription> {
+  return (await apiClient.patch<ClashSubscription>('/admin/proxies/clash/settings', { revision, ...edits })).data
+}
+
+export async function importNewClashSubscriptions(url: string, revision: number, edits?: ClashSettingsEdits): Promise<ClashSubscription> {
+  return (await apiClient.post<ClashSubscription>('/admin/proxies/clash/import', { url, revision, mode: 'append', ...edits }, { timeout: 120000 })).data
+}
+
+export async function importClashSubscription(url: string, names: string[], revision: number, sourceIDs?: Record<string, string>, edits?: ClashSettingsEdits): Promise<ClashSubscription> {
+  const { data } = await apiClient.post<ClashSubscription>('/admin/proxies/clash/import', { url, names, revision, source_ids: sourceIDs, ...edits }, { timeout: 120000 })
   return data
+}
+
+export interface BlockedProxyNode {
+  proxy_id: number
+  name: string
+  server: string
+  server_port: number
+  enabled: boolean
+  bound_accounts: number
+  manual: boolean
+  excluded_at: string | null
+  failed_at: string | null
+  retry_after: string | null
 }
 
 export interface ProxySourceHealth {
   proxy_ids: number[]
   blocked_proxy_ids: number[]
   generation_blocked: number
+  blocked_nodes?: BlockedProxyNode[]
   id: string
   index: number
   url_hint: string

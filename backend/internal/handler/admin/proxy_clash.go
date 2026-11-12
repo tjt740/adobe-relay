@@ -145,3 +145,23 @@ func (h *ProxyHandler) ClashHealth(c *gin.Context) {
 	}
 	response.Success(c, view)
 }
+
+func (h *ProxyHandler) ClashSettings(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	var req clash.SettingsRequest
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 512<<10)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "订阅设置请求格式无效")
+		return
+	}
+	if h.clash == nil {
+		response.BadRequest(c, "Clash 服务未配置")
+		return
+	}
+	result, err := h.clash.UpdateSettings(c.Request.Context(), req)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, result)
+}
