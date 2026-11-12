@@ -1,6 +1,6 @@
 export default {
     accounts: {
-      currentResult: { succeeded: 'Request succeeded', failed: 'Request failed' },
+      currentResult: { succeeded: 'Test passed', failed: 'Request failed' },
       manualProxy: { title: 'Manual IP settings', hint: 'Keep the selected proxy (No proxy means direct). Skip automatic allocation, IP switching and 408 proxy release; manual selection is allowed for 408 accounts. Saved with Update; errors and scheduling remain unchanged. Turn off to restore normal automatic management.', failoverHint: 'Manual IP mode is enabled or being edited. Automatic failover is paused. Update the account to save this setting.' },
       proxyFailover: {
   "autoManaged": "Routing is managed by automatic allocation in IP management, with at most 3 accounts per node.",

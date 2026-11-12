@@ -325,7 +325,7 @@ func TestAccountRuntimeCurrentResultParity(t *testing.T) {
 		Matches []string `json:"matches"`
 	}
 	require.NoError(t, json.Unmarshal(data, &cases))
-	statuses := []string{"test_passed", "test_failed", "request_succeeded", "request_failed", "authentication_failed", "request_timeout", "untested"}
+	statuses := []string{"test_passed", "test_failed", "request_failed", "authentication_failed", "request_timeout", "untested"}
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			a := service.Account{Platform: c.Account.Platform, ErrorMessage: c.Account.Error, Extra: c.Account.Extra}

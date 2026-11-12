@@ -23,9 +23,11 @@ describe('Account health evidence', () => {
     expect(wrapper.text()).toContain('等待生成')
   })
   it('keeps other model failures visible after a successful observation', () => {
-    const wrapper = mount(AccountHealthEvidence, { props: { account: { platform: 'adobe', extra: { adobe_health: { pending: true, latest: { success: true, checked_at: '2026-10-13T09:00:00Z' } } } } as Account } })
+    const wrapper = mount(AccountHealthEvidence, { props: { account: { platform: 'adobe', extra: { adobe_health: { pending: true, latest: { success: true, source: 'business', checked_at: '2026-10-13T09:00:00Z' } } } } as Account } })
     expect(wrapper.text()).toContain('失败后还没有对应的成功记录')
-    expect(wrapper.text()).toContain('请求成功')
+    expect(wrapper.text()).toContain('检测通过')
+    expect(wrapper.text()).not.toContain('请求成功')
+    expect(wrapper.text()).toContain('真实业务请求')
   })
   it('shows old detection evidence instead of incorrectly claiming no success history', () => {
     const wrapper = mount(AccountHealthEvidence, { props: { account: { platform: 'adobe', extra: { last_check_success: false, last_check_status_code: 408, last_check_at: '2026-10-13T08:38:54Z' } } as Account } })

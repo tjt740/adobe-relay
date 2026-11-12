@@ -499,7 +499,7 @@ import { matchesAccountRuntimeStatus } from '@/utils/accountStatus'
 describe('status filter and displayed result parity', () => {
   const labels: Record<string, string> = {
     test_passed: 'admin.accounts.bulkTest.passed', test_failed: 'admin.accounts.bulkTest.failed',
-    request_succeeded: 'admin.accounts.currentResult.succeeded', request_failed: 'admin.accounts.currentResult.failed'
+    request_failed: 'admin.accounts.currentResult.failed'
   }
   it.each(currentCases)('$name', ({ account: values }) => {
     const account = makeAccount(values as Partial<Account>)
