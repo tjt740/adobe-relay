@@ -343,7 +343,7 @@ func TestMihomoLifecycleIntegration(t *testing.T) {
 	require.Equal(t, cleaned.Revision, idempotent.Revision)
 	// Subscription order must not let a new node steal a retained node's port.
 	mu.Lock()
-	subscription = fmt.Sprintf("proxies:\n - {name: C, type: http, server: host.docker.internal, port: %d}\n - {name: A, type: http, server: host.docker.internal, port: %d}\n - {name: B, type: http, server: host.docker.internal, port: %d}\n", portOf(a.URL), portOf(a.URL), portOf(b.URL))
+	subscription = fmt.Sprintf("proxies:\n - {name: C, type: http, server: %s, port: %d}\n - {name: A, type: http, server: %s, port: %d}\n - {name: B, type: http, server: %s, port: %d}\n", outboundHost, portOf(a.URL), outboundHost, portOf(a.URL), outboundHost, portOf(b.URL))
 	mu.Unlock()
 	_, err = m.Import(ctx, ImportRequest{Names: []string{"C", "A", "B"}, Revision: cleaned.Revision})
 	require.NoError(t, err)
@@ -356,7 +356,7 @@ func TestMihomoLifecycleIntegration(t *testing.T) {
 	// Replacing every node in a single reload must not collide with listeners
 	// Mihomo has not closed yet. The next import may reuse those released ports.
 	mu.Lock()
-	subscription = fmt.Sprintf("proxies: [{name: D, type: http, server: host.docker.internal, port: %d}]", portOf(b.URL))
+	subscription = fmt.Sprintf("proxies: [{name: D, type: http, server: %s, port: %d}]", outboundHost, portOf(b.URL))
 	mu.Unlock()
 	_, err = m.Import(ctx, ImportRequest{Names: []string{"D"}, Revision: expanded.Revision})
 	require.NoError(t, err)
@@ -377,7 +377,7 @@ func TestMihomoLifecycleIntegration(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, m.matches(ctx, replaced))
 	newFeed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "proxies: [{name: D, type: http, server: host.docker.internal, port: %d}]", portOf(a.URL))
+		fmt.Fprintf(w, "proxies: [{name: D, type: http, server: %s, port: %d}]", outboundHost, portOf(a.URL))
 	}))
 	defer newFeed.Close()
 	_, err = m.Import(ctx, ImportRequest{Mode: "append", URL: newFeed.URL, Revision: replaced.Revision})

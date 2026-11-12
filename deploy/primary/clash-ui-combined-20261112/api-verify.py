@@ -20,10 +20,10 @@ def read(path):
   assert res.status==200
   return json.load(res)['data']
 health=read('/api/v1/admin/proxies/clash/health')
-blocked=[node for source in health['sources'] for node in source['blocked_nodes']]
+blocked=[node for source in health['sources'] for node in (source.get('blocked_nodes') or [])]
 for source in health['sources']:
- assert source['generation_blocked']==len(source['blocked_nodes'])
- assert set(source['blocked_proxy_ids'])=={node['proxy_id'] for node in source['blocked_nodes']}
+ assert source['generation_blocked']==len(source.get('blocked_nodes') or [])
+ assert set(source.get('blocked_proxy_ids') or [])=={node['proxy_id'] for node in (source.get('blocked_nodes') or [])}
 for node in blocked:
  assert all(k in node for k in ['proxy_id','name','bound_accounts','manual','enabled'])
 ids=[node['proxy_id'] for node in blocked[:2]]

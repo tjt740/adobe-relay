@@ -17,7 +17,7 @@
   },
   "backend/internal/clash/manager_integration_test.go": {
     "before": "ef53c9f770eefbbf0b6106762023e92ae3f74d03b36f3b8c32bf02dfae60509f",
-    "candidate": "33703a8f3a0fd0b3b109ec21f91b045c6f3c6ea79374a7d2325e648d52cb34b0"
+    "candidate": "0878180885d932949f00f96b79608df3fdd7d6d9c7b618dc409d40b3483bc345"
   },
   "backend/internal/clash/related_accounts.go": {
     "before": null,
