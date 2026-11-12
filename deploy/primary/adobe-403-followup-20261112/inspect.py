@@ -22,7 +22,7 @@ out={'window_start':start.isoformat(),'window_end':end.isoformat(),'read_only':T
 out['hourly']=sql("SELECT coalesce(json_agg(t),'[]') FROM (SELECT date_trunc('hour',created_at) bucket,status_code,count(*) n FROM ops_error_logs WHERE created_at>now()-interval '5 hours' AND status_code IN (401,403,429,502) GROUP BY 1,2 ORDER BY 1,2)t")
 out['usage']=sql("SELECT json_build_object('records',count(*),'images',sum(image_count)) FROM usage_logs WHERE "+window)
 out['attempt_counts']=sql("SELECT coalesce(json_agg(t),'[]') FROM (SELECT status_code outer_status,count(*) logged_requests,sum(jsonb_array_length(coalesce(upstream_errors,'[]'::jsonb))) recorded_attempts,sum((SELECT count(*) FROM jsonb_array_elements(coalesce(upstream_errors,'[]'::jsonb)) e WHERE e->>'upstream_status_code'='403')) attempts_403 FROM ops_error_logs WHERE "+window+" AND platform='adobe' GROUP BY 1 ORDER BY 1)t")
-rows=sql("SELECT coalesce(json_agg(t),'[]') FROM (SELECT id,created_at,account_id,model,request_body->>'quality' quality,request_body->>'size' size,upstream_status_code,upstream_errors->-1 last,upstream_error_message,error_message FROM ops_error_logs WHERE "+window+" AND status_code=403 ORDER BY id DESC LIMIT 10000)t")
+rows=sql("SELECT coalesce(json_agg(t),'[]') FROM (SELECT id,created_at,account_id,model,NULL::text quality,NULL::text size,upstream_status_code,upstream_errors->-1 last,upstream_error_message,error_message FROM ops_error_logs WHERE "+window+" AND status_code=403 ORDER BY id DESC LIMIT 10000)t")
 assert len(rows)<10000,'Window truncated; narrow it'
 failures=[]
 for r in rows:
@@ -63,18 +63,18 @@ for s in success:
         o=candidates[0];s['proxy']=o['proxy_id'];s['proxy_revision']=o['proxy_updated_at'];s['generation_started_at']=o['started_at'];matched_success_routes+=1
 out['success_unique_route_matches']=matched_success_routes
 by_exact=collections.defaultdict(list)
-for s in success:by_exact[(s['account'],s['credential_fp'],s['model'],quality(s['quality']))].append(s)
+for s in success:by_exact[(s['account'],s['credential_fp'],s['model'])].append(s)
 matched=[];same_proxy=[]
 for f in failures:
-    key=(f['account'],f['diagnostics'].get('credential_fingerprint'),f['model'],quality(f['quality']))
-    candidates=[s for s in by_exact.get(key,[]) if 0<(ts(s['at'])-ts(f['at'])).total_seconds()<=600 and s['size']==f['size']]
+    key=(f['account'],f['diagnostics'].get('credential_fingerprint'),f['model'])
+    candidates=[s for s in by_exact.get(key,[]) if 0<(ts(s['at'])-ts(f['at'])).total_seconds()<=600]
     if not candidates:continue
     matched.append(f)
     exact=[s for s in candidates if s.get('proxy')==f['proxy'] and f['proxy_revision'] and s.get('proxy_revision') and ts(s['proxy_revision'])==ts(f['proxy_revision']) and ts(s['generation_started_at'])>ts(f['at'])]
     if exact:
         s=min(exact,key=lambda s:ts(s['at']))
-        same_proxy.append({'failed_record_id':f['id'],'failed_at':f['at'],'success_at':s['at'],'success_started_at':s['generation_started_at'],'account':f['account'],'proxy':f['proxy'],'model':f['model'],'quality':quality(f['quality']),'size':f['size'],'upstream_error_code':f['diagnostics'].get('upstream_error_code')})
-out['natural_pairs']={'same_account_credentials_model_quality_size_then_success':len(matched),'accounts':len({f['account'] for f in matched}),'also_same_proxy_revision_and_new_generation_after_failure':len(same_proxy),'same_proxy_accounts':len({p['account'] for p in same_proxy}),'examples':same_proxy[:12],'limitation':'Exact bearer/session fingerprints; prompts are not compared. Configured route is known, actual request egress IP is not observed.'}
+        same_proxy.append({'failed_record_id':f['id'],'failed_at':f['at'],'success_at':s['at'],'success_started_at':s['generation_started_at'],'account':f['account'],'proxy':f['proxy'],'model':f['model'],'quality_comparison':'not_available','upstream_error_code':f['diagnostics'].get('upstream_error_code')})
+out['natural_pairs']={'same_account_credentials_public_model_then_success':len(matched),'accounts':len({f['account'] for f in matched}),'also_same_proxy_revision_and_new_generation_after_failure':len(same_proxy),'same_proxy_accounts':len({p['account'] for p in same_proxy}),'examples':same_proxy[:12],'limitation':'Exact bearer/session fingerprints; prompts, quality and actual mapped model are not compared. Configured route is known, actual request egress IP is not observed.'}
 out['latest_failures']=failures[:12]
 out['failure_fingerprints']=failures
 print(json.dumps(out,ensure_ascii=False,indent=2))
