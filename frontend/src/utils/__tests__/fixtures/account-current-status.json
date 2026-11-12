@@ -1,0 +1,546 @@
+[
+  {
+    "name": "successful test",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200
+      }
+    },
+    "matches": [
+      "test_passed"
+    ]
+  },
+  {
+    "name": "new business 403 replaces passed test",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "business",
+            "success": false,
+            "code": 403,
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        }
+      }
+    },
+    "matches": [
+      "request_failed"
+    ]
+  },
+  {
+    "name": "new business success is not a test",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "business",
+            "success": true,
+            "code": 200,
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        }
+      }
+    },
+    "matches": [
+      "request_succeeded"
+    ]
+  },
+  {
+    "name": "new manual test failure replaces passed test",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "test",
+            "success": false,
+            "code": 403,
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        }
+      }
+    },
+    "matches": [
+      "test_failed"
+    ]
+  },
+  {
+    "name": "new Okad success replaces failed test",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": false,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "okad",
+            "success": true,
+            "code": 200,
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        }
+      }
+    },
+    "matches": [
+      "test_passed"
+    ]
+  },
+  {
+    "name": "new Okad failure",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "okad",
+            "success": false,
+            "code": 500,
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        }
+      }
+    },
+    "matches": [
+      "test_failed"
+    ]
+  },
+  {
+    "name": "new business 401",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "business",
+            "success": false,
+            "code": 401,
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        }
+      }
+    },
+    "matches": [
+      "request_failed",
+      "authentication_failed"
+    ]
+  },
+  {
+    "name": "new business 408",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "business",
+            "success": false,
+            "code": "408",
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        }
+      }
+    },
+    "matches": [
+      "request_failed",
+      "request_timeout"
+    ]
+  },
+  {
+    "name": "new test 408",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "test",
+            "success": false,
+            "code": 408,
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        }
+      }
+    },
+    "matches": [
+      "test_failed",
+      "request_timeout"
+    ]
+  },
+  {
+    "name": "new request success supersedes stale auth metadata",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "invalid_credentials",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "business",
+            "success": true,
+            "code": 200,
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        },
+        "last_status_code": 401
+      }
+    },
+    "matches": [
+      "request_succeeded"
+    ]
+  },
+  {
+    "name": "completed test hides stale auth error",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "invalid_credentials",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200
+      }
+    },
+    "matches": [
+      "test_passed"
+    ]
+  },
+  {
+    "name": "older business result stays historical",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "business",
+            "success": false,
+            "code": 403,
+            "checked_at": "2026-11-11T23:59:59Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        }
+      }
+    },
+    "matches": [
+      "test_passed"
+    ]
+  },
+  {
+    "name": "millisecond tie keeps test",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "business",
+            "success": false,
+            "code": 403,
+            "checked_at": "2026-11-12T00:00:00.100999999Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        }
+      }
+    },
+    "matches": [
+      "test_passed"
+    ]
+  },
+  {
+    "name": "invalid latest timestamp keeps test",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "business",
+            "success": false,
+            "code": 403,
+            "checked_at": "invalid",
+            "scope": "gpt-image-2.6-flare"
+          }
+        }
+      }
+    },
+    "matches": [
+      "test_passed"
+    ]
+  },
+  {
+    "name": "new request without test history",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "adobe_health": {
+          "latest": {
+            "source": "business",
+            "success": true,
+            "code": 200,
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        }
+      }
+    },
+    "matches": [
+      "request_succeeded"
+    ]
+  },
+  {
+    "name": "legacy unspecified source is request",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "",
+            "success": false,
+            "code": 403,
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        }
+      }
+    },
+    "matches": [
+      "request_failed"
+    ]
+  },
+  {
+    "name": "legacy failed test",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_success": false,
+        "last_check_status_code": 403
+      }
+    },
+    "matches": [
+      "test_failed"
+    ]
+  },
+  {
+    "name": "legacy failed 401 test remains a failed test",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_success": false,
+        "last_check_status_code": 401
+      }
+    },
+    "matches": [
+      "test_failed",
+      "authentication_failed"
+    ]
+  },
+  {
+    "name": "legacy 408 shown as timeout",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_success": false,
+        "last_check_status_code": 408
+      }
+    },
+    "matches": [
+      "request_timeout"
+    ]
+  },
+  {
+    "name": "no history",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {}
+    },
+    "matches": [
+      "untested"
+    ]
+  },
+  {
+    "name": "pending test suppresses old results pending",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "business",
+            "success": false,
+            "code": 403,
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        },
+        "okad_connection_test": {
+          "state": "pending"
+        }
+      }
+    },
+    "matches": []
+  },
+  {
+    "name": "pending test suppresses old results running",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "business",
+            "success": false,
+            "code": 403,
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        },
+        "okad_connection_test": {
+          "state": "running"
+        }
+      }
+    },
+    "matches": []
+  },
+  {
+    "name": "pending test suppresses old results proxy_pending",
+    "account": {
+      "platform": "adobe",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "business",
+            "success": false,
+            "code": 403,
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        },
+        "okad_connection_test": {
+          "state": "proxy_pending"
+        }
+      }
+    },
+    "matches": []
+  },
+  {
+    "name": "non Adobe keeps its own test result",
+    "account": {
+      "platform": "openai",
+      "status": "active",
+      "error_message": "",
+      "extra": {
+        "last_check_at": "2026-11-12T00:00:00.100Z",
+        "last_check_success": true,
+        "last_check_status_code": 200,
+        "adobe_health": {
+          "latest": {
+            "source": "business",
+            "success": false,
+            "code": 403,
+            "checked_at": "2026-11-12T00:00:00.150Z",
+            "scope": "gpt-image-2.6-flare"
+          }
+        }
+      }
+    },
+    "matches": [
+      "test_passed"
+    ]
+  }
+]

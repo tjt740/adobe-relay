@@ -1,4 +1,5 @@
 import type { Account } from '@/types'
+import { adobeCurrentResult, adobeCheckPending } from './adobeCurrentResult'
 
 type StatusAccount = Pick<Account, 'platform' | 'error_message' | 'extra' | 'temp_unschedulable_until' | 'temp_unschedulable_reason'>
 const metadataKeys = ['last_status_code', 'status_code', 'upstream_status_code', 'adobe_last_status_code']
@@ -37,18 +38,34 @@ export function getAccountStatusCode(account: StatusAccount): number | null {
 }
 
 export function matchesAccountRuntimeStatus(account: StatusAccount, status: string): boolean {
-  const auth = Boolean(getAccountAuthenticationError(account))
-  const timeout = !auth && getAccountStatusCode(account) === 408
+  const result = adobeCurrentResult(account)
+  if (result) {
+    switch (status) {
+      case 'active': return result.success
+      case 'authentication_failed': return !result.success && result.code === 401
+      case 'request_timeout': return !result.success && result.code === 408
+      case 'test_passed': return result.source === 'test' && result.success
+      case 'test_failed': return result.source === 'test' && !result.success
+      case 'request_succeeded': return result.source === 'business' && result.success
+      case 'request_failed': return result.source === 'business' && !result.success
+      case 'untested': return false
+    }
+  }
+  const pending = adobeCheckPending(account)
+  const auth = !pending && Boolean(getAccountAuthenticationError(account))
+  const timeout = !pending && !auth && getAccountStatusCode(account) === 408
   const success = account.extra?.last_check_success
   const checked = typeof success === 'boolean'
   switch (status) {
     case 'active': return !auth && !timeout
-    case 'authentication_failed': return auth || (success === false && Number(account.extra?.last_check_status_code) === 401)
+    case 'authentication_failed': return auth || (!pending && success === false && Number(account.extra?.last_check_status_code) === 401)
     case 'request_timeout': return timeout
-    case 'test_passed': return success === true && !auth && !timeout
-    case 'test_failed': return success === false
+    case 'test_passed': return !pending && success === true && !auth && !timeout
+    case 'test_failed': return !pending && success === false && !auth && !timeout
+    case 'request_succeeded':
+    case 'request_failed': return false
     case 'untested': return !checked
     default: return true
   }
 }
-export const runtimeAccountStatuses = ['authentication_failed', 'request_timeout', 'test_passed', 'test_failed', 'untested']
+export const runtimeAccountStatuses = ['authentication_failed', 'request_timeout', 'test_passed', 'test_failed', 'request_succeeded', 'request_failed', 'untested']

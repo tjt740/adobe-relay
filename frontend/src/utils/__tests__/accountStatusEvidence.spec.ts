@@ -41,3 +41,13 @@ describe('actual account status evidence', () => {
     expect(statusErrorExplanation('{"status_code":408}')).toContain('系统保存了 408 错误')
   })
 })
+
+// Shared cases also run against the backend before-pagination filter.
+import currentCases from './fixtures/account-current-status.json'
+import { matchesAccountRuntimeStatus } from '../accountStatus'
+describe('visible current account result filters', () => {
+  const statuses = ['test_passed', 'test_failed', 'request_succeeded', 'request_failed', 'authentication_failed', 'request_timeout', 'untested']
+  it.each(currentCases)('$name', ({ account, matches }) => {
+    expect(statuses.filter(status => matchesAccountRuntimeStatus(account as Account, status))).toEqual(matches)
+  })
+})

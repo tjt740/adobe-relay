@@ -8,7 +8,7 @@ describe('account table filters', () => {
     const filters = { platform: 'adobe', status: 'request_timeout', capacity: 'full', concurrency_min: '', concurrency_max: '' }
     const wrapper = mount(AccountTableFilters, { props: { filters, searchQuery: '' }, global: { stubs: { Select, SearchInput: true } } })
     const options = wrapper.findAll('option').map(option => option.attributes('value'))
-    expect(options).toEqual(expect.arrayContaining(['authentication_failed', 'request_timeout', 'test_passed', 'test_failed', 'untested']))
+    expect(options).toEqual(expect.arrayContaining(['authentication_failed', 'request_timeout', 'test_passed', 'test_failed', 'request_succeeded', 'request_failed', 'untested']))
     expect(wrapper.find('input[type=number]').exists()).toBe(false)
     expect(options).toEqual(expect.arrayContaining(['company', 'non_company', 'unknown']))
     const companySelect = wrapper.findAll('select').find(select => select.find('option[value=company]').exists())!

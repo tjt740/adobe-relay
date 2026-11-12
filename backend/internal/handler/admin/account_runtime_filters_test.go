@@ -2,9 +2,11 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -42,7 +44,7 @@ func TestAccountRuntimeFilterStatuses(t *testing.T) {
 		{"old timeout superseded", service.Account{Extra: map[string]any{"last_status_code": 408, "last_check_success": true, "last_check_status_code": 200}}, "request_timeout", false},
 		{"latest timeout", service.Account{Extra: map[string]any{"last_check_success": false, "last_check_status_code": 408}}, "request_timeout", true},
 		{"expired reason ignored", service.Account{TempUnschedulableUntil: &expired, TempUnschedulableReason: "HTTP 408", Extra: map[string]any{"last_check_success": true, "last_check_status_code": 200}}, "test_passed", true},
-		{"current auth wins", service.Account{Platform: "adobe", ErrorMessage: "invalid_credentials", Extra: map[string]any{"last_check_success": true, "last_check_status_code": 200}}, "test_passed", false},
+		{"visible completed Adobe test wins", service.Account{Platform: "adobe", ErrorMessage: "invalid_credentials", Extra: map[string]any{"last_check_success": true, "last_check_status_code": 200}}, "test_passed", true},
 		{"current cookie failure", service.Account{Platform: "adobe", ErrorMessage: "invalid_credentials"}, "authentication_failed", true},
 		{"latest auth failure", service.Account{Extra: map[string]any{"last_check_success": false, "last_check_status_code": 401}}, "authentication_failed", true},
 		{"untested", service.Account{}, "untested", true},
@@ -308,4 +310,54 @@ func TestOkadGroupFilterCombinesTypeAcrossPagesAndMutations(t *testing.T) {
 	require.Contains(t, rec.Body.String(), `"value":"other:3"`)
 	f.OkadGroup = "site:0"
 	require.Error(t, f.validate())
+}
+
+func TestAccountRuntimeCurrentResultParity(t *testing.T) {
+	data, err := os.ReadFile("../../../../frontend/src/utils/__tests__/fixtures/account-current-status.json")
+	require.NoError(t, err)
+	var cases []struct {
+		Name    string `json:"name"`
+		Account struct {
+			Platform string         `json:"platform"`
+			Error    string         `json:"error_message"`
+			Extra    map[string]any `json:"extra"`
+		} `json:"account"`
+		Matches []string `json:"matches"`
+	}
+	require.NoError(t, json.Unmarshal(data, &cases))
+	statuses := []string{"test_passed", "test_failed", "request_succeeded", "request_failed", "authentication_failed", "request_timeout", "untested"}
+	for _, c := range cases {
+		t.Run(c.Name, func(t *testing.T) {
+			a := service.Account{Platform: c.Account.Platform, ErrorMessage: c.Account.Error, Extra: c.Account.Extra}
+			got := []string{}
+			for _, status := range statuses {
+				if matchesRuntimeAccountStatus(a, status, time.Now()) {
+					got = append(got, status)
+				}
+			}
+			require.Equal(t, c.Matches, got)
+		})
+	}
+}
+
+func TestAccountRuntimeCurrentResultBeforePaginationAndBulk(t *testing.T) {
+	svc := newStubAdminService()
+	svc.accounts = nil
+	for i := 1; i <= 1205; i++ {
+		extra := map[string]any{"last_check_success": true, "last_check_at": "2026-11-12T00:00:00Z"}
+		if i <= 1200 {
+			extra["adobe_health"] = map[string]any{"latest": map[string]any{"success": false, "code": 403, "source": "business", "checked_at": "2026-11-12T00:00:00.050Z"}}
+		}
+		svc.accounts = append(svc.accounts, service.Account{ID: int64(i), Platform: service.PlatformAdobe, Extra: extra})
+	}
+	h := &AccountHandler{adminService: svc}
+	rows, total, _, err := h.listAccountsWithRuntimeFilters(context.Background(), 2, 2, "adobe", "", "test_passed", "", 0, "", "id", "asc", accountRuntimeFilters{})
+	require.NoError(t, err)
+	require.EqualValues(t, 5, total)
+	require.EqualValues(t, 1203, rows[0].ID)
+	all, total, _, err := h.listAccountsWithRuntimeFilters(context.Background(), 0, 0, "adobe", "", "request_failed", "", 0, "", "id", "asc", accountRuntimeFilters{})
+	require.NoError(t, err)
+	require.EqualValues(t, 1200, total)
+	require.Len(t, all, 1200)
+	require.Equal(t, "", svc.lastListAccounts.status)
 }
